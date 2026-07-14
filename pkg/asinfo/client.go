@@ -1014,36 +1014,6 @@ func (ic *Client) getBackupStatusByNode(node infoGetter) (val float64, trID int6
 	return 0, 0, ErrNotFound
 }
 
-// restoreStatePriority defines priority for "active" states when
-// nodes disagree. Lower index = higher priority.
-var restoreStatePriority = []string{
-	"FAILED",
-	"RESTORING",
-	"PREPARING",
-}
-
-// resolveRestoreState picks a single state out of the states seen
-// across all nodes.
-//
-// Priority:
-//  1. If any node reports an active state (PREPARING, RESTORING, FAILED),
-//     return the highest-priority one among those seen.
-//  2. Otherwise all nodes report READY or NONE; return NONE if any node
-//     reports NONE, otherwise READY.
-func resolveRestoreState(seen map[string]struct{}) string {
-	for _, state := range restoreStatePriority {
-		if _, ok := seen[state]; ok {
-			return state
-		}
-	}
-
-	if _, ok := seen["NONE"]; ok {
-		return "NONE"
-	}
-
-	return "READY"
-}
-
 func (ic *Client) GetRestoreStatus(ctx context.Context, namespace string) (string, error) {
 	var result string
 

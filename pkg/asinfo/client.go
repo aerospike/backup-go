@@ -1067,7 +1067,7 @@ func (ic *Client) getBackupStatusByNode(node infoGetter) (val float64, trID int6
 	}
 
 	if okProgress && okPids && okTrID {
-		return progress / 100 * float64(pids), trID, nil
+		return progress / 100 * pids, trID, nil
 	}
 
 	return 0, 0, ErrNotFound

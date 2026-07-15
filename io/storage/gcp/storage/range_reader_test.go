@@ -15,12 +15,13 @@
 package storage
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"testing"
 
 	"cloud.google.com/go/storage"
-	closerMock "github.com/aerospike/backup-go/io/storage/common/mocks"
 	"github.com/aerospike/backup-go/io/storage/gcp/storage/mocks"
 	"github.com/stretchr/testify/require"
 )
@@ -143,11 +144,11 @@ func TestRangeReader_OpenRange(t *testing.T) {
 		offset := int64(100)
 		count := int64(1024)
 
-		bodyMock := closerMock.NewMockreaderCloser(t)
+		wantBody := io.NopCloser(bytes.NewReader(nil))
 
 		clientMock := mocks.NewMockgcpGetter(t)
 		clientMock.On("GetReader", ctx, testPath, testGeneration, offset, count).
-			Return(bodyMock, nil)
+			Return(wantBody, nil)
 
 		reader := &rangeReader{
 			client:     clientMock,
@@ -157,21 +158,21 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			size:       testSize,
 		}
 
-		body, err := reader.OpenRange(ctx, offset, count)
+		got, err := reader.OpenRange(ctx, offset, count)
 
 		require.NoError(t, err)
-		require.NotNil(t, body)
-		require.Equal(t, bodyMock, body)
+		require.NotNil(t, got)
+		require.Equal(t, wantBody, got)
 	})
 
 	t.Run("Success with zero offset and count", func(t *testing.T) {
 		t.Parallel()
 
-		bodyMock := closerMock.NewMockreaderCloser(t)
+		wantBody := io.NopCloser(bytes.NewReader(nil))
 
 		clientMock := mocks.NewMockgcpGetter(t)
 		clientMock.On("GetReader", ctx, testPath, testGeneration, int64(0), int64(0)).
-			Return(bodyMock, nil)
+			Return(wantBody, nil)
 
 		reader := &rangeReader{
 			client:     clientMock,
@@ -181,22 +182,22 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			size:       testSize,
 		}
 
-		body, err := reader.OpenRange(ctx, 0, 0)
+		got, err := reader.OpenRange(ctx, 0, 0)
 
 		require.NoError(t, err)
-		require.NotNil(t, body)
-		require.Equal(t, bodyMock, body)
+		require.NotNil(t, got)
+		require.Equal(t, wantBody, got)
 	})
 
 	t.Run("Success with offset and zero count (read to end)", func(t *testing.T) {
 		t.Parallel()
 
 		offset := int64(100)
-		bodyMock := closerMock.NewMockreaderCloser(t)
+		wantBody := io.NopCloser(bytes.NewReader(nil))
 
 		clientMock := mocks.NewMockgcpGetter(t)
 		clientMock.On("GetReader", ctx, testPath, testGeneration, offset, int64(0)).
-			Return(bodyMock, nil)
+			Return(wantBody, nil)
 
 		reader := &rangeReader{
 			client:     clientMock,
@@ -206,11 +207,11 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			size:       testSize,
 		}
 
-		body, err := reader.OpenRange(ctx, offset, 0)
+		got, err := reader.OpenRange(ctx, offset, 0)
 
 		require.NoError(t, err)
-		require.NotNil(t, body)
-		require.Equal(t, bodyMock, body)
+		require.NotNil(t, got)
+		require.Equal(t, wantBody, got)
 	})
 
 	t.Run("Success with large offset and count", func(t *testing.T) {
@@ -218,11 +219,11 @@ func TestRangeReader_OpenRange(t *testing.T) {
 
 		offset := int64(1048576) // 1MB
 		count := int64(10485760) // 10MB
-		bodyMock := closerMock.NewMockreaderCloser(t)
+		wantBody := io.NopCloser(bytes.NewReader(nil))
 
 		clientMock := mocks.NewMockgcpGetter(t)
 		clientMock.On("GetReader", ctx, testPath, testGeneration, offset, count).
-			Return(bodyMock, nil)
+			Return(wantBody, nil)
 
 		reader := &rangeReader{
 			client:     clientMock,
@@ -232,11 +233,11 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			size:       testSize,
 		}
 
-		body, err := reader.OpenRange(ctx, offset, count)
+		got, err := reader.OpenRange(ctx, offset, count)
 
 		require.NoError(t, err)
-		require.NotNil(t, body)
-		require.Equal(t, bodyMock, body)
+		require.NotNil(t, got)
+		require.Equal(t, wantBody, got)
 	})
 
 	t.Run("Success with negative count (read to end)", func(t *testing.T) {
@@ -244,11 +245,11 @@ func TestRangeReader_OpenRange(t *testing.T) {
 
 		offset := int64(100)
 		count := int64(-1) // GCP convention for "read to end"
-		bodyMock := closerMock.NewMockreaderCloser(t)
+		wantBody := io.NopCloser(bytes.NewReader(nil))
 
 		clientMock := mocks.NewMockgcpGetter(t)
 		clientMock.On("GetReader", ctx, testPath, testGeneration, offset, count).
-			Return(bodyMock, nil)
+			Return(wantBody, nil)
 
 		reader := &rangeReader{
 			client:     clientMock,
@@ -258,11 +259,11 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			size:       testSize,
 		}
 
-		body, err := reader.OpenRange(ctx, offset, count)
+		got, err := reader.OpenRange(ctx, offset, count)
 
 		require.NoError(t, err)
-		require.NotNil(t, body)
-		require.Equal(t, bodyMock, body)
+		require.NotNil(t, got)
+		require.Equal(t, wantBody, got)
 	})
 
 	t.Run("Error GetReader failed", func(t *testing.T) {

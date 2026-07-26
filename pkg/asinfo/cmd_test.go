@@ -33,7 +33,7 @@ func TestNewCmdDict(t *testing.T) {
 		{
 			name:           "version less than versionLast uses deprecated commands",
 			version:        models.AerospikeVersionSupportsSIndexContext,
-			expectedLength: commandsNumber - 3, // @ new commands are for new version only
+			expectedLength: commandsNumber - 4, // @ new commands are for new version only
 			expectedCmds: map[int]string{
 				cmdIDBuild:               cmdBuild,
 				cmdIDStatus:              cmdStatus,
@@ -59,6 +59,8 @@ func TestNewCmdDict(t *testing.T) {
 				cmdIDGetConfigXDR:        cmdGetConfigXDR,
 				cmdIDReplicas:            cmdReplicas,
 				cmdIDShowJobsQueries:     cmdShowJobsQueries,
+				cmdIDClusterStable:       cmdClusterStable,
+				cmdIDStatistics:          cmdStatistics,
 			},
 		},
 		{
@@ -90,10 +92,13 @@ func TestNewCmdDict(t *testing.T) {
 				cmdIDGetConfigXDR:        cmdGetConfigXDR,
 				cmdIDReplicas:            cmdReplicas,
 				cmdIDShowJobsQueries:     cmdShowJobsQueries,
+				cmdIDClusterStable:       cmdClusterStable,
+				cmdIDStatistics:          cmdStatistics,
 
 				cmdIDServerBackup:         cmdServerBackup,
 				cmdIDServerRestore:        cmdServerRestore,
 				cmdIDServerPrepareRestore: cmdServerPrepareRestore,
+				cmdIDRestoreStatus:        cmdRestoreStatus,
 			},
 		},
 	}

@@ -56,3 +56,7 @@ packages:
     config:
       dir: ./io/storage/gcp/storage/mocks
       pkgname: mocks
+  github.com/aerospike/backup-go/pkg/server:
+    config:
+      dir: ./pkg/server/mocks
+      pkgname: mocks

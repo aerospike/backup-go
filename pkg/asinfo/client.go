@@ -54,8 +54,6 @@ const (
 	// partitionsPerNamespace is the fixed number of partitions every Aerospike
 	// namespace is split into. Used to normalize aggregated backup progress.
 	partitionsPerNamespace = 4096
-	// percentBase converts a percentage value (0-100) into a ratio.
-	percentBase = 100
 	// minReplicasFields is the minimum number of comma-separated fields expected
 	// in a single namespace entry of the "replicas" info response.
 	minReplicasFields = 3

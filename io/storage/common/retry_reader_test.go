@@ -15,6 +15,7 @@
 package common
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -40,6 +41,49 @@ var (
 	errNonNetwork = errors.New("some other error")
 )
 
+// errReadCloser is a test double that always fails Read with a fixed error.
+type errReadCloser struct {
+	err error
+}
+
+func (r errReadCloser) Read([]byte) (int, error) {
+	return 0, r.err
+}
+
+func (r errReadCloser) Close() error {
+	return nil
+}
+
+type readResult struct {
+	n   int
+	err error
+}
+
+// seqReadCloser is a test double that returns scripted Read results in order.
+type seqReadCloser struct {
+	reads []readResult
+	i     int
+}
+
+func (r *seqReadCloser) Read([]byte) (int, error) {
+	if r.i >= len(r.reads) {
+		return 0, io.EOF
+	}
+
+	res := r.reads[r.i]
+	r.i++
+
+	return res.n, res.err
+}
+
+func (r *seqReadCloser) Close() error {
+	return nil
+}
+
+func nopReadCloser(data []byte) io.ReadCloser {
+	return io.NopCloser(bytes.NewReader(data))
+}
+
 func TestRetryableReader_New(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
@@ -49,11 +93,11 @@ func TestRetryableReader_New(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 
-		readerMock := mocks.NewMockreaderCloser(t)
+		reader := nopReadCloser(nil)
 
 		rrMock := mocks.NewMockrangeReader(t)
 		rrMock.On("OpenRange", mock.Anything, mock.Anything, mock.Anything).
-			Return(readerMock, nil)
+			Return(reader, nil)
 		rrMock.On("GetSize").
 			Return(testSize)
 		rrMock.On("GetInfo").
@@ -101,13 +145,11 @@ func TestRetryableReader_Read(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 
-		readerMock := mocks.NewMockreaderCloser(t)
-		readerMock.On("Read", mock.Anything).Return(10, nil)
-		readerMock.On("Close").Return(nil)
+		reader := nopReadCloser(make([]byte, 10))
 
 		rrMock := mocks.NewMockrangeReader(t)
 		rrMock.On("OpenRange", mock.Anything, mock.Anything, mock.Anything).
-			Return(readerMock, nil)
+			Return(reader, nil)
 		rrMock.On("GetSize").
 			Return(testSize)
 		rrMock.On("GetInfo").
@@ -132,12 +174,11 @@ func TestRetryableReader_Read(t *testing.T) {
 	t.Run("Reader closed", func(t *testing.T) {
 		t.Parallel()
 
-		readerMock := mocks.NewMockreaderCloser(t)
-		readerMock.On("Close").Return(nil)
+		reader := nopReadCloser(nil)
 
 		rrMock := mocks.NewMockrangeReader(t)
 		rrMock.On("OpenRange", mock.Anything, mock.Anything, mock.Anything).
-			Return(readerMock, nil)
+			Return(reader, nil)
 		rrMock.On("GetSize").
 			Return(testSize)
 		rrMock.On("GetInfo").
@@ -163,12 +204,11 @@ func TestRetryableReader_Read(t *testing.T) {
 	t.Run("EOF when offset >= totalSize", func(t *testing.T) {
 		t.Parallel()
 
-		readerMock := mocks.NewMockreaderCloser(t)
-		readerMock.On("Close").Return(nil)
+		reader := nopReadCloser(nil)
 
 		rrMock := mocks.NewMockrangeReader(t)
 		rrMock.On("OpenRange", mock.Anything, mock.Anything, mock.Anything).
-			Return(readerMock, nil)
+			Return(reader, nil)
 		rrMock.On("GetSize").
 			Return(testSize)
 		rrMock.On("GetInfo").
@@ -194,19 +234,14 @@ func TestRetryableReader_Read(t *testing.T) {
 	t.Run("Network error with successful retry", func(t *testing.T) {
 		t.Parallel()
 
-		readerErrorMock := mocks.NewMockreaderCloser(t)
-		readerErrorMock.On("Read", mock.Anything).Return(0, syscall.ECONNRESET)
-		readerErrorMock.On("Close").Return(nil)
-
-		readerMock := mocks.NewMockreaderCloser(t)
-		readerMock.On("Read", mock.Anything).Return(10, nil)
-		readerMock.On("Close").Return(nil)
+		failingReader := errReadCloser{err: syscall.ECONNRESET}
+		successReader := nopReadCloser(make([]byte, 10))
 
 		rrMock := mocks.NewMockrangeReader(t)
 		rrMock.On("OpenRange", mock.Anything, mock.Anything, mock.Anything).
-			Return(readerErrorMock, nil).Once().
+			Return(failingReader, nil).Once().
 			On("OpenRange", mock.Anything, mock.Anything, mock.Anything).
-			Return(readerMock, nil).Once()
+			Return(successReader, nil).Once()
 		rrMock.On("GetSize").
 			Return(testSize)
 		rrMock.On("GetInfo").
@@ -233,14 +268,16 @@ func TestRetryableReader_Read(t *testing.T) {
 	t.Run("Network error - failed to reopen stream", func(t *testing.T) {
 		t.Parallel()
 
-		readerMock := mocks.NewMockreaderCloser(t)
-		readerMock.EXPECT().Read(mock.Anything).Return(5, io.ErrUnexpectedEOF).Once().
-			On("Read", mock.Anything).Return(5, nil)
-		readerMock.On("Close").Return(nil)
+		reader := &seqReadCloser{
+			reads: []readResult{
+				{n: 5, err: io.ErrUnexpectedEOF},
+				{n: 5, err: nil},
+			},
+		}
 
 		rrMock := mocks.NewMockrangeReader(t)
 		// First call ok.
-		rrMock.EXPECT().OpenRange(ctx, mock.Anything, mock.Anything).Return(readerMock, nil).Once().
+		rrMock.EXPECT().OpenRange(ctx, mock.Anything, mock.Anything).Return(reader, nil).Once().
 			// Second call fails.
 			On("OpenRange", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, errTest)
@@ -267,13 +304,11 @@ func TestRetryableReader_Read(t *testing.T) {
 	t.Run("Non-network error", func(t *testing.T) {
 		t.Parallel()
 
-		readerErrorMock := mocks.NewMockreaderCloser(t)
-		readerErrorMock.On("Read", mock.Anything).Return(0, errNonNetwork)
-		readerErrorMock.On("Close").Return(nil)
+		reader := errReadCloser{err: errNonNetwork}
 
 		rrMock := mocks.NewMockrangeReader(t)
 		rrMock.On("OpenRange", mock.Anything, mock.Anything, mock.Anything).
-			Return(readerErrorMock, nil)
+			Return(reader, nil)
 		rrMock.On("GetSize").
 			Return(testSize)
 		rrMock.On("GetInfo").
@@ -302,13 +337,11 @@ func TestRetryableReader_Read(t *testing.T) {
 			BaseTimeout: time.Millisecond,
 		}
 
-		readerErrorMock := mocks.NewMockreaderCloser(t)
-		readerErrorMock.On("Read", mock.Anything).Return(0, syscall.ECONNREFUSED)
-		readerErrorMock.On("Close").Return(nil)
+		reader := errReadCloser{err: syscall.ECONNREFUSED}
 
 		rrMock := mocks.NewMockrangeReader(t)
 		rrMock.On("OpenRange", mock.Anything, mock.Anything, mock.Anything).
-			Return(readerErrorMock, nil)
+			Return(reader, nil)
 		rrMock.On("GetSize").
 			Return(testSize)
 		rrMock.On("GetInfo").

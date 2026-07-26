@@ -15,12 +15,13 @@
 package s3
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"testing"
 
 	"github.com/aerospike/backup-go/io/storage/aws/s3/mocks"
-	closerMock "github.com/aerospike/backup-go/io/storage/common/mocks"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/require"
@@ -157,7 +158,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 
-		bodyMock := closerMock.NewMockreaderCloser(t)
+		wantBody := io.NopCloser(bytes.NewReader(nil))
 
 		clientMock := mocks.NewMockClient(t)
 		clientMock.On("GetObject", ctx, &s3.GetObjectInput{
@@ -166,7 +167,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			Range:   rangeHeader,
 			IfMatch: etag,
 		}).Return(&s3.GetObjectOutput{
-			Body: bodyMock,
+			Body: wantBody,
 		}, nil)
 
 		reader := &rangeReader{
@@ -177,17 +178,17 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			size:   testSize,
 		}
 
-		body, err := reader.OpenRange(ctx, testOffset, testCount)
+		got, err := reader.OpenRange(ctx, testOffset, testCount)
 
 		require.NoError(t, err)
-		require.NotNil(t, body)
-		require.Equal(t, bodyMock, body)
+		require.NotNil(t, got)
+		require.Equal(t, wantBody, got)
 	})
 
 	t.Run("Success with nil range header", func(t *testing.T) {
 		t.Parallel()
 
-		bodyMock := closerMock.NewMockreaderCloser(t)
+		body := io.NopCloser(bytes.NewReader(nil))
 
 		clientMock := mocks.NewMockClient(t)
 		clientMock.On("GetObject", ctx, &s3.GetObjectInput{
@@ -196,7 +197,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			Range:   nil,
 			IfMatch: etag,
 		}).Return(&s3.GetObjectOutput{
-			Body: bodyMock,
+			Body: body,
 		}, nil)
 
 		reader := &rangeReader{
@@ -217,7 +218,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 		t.Parallel()
 
 		differentRange := aws.String("bytes=1024-2047")
-		bodyMock := closerMock.NewMockreaderCloser(t)
+		body := io.NopCloser(bytes.NewReader(nil))
 
 		clientMock := mocks.NewMockClient(t)
 		clientMock.On("GetObject", ctx, &s3.GetObjectInput{
@@ -226,7 +227,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			Range:   differentRange,
 			IfMatch: etag,
 		}).Return(&s3.GetObjectOutput{
-			Body: bodyMock,
+			Body: body,
 		}, nil)
 
 		reader := &rangeReader{

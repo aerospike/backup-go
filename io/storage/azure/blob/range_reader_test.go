@@ -15,14 +15,15 @@
 package blob
 
 import (
+	"bytes"
 	"errors"
+	"io"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/aerospike/backup-go/io/storage/azure/blob/mocks"
-	closerMock "github.com/aerospike/backup-go/io/storage/common/mocks"
 	"github.com/stretchr/testify/require"
 )
 
@@ -133,7 +134,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 		offset := int64(100)
 		count := int64(1024)
 
-		bodyMock := closerMock.NewMockreaderCloser(t)
+		body := io.NopCloser(bytes.NewReader(nil))
 
 		clientMock := mocks.NewMockazblobGetter(t)
 		clientMock.On("DownloadStream", ctx, testContainer, testPath, &blob.DownloadStreamOptions{
@@ -148,7 +149,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			},
 		}).Return(azblob.DownloadStreamResponse{
 			DownloadResponse: blob.DownloadResponse{
-				Body: bodyMock,
+				Body: body,
 			},
 		}, nil)
 
@@ -169,13 +170,13 @@ func TestRangeReader_OpenRange(t *testing.T) {
 	t.Run("Success with zero offset and count", func(t *testing.T) {
 		t.Parallel()
 
-		bodyMock := closerMock.NewMockreaderCloser(t)
+		body := io.NopCloser(bytes.NewReader(nil))
 
 		clientMock := mocks.NewMockazblobGetter(t)
 		clientMock.On("DownloadStream", ctx, testContainer, testPath, (*blob.DownloadStreamOptions)(nil)).
 			Return(azblob.DownloadStreamResponse{
 				DownloadResponse: blob.DownloadResponse{
-					Body: bodyMock,
+					Body: body,
 				},
 			}, nil)
 
@@ -197,7 +198,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 
 		offset := int64(100)
 
-		bodyMock := closerMock.NewMockreaderCloser(t)
+		body := io.NopCloser(bytes.NewReader(nil))
 
 		clientMock := mocks.NewMockazblobGetter(t)
 		clientMock.On("DownloadStream", ctx, testContainer, testPath, &blob.DownloadStreamOptions{
@@ -212,7 +213,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			},
 		}).Return(azblob.DownloadStreamResponse{
 			DownloadResponse: blob.DownloadResponse{
-				Body: bodyMock,
+				Body: body,
 			},
 		}, nil)
 
@@ -236,7 +237,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 		offset := int64(1048576) // 1MB
 		count := int64(10485760) // 10MB
 
-		bodyMock := closerMock.NewMockreaderCloser(t)
+		body := io.NopCloser(bytes.NewReader(nil))
 
 		clientMock := mocks.NewMockazblobGetter(t)
 		clientMock.On("DownloadStream", ctx, testContainer, testPath, &blob.DownloadStreamOptions{
@@ -251,7 +252,7 @@ func TestRangeReader_OpenRange(t *testing.T) {
 			},
 		}).Return(azblob.DownloadStreamResponse{
 			DownloadResponse: blob.DownloadResponse{
-				Body: bodyMock,
+				Body: body,
 			},
 		}, nil)
 

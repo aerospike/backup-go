@@ -27,7 +27,7 @@ import (
 type InfoGetter interface {
 	ClusterInfo
 	XDRInfo
-	BackupInfo
+	ServerBackupInfo
 }
 
 // ClusterInfo provides cluster metadata and introspection for client-side backup and restore.
@@ -63,10 +63,10 @@ type XDRInfo interface {
 	GetNodesNames() []string
 }
 
-// BackupInfo provides server-side backup and restore job control.
+// ServerBackupInfo provides server-side backup and restore job control.
 //
 //go:generate mockery --name BackupInfo
-type BackupInfo interface {
+type ServerBackupInfo interface {
 	StartServerBackup(ctx context.Context, request *infoModels.RequestBackup) (string, error)
 	StartServerRestore(ctx context.Context, request *infoModels.RequestRestore) error
 	PrepareServerRestore(ctx context.Context, jobID, namespace string) error

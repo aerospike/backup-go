@@ -26,7 +26,9 @@ type RequestBackup struct {
 
 type RequestRestore struct {
 	RequestCommon
-	JobID string
+	JobID        string
+	Path         string
+	FuzzyRestore bool
 }
 
 type RequestCommon struct {

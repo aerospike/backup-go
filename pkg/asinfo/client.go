@@ -895,7 +895,10 @@ func (ic *Client) StartServerRestore(ctx context.Context, request *iModels.Reque
 		request.Profile,
 		request.AccessKey,
 		request.SecretKey,
-		request.Endpoint)
+		request.Endpoint,
+		request.FuzzyRestore,
+		request.Path,
+	)
 
 	resp, err := ic.GetInfo(ctx, cmd)
 	if err != nil {

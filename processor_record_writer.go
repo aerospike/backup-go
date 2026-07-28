@@ -31,7 +31,7 @@ type recordWriterProcessor[T models.TokenConstraint] struct {
 	config           *ConfigRestore
 	stats            *models.RestoreStats
 	metricsCollector *metrics.Collector
-	infoClient       InfoGetter
+	infoClient       ClusterInfo
 
 	logger *slog.Logger
 }
@@ -42,7 +42,7 @@ func newRecordWriterProcessor[T models.TokenConstraint](
 	config *ConfigRestore,
 	stats *models.RestoreStats,
 	metricsCollector *metrics.Collector,
-	infoClient InfoGetter,
+	infoClient ClusterInfo,
 	logger *slog.Logger,
 ) *recordWriterProcessor[T] {
 	logger.Debug("created new records writer processor")

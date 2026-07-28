@@ -79,7 +79,7 @@ type BackupHandler struct {
 	logger                 *slog.Logger
 	firstFileHeaderWritten *atomic.Bool
 	limiter                *bandwidth.Limiter
-	infoClient             InfoGetter
+	infoClient             ClusterInfo
 	scanLimiter            scanlimiter.Limiter
 	id                     string
 
@@ -104,7 +104,7 @@ func newBackupHandler(
 	writer Writer,
 	reader StreamingReader,
 	scanLimiter scanlimiter.Limiter,
-	infoClient InfoGetter,
+	infoClient ClusterInfo,
 ) (*BackupHandler, error) {
 	// For estimates calculations, a writer will be nil.
 	var storageType string

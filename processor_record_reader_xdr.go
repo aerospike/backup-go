@@ -31,7 +31,7 @@ type recordReaderProcessorXDR[T models.TokenConstraint] struct {
 	xdrConfig *ConfigBackupXDR
 	// add scanConfig in the future.
 	aerospikeClient AerospikeClient
-	infoClient      InfoGetter
+	xdrInfoClient   XDRInfo
 	state           *State
 	scanLimiter     scanlimiter.Limiter
 	rpsCollector    *metrics.Collector
@@ -43,7 +43,7 @@ type recordReaderProcessorXDR[T models.TokenConstraint] struct {
 func newRecordReaderProcessorXDR[T models.TokenConstraint](
 	xdrConfig *ConfigBackupXDR,
 	aerospikeClient AerospikeClient,
-	infoClient InfoGetter,
+	xdrInfo XDRInfo,
 	state *State,
 	scanLimiter scanlimiter.Limiter,
 	rpsCollector *metrics.Collector,
@@ -54,7 +54,7 @@ func newRecordReaderProcessorXDR[T models.TokenConstraint](
 	return &recordReaderProcessorXDR[T]{
 		xdrConfig:       xdrConfig,
 		aerospikeClient: aerospikeClient,
-		infoClient:      infoClient,
+		xdrInfoClient:   xdrInfo,
 		scanLimiter:     scanLimiter,
 		state:           state,
 		rpsCollector:    rpsCollector,
@@ -97,7 +97,7 @@ func (rr *recordReaderProcessorXDR[T]) newReadWorkersXDR(ctx context.Context,
 ) ([]pipe.Reader[*models.ASBXToken], error) {
 	readerConfig := rr.recordReaderConfigForXDR()
 
-	reader, err := xdr.NewRecordReader(ctx, rr.infoClient, readerConfig, rr.logger)
+	reader, err := xdr.NewRecordReader(ctx, rr.xdrInfoClient, readerConfig, rr.logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create xdr reader: %w", err)
 	}

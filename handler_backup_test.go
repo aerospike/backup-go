@@ -38,7 +38,7 @@ func TestBackupHandler_GoroutineLeak_OnSuccess(t *testing.T) {
 	mockAerospikeClient := mocks.NewMockAerospikeClient(t)
 	mockWriter := mocks.NewMockWriter(t)
 	mockReader := mocks.NewMockStreamingReader(t)
-	mockInfoGetter := mocks.NewMockInfoGetter(t)
+	mockInfoGetter := mocks.NewMockClusterInfo(t)
 
 	// Configure mock expectations
 	mockWriter.EXPECT().GetType().Return("local").Maybe()

@@ -31,7 +31,7 @@ import (
 // Notice! At the moment works only with *models.Token type.
 type recordCounter struct {
 	aerospikeClient AerospikeClient
-	infoClient      InfoGetter
+	infoClient      ClusterInfo
 	config          *ConfigBackup
 	readerProcessor *recordReaderProcessor[*models.Token]
 
@@ -41,7 +41,7 @@ type recordCounter struct {
 // newRecordCounter returns a new record counter.
 func newRecordCounter(
 	aerospikeClient AerospikeClient,
-	infoClient InfoGetter,
+	infoClient ClusterInfo,
 	config *ConfigBackup,
 	readerProcessor *recordReaderProcessor[*models.Token],
 	logger *slog.Logger,
@@ -56,7 +56,7 @@ func newRecordCounter(
 }
 
 // countRecords counts the records using the info client or scan.
-func (rc *recordCounter) countRecords(ctx context.Context, infoClient InfoGetter) (uint64, error) {
+func (rc *recordCounter) countRecords(ctx context.Context, infoClient ClusterInfo) (uint64, error) {
 	if rc.config.withoutFilter() {
 		return rc.countUsingInfoClient(ctx, infoClient)
 	}
@@ -65,7 +65,7 @@ func (rc *recordCounter) countRecords(ctx context.Context, infoClient InfoGetter
 }
 
 // countUsingInfoClient counts the records using the info client.
-func (rc *recordCounter) countUsingInfoClient(ctx context.Context, infoClient InfoGetter) (uint64, error) {
+func (rc *recordCounter) countUsingInfoClient(ctx context.Context, infoClient ClusterInfo) (uint64, error) {
 	totalRecordCount, err := infoClient.GetRecordCount(ctx, rc.config.Namespace, rc.config.SetList)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get record count: %w", err)

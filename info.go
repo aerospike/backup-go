@@ -22,14 +22,6 @@ import (
 	infoModels "github.com/aerospike/backup-go/pkg/asinfo/models"
 )
 
-// InfoGetter is an interface that abstracts methods for retrieving cluster information
-// and performing cluster operations.
-type InfoGetter interface {
-	ClusterInfo
-	XDRInfo
-	ServerBackupInfo
-}
-
 // ClusterInfo provides cluster metadata and introspection for client-side backup and restore.
 //
 //go:generate mockery --name ClusterInfo

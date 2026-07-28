@@ -75,6 +75,14 @@ type AerospikeClient interface {
 	PutPayload(policy *a.WritePolicy, key *a.Key, payload []byte) a.Error
 }
 
+// InfoGetter is an interface that abstracts methods for retrieving cluster information
+// and performing cluster operations.
+type InfoGetter interface {
+	ClusterInfo
+	XDRInfo
+	ServerBackupInfo
+}
+
 // Client is the main entry point for the backup package.
 // It wraps an aerospike client and provides methods to start backup and restore operations.
 // Example usage:

@@ -2341,3 +2341,18 @@ func TestClient_getStatistics(t *testing.T) {
 	_, err = ic.getStatistics(ctx)
 	require.NoError(t, err)
 }
+
+func TestClient_getPrincipal(t *testing.T) {
+	t.Parallel()
+
+	client, aerr := newAerospikeClient()
+	require.NoError(t, aerr)
+
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	require.NoError(t, err)
+
+	ctx := t.Context()
+
+	_, err = ic.getPrincipal(ctx)
+	require.NoError(t, err)
+}

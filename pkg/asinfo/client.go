@@ -872,16 +872,25 @@ func (ic *Client) StartServerBackup(ctx context.Context, request *iModels.Reques
 		request.EnableChangeStream,
 	)
 
-	resp, err := ic.GetInfo(ctx, cmd)
-	if err != nil {
-		return "", fmt.Errorf("failed start backup: %w", err)
-	}
+	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
+		principal, err := ic.getPrincipal(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get cluster principal: %w", err)
+		}
 
-	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return "", fmt.Errorf("failed to parse start backup response: %w", err)
-	}
+		resp, err := ic.requestByNode(principal, cmd)
+		if err != nil {
+			return fmt.Errorf("failed start backup: %w", err)
+		}
 
-	return jobID, nil
+		if _, err = parseResultResponse(cmd, resp); err != nil {
+			return fmt.Errorf("failed to parse start backup response: %w", err)
+		}
+
+		return nil
+	})
+
+	return jobID, err
 }
 
 // StartServerRestore starts a restore job on the server.
@@ -900,16 +909,25 @@ func (ic *Client) StartServerRestore(ctx context.Context, request *iModels.Reque
 		request.Path,
 	)
 
-	resp, err := ic.GetInfo(ctx, cmd)
-	if err != nil {
-		return fmt.Errorf("failed start restore: %w", err)
-	}
+	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
+		principal, err := ic.getPrincipal(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get cluster principal: %w", err)
+		}
 
-	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to parse start restore response: %w", err)
-	}
+		resp, err := ic.requestByNode(principal, cmd)
+		if err != nil {
+			return fmt.Errorf("failed start restore: %w", err)
+		}
 
-	return nil
+		if _, err = parseResultResponse(cmd, resp); err != nil {
+			return fmt.Errorf("failed to parse start restore response: %w", err)
+		}
+
+		return nil
+	})
+
+	return err
 }
 
 // PrepareServerRestore starts a restore preparation on the server.
@@ -1334,6 +1352,24 @@ func (ic *Client) getStatistics(ctx context.Context) ([]iModels.InfoMap, error) 
 	}
 
 	return infoResponse, nil
+}
+
+func (ic *Client) getPrincipal(ctx context.Context) (string, error) {
+	stats, err := ic.getStatistics(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get cluster statistics: %w", err)
+	}
+
+	principal, ok := searchInInfoResponse(stats, "cluster_principal")
+	if !ok {
+		return "", fmt.Errorf("cluster key not found in statistics")
+	}
+
+	if principal == "" {
+		return "", fmt.Errorf("cluster principal is empty")
+	}
+
+	return principal, nil
 }
 
 func searchInInfoResponse(infoResponse []iModels.InfoMap, key string) (string, bool) {

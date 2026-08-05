@@ -104,7 +104,7 @@ func createDirIfNotExist(path string, isDir bool) error {
 	case err == nil:
 		// ok.
 	case os.IsNotExist(err):
-		if err = os.MkdirAll(path, os.ModePerm); err != nil {
+		if err = os.MkdirAll(path, 0o700); err != nil {
 			return fmt.Errorf("failed to create directory: %w", err)
 		}
 	default:
@@ -125,6 +125,21 @@ func isEmptyDirectory(path string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+// validateFilename ensures that generated files stay directly under the
+// configured storage path. Local storage intentionally follows symlinks so it
+// remains compatible with mounted and FUSE filesystems.
+func validateFilename(filename string) error {
+	if filename == "" {
+		return nil
+	}
+
+	if filename == "." || filename == ".." || filepath.Base(filename) != filename {
+		return fmt.Errorf("filename must be a single path component: %q", filename)
+	}
+
+	return nil
 }
 
 // RemoveFiles removes a backup file or files from directory.
@@ -228,6 +243,9 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 
 	// We ignore `fileName` if `Writer` was initialized .WithFile()
 	var filePath string
+	if err = validateFilename(filename); err != nil {
+		return nil, err
+	}
 
 	switch {
 	case w.IsDir:
@@ -241,7 +259,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		filePath = w.PathList[0]
 	}
 
-	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0o666)
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file %s: %w", filePath, err)
 	}

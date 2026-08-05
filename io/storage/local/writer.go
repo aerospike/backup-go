@@ -25,6 +25,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 )
 
@@ -120,23 +121,6 @@ func isEmptyDirectory(path string) (bool, error) {
 // validateFilename ensures that generated files stay directly under the
 // configured storage path. Local storage intentionally follows symlinks so it
 // remains compatible with mounted and FUSE filesystems.
-func validateFilename(filename string) error {
-	if filename == "" {
-		return nil
-	}
-
-	if filename == "." ||
-		filename == ".." ||
-		strings.ContainsAny(filename, `/\`) ||
-		strings.ContainsRune(filename, '\x00') ||
-		filepath.IsAbs(filename) ||
-		filepath.VolumeName(filename) != "" {
-		return fmt.Errorf("filename must be a single portable path component: %q", filename)
-	}
-
-	return nil
-}
-
 // RemoveFiles removes a backup file or files from directory.
 func (w *Writer) RemoveFiles(ctx context.Context) error {
 	return w.Remove(ctx, w.PathList[0])
@@ -233,7 +217,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	}
 
 	// We ignore `fileName` if `Writer` was initialized .WithFile()
-	if err := validateFilename(filename); err != nil {
+	if err := common.ValidateFilename(filename); err != nil {
 		return nil, err
 	}
 

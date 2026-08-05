@@ -21,6 +21,10 @@ import (
 
 // GetFullPath returns full path for file or directory, according to params.
 func GetFullPath(prefix, filename string, pathList []string, isDir bool) (string, error) {
+	if err := ValidateFilename(filename); err != nil {
+		return "", err
+	}
+
 	if isDir {
 		return path.Join(prefix, filename), nil
 	}

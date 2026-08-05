@@ -35,8 +35,8 @@ const (
 	BackupStateUnknown              BackupState = "UNKNOWN"
 )
 
-// ToHuman returns a human-readable description of the backup state.
-func (s BackupState) ToHuman() string {
+// Describe returns a human-readable description of the backup state.
+func (s BackupState) Describe() string {
 	switch s {
 	case BackupStateInit:
 		return "initializing backup"

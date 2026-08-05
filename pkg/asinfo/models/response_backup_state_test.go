@@ -103,7 +103,7 @@ func TestBackupState_ToHuman(t *testing.T) {
 		t.Run(string(tt.state), func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, tt.want, tt.state.ToHuman())
+			assert.Equal(t, tt.want, tt.state.Describe())
 		})
 	}
 }

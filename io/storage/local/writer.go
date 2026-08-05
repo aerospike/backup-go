@@ -118,9 +118,6 @@ func isEmptyDirectory(path string) (bool, error) {
 	return true, nil
 }
 
-// validateFilename ensures that generated files stay directly under the
-// configured storage path. Local storage intentionally follows symlinks so it
-// remains compatible with mounted and FUSE filesystems.
 // RemoveFiles removes a backup file or files from directory.
 func (w *Writer) RemoveFiles(ctx context.Context) error {
 	return w.Remove(ctx, w.PathList[0])

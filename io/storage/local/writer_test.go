@@ -144,9 +144,20 @@ func TestWriter_NewWriter_RejectsPathTraversal(t *testing.T) {
 		IsDir:    true,
 	}}
 
-	_, err := w.NewWriter(t.Context(), "../outside.asb")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "single path component")
+	for _, filename := range []string{
+		"../outside.asb",
+		"/absolute.asb",
+		"nested/file.asb",
+		`nested\file.asb`,
+		`C:\absolute.asb`,
+		".",
+		"..",
+		"invalid\x00.asb",
+	} {
+		_, err := w.NewWriter(t.Context(), filename)
+		require.Error(t, err, filename)
+	}
+
 	require.NoFileExists(t, filepath.Join(filepath.Dir(tmpDir), "outside.asb"))
 }
 

@@ -22,6 +22,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/aerospike/backup-go/io/storage/options"
 )
@@ -135,8 +136,13 @@ func validateFilename(filename string) error {
 		return nil
 	}
 
-	if filename == "." || filename == ".." || filepath.Base(filename) != filename {
-		return fmt.Errorf("filename must be a single path component: %q", filename)
+	if filename == "." ||
+		filename == ".." ||
+		strings.ContainsAny(filename, `/\`) ||
+		strings.ContainsRune(filename, '\x00') ||
+		filepath.IsAbs(filename) ||
+		filepath.VolumeName(filename) != "" {
+		return fmt.Errorf("filename must be a single portable path component: %q", filename)
 	}
 
 	return nil
@@ -242,11 +248,11 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	}
 
 	// We ignore `fileName` if `Writer` was initialized .WithFile()
-	var filePath string
-	if err = validateFilename(filename); err != nil {
+	if err := validateFilename(filename); err != nil {
 		return nil, err
 	}
 
+	var filePath string
 	switch {
 	case w.IsDir:
 		// If it is directory.

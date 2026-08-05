@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package asinfo
+package models
 
 // Namespace restore states returned by the restore-status info command.
 const (
@@ -32,7 +32,7 @@ var restoreStatePriority = []string{
 	RestoreStatePreparing,
 }
 
-// resolveRestoreState picks a single state out of the states seen
+// ResolveRestoreState picks a single state out of the states seen
 // across all nodes.
 //
 // Priority:
@@ -40,7 +40,7 @@ var restoreStatePriority = []string{
 //     return the highest-priority one among those seen.
 //  2. Otherwise all nodes report READY or NONE; return NONE if any node
 //     reports NONE, otherwise READY.
-func resolveRestoreState(seen map[string]struct{}) string {
+func ResolveRestoreState(seen map[string]struct{}) string {
 	for _, state := range restoreStatePriority {
 		if _, ok := seen[state]; ok {
 			return state

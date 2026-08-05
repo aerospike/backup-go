@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"regexp"
 	"slices"
 	"strconv"
@@ -51,9 +50,6 @@ const (
 )
 
 const (
-	// partitionsPerNamespace is the fixed number of partitions every Aerospike
-	// namespace is split into. Used to normalize aggregated backup progress.
-	partitionsPerNamespace = 4096
 	// minReplicasFields is the minimum number of comma-separated fields expected
 	// in a single namespace entry of the "replicas" info response.
 	minReplicasFields = 3
@@ -960,38 +956,35 @@ func (ic *Client) getNodesString() string {
 	return builder.String()
 }
 
-// GetBackupStatus aggregates the server-side backup progress across all nodes and
-// returns it as a ratio in the [0, 1] range.
-func (ic *Client) GetBackupStatus(ctx context.Context) (float64, error) {
-	var result float64
+// GetBackupStatus aggregates server-side backup status across all nodes.
+func (ic *Client) GetBackupStatus(ctx context.Context, jobID string) (*iModels.ResponseBackupState, error) {
+	var result *iModels.ResponseBackupState
 
 	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
 		nodes := ic.cluster.GetNodes()
 
-		var (
-			total     float64
-			firstTrID int64
-		)
+		statuses := make([]*iModels.ResponseBackupState, 0, len(nodes))
 
 		for _, node := range nodes {
-			one, trID, err := ic.getBackupStatusByNode(node)
+			resp, err := ic.getBackupStatusByNode(node, jobID)
 			if err != nil {
+				if strings.Contains(err.Error(), "no backup job") {
+					return ErrNotFound
+				}
+
 				return fmt.Errorf("failed to get backup status from node %s: %w", node.GetName(), err)
 			}
 
-			if firstTrID == 0 {
-				firstTrID = trID
+			if status := iModels.NewResponseBackupState(resp); status != nil {
+				statuses = append(statuses, status)
 			}
-
-			if trID != firstTrID {
-				return fmt.Errorf("backup trid mismatch: node %s has trid %d, expected %d",
-					node.GetName(), trID, firstTrID)
-			}
-
-			total += one
 		}
 
-		result = math.Min(1.0, total/partitionsPerNamespace)
+		if len(statuses) == 0 {
+			return fmt.Errorf("no backup state found for backup-id %s: %w", jobID, ErrNotFound)
+		}
+
+		result = iModels.MergeResponseBackupStates(statuses)
 
 		return nil
 	})
@@ -999,38 +992,25 @@ func (ic *Client) GetBackupStatus(ctx context.Context) (float64, error) {
 	return result, err
 }
 
-func (ic *Client) getBackupStatusByNode(node infoGetter) (val float64, trID int64, err error) {
-	jobs, err := ic.getBackupJobsByNode(node)
+func (ic *Client) getBackupStatusByNode(node infoGetter, jobID string) ([]iModels.InfoMap, error) {
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDBackupStatus], jobID)
+
+	response, aErr := node.RequestInfo(ic.policy, cmd)
+	if aErr != nil {
+		return nil, fmt.Errorf("failed to get backup status: %w", aErr)
+	}
+
+	result, err := parseResultResponse(cmd, response)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get backup jobs: %w", err)
+		return nil, fmt.Errorf("failed to read backup status response: %w", err)
 	}
 
-	if len(jobs) == 0 {
-		return 0, 0, ErrNotFound
-	}
-
-	latestBackup := jobs[0]
-
-	trID, okTrID, err := latestBackup.ParseInt64("trid")
+	infoResponse, err := parseInfoResponse(result, ";", ":", "=")
 	if err != nil {
-		return 0, 0, err
+		return nil, fmt.Errorf("failed to parse backup status: %w", err)
 	}
 
-	progress, okProgress, err := latestBackup.ParseFloat64("job-progress")
-	if err != nil {
-		return 0, 0, err
-	}
-
-	pids, okPids, err := latestBackup.ParseFloat64("n-pids-requested")
-	if err != nil {
-		return 0, 0, err
-	}
-
-	if okProgress && okPids && okTrID {
-		return progress / 100 * pids, trID, nil
-	}
-
-	return 0, 0, ErrNotFound
+	return infoResponse, nil
 }
 
 func (ic *Client) GetRestoreStatus(ctx context.Context, namespace string) (string, error) {
@@ -1058,10 +1038,10 @@ func (ic *Client) GetRestoreStatus(ctx context.Context, namespace string) (strin
 		}
 
 		if len(seen) == 0 {
-			return fmt.Errorf("no restore state found for namespace %s", namespace)
+			return fmt.Errorf("no restore state found for namespace %s: %w", namespace, ErrNotFound)
 		}
 
-		result = resolveRestoreState(seen)
+		result = iModels.ResolveRestoreState(seen)
 
 		return nil
 	})
@@ -1077,27 +1057,17 @@ func (ic *Client) getRestoreStatusByNode(node infoGetter, namespace string) ([]i
 		return nil, fmt.Errorf("failed to get restore status: %w", aErr)
 	}
 
-	infoResponse, err := parseInfoResponse(response[cmd], ";", ":", "=")
+	result, err := parseResultResponse(cmd, response)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read restore status response: %w", err)
+	}
+
+	infoResponse, err := parseInfoResponse(result, ";", ":", "=")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse restore status: %w", err)
 	}
 
 	return infoResponse, nil
-}
-
-func (ic *Client) getBackupJobsByNode(node infoGetter) ([]iModels.InfoMap, error) {
-	jobs, err := ic.getJobsQueriesByNode(node)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get jobs: %w", err)
-	}
-
-	// Latest backup job will be first.
-	jobs, err = filterBackupsSortedByTimeSinceDone(jobs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to filter backups sorted by time since done: %w", err)
-	}
-
-	return jobs, nil
 }
 
 func (ic *Client) getUDFs(node infoGetter, policy *a.InfoPolicy) ([]*models.UDF, error) {
@@ -1260,22 +1230,6 @@ func (ic *Client) getEffectiveReplicationFactor(node infoGetter, policy *a.InfoP
 	}
 
 	return 0, errReplicationFactorNotFound
-}
-
-func (ic *Client) getJobsQueriesByNode(node infoGetter) ([]iModels.InfoMap, error) {
-	cmd := ic.cmdDict[cmdIDShowJobsQueries]
-
-	response, aErr := node.RequestInfo(ic.policy, cmd)
-	if aErr != nil {
-		return nil, fmt.Errorf("failed to show job queries: %w", aErr)
-	}
-
-	infoResponse, err := parseInfoResponse(response[cmd], ";", ":", "=")
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse show job info response: %w", err)
-	}
-
-	return infoResponse, nil
 }
 
 // GetClusterStable checks the stability of a cluster within the specified namespace and retries on transient errors.

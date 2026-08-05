@@ -62,6 +62,6 @@ type ServerBackupInfo interface {
 	StartServerBackup(ctx context.Context, request *infoModels.RequestBackup) (string, error)
 	StartServerRestore(ctx context.Context, request *infoModels.RequestRestore) error
 	PrepareServerRestore(ctx context.Context, jobID, namespace string) error
-	GetBackupStatus(ctx context.Context) (float64, error)
+	GetBackupStatus(ctx context.Context, jobID string) (*infoModels.ResponseBackupState, error)
 	GetRestoreStatus(ctx context.Context, namespace string) (string, error)
 }

@@ -508,6 +508,13 @@ func (bh *BackupHandler) GetStats() *models.BackupStats {
 func (bh *BackupHandler) Wait(ctx context.Context) error {
 	err := bh.waitForCompletion(ctx)
 
+	if bh.state != nil {
+		// waitForCompletion cancels the handler context. Wait for the
+		// asynchronous state writer to finish flushing any pending update
+		// before a caller can start a continuation backup.
+		bh.state.wait()
+	}
+
 	// If the err is nil, we can remove the state file.
 	if err == nil && bh.state != nil {
 		// Clean only if err == nil and state is not nil.

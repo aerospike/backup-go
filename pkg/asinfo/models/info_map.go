@@ -55,6 +55,22 @@ func (m InfoMap) ParseInt64(key string) (result int64, ok bool, err error) {
 	return v, true, nil
 }
 
+// ParseBool returns the parsed bool value from the map for the given key if found.
+// ok = true if the key was found.
+func (m InfoMap) ParseBool(key string) (result, ok bool, err error) {
+	val, ok := m[key]
+	if !ok {
+		return false, false, nil
+	}
+
+	v, err := strconv.ParseBool(val)
+	if err != nil {
+		return false, true, fmt.Errorf("failed to parse %s=%q: %w", key, val, err)
+	}
+
+	return v, true, nil
+}
+
 // ParseFloat64 returns the parsed float64 value from the map for the given key if found.
 // ok = true if the key was found.
 func (m InfoMap) ParseFloat64(key string) (result float64, ok bool, err error) {

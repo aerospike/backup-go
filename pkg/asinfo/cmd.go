@@ -47,10 +47,11 @@ const (
 	cmdIDClusterStable
 	cmdIDStatistics
 	cmdIDRestoreStatus
+	cmdIDBackupStatus
 )
 
 // commandsNumber shows how many commands we have, if you add new command, increase this number.
-const commandsNumber = 30
+const commandsNumber = 31
 
 // Old commands for db version < AerospikeVersionRecentInfoCommands
 const (
@@ -90,6 +91,7 @@ const (
 	cmdShowJobsQueries = "query-show"
 
 	cmdRestoreStatus = "restore-status:namespace=%s;"
+	cmdBackupStatus  = "backup-status:job-id=%s;"
 
 	// Deprecated commands:
 
@@ -140,6 +142,7 @@ func newCmdDict(version models.AerospikeVersion) map[int]string {
 		cmds[cmdIDServerRestore] = cmdServerRestore
 		cmds[cmdIDServerPrepareRestore] = cmdServerPrepareRestore
 		cmds[cmdIDRestoreStatus] = cmdRestoreStatus
+		cmds[cmdIDBackupStatus] = cmdBackupStatus
 	}
 
 	return cmds

@@ -38,11 +38,7 @@ const (
 	testASRewind        = "all"
 	testXDRHostPort     = "127.0.0.1:3003"
 	testSetInfo         = "info_set"
-	testShowJobsCmd     = "show-jobs:module=query"
 )
-
-// errParseGeneric — sentinel only used to mark "any parse error is acceptable" in table.
-var errParseGeneric = errors.New("parse error sentinel")
 
 func newAerospikeClient() (*a.Client, a.Error) {
 	asPolicy := a.NewClientPolicy()
@@ -2117,15 +2113,16 @@ func TestClient_GetPendingMigrations(t *testing.T) {
 }
 
 func TestClient_GetBackupStatus(t *testing.T) {
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
+	t.Parallel()
 
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
+	mockNodeGetter := mocks.NewMockNodeGetter(t)
+	mockNodeGetter.EXPECT().GetNodes().Return([]*a.Node{})
+
+	ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 
 	ctx := t.Context()
 
-	_, err = ic.GetBackupStatus(ctx)
+	_, err := ic.GetBackupStatus(ctx, "523607479")
 	require.ErrorIs(t, err, ErrNotFound)
 }
 
@@ -2224,7 +2221,7 @@ func newTestClient(t *testing.T) *Client {
 		policy:      nil,
 		retryPolicy: models.NewDefaultRetryPolicy(),
 		cmdDict: map[int]string{
-			cmdIDShowJobsQueries: testShowJobsCmd,
+			cmdIDBackupStatus: cmdBackupStatus,
 		},
 	}
 }
@@ -2232,49 +2229,50 @@ func newTestClient(t *testing.T) *Client {
 func TestClient_getBackupStatusByNode(t *testing.T) {
 	t.Parallel()
 
-	const (
-		// Two backup jobs: trid=2 finished more recently (smaller time-since-done),
-		// so it must be picked.
-		twoBackups = "trid=2:ns=test-ns:job-type=backup:job-progress=75.00:" +
-			"n-pids-requested=4096:time-since-done=100;" +
-			"trid=1:ns=test-ns:job-type=backup:job-progress=100.00:" +
-			"n-pids-requested=4096:time-since-done=999"
+	const testJobID = "523607479"
 
-		noBackupsJustScan = "trid=5:ns=test-ns:job-type=scan:time-since-done=10"
+	backupStatusCmd := fmt.Sprintf(cmdBackupStatus, testJobID)
 
-		malformedProgress = "trid=2:ns=test-ns:job-type=backup:" +
-			"job-progress=oops:n-pids-requested=4096:time-since-done=100"
-	)
+	const completeStatus = "change-stream-active=false:finish-time=20260805T063131.077Z:" +
+		"job-id=523607479:ns=source-ns1:partitions-flushed=4096:partitions-owned=4096:" +
+		"partitions-scanned=4096:progress-pct=100.00:recs-backed-up=985:recs-change=0:" +
+		"recs-scan=985:start-time=20260805T063119.905Z:state=COMPLETE"
 
 	tests := []struct {
 		name     string
 		response string
 		reqErr   a.Error
-		wantVal  float64
-		wantTRID int64
-		wantErr  error
+		wantErr  bool
+		check    func(t *testing.T, resp []models2.InfoMap)
 	}{
 		{
-			name:     "picks the most recently finished backup",
-			response: twoBackups,
-			// progress=75% of 4096 partitions = 3072
-			wantVal:  3072,
-			wantTRID: 2,
+			name:     "parses backup status response",
+			response: completeStatus,
+			check: func(t *testing.T, resp []models2.InfoMap) {
+				t.Helper()
+
+				status := models2.NewResponseBackupState(resp)
+				require.NotNil(t, status)
+				assert.Equal(t, models2.BackupStateComplete, status.State)
+				assert.Equal(t, testJobID, status.JobID)
+				assert.Equal(t, "source-ns1", status.Namespace)
+				assert.InEpsilon(t, 100.0, status.ProgressPct, 0.01)
+			},
 		},
 		{
-			name:     "no backup jobs returns ErrNotFound",
-			response: noBackupsJustScan,
-			wantErr:  ErrNotFound,
-		},
-		{
-			name:     "empty response returns ErrNotFound",
+			name:     "empty response",
 			response: "",
-			wantErr:  ErrNotFound,
+			check: func(t *testing.T, resp []models2.InfoMap) {
+				t.Helper()
+
+				assert.Nil(t, resp)
+				assert.Nil(t, models2.NewResponseBackupState(resp))
+			},
 		},
 		{
-			name:     "malformed numeric field returns parse error",
-			response: malformedProgress,
-			wantErr:  errParseGeneric, // sentinel matched by errors.As below
+			name:    "request info error",
+			reqErr:  a.ErrInvalidParam,
+			wantErr: true,
 		},
 	}
 
@@ -2282,20 +2280,25 @@ func TestClient_getBackupStatusByNode(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			node := newMockInfoGetter(t, testShowJobsCmd, map[string]string{testShowJobsCmd: tt.response}, nil)
+			node := newMockInfoGetter(
+				t,
+				backupStatusCmd,
+				map[string]string{backupStatusCmd: tt.response},
+				tt.reqErr,
+			)
 
 			ic := newTestClient(t)
-			val, trID, err := ic.getBackupStatusByNode(node)
+			resp, err := ic.getBackupStatusByNode(node, testJobID)
 
-			switch {
-			case errors.Is(tt.wantErr, errParseGeneric):
+			if tt.wantErr {
 				require.Error(t, err)
-			case tt.wantErr != nil:
-				require.ErrorIs(t, err, tt.wantErr)
-			default:
-				require.NoError(t, err)
-				assert.InEpsilon(t, tt.wantVal, val, 0.1)
-				assert.Equal(t, tt.wantTRID, trID)
+				return
+			}
+
+			require.NoError(t, err)
+
+			if tt.check != nil {
+				tt.check(t, resp)
 			}
 		})
 	}
@@ -2304,12 +2307,16 @@ func TestClient_getBackupStatusByNode(t *testing.T) {
 func TestClient_getBackupStatusByNode_RequestInfoError(t *testing.T) {
 	t.Parallel()
 
-	node := newMockInfoGetter(t, testShowJobsCmd, nil, a.ErrInvalidParam)
+	const testJobID = "523607479"
+
+	backupStatusCmd := fmt.Sprintf(cmdBackupStatus, testJobID)
+	node := newMockInfoGetter(t, backupStatusCmd, nil, a.ErrInvalidParam)
 
 	ic := newTestClient(t)
-	_, _, err := ic.getBackupStatusByNode(node)
+	_, err := ic.getBackupStatusByNode(node, testJobID)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to show job queries")
+
+	assert.Contains(t, err.Error(), "failed to get backup status")
 }
 
 func TestClient_getClusterStable(t *testing.T) {

@@ -996,11 +996,12 @@ func (ic *Client) getBackupStatusByNode(node infoGetter, jobID string) ([]iModel
 		return nil, fmt.Errorf("failed to get backup status: %w", aErr)
 	}
 
-	if response[cmd] == "" {
-		return nil, ErrNotFound
+	result, err := parseResultResponse(cmd, response)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read backup status response: %w", err)
 	}
 
-	infoResponse, err := parseInfoResponse(response[cmd], ";", ":", "=")
+	infoResponse, err := parseInfoResponse(result, ";", ":", "=")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse backup status: %w", err)
 	}
@@ -1052,11 +1053,12 @@ func (ic *Client) getRestoreStatusByNode(node infoGetter, namespace string) ([]i
 		return nil, fmt.Errorf("failed to get restore status: %w", aErr)
 	}
 
-	if response[cmd] == "" {
-		return nil, ErrNotFound
+	result, err := parseResultResponse(cmd, response)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read restore status response: %w", err)
 	}
 
-	infoResponse, err := parseInfoResponse(response[cmd], ";", ":", "=")
+	infoResponse, err := parseInfoResponse(result, ";", ":", "=")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse restore status: %w", err)
 	}

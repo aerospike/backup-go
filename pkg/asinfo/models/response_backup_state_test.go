@@ -77,6 +77,37 @@ func TestNewResponseServerBackupStatus_NoState(t *testing.T) {
 	assert.Nil(t, got)
 }
 
+func TestBackupState_ToHuman(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		state BackupState
+		want  string
+	}{
+		{BackupStateInit, "initializing backup"},
+		{BackupStateBaseScanActive, "scanning disk and backing up all records"},
+		{BackupStateBaseScanDone, "base scan complete"},
+		{
+			BackupStateIncrScanActive,
+			"capturing live writes and scanning for records updated since base scan",
+		},
+		{BackupStateStoppingChangeStream, "stopping change stream capture"},
+		{BackupStateFinalDraining, "flushing buffered backup segments to object storage"},
+		{BackupStateComplete, "backup complete"},
+		{BackupStateFailed, "backup failed"},
+		{BackupStateUnknown, "unknown backup state"},
+		{BackupState("CUSTOM"), "unknown backup state: CUSTOM"},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.state), func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, tt.state.ToHuman())
+		})
+	}
+}
+
 func TestResolveServerBackupState(t *testing.T) {
 	t.Parallel()
 

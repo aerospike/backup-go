@@ -35,6 +35,32 @@ const (
 	BackupStateUnknown              BackupState = "UNKNOWN"
 )
 
+// ToHuman returns a human-readable description of the backup state.
+func (s BackupState) ToHuman() string {
+	switch s {
+	case BackupStateInit:
+		return "initializing backup"
+	case BackupStateBaseScanActive:
+		return "scanning disk and backing up all records"
+	case BackupStateBaseScanDone:
+		return "base scan complete"
+	case BackupStateIncrScanActive:
+		return "capturing live writes and scanning for records updated since base scan"
+	case BackupStateStoppingChangeStream:
+		return "stopping change stream capture"
+	case BackupStateFinalDraining:
+		return "flushing buffered backup segments to object storage"
+	case BackupStateComplete:
+		return "backup complete"
+	case BackupStateFailed:
+		return "backup failed"
+	case BackupStateUnknown:
+		return "unknown backup state"
+	default:
+		return "unknown backup state: " + string(s)
+	}
+}
+
 // backupStateOrder defines backup lifecycle order. Lower index = earlier stage.
 var backupStateOrder = []BackupState{
 	BackupStateInit,

@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/aerospike/backup-go/io/storage/options"
 )
@@ -165,6 +166,11 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		// On some platforms (macOS), OpenRoot returns an error matching
 		// "not a directory" but not exactly syscall.ENOTDIR.
 		// Fall back to a direct Stat check if OpenRoot fails.
+		if errors.Is(err, syscall.ENOTDIR) {
+			// Path exists, but it is a file (not a directory)
+			return nil
+		}
+
 		info, statErr := os.Stat(targetPath)
 		if statErr == nil && !info.IsDir() {
 			if err = os.Remove(targetPath); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -208,20 +214,6 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 	}
 
 	return nil
-}
-
-// bufferedFile is a wrapper around a `bufio.Writer` and a `io.Closer`.
-type bufferedFile struct {
-	*bufio.Writer
-	closer io.Closer
-}
-
-// Close flushes the writer and closes the closer.
-func (bf *bufferedFile) Close() error {
-	flushErr := bf.Flush()
-	closeErr := bf.closer.Close()
-
-	return errors.Join(flushErr, closeErr)
 }
 
 // NewWriter creates a new backup file in the given directory.

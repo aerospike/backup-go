@@ -222,9 +222,7 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 		if errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("failed to get path info %s: %w", dir, err)
 		}
-		// On some platforms, OpenRoot falls back to a path error instead of
-		// ENOTDIR when pointing to a file. Fall back to Stat if OpenRoot fails.
-		if info, statErr := os.Stat(dir); statErr == nil && !info.IsDir() {
+		if isNotDir(err) {
 			return fmt.Errorf("%s is not a directory", dir)
 		}
 		return fmt.Errorf("failed to open root %s: %w", dir, err)

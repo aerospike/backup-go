@@ -133,6 +133,7 @@ func (r *Reader) streamDirectory(
 		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open root %s: %w", path, err))
 		return
 	}
+
 	defer root.Close()
 
 	dirFile, err := root.Open(".")
@@ -141,6 +142,7 @@ func (r *Reader) streamDirectory(
 		return
 	}
 	defer dirFile.Close()
+
 	fileInfo, err := dirFile.ReadDir(-1)
 	if err != nil {
 		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to read root %s: %w", path, err))
@@ -222,11 +224,14 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 		if errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("failed to get path info %s: %w", dir, err)
 		}
-		if isNotDir(err) {
+
+		if isNotDir(err) { // it's a file, not a directory
 			return fmt.Errorf("%s is not a directory", dir)
 		}
+
 		return fmt.Errorf("failed to open root %s: %w", dir, err)
 	}
+
 	defer root.Close()
 
 	dirFile, err := root.Open(".")
@@ -234,6 +239,7 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 		return fmt.Errorf("failed to open root directory: %w", err)
 	}
 	defer dirFile.Close()
+
 	fileInfo, err := dirFile.ReadDir(-1)
 	if err != nil {
 		return fmt.Errorf("failed to read root %s: %w", dir, err)
@@ -284,6 +290,7 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 
 		return nil, fmt.Errorf("failed to open root %s: %w", path, err)
 	}
+
 	defer root.Close()
 
 	dirFile, err := root.Open(".")
@@ -291,6 +298,7 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 		return nil, fmt.Errorf("failed to open root directory: %w", err)
 	}
 	defer dirFile.Close()
+
 	fileInfo, err := dirFile.ReadDir(-1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read root %s: %w", path, err)
@@ -393,6 +401,7 @@ func (r *Reader) calculateTotalSizeForDir(path string) (totalSize, totalNum int6
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to open root %s: %w", path, err)
 	}
+
 	defer root.Close()
 
 	dirFile, err := root.Open(".")
@@ -400,6 +409,7 @@ func (r *Reader) calculateTotalSizeForDir(path string) (totalSize, totalNum int6
 		return 0, 0, fmt.Errorf("failed to open root directory: %w", err)
 	}
 	defer dirFile.Close()
+
 	fileInfo, err := dirFile.ReadDir(-1)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to read root %s: %w", path, err)

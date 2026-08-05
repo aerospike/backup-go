@@ -160,26 +160,21 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 
 	root, err := os.OpenRoot(targetPath)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
-		// On some platforms (macOS), OpenRoot returns an error matching
-		// "not a directory" but not exactly syscall.ENOTDIR.
-		// Fall back to a direct Stat check if OpenRoot fails.
-		if errors.Is(err, syscall.ENOTDIR) {
-			// Path exists, but it is a file (not a directory)
+		if errors.Is(err, os.ErrNotExist) { // not exists, nothing to delete
 			return nil
 		}
 
-		info, statErr := os.Stat(targetPath)
-		if statErr == nil && !info.IsDir() {
+		if isNotDir(err) { // it's a file, remove a single file
 			if err = os.Remove(targetPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 				return fmt.Errorf("failed to remove file %s: %w", targetPath, err)
 			}
+
 			return nil
 		}
-		return fmt.Errorf("failed to open root %s: %w", targetPath, err)
+
+		return fmt.Errorf("failed to open %s: %w", targetPath, err)
 	}
+
 	defer root.Close()
 
 	f, err := root.Open(".")
@@ -187,6 +182,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		return fmt.Errorf("failed to open root directory %s: %w", targetPath, err)
 	}
 	defer f.Close()
+
 	files, err := f.ReadDir(-1)
 	if err != nil {
 		return fmt.Errorf("failed to read root directory %s: %w", targetPath, err)
@@ -209,6 +205,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 			if errors.Is(err, os.ErrNotExist) {
 				continue
 			}
+
 			return fmt.Errorf("failed to remove file %s: %w", file.Name(), err)
 		}
 	}
@@ -252,11 +249,13 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		if err != nil {
 			return nil, fmt.Errorf("failed to open file %s in root %s: %w", filename, w.PathList[0], err)
 		}
+
 		return &bufferedFile{bufio.NewWriterSize(file, w.ChunkSize), file}, nil
 
 	case !w.IsDir && filename != "":
 		// If it is metadata file and we backup to one file.
 		dir := filepath.Dir(w.PathList[0])
+
 		root, err := os.OpenRoot(dir)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open root %s: %w", dir, err)
@@ -267,17 +266,19 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		if err != nil {
 			return nil, fmt.Errorf("failed to open file %s in root %s: %w", filename, dir, err)
 		}
+
 		return &bufferedFile{bufio.NewWriterSize(file, w.ChunkSize), file}, nil
 	}
 
 	// If we backup to one file (filename is empty).
 	filePath := w.PathList[0]
+
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file %s: %w", filePath, err)
 	}
-	return &bufferedFile{bufio.NewWriterSize(file, w.ChunkSize), file}, nil
 
+	return &bufferedFile{bufio.NewWriterSize(file, w.ChunkSize), file}, nil
 }
 
 // GetType returns the `localType` type of storage. Used in logging.
@@ -288,4 +289,16 @@ func (w *Writer) GetType() string {
 // GetOptions returns initialized options for the writer.
 func (w *Writer) GetOptions() options.Options {
 	return w.Options
+}
+
+func isNotDir(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Check Unix syscall error
+	if errors.Is(err, syscall.ENOTDIR) {
+		return true
+	}
+	// Fallback check for unexported error strings
+	return strings.Contains(err.Error(), "not a directory")
 }

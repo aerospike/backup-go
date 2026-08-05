@@ -476,7 +476,7 @@ func (s *AzureSuite) TestWriter_WriteEmptyDir() {
 	s.Require().NoError(err)
 
 	for i := range testFilesNumber {
-		fileName := fmt.Sprintf("%s%s", testWriteFolderEmpty, fmt.Sprintf(testFileNameTemplate, i))
+		fileName := fmt.Sprintf(testFileNameTemplate, i)
 		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContent))
@@ -525,7 +525,7 @@ func (s *AzureSuite) TestWriter_WriteNotEmptyDir() {
 	s.Require().NoError(err)
 
 	for i := range testFilesNumber {
-		fileName := fmt.Sprintf("%s%s", testWriteFolderWithData, fmt.Sprintf(testFileNameTemplate, i))
+		fileName := fmt.Sprintf(testFileNameTemplate, i)
 		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContent))
@@ -555,7 +555,7 @@ func (s *AzureSuite) TestWriter_WriteMixedDir() {
 	s.Require().NoError(err)
 
 	for i := range testFilesNumber {
-		fileName := fmt.Sprintf("%s%s", testWriteFolderMixedData, fmt.Sprintf(testFileNameTemplate, i))
+		fileName := fmt.Sprintf(testFileNameTemplate, i)
 		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContent))

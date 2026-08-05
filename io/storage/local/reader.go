@@ -128,9 +128,22 @@ func (r *Reader) StreamFiles(
 func (r *Reader) streamDirectory(
 	ctx context.Context, path string, readersCh chan<- models.File, errorsCh chan<- error,
 ) {
-	fileInfo, err := os.ReadDir(path)
+	root, err := os.OpenRoot(path)
 	if err != nil {
-		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to read path %s: %w", path, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open root %s: %w", path, err))
+		return
+	}
+	defer root.Close()
+
+	dirFile, err := root.Open(".")
+	if err != nil {
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open root directory: %w", err))
+		return
+	}
+	defer dirFile.Close()
+	fileInfo, err := dirFile.ReadDir(-1)
+	if err != nil {
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to read root %s: %w", path, err))
 		return
 	}
 
@@ -150,12 +163,10 @@ func (r *Reader) streamDirectory(
 			continue
 		}
 
-		filePath := filepath.Join(path, file.Name())
-
 		// Skip empty files.
 		info, err := file.Info()
 		if err != nil {
-			common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get file info %s: %w", filePath, err))
+			common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get file info %s in root %s: %w", file.Name(), path, err))
 			return
 		}
 
@@ -163,13 +174,11 @@ func (r *Reader) streamDirectory(
 			continue
 		}
 
-		if r.shouldSkip(filePath) {
-			// Since we are passing invalid files, we don't need to handle this
-			// error and write a test for it. Maybe we should log this information
-			// for the user so they know what is going on.
+		if r.shouldSkip(file.Name()) {
 			continue
 		}
 
+		filePath := filepath.Join(path, file.Name())
 		// If skipPrefix is set we save skipped filepath and continue.
 		if r.skipped.Skip(filePath) {
 			continue
@@ -177,9 +186,9 @@ func (r *Reader) streamDirectory(
 
 		var reader io.ReadCloser
 
-		reader, err = os.Open(filePath)
+		reader, err = root.Open(file.Name())
 		if err != nil {
-			common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open %s: %w", filePath, err))
+			common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open file %s in root %s: %w", file.Name(), path, err))
 			return
 		}
 
@@ -208,20 +217,28 @@ func (r *Reader) StreamFile(
 // checkRestoreDirectory checks that the restore directory exists,
 // is a readable directory, and contains backup files of the correct format.
 func (r *Reader) checkRestoreDirectory(dir string) error {
-	dirInfo, err := os.Stat(dir)
+	root, err := os.OpenRoot(dir)
 	if err != nil {
-		// Handle the error
-		return fmt.Errorf("failed to get path info %s: %w", dir, err)
+		if errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("failed to get path info %s: %w", dir, err)
+		}
+		// On some platforms, OpenRoot falls back to a path error instead of
+		// ENOTDIR when pointing to a file. Fall back to Stat if OpenRoot fails.
+		if info, statErr := os.Stat(dir); statErr == nil && !info.IsDir() {
+			return fmt.Errorf("%s is not a directory", dir)
+		}
+		return fmt.Errorf("failed to open root %s: %w", dir, err)
 	}
+	defer root.Close()
 
-	if !dirInfo.IsDir() {
-		// Handle the case when it's not a directory
-		return fmt.Errorf("%s is not a directory", dir)
-	}
-
-	fileInfo, err := os.ReadDir(dir)
+	dirFile, err := root.Open(".")
 	if err != nil {
-		return fmt.Errorf("failed to read path %s: %w", dir, err)
+		return fmt.Errorf("failed to open root directory: %w", err)
+	}
+	defer dirFile.Close()
+	fileInfo, err := dirFile.ReadDir(-1)
+	if err != nil {
+		return fmt.Errorf("failed to read root %s: %w", dir, err)
 	}
 
 	switch {
@@ -261,13 +278,24 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error) {
 	result := make([]string, 0)
 
-	fileInfo, err := os.ReadDir(path)
+	root, err := os.OpenRoot(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) && r.SkipDirCheck {
 			return nil, nil // Path doesn't exist, no error returned
 		}
 
-		return nil, fmt.Errorf("failed to read path %s: %w", path, err)
+		return nil, fmt.Errorf("failed to open root %s: %w", path, err)
+	}
+	defer root.Close()
+
+	dirFile, err := root.Open(".")
+	if err != nil {
+		return nil, fmt.Errorf("failed to open root directory: %w", err)
+	}
+	defer dirFile.Close()
+	fileInfo, err := dirFile.ReadDir(-1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read root %s: %w", path, err)
 	}
 
 	for i := range fileInfo {
@@ -363,9 +391,20 @@ func (r *Reader) calculateTotalSizeForPath(path string) (totalSize, totalNum int
 }
 
 func (r *Reader) calculateTotalSizeForDir(path string) (totalSize, totalNum int64, err error) {
-	fileInfo, err := os.ReadDir(path)
+	root, err := os.OpenRoot(path)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to read path %s: %w", path, err)
+		return 0, 0, fmt.Errorf("failed to open root %s: %w", path, err)
+	}
+	defer root.Close()
+
+	dirFile, err := root.Open(".")
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to open root directory: %w", err)
+	}
+	defer dirFile.Close()
+	fileInfo, err := dirFile.ReadDir(-1)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to read root %s: %w", path, err)
 	}
 
 	for _, file := range fileInfo {

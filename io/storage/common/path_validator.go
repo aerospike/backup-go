@@ -27,13 +27,28 @@ func ValidateFilename(filename string) error {
 		return nil
 	}
 
-	if filename == "." ||
-		filename == ".." ||
-		strings.ContainsAny(filename, `/\`) ||
-		strings.ContainsRune(filename, '\x00') ||
-		filepath.IsAbs(filename) ||
-		filepath.VolumeName(filename) != "" {
-		return fmt.Errorf("filename must be a single portable path component: %q", filename)
+	if filename == "." {
+		return fmt.Errorf("filename must not be '.' (current directory)")
+	}
+
+	if filename == ".." {
+		return fmt.Errorf("filename must not be '..' (parent directory)")
+	}
+
+	if strings.ContainsAny(filename, `/\`) {
+		return fmt.Errorf("filename must not contain path separators ('/' or '\\')")
+	}
+
+	if strings.ContainsRune(filename, '\x00') {
+		return fmt.Errorf("filename must not contain NUL bytes")
+	}
+
+	if filepath.IsAbs(filename) {
+		return fmt.Errorf("filename must not be an absolute path")
+	}
+
+	if filepath.VolumeName(filename) != "" {
+		return fmt.Errorf("filename must not contain a Windows volume name or UNC prefix")
 	}
 
 	return nil

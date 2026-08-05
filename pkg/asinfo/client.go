@@ -968,6 +968,10 @@ func (ic *Client) GetBackupStatus(ctx context.Context, jobID string) (*iModels.R
 		for _, node := range nodes {
 			resp, err := ic.getBackupStatusByNode(node, jobID)
 			if err != nil {
+				if strings.Contains(err.Error(), "no backup job") {
+					return ErrNotFound
+				}
+
 				return fmt.Errorf("failed to get backup status from node %s: %w", node.GetName(), err)
 			}
 

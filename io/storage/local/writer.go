@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/aerospike/backup-go/io/storage/options"
 )
@@ -49,13 +50,6 @@ func NewWriter(ctx context.Context, opts ...options.Opt) (*Writer, error) {
 		return nil, fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	// If directory does not exist, we don't need to check it for emptiness.
-	// For writer we don't support PathList, so our path will always be the first element of PathList.
-	path := w.PathList[0]
-	if !w.IsDir {
-		path = filepath.Dir(w.PathList[0])
-	}
-
 	if w.ChunkSize == 0 {
 		w.ChunkSize = defaultBufferSize
 	}
@@ -65,13 +59,14 @@ func NewWriter(ctx context.Context, opts ...options.Opt) (*Writer, error) {
 		return w, nil
 	}
 
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return w, nil
-	}
-
 	if w.IsDir && !w.SkipDirCheck {
 		// Check if backup dir is empty.
 		isEmpty, err := isEmptyDirectory(w.PathList[0])
+		if errors.Is(err, os.ErrNotExist) {
+			// The directory is created lazily by NewWriter when the first
+			// backup file is opened.
+			return w, nil
+		}
 		if err != nil {
 			return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
 		}
@@ -99,17 +94,10 @@ func createDirIfNotExist(path string, isDir bool) error {
 		path = filepath.Dir(path)
 	}
 
-	_, err := os.Stat(path)
-
-	switch {
-	case err == nil:
-		// ok.
-	case os.IsNotExist(err):
-		if err = os.MkdirAll(path, 0o700); err != nil {
-			return fmt.Errorf("failed to create directory: %w", err)
-		}
-	default:
-		return fmt.Errorf("failed to get stats for directory %s: %w", path, err)
+	// Create directly instead of checking with Stat first. A separate check
+	// can become stale before MkdirAll runs if another process changes path.
+	if err := os.MkdirAll(path, 0o700); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	return nil
@@ -159,37 +147,30 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		return ctx.Err()
 	}
 
-	info, err := os.Stat(targetPath)
-
-	switch {
-	case err == nil:
-		// ok.
-	case os.IsNotExist(err):
-		// File doesn't exist, it's ok.
-		return nil
-	default:
-		return fmt.Errorf("failed to stat targetPath %s: %w", targetPath, err)
-	}
-	// if it is a file.
-	if !info.IsDir() {
-		if err = os.Remove(targetPath); err != nil {
-			return fmt.Errorf("failed to remove file %s: %w", targetPath, err)
-		}
-
-		return nil
-	}
-
 	if w.WithNestedDir {
-		if err = os.RemoveAll(targetPath); err != nil {
+		// RemoveAll is intentionally used directly. Stat-then-remove would
+		// make the deletion decision on a stale path if it changes meanwhile.
+		if err := os.RemoveAll(targetPath); err != nil {
 			return fmt.Errorf("failed to remove targetPath %s: %w", targetPath, err)
 		}
 
 		return nil
 	}
 
-	// If it is a dir.
+	// ReadDir determines whether targetPath is a directory without a
+	// preceding Stat. If it is a file, ReadDir returns ENOTDIR and we remove
+	// the file directly. This keeps the operation compatible with symlinks.
 	files, err := os.ReadDir(targetPath)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		if errors.Is(err, syscall.ENOTDIR) {
+			if err = os.Remove(targetPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return fmt.Errorf("failed to remove file %s: %w", targetPath, err)
+			}
+			return nil
+		}
 		return fmt.Errorf("failed to read directory %s: %w", targetPath, err)
 	}
 
@@ -207,6 +188,9 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		}
 
 		if err = os.Remove(filePath); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
 			return fmt.Errorf("failed to remove file %s: %w", filePath, err)
 		}
 	}

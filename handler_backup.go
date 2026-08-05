@@ -509,9 +509,7 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 	err := bh.waitForCompletion(ctx)
 
 	if bh.state != nil {
-		// waitForCompletion cancels the handler context. Wait for the
-		// asynchronous state writer to finish flushing any pending update
-		// before a caller can start a continuation backup.
+		// Wait for the asynchronous state writer to finish flushing.
 		bh.state.wait()
 	}
 

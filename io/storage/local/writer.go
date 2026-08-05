@@ -67,6 +67,7 @@ func NewWriter(ctx context.Context, opts ...options.Opt) (*Writer, error) {
 			// backup file is opened.
 			return w, nil
 		}
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
 		}
@@ -165,12 +166,15 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
 		}
+
 		if errors.Is(err, syscall.ENOTDIR) {
 			if err = os.Remove(targetPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 				return fmt.Errorf("failed to remove file %s: %w", targetPath, err)
 			}
+
 			return nil
 		}
+
 		return fmt.Errorf("failed to read directory %s: %w", targetPath, err)
 	}
 
@@ -191,6 +195,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 			if errors.Is(err, os.ErrNotExist) {
 				continue
 			}
+
 			return fmt.Errorf("failed to remove file %s: %w", filePath, err)
 		}
 	}
@@ -237,6 +242,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	}
 
 	var filePath string
+
 	switch {
 	case w.IsDir:
 		// If it is directory.

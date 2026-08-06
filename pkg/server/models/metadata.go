@@ -14,23 +14,9 @@
 
 package models
 
-import "time"
-
 // Metadata is the metadata for a backup.
 type Metadata struct {
-	BackupID      string `json:"backup_id"`
-	Namespace     string `json:"namespace"`
-	FormatVersion int    `json:"format_version"`
-	Nodes         []Node `json:"nodes"`
-}
-
-// Node is the metadata for a node.
-type Node struct {
-	NodeID         string    `json:"node_id"`
-	Created        time.Time `json:"created"`
-	Finished       time.Time `json:"finished"`
-	RecordCount    int64     `json:"record_count"`
-	ByteCount      int64     `json:"byte_count"`
-	PartitionCount int       `json:"partition_count"`
-	SegmentCount   int       `json:"segment_count"`
+	BackupID  string `json:"backup_id"`
+	Namespace string `json:"namespace"`
+	Status    string `json:"status"`
 }

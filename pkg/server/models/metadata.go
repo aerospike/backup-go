@@ -22,7 +22,7 @@ type Metadata struct {
 	Namespace     string `json:"namespace"`
 	FormatVersion int    `json:"format_version"`
 	Nodes         []Node `json:"nodes"`
-	ModAfter      int    `json:"modified_after"`
+	ModAfter      int    `json:"modified-after"`
 }
 
 // Node is the metadata for a node.

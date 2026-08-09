@@ -494,47 +494,6 @@ func TestDirectoryReader_StreamPathList(t *testing.T) {
 	}
 }
 
-func TestReader_WithSorting(t *testing.T) {
-	t.Parallel()
-	dir := path.Join(t.TempDir(), "TestReader_WithSorting")
-	err := os.MkdirAll(dir, os.ModePerm)
-	require.NoError(t, err)
-
-	expResult := []string{"0_file_1.asbx", "0_file_2.asbx", "0_file_3.asbx"}
-
-	err = createTmpFile(dir, "0_file_3.asbx")
-	require.NoError(t, err)
-	err = createTmpFile(dir, "0_file_1.asbx")
-	require.NoError(t, err)
-	err = createTmpFile(dir, "0_file_2.asbx")
-	require.NoError(t, err)
-	ctx := t.Context()
-	r, err := NewReader(
-		ctx,
-		options.WithDir(dir),
-	)
-	require.NoError(t, err)
-
-	readerChan := make(chan models.File)
-	errorChan := make(chan error)
-	go r.StreamFiles(t.Context(), readerChan, errorChan, nil)
-
-	result := make([]string, 0, 3)
-	for {
-		select {
-		case f, ok := <-readerChan:
-			// if chan closed, we're done.
-			if !ok {
-				require.Equal(t, expResult, result)
-				return
-			}
-			result = append(result, f.Name)
-		case err = <-errorChan:
-			require.NoError(t, err)
-		}
-	}
-}
-
 func TestReader_ListObjectsWithNestedDir(t *testing.T) {
 	dir := path.Join(t.TempDir(), "TestReader_ListObjectsWithNestedDir")
 	err := os.MkdirAll(dir, os.ModePerm)

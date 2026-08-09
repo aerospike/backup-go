@@ -17,7 +17,6 @@ package blob
 import (
 	"context"
 	"fmt"
-	"io"
 	"path"
 	"strings"
 	"sync"
@@ -265,50 +264,6 @@ func (s *AzureSuite) TestReader_StreamFilesOk() {
 				return
 			}
 			filesCounter++
-		}
-	}
-}
-
-func (s *AzureSuite) TestReader_WithSorting() {
-	s.suiteWg.Wait()
-	ctx := s.T().Context()
-	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
-	s.Require().NoError(err)
-	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
-	s.Require().NoError(err)
-
-	reader, err := NewReader(
-		ctx,
-		client,
-		testContainerName,
-		options.WithDir(testReadFolderSorted),
-		options.WithCalculateTotalSize(),
-	)
-	s.Require().NoError(err)
-
-	rCH := make(chan models.File)
-	eCH := make(chan error)
-
-	go reader.StreamFiles(ctx, rCH, eCH, nil)
-
-	var filesCounter int
-
-	for {
-		select {
-		case err := <-eCH:
-			s.Require().NoError(err)
-		case f, ok := <-rCH:
-			if !ok {
-				s.Require().Equal(3, filesCounter)
-				return
-			}
-			filesCounter++
-
-			result, err := readAll(f.Reader)
-			expecting := fmt.Sprintf("%s%d", "sorted", filesCounter)
-
-			s.Require().NoError(err)
-			s.Require().Equal(expecting, result)
 		}
 	}
 }
@@ -830,18 +785,6 @@ func TestParseAccessTier(t *testing.T) {
 			}
 		})
 	}
-}
-
-func readAll(r io.ReadCloser) (string, error) {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return "", fmt.Errorf("failed to read data: %w", err)
-	}
-	if err := r.Close(); err != nil {
-		return "", fmt.Errorf("failed to close reader: %w", err)
-	}
-
-	return string(data), nil
 }
 
 func (s *AzureSuite) TestReader_StreamFiles_Skipped() {

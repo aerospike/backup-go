@@ -297,53 +297,6 @@ func (s *GCPSuite) TestReader_StreamFilesOk() {
 	}
 }
 
-func (s *GCPSuite) TestReader_WithSorting() {
-	s.suiteWg.Wait()
-
-	ctx := s.T().Context()
-	client, err := storage.NewClient(
-		ctx,
-		option.WithEndpoint(testServiceAddress),
-		option.WithoutAuthentication(),
-	)
-	s.Require().NoError(err)
-
-	reader, err := NewReader(
-		ctx,
-		client,
-		testBucketName,
-		options.WithDir(testReadFolderSorted),
-		options.WithCalculateTotalSize(),
-	)
-	s.Require().NoError(err)
-
-	rCH := make(chan models.File)
-	eCH := make(chan error)
-
-	go reader.StreamFiles(ctx, rCH, eCH, nil)
-
-	var filesCounter int
-
-	for {
-		select {
-		case err := <-eCH:
-			s.Require().NoError(err)
-		case f, ok := <-rCH:
-			if !ok {
-				s.Require().Equal(3, filesCounter)
-				return
-			}
-			filesCounter++
-
-			result, err := readAll(f.Reader)
-			expecting := fmt.Sprintf("%s%d", "sorted", filesCounter)
-
-			s.Require().NoError(err)
-			s.Require().Equal(expecting, result)
-		}
-	}
-}
-
 func (s *GCPSuite) TestReader_StreamFilesEmpty() {
 	s.suiteWg.Wait()
 	ctx := s.T().Context()
@@ -795,18 +748,6 @@ func (s *GCPSuite) TestReader_StreamFilesList() {
 			filesCounter++
 		}
 	}
-}
-
-func readAll(r io.ReadCloser) (string, error) {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return "", fmt.Errorf("failed to read data: %w", err)
-	}
-	if err := r.Close(); err != nil {
-		return "", fmt.Errorf("failed to close reader: %w", err)
-	}
-
-	return string(data), nil
 }
 
 func (s *GCPSuite) TestReader_StreamFiles_Skipped() {

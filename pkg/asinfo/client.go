@@ -708,7 +708,12 @@ func (ic *Client) PrepareServerRestore(ctx context.Context, jobID, namespace str
 	allNodes := ic.getNodesString()
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerPrepareRestore], namespace, jobID, allNodes)
 
-	resp, err := ic.GetInfo(ctx, cmd)
+	principal, err := ic.getPrincipal(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get cluster principal: %w", err)
+	}
+
+	resp, err := ic.requestByNode(principal, cmd)
 	if err != nil {
 		return fmt.Errorf("failed prepare restore: %w", err)
 	}

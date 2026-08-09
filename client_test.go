@@ -123,57 +123,6 @@ func TestBackupInvalidParallelRead(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to validate backup config")
 }
 
-// Negative test cases for BackupXDR method
-func TestBackupXDRNilConfig(t *testing.T) {
-	t.Parallel()
-
-	testAeroClient, aerr := testAerospikeClient()
-	require.NoError(t, aerr)
-
-	client, err := NewClient(testAeroClient)
-	require.NoError(t, err)
-
-	_, err = client.BackupXDR(t.Context(), nil, &mocks.MockWriter{})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "xdr backup config required")
-}
-
-func TestBackupXDRNilWriter(t *testing.T) {
-	t.Parallel()
-
-	testAeroClient, aerr := testAerospikeClient()
-	require.NoError(t, aerr)
-
-	client, err := NewClient(testAeroClient)
-	require.NoError(t, err)
-
-	config := &ConfigBackupXDR{
-		DC: "test",
-	}
-
-	_, err = client.BackupXDR(t.Context(), config, nil)
-	require.Error(t, err)
-	// The validation happens before the check for nil writer
-	assert.Contains(t, err.Error(), "failed to validate xdr backup config")
-}
-
-func TestBackupXDRInvalidConfig(t *testing.T) {
-	t.Parallel()
-
-	testAeroClient, aerr := testAerospikeClient()
-	require.NoError(t, aerr)
-
-	client, err := NewClient(testAeroClient)
-	require.NoError(t, err)
-
-	// Create an invalid config (missing DC name)
-	config := &ConfigBackupXDR{}
-
-	_, err = client.BackupXDR(t.Context(), config, &mocks.MockWriter{})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to validate xdr backup config")
-}
-
 // Negative test cases for Restore method
 func TestRestoreNilConfig(t *testing.T) {
 	t.Parallel()
@@ -246,26 +195,6 @@ func TestRestoreInvalidEncoderType(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to validate restore config")
 }
 
-func TestRestoreASBXValidationError(t *testing.T) {
-	t.Parallel()
-
-	testAeroClient, aerr := testAerospikeClient()
-	require.NoError(t, aerr)
-
-	client, err := NewClient(testAeroClient)
-	require.NoError(t, err)
-
-	// Create a config with ASBX encoder type but missing required fields
-	config := &ConfigRestore{
-		EncoderType: EncoderTypeASBX,
-		// Missing required fields for ASBX
-	}
-
-	_, err = client.Restore(t.Context(), config, &mocks.MockStreamingReader{})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to validate restore config")
-}
-
 // Negative test cases for Estimate method
 func TestEstimateNilConfig(t *testing.T) {
 	t.Parallel()
@@ -331,20 +260,6 @@ func TestNilClientBackup(t *testing.T) {
 	}
 
 	_, err = c.Backup(t.Context(), config, &mocks.MockWriter{}, &mocks.MockStreamingReader{})
-	require.Error(t, err, "aerospike client is nil")
-}
-
-func TestNilClientBackupXdr(t *testing.T) {
-	t.Parallel()
-
-	c, err := NewClient(nil)
-	require.NoError(t, err)
-
-	config := &ConfigBackupXDR{
-		Namespace: "test",
-	}
-
-	_, err = c.BackupXDR(t.Context(), config, &mocks.MockWriter{})
 	require.Error(t, err, "aerospike client is nil")
 }
 

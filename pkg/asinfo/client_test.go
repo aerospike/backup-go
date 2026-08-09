@@ -35,8 +35,6 @@ const (
 	testASDC            = "DC1"
 	testASHost          = "127.0.0.1"
 	testASPort          = 3000
-	testASRewind        = "all"
-	testXDRHostPort     = "127.0.0.1:3003"
 	testSetInfo         = "info_set"
 )
 
@@ -1810,40 +1808,6 @@ func Test_parseInfoObject(t *testing.T) {
 	}
 }
 
-func TestClient_EnableDisableXDR(t *testing.T) {
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	nodes := ic.GetNodesNames()
-	err = ic.StartXDR(t.Context(), nodes[0], testASDC, testXDRHostPort, testASNamespace, testASRewind, 0, true)
-	require.NoError(t, err)
-
-	_, err = ic.GetStats(t.Context(), nodes[0], testASDC, testASNamespace)
-	require.NoError(t, err)
-
-	err = ic.StopXDR(t.Context(), nodes[0], testASDC)
-	require.NoError(t, err)
-}
-
-func TestClient_BlockUnblockMRTWrites(t *testing.T) {
-	t.Parallel()
-
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	nodes := ic.GetNodesNames()
-
-	_ = ic.BlockMRTWrites(t.Context(), nodes[0], testASNamespace)
-
-	_ = ic.UnBlockMRTWrites(t.Context(), nodes[0], testASNamespace)
-}
-
 func TestClient_parseResultResponse(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -1946,27 +1910,6 @@ func TestClient_GetRecordCount(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestClient_XDR(t *testing.T) {
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	nodes := ic.GetNodesNames()
-
-	ctx := t.Context()
-
-	err = ic.StartXDR(ctx, nodes[0], testASDC, testXDRHostPort, testASNamespace, testASRewind, 0, false)
-	require.NoError(t, err)
-
-	_, err = ic.GetStats(ctx, nodes[0], testASDC, testASNamespace)
-	require.NoError(t, err)
-
-	err = ic.StopXDR(ctx, nodes[0], testASDC)
-	require.NoError(t, err)
-}
-
 func TestClient_GetSets(t *testing.T) {
 	t.Parallel()
 
@@ -2055,30 +1998,6 @@ func TestClient_GetStatus(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, "ok", result)
-}
-
-func TestClient_GetDCsList(t *testing.T) {
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	node, err := ic.cluster.GetRandomNode()
-	require.NoError(t, err)
-
-	err = ic.createXDRDC(node.GetName(), testASDC)
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	result, err := ic.GetDCsList(ctx)
-	require.NoError(t, err)
-
-	err = ic.deleteXDRDC(node.GetName(), testASDC)
-	require.NoError(t, err)
-
-	require.Equal(t, []string{testASDC}, result)
 }
 
 func TestClient_GetReplicas(t *testing.T) {

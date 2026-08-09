@@ -109,14 +109,6 @@ func TestWithSkipDirCheck(t *testing.T) {
 	assert.True(t, opts.SkipDirCheck)
 }
 
-func TestWithSorting(t *testing.T) {
-	t.Parallel()
-	opts := &Options{}
-	WithSorting()(opts)
-
-	assert.True(t, opts.SortFiles)
-}
-
 func TestWithUploadConcurrency(t *testing.T) {
 	t.Parallel()
 	opts := &Options{}
@@ -191,7 +183,6 @@ func TestCombinedOptions(t *testing.T) {
 	WithDir("/test/path")(opts)
 	WithNestedDir()(opts)
 	WithRemoveFiles()(opts)
-	WithSorting()(opts)
 	WithUploadConcurrency(10)(opts)
 
 	// Verify all options were applied correctly
@@ -199,7 +190,6 @@ func TestCombinedOptions(t *testing.T) {
 	assert.True(t, opts.IsDir)
 	assert.True(t, opts.WithNestedDir)
 	assert.True(t, opts.IsRemovingFiles)
-	assert.True(t, opts.SortFiles)
 	assert.Equal(t, 10, opts.UploadConcurrency)
 }
 

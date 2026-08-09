@@ -41,6 +41,14 @@ const (
 	hllValue = "\x00\x04\f\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x7f\x84\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
 )
 
+const (
+	testASLoginPassword = "admin"
+	testASNamespace     = "test"
+	testASHost          = "127.0.0.1"
+	testASPort          = 3000
+	testTimeout         = 60 * time.Second
+)
+
 // testBins is a collection of all supported bin types
 // useful for testing backup and restore
 var testBins = a.BinMap{
@@ -1205,7 +1213,7 @@ func TestRestoreExpiredRecords(t *testing.T) {
 
 	encoder := NewEncoder[*models.Token](EncoderTypeASB, testASNamespace, false, false)
 
-	header := encoder.GetHeader(0, true)
+	header := encoder.GetHeader(true)
 
 	_, err = w.Write(header)
 	require.NoError(t, err)

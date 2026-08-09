@@ -79,7 +79,6 @@ type AerospikeClient interface {
 // and performing cluster operations.
 type InfoGetter interface {
 	ClusterInfo
-	XDRInfo
 	ServerBackupInfo
 }
 
@@ -287,39 +286,6 @@ func (c *Client) Backup(
 	return handler, nil
 }
 
-// BackupXDR starts an xdr backup operation that writes data to a provided writer.
-//   - ctx can be used to cancel the backup operation.
-//   - config is the configuration for the xdr backup operation.
-//   - writer creates new writers for the backup operation.
-func (c *Client) BackupXDR(
-	ctx context.Context,
-	config *ConfigBackupXDR,
-	writer Writer,
-) (*HandlerBackupXDR, error) {
-	if config == nil {
-		return nil, fmt.Errorf("xdr backup config required")
-	}
-
-	if c.aerospikeClient == nil {
-		return nil, fmt.Errorf("aerospike client is nil")
-	}
-
-	if err := config.validate(); err != nil {
-		return nil, fmt.Errorf("failed to validate xdr backup config: %w", err)
-	}
-
-	handler, err := newBackupXDRHandler(
-		ctx, config, c.aerospikeClient, writer, c.logger, c.infoClient, c.infoClient,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create backup xdr handler: %w", err)
-	}
-
-	handler.run()
-
-	return handler, nil
-}
-
 // Restorer represents restore handler interface.
 type Restorer interface {
 	GetStats() *models.RestoreStats
@@ -355,26 +321,6 @@ func (c *Client) Restore(
 	switch config.EncoderType {
 	case EncoderTypeASB:
 		handler, err := newRestoreHandler[*models.Token](
-			ctx,
-			config,
-			c.aerospikeClient,
-			c.logger,
-			streamingReader,
-			c.infoClient,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create restore handler: %w", err)
-		}
-
-		handler.run()
-
-		return handler, nil
-	case EncoderTypeASBX:
-		if err := config.isValidForASBX(); err != nil {
-			return nil, fmt.Errorf("failed to validate restore config: %w", err)
-		}
-
-		handler, err := newRestoreHandler[*models.ASBXToken](
 			ctx,
 			config,
 			c.aerospikeClient,

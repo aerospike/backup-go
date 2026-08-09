@@ -22,7 +22,6 @@ import (
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/internal/metrics"
-	"github.com/aerospike/backup-go/internal/util/files"
 	"github.com/aerospike/backup-go/io/compression"
 	"github.com/aerospike/backup-go/io/counter"
 	"github.com/aerospike/backup-go/io/encryption"
@@ -205,11 +204,6 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 		return nil, fmt.Errorf("failed to create storage writer: %w", err)
 	}
 
-	num, err := files.GetFileNumber(filename)
-	if err != nil {
-		return nil, err
-	}
-
 	// Apply encryption (if it is enabled).
 	encryptedWriter, err := newEncryptionWriter(
 		fw.encryptionKey,
@@ -229,7 +223,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 	isRecords := n != metadataFileID
 
 	// Write file header.
-	_, err = compressedWriter.Write(fw.encoder.GetHeader(num, isRecords))
+	_, err = compressedWriter.Write(fw.encoder.GetHeader(isRecords))
 	if err != nil {
 		_ = compressedWriter.Close()
 		return nil, fmt.Errorf("failed to write header: %w", err)
@@ -269,11 +263,6 @@ func (fw *fileWriterProcessor[T]) getFileName(n int) string {
 // isSingleFileBackup returns true if the backup is single file backup.
 func (fw *fileWriterProcessor[T]) isSingleFileBackup() bool {
 	return fw.writer != nil && !fw.writer.GetOptions().IsDir
-}
-
-// emptyPrefixSuffix returns empty string, to configure prefix and suffix generator.
-func emptyPrefixSuffix() string {
-	return ""
 }
 
 // newCompressionWriter returns a compression writer for compressing backup.

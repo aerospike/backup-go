@@ -153,16 +153,16 @@ func (_c *MockEncoder_GenerateFilename_Call[T]) RunAndReturn(run func(prefix str
 }
 
 // GetHeader provides a mock function for the type MockEncoder
-func (_mock *MockEncoder[T]) GetHeader(v uint64, b bool) []byte {
-	ret := _mock.Called(v, b)
+func (_mock *MockEncoder[T]) GetHeader(b bool) []byte {
+	ret := _mock.Called(b)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetHeader")
 	}
 
 	var r0 []byte
-	if returnFunc, ok := ret.Get(0).(func(uint64, bool) []byte); ok {
-		r0 = returnFunc(v, b)
+	if returnFunc, ok := ret.Get(0).(func(bool) []byte); ok {
+		r0 = returnFunc(b)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -177,25 +177,19 @@ type MockEncoder_GetHeader_Call[T models.TokenConstraint] struct {
 }
 
 // GetHeader is a helper method to define mock.On call
-//   - v uint64
 //   - b bool
-func (_e *MockEncoder_Expecter[T]) GetHeader(v interface{}, b interface{}) *MockEncoder_GetHeader_Call[T] {
-	return &MockEncoder_GetHeader_Call[T]{Call: _e.mock.On("GetHeader", v, b)}
+func (_e *MockEncoder_Expecter[T]) GetHeader(b interface{}) *MockEncoder_GetHeader_Call[T] {
+	return &MockEncoder_GetHeader_Call[T]{Call: _e.mock.On("GetHeader", b)}
 }
 
-func (_c *MockEncoder_GetHeader_Call[T]) Run(run func(v uint64, b bool)) *MockEncoder_GetHeader_Call[T] {
+func (_c *MockEncoder_GetHeader_Call[T]) Run(run func(b bool)) *MockEncoder_GetHeader_Call[T] {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 uint64
+		var arg0 bool
 		if args[0] != nil {
-			arg0 = args[0].(uint64)
-		}
-		var arg1 bool
-		if args[1] != nil {
-			arg1 = args[1].(bool)
+			arg0 = args[0].(bool)
 		}
 		run(
 			arg0,
-			arg1,
 		)
 	})
 	return _c
@@ -206,7 +200,7 @@ func (_c *MockEncoder_GetHeader_Call[T]) Return(bytes1 []byte) *MockEncoder_GetH
 	return _c
 }
 
-func (_c *MockEncoder_GetHeader_Call[T]) RunAndReturn(run func(v uint64, b bool) []byte) *MockEncoder_GetHeader_Call[T] {
+func (_c *MockEncoder_GetHeader_Call[T]) RunAndReturn(run func(b bool) []byte) *MockEncoder_GetHeader_Call[T] {
 	_c.Call.Return(run)
 	return _c
 }

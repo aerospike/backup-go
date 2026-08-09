@@ -292,7 +292,7 @@ func (bh *BackupHandler) getEstimate(ctx context.Context, recordsNumber int64) (
 	result /= compressRatio
 
 	// Calculate and add estimated backup file headers size.
-	header := bh.encoder.GetHeader(0, false)
+	header := bh.encoder.GetHeader(false)
 	numFiles := bh.config.ParallelWrite
 
 	if bh.config.FileLimit > 0 {

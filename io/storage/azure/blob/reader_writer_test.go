@@ -19,14 +19,13 @@ import (
 	"fmt"
 	"io"
 	"path"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
-	"github.com/aerospike/backup-go/internal/util/files"
+	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
@@ -222,7 +221,7 @@ func fillTestData(ctx context.Context, client *azblob.Client) error {
 type validatorMock struct{}
 
 func (mock validatorMock) Run(fileName string) error {
-	if !strings.HasSuffix(fileName, files.ExtensionASB) {
+	if !strings.HasSuffix(fileName, asb.Extension) {
 		return fmt.Errorf("file name must end with .asb")
 	}
 	return nil
@@ -284,7 +283,6 @@ func (s *AzureSuite) TestReader_WithSorting() {
 		testContainerName,
 		options.WithDir(testReadFolderSorted),
 		options.WithCalculateTotalSize(),
-		options.WithSorting(),
 	)
 	s.Require().NoError(err)
 
@@ -743,53 +741,6 @@ func (s *AzureSuite) TestReader_StreamFilesList() {
 	}
 }
 
-func (s *AzureSuite) TestReader_StreamFilesPreloaded() {
-	s.suiteWg.Wait()
-	ctx := s.T().Context()
-	cred, err := azblob.NewSharedKeyCredential(azuritAccountName, azuritAccountKey)
-	s.Require().NoError(err)
-	client, err := azblob.NewClientWithSharedKeyCredential(testServiceAddress, cred, nil)
-	s.Require().NoError(err)
-
-	reader, err := NewReader(
-		ctx,
-		client,
-		testContainerName,
-		options.WithDir(testFolderMixedBackups),
-	)
-	s.Require().NoError(err)
-
-	list, err := reader.ListObjects(ctx, testFolderMixedBackups)
-	s.Require().NoError(err)
-
-	_, asbxList := filterList(list)
-	reader.SetObjectsToStream(asbxList)
-
-	rCH := make(chan models.File)
-	eCH := make(chan error)
-
-	go reader.StreamFiles(ctx, rCH, eCH, nil)
-
-	var filesCounter int
-
-	for {
-		select {
-		case err := <-eCH:
-			s.Require().NoError(err)
-		case f, ok := <-rCH:
-			if !ok {
-				s.Require().Equal(5, filesCounter)
-				return
-			}
-			filesCounter++
-
-			result, err := readAll(f.Reader)
-			s.Require().NoError(err)
-			s.Require().Equal(testFileContentAsbx, result)
-		}
-	}
-}
-
 func (s *AzureSuite) TestIsSkippedByStartAfter() {
 	s.suiteWg.Wait()
 	tests := []struct {
@@ -879,18 +830,6 @@ func TestParseAccessTier(t *testing.T) {
 			}
 		})
 	}
-}
-
-func filterList(list []string) (asbList, asbxList []string) {
-	for i := range list {
-		switch filepath.Ext(list[i]) {
-		case files.ExtensionASB:
-			asbList = append(asbList, list[i])
-		case files.ExtensionASBX:
-			asbxList = append(asbxList, list[i])
-		}
-	}
-	return asbList, asbxList
 }
 
 func readAll(r io.ReadCloser) (string, error) {

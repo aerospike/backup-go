@@ -47,8 +47,6 @@ type Options struct {
 	StartAfter string
 	// SkipDirCheck, if true, the backup directory won't be checked.
 	SkipDirCheck bool
-	// SortFiles determines whether we need to sort files before reading.
-	SortFiles bool
 
 	// UploadConcurrency defines the max number of concurrent uploads to be performed to
 	// upload the file. Each concurrent upload will create a buffer of size BlockSize.
@@ -154,15 +152,6 @@ func WithStartAfter(v string) Opt {
 func WithSkipDirCheck() Opt {
 	return func(r *Options) {
 		r.SkipDirCheck = true
-	}
-}
-
-// WithSorting adds a sorting flag.
-// Which means that files will be read from directory in the sorted order.
-// Is used only for Reader.
-func WithSorting() Opt {
-	return func(r *Options) {
-		r.SortFiles = true
 	}
 }
 

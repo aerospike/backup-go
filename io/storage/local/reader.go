@@ -73,7 +73,8 @@ func NewReader(_ context.Context, opts ...options.Opt) (*Reader, error) {
 	}
 
 	if r.CalculateTotalSize {
-		// We "lazy" calculate the total size of all files in a path for estimates calculations.
+		// Calculate directory size asynchronously in the background so that reader initialization
+		// remains non-blocking for large file trees.
 		go r.calculateTotalSize()
 	}
 
@@ -122,6 +123,8 @@ func (r *Reader) StreamFiles(
 func (r *Reader) streamDirectory(
 	ctx context.Context, path string, readersCh chan<- models.File, errorsCh chan<- error,
 ) {
+	// os.OpenRoot sandboxes path operations inside the specified directory root,
+	// protecting against directory traversal vulnerability exploits.
 	root, err := os.OpenRoot(path)
 	if err != nil {
 		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open root %s: %w", path, err))
@@ -170,6 +173,7 @@ func (r *Reader) streamDirectory(
 			continue
 		}
 
+		// Apply application-level filter/validator rules.
 		if r.shouldSkip(file.Name()) {
 			// Since we are passing invalid files, we don't need to handle this
 			// error and write a test for it. Maybe we should log this information
@@ -185,12 +189,14 @@ func (r *Reader) streamDirectory(
 
 		var reader io.ReadCloser
 
+		// Open the file relative to the secure root handle.
 		reader, err = root.Open(file.Name())
 		if err != nil {
 			common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open file %s in root %s: %w", file.Name(), path, err))
 			return
 		}
 
+		// Send open file reader handle downstream; caller is responsible for closing reader.
 		readersCh <- models.File{Reader: reader, Name: filepath.Base(file.Name())}
 	}
 }
@@ -244,12 +250,13 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 
 	switch {
 	case r.Validator != nil:
+		// Fast-fail search: verify directory validness by finding at least one valid backup file.
 		for _, file := range fileInfo {
 			if file.IsDir() {
 				// Iterate over nested dirs recursively.
 				if r.WithNestedDir {
 					nestedDir := filepath.Join(dir, file.Name())
-					// If the nested folder is ok, then return nil.
+					// Short-circuit: return success immediately if any nested subdirectory is valid.
 					if err = r.checkRestoreDirectory(nestedDir); err == nil {
 						return nil
 					}
@@ -258,7 +265,7 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 				continue
 			}
 
-			// If we found a valid file, return.
+			// Short-circuit: return success as soon as one file matches validation criteria.
 			if err = r.Validator.Run(file.Name()); err == nil {
 				return nil
 			}
@@ -374,7 +381,7 @@ func (r *Reader) calculateTotalSize() {
 		totalNum += num
 	}
 
-	// set size when everything is ready.
+	// Atomically store calculated aggregate values.
 	r.totalSize.Store(totalSize)
 	r.totalNumber.Store(totalNum)
 }
@@ -466,7 +473,7 @@ func (r *Reader) GetNumber() int64 {
 	return r.totalNumber.Load()
 }
 
-// GetSkipped returns a list of file paths that were skipped during the `StreamFlies` with skipPrefix.
+// GetSkipped returns a list of file paths that were skipped during the `StreamFiles` with skipPrefix.
 func (r *Reader) GetSkipped() []string {
 	return r.skipped.GetSkipped()
 }

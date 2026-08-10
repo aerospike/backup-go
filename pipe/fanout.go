@@ -36,10 +36,6 @@ const (
 	// RoundRobin distributes incoming tokens between available output channels in a
 	// fair, rotating manner.
 	RoundRobin
-	// Split routes incoming tokens to output channels using a custom routing function.
-	// The routing function determines the destination channel for each token based on
-	// its partition id.
-	Split
 )
 
 // Fanout routes messages between chain pools.
@@ -79,7 +75,7 @@ func NewFanout[T models.TokenConstraint](
 			len(f.Inputs), len(f.Outputs))
 	}
 
-	if f.strategy != Fixed && f.strategy != RoundRobin && f.strategy != Split {
+	if f.strategy != Fixed && f.strategy != RoundRobin {
 		return nil, fmt.Errorf("unsupported fanout strategy: %d", f.strategy)
 	}
 
@@ -130,8 +126,6 @@ func (f *Fanout[T]) routeData(ctx context.Context, index int, data T) {
 	case Fixed: // Send it to the current index.
 	case RoundRobin:
 		index = f.roundRobin(data)
-	case Split:
-		index = f.splitFunc(data)
 	}
 
 	select {
@@ -146,27 +140,6 @@ func (f *Fanout[T]) roundRobin(_ T) int {
 	index := f.currentIndex.Add(1) % uint64(len(f.Outputs))
 
 	return int(index)
-}
-
-// splitFunc determines an output chain for the token based on its partition id.
-func (f *Fanout[T]) splitFunc(token T) int {
-	t, ok := any(token).(*models.ASBXToken)
-	if !ok {
-		return 0
-	}
-
-	partPerWorker := 4096 / len(f.Outputs)
-
-	var id int
-	if partPerWorker > 0 {
-		id = t.Key.PartitionId() / partPerWorker
-	}
-
-	if id >= len(f.Outputs) {
-		return id - 1
-	}
-
-	return id
 }
 
 // GetMetrics returns the accumulated length for input and output channels.

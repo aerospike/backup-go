@@ -119,12 +119,6 @@ func NewReader(
 		}
 	}
 
-	if r.IsDir && r.SortFiles && len(r.PathList) == 1 {
-		if err := common.PreSort(ctx, r, r.PathList[0]); err != nil {
-			return nil, fmt.Errorf("failed to pre sort: %w", err)
-		}
-	}
-
 	if r.AccessTier != "" {
 		r.Logger.Debug("start warming storage")
 

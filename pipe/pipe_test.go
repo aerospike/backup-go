@@ -177,7 +177,7 @@ func TestPipe_NewBackupPipeError(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		Split,
+		Fixed,
 	)
 	require.ErrorContains(t, err, "failed to create fanout")
 	require.Nil(t, p)

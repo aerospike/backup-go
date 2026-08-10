@@ -17,9 +17,9 @@ package asb
 import (
 	"fmt"
 	"path/filepath"
-
-	"github.com/aerospike/backup-go/internal/util/files"
 )
+
+const Extension = ".asb"
 
 // Validator represents backup files validator.
 type Validator struct {
@@ -32,7 +32,7 @@ func NewValidator() *Validator {
 
 // Run performs backup files validation.
 func (v *Validator) Run(fileName string) error {
-	if filepath.Ext(fileName) != files.ExtensionASB {
+	if filepath.Ext(fileName) != Extension {
 		return fmt.Errorf("restore file %s is in an invalid format, expected extension: .asb, got: %s",
 			fileName, filepath.Ext(fileName))
 	}

@@ -206,19 +206,21 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		return noopWriter{}, nil
 	}
 
+	// Validate generated names before touching the filesystem, so rejected
+	// filenames do not create directories as a side effect.
+	if err := ValidateFilename(filename); err != nil {
+		return nil, err
+	}
+
 	// Create directory only if we have something to back up to this directory.
 	err := createDirIfNotExist(w.PathList[0], w.IsDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare backup directory: %w", err)
 	}
 
-	if err := ValidateFilename(filename); err != nil {
-		return nil, err
-	}
-
 	switch {
 	case w.IsDir:
-		// We ignore `fileName` if `Writer` was initialized .WithFile()
+		// Directory backup writes files under PathList[0] by generated filename.
 		root, err := os.OpenRoot(w.PathList[0])
 		if err != nil {
 			return nil, fmt.Errorf("failed to open root %s: %w", w.PathList[0], err)

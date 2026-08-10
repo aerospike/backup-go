@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"regexp"
 	"slices"
 	"strconv"
@@ -51,9 +50,6 @@ const (
 )
 
 const (
-	// partitionsPerNamespace is the fixed number of partitions every Aerospike
-	// namespace is split into. Used to normalize aggregated backup progress.
-	partitionsPerNamespace = 4096
 	// minReplicasFields is the minimum number of comma-separated fields expected
 	// in a single namespace entry of the "replicas" info response.
 	minReplicasFields = 3
@@ -161,21 +157,6 @@ func (ic *Client) requestByNode(nodeName string, names ...string) (map[string]st
 	}
 
 	return result, nil
-}
-
-// execByNode runs cmd on the named node and validates the result response.
-// action is a short verb phrase used to build the error messages, e.g. "create xdr dc".
-func (ic *Client) execByNode(nodeName, cmd, action string) error {
-	resp, err := ic.requestByNode(nodeName, cmd)
-	if err != nil {
-		return fmt.Errorf("failed to %s: %w", action, err)
-	}
-
-	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to parse %s response: %w", action, err)
-	}
-
-	return nil
 }
 
 // GetVersion returns the lowest node version from the cluster.
@@ -404,90 +385,6 @@ func (ic *Client) getPendingMigrations(node infoGetter, namespace string) (uint6
 	return totalRemaining, nil
 }
 
-// StartXDR creates xdr config and starts replication.
-func (ic *Client) StartXDR(
-	ctx context.Context, nodeName, dc, hostPort, namespace, rewind string, throughput int, forward bool,
-) error {
-	// The order of these operations is important. Don't reorder it if you don't know what you are doing!
-	steps := []func() error{
-		func() error { return ic.createXDRDC(nodeName, dc) },
-		func() error { return ic.createXDRConnector(nodeName, dc) },
-		func() error { return ic.createXDRNode(nodeName, dc, hostPort) },
-		func() error { return ic.setMaxThroughput(nodeName, dc, namespace, throughput) },
-		func() error { return ic.createXDRNamespace(nodeName, dc, namespace, rewind) },
-	}
-
-	if forward {
-		steps = append(steps, func() error {
-			return ic.setXDRForward(nodeName, dc, namespace, forward)
-		})
-	}
-
-	for _, step := range steps {
-		if err := executeWithRetry(ctx, ic.retryPolicy, step); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// StopXDR disable replication and remove xdr config.
-func (ic *Client) StopXDR(ctx context.Context, nodeName, dc string) error {
-	return executeWithRetry(ctx, ic.retryPolicy, func() error {
-		return ic.deleteXDRDC(nodeName, dc)
-	})
-}
-
-func (ic *Client) createXDRDC(nodeName, dc string) error {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDCreateXDRDC], dc)
-	return ic.execByNode(nodeName, cmd, "create xdr dc")
-}
-
-func (ic *Client) createXDRConnector(nodeName, dc string) error {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDCreateConnector], dc)
-	return ic.execByNode(nodeName, cmd, "create xdr connector")
-}
-
-func (ic *Client) createXDRNode(nodeName, dc, hostPort string) error {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDCreateXDRNode], dc, hostPort)
-	return ic.execByNode(nodeName, cmd, "create xdr node")
-}
-
-func (ic *Client) createXDRNamespace(nodeName, dc, namespace, rewind string) error {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDCreateXDRNamespace], dc, namespace, rewind)
-	return ic.execByNode(nodeName, cmd, "create xdr namespace")
-}
-
-func (ic *Client) deleteXDRDC(nodeName, dc string) error {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDDeleteXDRDC], dc)
-	return ic.execByNode(nodeName, cmd, "remove xdr dc")
-}
-
-// BlockMRTWrites blocks MRT writes on cluster.
-func (ic *Client) BlockMRTWrites(ctx context.Context, nodeName, namespace string) error {
-	return executeWithRetry(ctx, ic.retryPolicy, func() error {
-		return ic.blockMRTWrites(nodeName, namespace)
-	})
-}
-
-func (ic *Client) blockMRTWrites(nodeName, namespace string) error {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDBlockMRTWrites], namespace)
-	return ic.execByNode(nodeName, cmd, "block mrt writes")
-}
-
-// UnBlockMRTWrites unblocks MRT writes on cluster.
-func (ic *Client) UnBlockMRTWrites(ctx context.Context, nodeName, namespace string) error {
-	return executeWithRetry(ctx, ic.retryPolicy, func() error {
-		return ic.unBlockMRTWrites(nodeName, namespace)
-	})
-}
-
-func (ic *Client) unBlockMRTWrites(nodeName, namespace string) error {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDUnBlockMRTWrites], namespace)
-	return ic.execByNode(nodeName, cmd, "unblock mrt writes")
-}
-
 // GetNodesNames return list of active nodes names.
 func (ic *Client) GetNodesNames() []string {
 	nodes := ic.cluster.GetNodes()
@@ -500,26 +397,6 @@ func (ic *Client) GetNodesNames() []string {
 	}
 
 	return result
-}
-
-// setMaxThroughput sets max throughput for xdr. The value should be in multiples of 100.
-func (ic *Client) setMaxThroughput(nodeName, dc, namespace string, throughput int) error {
-	// Do nothing.
-	if throughput == 0 {
-		return nil
-	}
-
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDSetXDRMaxThroughput], dc, namespace, throughput)
-
-	return ic.execByNode(nodeName, cmd, "set max throughput")
-}
-
-// setXDRForward setting this parameter to true sends writes,
-// that originated from another XDR to the specified destination datacenters.
-func (ic *Client) setXDRForward(nodeName, dc, namespace string, forward bool) error {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDSetXDRForward], dc, namespace, forward)
-
-	return ic.execByNode(nodeName, cmd, "set xdr forward")
 }
 
 // GetSetsList returns the list of set names for the given namespace, excluding the MRT monitor set.
@@ -605,77 +482,6 @@ type Stats struct {
 	RecoveriesPending int64
 }
 
-// GetStats requests node statistics like recoveries, lag, etc.
-// returns Stats struct.
-func (ic *Client) GetStats(ctx context.Context, nodeName, dc, namespace string) (Stats, error) {
-	var result Stats
-
-	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
-		res, err := ic.getStats(nodeName, dc, namespace)
-		if err != nil {
-			return err
-		}
-
-		result = res
-
-		return nil
-	})
-
-	return result, err
-}
-
-func (ic *Client) getStats(nodeName, dc, namespace string) (Stats, error) {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDGetXDRStats], dc, namespace)
-
-	resp, err := ic.requestByNode(nodeName, cmd)
-	if err != nil {
-		return Stats{}, fmt.Errorf("failed to get stats: %w", err)
-	}
-
-	result, err := parseResultResponse(cmd, resp)
-	if err != nil {
-		return Stats{}, fmt.Errorf("failed to parse get stats response: %w", err)
-	}
-
-	resultMap, err := parseInfoResponse(result, ";", ":", "=")
-	if err != nil {
-		return Stats{}, fmt.Errorf("failed to parse get stats response map: %w", err)
-	}
-
-	var stats Stats
-
-	for i := range resultMap {
-		lag, ok, err := resultMap[i].ParseInt64("lag")
-		if err != nil {
-			return Stats{}, err
-		}
-
-		if ok {
-			stats.Lag = lag
-		}
-
-		recoveries, ok, err := resultMap[i].ParseInt64("recoveries")
-		if err != nil {
-			return Stats{}, err
-		}
-
-		if ok {
-			stats.Recoveries = recoveries
-		}
-
-		recoveriesPending, ok, err := resultMap[i].ParseInt64("recoveries_pending")
-		if err != nil {
-			return Stats{}, err
-		}
-
-		if ok {
-			stats.RecoveriesPending = recoveriesPending
-		}
-	}
-
-	return stats, nil
-}
-
 // GetService returns service name by node name.
 func (ic *Client) GetService(ctx context.Context, node string) (string, error) {
 	var result string
@@ -755,39 +561,6 @@ func (ic *Client) GetStatus(ctx context.Context) (string, error) {
 	}
 
 	return result, nil
-}
-
-// GetDCsList returns list of XDR DCs.
-func (ic *Client) GetDCsList(ctx context.Context) ([]string, error) {
-	cmd := ic.cmdDict[cmdIDGetConfigXDR]
-
-	resp, err := ic.GetInfo(ctx, cmd)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get DCs list: %w", err)
-	}
-
-	result, err := parseResultResponse(cmd, resp)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse DCs list result response: %w", err)
-	}
-
-	infoResponse, err := parseInfoResponse(result, ";", ":", "=")
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse DCs list info response: %w", err)
-	}
-
-	dcs := make([]string, 0, len(infoResponse))
-
-	for _, rec := range infoResponse {
-		val, ok := rec["dcs"]
-		if !ok {
-			continue
-		}
-
-		dcs = append(dcs, val)
-	}
-
-	return dcs, nil
 }
 
 // GetPrimaryPartitions returns a list of primary partitions.
@@ -935,7 +708,12 @@ func (ic *Client) PrepareServerRestore(ctx context.Context, jobID, namespace str
 	allNodes := ic.getNodesString()
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerPrepareRestore], namespace, jobID, allNodes)
 
-	resp, err := ic.GetInfo(ctx, cmd)
+	principal, err := ic.getPrincipal(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get cluster principal: %w", err)
+	}
+
+	resp, err := ic.requestByNode(principal, cmd)
 	if err != nil {
 		return fmt.Errorf("failed prepare restore: %w", err)
 	}
@@ -960,38 +738,35 @@ func (ic *Client) getNodesString() string {
 	return builder.String()
 }
 
-// GetBackupStatus aggregates the server-side backup progress across all nodes and
-// returns it as a ratio in the [0, 1] range.
-func (ic *Client) GetBackupStatus(ctx context.Context) (float64, error) {
-	var result float64
+// GetBackupStatus aggregates server-side backup status across all nodes.
+func (ic *Client) GetBackupStatus(ctx context.Context, jobID string) (*iModels.ResponseBackupState, error) {
+	var result *iModels.ResponseBackupState
 
 	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
 		nodes := ic.cluster.GetNodes()
 
-		var (
-			total     float64
-			firstTrID int64
-		)
+		statuses := make([]*iModels.ResponseBackupState, 0, len(nodes))
 
 		for _, node := range nodes {
-			one, trID, err := ic.getBackupStatusByNode(node)
+			resp, err := ic.getBackupStatusByNode(node, jobID)
 			if err != nil {
+				if strings.Contains(err.Error(), "no backup job") {
+					return ErrNotFound
+				}
+
 				return fmt.Errorf("failed to get backup status from node %s: %w", node.GetName(), err)
 			}
 
-			if firstTrID == 0 {
-				firstTrID = trID
+			if status := iModels.NewResponseBackupState(resp); status != nil {
+				statuses = append(statuses, status)
 			}
-
-			if trID != firstTrID {
-				return fmt.Errorf("backup trid mismatch: node %s has trid %d, expected %d",
-					node.GetName(), trID, firstTrID)
-			}
-
-			total += one
 		}
 
-		result = math.Min(1.0, total/partitionsPerNamespace)
+		if len(statuses) == 0 {
+			return fmt.Errorf("no backup state found for backup-id %s: %w", jobID, ErrNotFound)
+		}
+
+		result = iModels.MergeResponseBackupStates(statuses)
 
 		return nil
 	})
@@ -999,38 +774,25 @@ func (ic *Client) GetBackupStatus(ctx context.Context) (float64, error) {
 	return result, err
 }
 
-func (ic *Client) getBackupStatusByNode(node infoGetter) (val float64, trID int64, err error) {
-	jobs, err := ic.getBackupJobsByNode(node)
+func (ic *Client) getBackupStatusByNode(node infoGetter, jobID string) ([]iModels.InfoMap, error) {
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDBackupStatus], jobID)
+
+	response, aErr := node.RequestInfo(ic.policy, cmd)
+	if aErr != nil {
+		return nil, fmt.Errorf("failed to get backup status: %w", aErr)
+	}
+
+	result, err := parseResultResponse(cmd, response)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get backup jobs: %w", err)
+		return nil, fmt.Errorf("failed to read backup status response: %w", err)
 	}
 
-	if len(jobs) == 0 {
-		return 0, 0, ErrNotFound
-	}
-
-	latestBackup := jobs[0]
-
-	trID, okTrID, err := latestBackup.ParseInt64("trid")
+	infoResponse, err := parseInfoResponse(result, ";", ":", "=")
 	if err != nil {
-		return 0, 0, err
+		return nil, fmt.Errorf("failed to parse backup status: %w", err)
 	}
 
-	progress, okProgress, err := latestBackup.ParseFloat64("job-progress")
-	if err != nil {
-		return 0, 0, err
-	}
-
-	pids, okPids, err := latestBackup.ParseFloat64("n-pids-requested")
-	if err != nil {
-		return 0, 0, err
-	}
-
-	if okProgress && okPids && okTrID {
-		return progress / 100 * pids, trID, nil
-	}
-
-	return 0, 0, ErrNotFound
+	return infoResponse, nil
 }
 
 func (ic *Client) GetRestoreStatus(ctx context.Context, namespace string) (string, error) {
@@ -1058,10 +820,10 @@ func (ic *Client) GetRestoreStatus(ctx context.Context, namespace string) (strin
 		}
 
 		if len(seen) == 0 {
-			return fmt.Errorf("no restore state found for namespace %s", namespace)
+			return fmt.Errorf("no restore state found for namespace %s: %w", namespace, ErrNotFound)
 		}
 
-		result = resolveRestoreState(seen)
+		result = iModels.ResolveRestoreState(seen)
 
 		return nil
 	})
@@ -1077,27 +839,17 @@ func (ic *Client) getRestoreStatusByNode(node infoGetter, namespace string) ([]i
 		return nil, fmt.Errorf("failed to get restore status: %w", aErr)
 	}
 
-	infoResponse, err := parseInfoResponse(response[cmd], ";", ":", "=")
+	result, err := parseResultResponse(cmd, response)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read restore status response: %w", err)
+	}
+
+	infoResponse, err := parseInfoResponse(result, ";", ":", "=")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse restore status: %w", err)
 	}
 
 	return infoResponse, nil
-}
-
-func (ic *Client) getBackupJobsByNode(node infoGetter) ([]iModels.InfoMap, error) {
-	jobs, err := ic.getJobsQueriesByNode(node)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get jobs: %w", err)
-	}
-
-	// Latest backup job will be first.
-	jobs, err = filterBackupsSortedByTimeSinceDone(jobs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to filter backups sorted by time since done: %w", err)
-	}
-
-	return jobs, nil
 }
 
 func (ic *Client) getUDFs(node infoGetter, policy *a.InfoPolicy) ([]*models.UDF, error) {
@@ -1260,22 +1012,6 @@ func (ic *Client) getEffectiveReplicationFactor(node infoGetter, policy *a.InfoP
 	}
 
 	return 0, errReplicationFactorNotFound
-}
-
-func (ic *Client) getJobsQueriesByNode(node infoGetter) ([]iModels.InfoMap, error) {
-	cmd := ic.cmdDict[cmdIDShowJobsQueries]
-
-	response, aErr := node.RequestInfo(ic.policy, cmd)
-	if aErr != nil {
-		return nil, fmt.Errorf("failed to show job queries: %w", aErr)
-	}
-
-	infoResponse, err := parseInfoResponse(response[cmd], ";", ":", "=")
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse show job info response: %w", err)
-	}
-
-	return infoResponse, nil
 }
 
 // GetClusterStable checks the stability of a cluster within the specified namespace and retries on transient errors.

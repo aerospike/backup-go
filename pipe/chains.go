@@ -34,8 +34,6 @@ type Reader[T models.TokenConstraint] interface {
 	Read(ctx context.Context) (T, error)
 	// Close is required so the read loop can defer cleanup; most
 	// implementations are no-ops. A notable exception is
-	// [github.com/aerospike/backup-go/io/aerospike/xdr.RecordReader], which must use Close to
-	// stop the XDR TCP server.
 	Close()
 }
 

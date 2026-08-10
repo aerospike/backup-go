@@ -219,14 +219,12 @@ func (rh *RestoreHandler[T]) runPipeline(ctx context.Context, dataReaders []pipe
 		return fmt.Errorf("failed to create compose processor: %w", err)
 	}
 
-	pipelineMode := rh.getPipelineMode(len(dataReaders), len(dataWriters))
-
 	pl, err := pipe.NewPipe(
 		composeProcessor,
 		dataReaders,
 		dataWriters,
 		rh.limiter,
-		pipelineMode,
+		pipe.RoundRobin,
 	)
 	if err != nil {
 		return err
@@ -236,15 +234,6 @@ func (rh *RestoreHandler[T]) runPipeline(ctx context.Context, dataReaders []pipe
 	rh.pl.Store(pl)
 
 	return pl.Run(ctx)
-}
-
-func (rh *RestoreHandler[T]) getPipelineMode(numReaders, numWriters int) pipe.FanoutStrategy {
-	switch {
-	case rh.config.EncoderType == EncoderTypeASBX, numReaders == numWriters:
-		return pipe.Fixed
-	default:
-		return pipe.RoundRobin
-	}
 }
 
 func (rh *RestoreHandler[T]) getComposeProcessor(ctx context.Context) (pipe.ProcessorCreator[T], error) {
@@ -270,13 +259,6 @@ func (rh *RestoreHandler[T]) getComposeProcessor(ctx context.Context) (pipe.Proc
 			processors.NewFilterByBin[T](rh.config.BinList, &rh.stats.RecordsSkipped),
 			processors.NewChangeNamespace[T](nsSource, nsDest),
 			processors.NewExpirationSetter[T](&rh.stats.RecordsExpired, rh.config.ExtraTTL, rh.logger),
-			processors.NewTPSLimiter[T](ctx, rh.config.RecordsPerSecond),
-		), nil
-
-	case EncoderTypeASBX:
-		return newDataProcessor[T](
-			processors.NewSizeCounter[T](&rh.stats.TotalBytesRead),
-			processors.NewTokenCounter[T](&rh.stats.ReadRecords),
 			processors.NewTPSLimiter[T](ctx, rh.config.RecordsPerSecond),
 		), nil
 

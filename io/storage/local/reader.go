@@ -53,7 +53,7 @@ type Reader struct {
 // NewReader creates a new local directory/file Reader.
 // Must be called with WithDir(path string) or WithFile(path string) - mandatory.
 // Can be called with WithValidator(v validator) - optional.
-func NewReader(ctx context.Context, opts ...options.Opt) (*Reader, error) {
+func NewReader(_ context.Context, opts ...options.Opt) (*Reader, error) {
 	r := &Reader{}
 
 	for _, opt := range opts {
@@ -69,12 +69,6 @@ func NewReader(ctx context.Context, opts ...options.Opt) (*Reader, error) {
 			if err := r.checkRestoreDirectory(path); err != nil {
 				return nil, fmt.Errorf("%w: %w", common.ErrEmptyStorage, err)
 			}
-		}
-	}
-
-	if r.IsDir && r.SortFiles && len(r.PathList) == 1 {
-		if err := common.PreSort(ctx, r, r.PathList[0]); err != nil {
-			return nil, fmt.Errorf("failed to pre sort: %w", err)
 		}
 	}
 

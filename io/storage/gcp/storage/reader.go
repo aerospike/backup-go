@@ -90,12 +90,6 @@ func NewReader(
 		}
 	}
 
-	if r.IsDir && r.SortFiles && len(r.PathList) == 1 {
-		if err := common.PreSort(ctx, r, r.PathList[0]); err != nil {
-			return nil, fmt.Errorf("failed to pre sort: %w", err)
-		}
-	}
-
 	if r.CalculateTotalSize {
 		// We "lazy" calculate the total size of all files in a path for estimates calculations.
 		go r.calculateTotalSize(ctx)

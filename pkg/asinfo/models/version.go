@@ -19,8 +19,10 @@ import (
 	"regexp"
 )
 
+// AerospikeVersionRegex matches Aerospike version strings in the format "X.Y.Z",
 var AerospikeVersionRegex = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)`)
 
+// AerospikeVersion represents an Aerospike version.
 type AerospikeVersion struct {
 	Major int
 	Minor int
@@ -38,10 +40,12 @@ var (
 	AerospikeVersionSupportsIntegratedBackup = AerospikeVersion{8, 1, 0}
 )
 
+// String returns the string representation of the version.
 func (av AerospikeVersion) String() string {
 	return fmt.Sprintf("%d.%d.%d", av.Major, av.Minor, av.Patch)
 }
 
+// IsGreater returns true if the version is greater than the other.
 func (av AerospikeVersion) IsGreater(other AerospikeVersion) bool {
 	if av.Major > other.Major {
 		return true
@@ -62,6 +66,7 @@ func (av AerospikeVersion) IsGreater(other AerospikeVersion) bool {
 	return false
 }
 
+// IsGreaterOrEqual returns true if the version is greater than or equal to the other.
 func (av AerospikeVersion) IsGreaterOrEqual(other AerospikeVersion) bool {
 	return av.IsGreater(other) || av == other
 }

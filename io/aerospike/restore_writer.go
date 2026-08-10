@@ -40,7 +40,6 @@ type RestoreWriter[T models.TokenConstraint] struct {
 	*sindexWriter
 	*udfWriter
 	recordWriter
-	*payloadWriter
 	logger *slog.Logger
 }
 
@@ -78,16 +77,6 @@ func NewRestoreWriter[T models.TokenConstraint](
 			retryPolicy,
 			rpsCollector,
 			ignoreRecordError,
-		),
-		payloadWriter: newPayloadWriter(
-			ctx,
-			asc,
-			writePolicy,
-			stats,
-			retryPolicy,
-			rpsCollector,
-			ignoreRecordError,
-			logger,
 		),
 		logger: logger,
 	}
@@ -134,9 +123,6 @@ func newRecordWriter(
 // Write writes the types from the models package to an Aerospike DB.
 func (rw *RestoreWriter[T]) Write(data T) (int, error) {
 	switch v := any(data).(type) {
-	case *models.ASBXToken:
-		// Logic for ASBXToken
-		return rw.writeASBXToken(v)
 	case *models.Token:
 		return rw.writeToken(v)
 	default:
@@ -157,10 +143,6 @@ func (rw *RestoreWriter[T]) writeToken(token *models.Token) (int, error) {
 	default:
 		return 0, errors.New("unsupported token type")
 	}
-}
-
-func (rw *RestoreWriter[T]) writeASBXToken(token *models.ASBXToken) (int, error) {
-	return len(token.Payload), rw.writePayload(token)
 }
 
 // Close satisfies the pipe.Writer interface.

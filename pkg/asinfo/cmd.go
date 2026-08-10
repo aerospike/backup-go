@@ -28,17 +28,6 @@ const (
 	cmdIDSindexList
 	cmdIDUdfList
 	cmdIDUdfGetFilename
-	cmdIDCreateXDRDC
-	cmdIDCreateConnector
-	cmdIDCreateXDRNode
-	cmdIDCreateXDRNamespace
-	cmdIDDeleteXDRDC
-	cmdIDGetXDRStats
-	cmdIDBlockMRTWrites
-	cmdIDUnBlockMRTWrites
-	cmdIDSetXDRMaxThroughput
-	cmdIDSetXDRForward
-	cmdIDGetConfigXDR
 	cmdIDReplicas
 	cmdIDServerBackup
 	cmdIDServerRestore
@@ -47,38 +36,28 @@ const (
 	cmdIDClusterStable
 	cmdIDStatistics
 	cmdIDRestoreStatus
+	cmdIDBackupStatus
 )
 
 // commandsNumber shows how many commands we have, if you add new command, increase this number.
-const commandsNumber = 30
+const commandsNumber = 20
 
 // Old commands for db version < AerospikeVersionRecentInfoCommands
 const (
 	// cmdBuild as we need to check version before we form dict, this command will be called directly.
-	cmdBuild               = "build"
-	cmdStatus              = "status"
-	cmdNamespaces          = "namespaces"
-	cmdSetsOfNamespace     = "sets/%s"
-	cmdNamespaceInfo       = "namespace/%s"
-	cmdRack                = "racks:"
-	cmdServiceClearStd     = "service-clear-std"
-	cmdServiceTLSStd       = "service-tls-std"
-	cmdUdfList             = "udf-list"
-	cmdUdfGetFilename      = "udf-get:filename=%s"
-	cmdCreateXDRDC         = "set-config:context=xdr;dc=%s;action=create"
-	cmdCreateConnector     = "set-config:context=xdr;dc=%s;connector=true"
-	cmdCreateXDRNode       = "set-config:context=xdr;dc=%s;node-address-port=%s;action=add"
-	cmdCreateXDRNamespace  = "set-config:context=xdr;dc=%s;namespace=%s;action=add;rewind=%s"
-	cmdDeleteXDRDC         = "set-config:context=xdr;dc=%s;action=delete"
-	cmdGetXDRStats         = "get-stats:context=xdr;dc=%s;namespace=%s"
-	cmdBlockMRTWrites      = "set-config:context=namespace;namespace=%s;disable-mrt-writes=true"
-	cmdUnBlockMRTWrites    = "set-config:context=namespace;namespace=%s;disable-mrt-writes=false"
-	cmdSetXDRMaxThroughput = "set-config:context=xdr;dc=%s;namespace=%s;max-throughput=%d"
-	cmdSetXDRForward       = "set-config:context=xdr;dc=%s;namespace=%s;forward=%t"
-	cmdGetConfigXDR        = "get-config:context=xdr"
-	cmdReplicas            = "replicas:max=1"
-	cmdClusterStable       = "cluster-stable:size=%d;ignore-migrations=false;namespace=%s"
-	cmdStatistics          = "statistics"
+	cmdBuild           = "build"
+	cmdStatus          = "status"
+	cmdNamespaces      = "namespaces"
+	cmdSetsOfNamespace = "sets/%s"
+	cmdNamespaceInfo   = "namespace/%s"
+	cmdRack            = "racks:"
+	cmdServiceClearStd = "service-clear-std"
+	cmdServiceTLSStd   = "service-tls-std"
+	cmdUdfList         = "udf-list"
+	cmdUdfGetFilename  = "udf-get:filename=%s"
+	cmdReplicas        = "replicas:max=1"
+	cmdClusterStable   = "cluster-stable:size=%d;ignore-migrations=false;namespace=%s"
+	cmdStatistics      = "statistics"
 
 	cmdServerBackup = "backup:namespace=%s;job-id=%s;object_storage_type=%s;s3-bucket=%s;" +
 		"s3-region=%s;s3-profile=%s;access-key=%s;secret-key=%s;s3-endpoint=%s;" +
@@ -90,6 +69,7 @@ const (
 	cmdShowJobsQueries = "query-show"
 
 	cmdRestoreStatus = "restore-status:namespace=%s;"
+	cmdBackupStatus  = "backup-status:job-id=%s;"
 
 	// Deprecated commands:
 
@@ -115,17 +95,6 @@ func newCmdDict(version models.AerospikeVersion) map[int]string {
 	cmds[cmdIDSindexList] = cmdSindexListDeprecated
 	cmds[cmdIDUdfList] = cmdUdfList
 	cmds[cmdIDUdfGetFilename] = cmdUdfGetFilename
-	cmds[cmdIDCreateXDRDC] = cmdCreateXDRDC
-	cmds[cmdIDCreateConnector] = cmdCreateConnector
-	cmds[cmdIDCreateXDRNode] = cmdCreateXDRNode
-	cmds[cmdIDCreateXDRNamespace] = cmdCreateXDRNamespace
-	cmds[cmdIDDeleteXDRDC] = cmdDeleteXDRDC
-	cmds[cmdIDGetXDRStats] = cmdGetXDRStats
-	cmds[cmdIDBlockMRTWrites] = cmdBlockMRTWrites
-	cmds[cmdIDUnBlockMRTWrites] = cmdUnBlockMRTWrites
-	cmds[cmdIDSetXDRMaxThroughput] = cmdSetXDRMaxThroughput
-	cmds[cmdIDSetXDRForward] = cmdSetXDRForward
-	cmds[cmdIDGetConfigXDR] = cmdGetConfigXDR
 	cmds[cmdIDReplicas] = cmdReplicas
 	cmds[cmdIDShowJobsQueries] = cmdShowJobsQueries
 	cmds[cmdIDClusterStable] = cmdClusterStable
@@ -140,6 +109,7 @@ func newCmdDict(version models.AerospikeVersion) map[int]string {
 		cmds[cmdIDServerRestore] = cmdServerRestore
 		cmds[cmdIDServerPrepareRestore] = cmdServerPrepareRestore
 		cmds[cmdIDRestoreStatus] = cmdRestoreStatus
+		cmds[cmdIDBackupStatus] = cmdBackupStatus
 	}
 
 	return cmds

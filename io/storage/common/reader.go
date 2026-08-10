@@ -15,50 +15,16 @@
 package common
 
 import (
-	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/aerospike/backup-go/internal/util/files"
 )
 
 // DefaultPollWarmDuration is the interval between requests to cloud providers,
 // to get file status during files restore.
 const DefaultPollWarmDuration = time.Minute
-
-// reader interface defines methods for listing and streaming objects
-type reader interface {
-	// ListObjects return list of filenames in given path. Result contains full path, from the root.
-	ListObjects(ctx context.Context, path string) ([]string, error)
-	// SetObjectsToStream sets elements that would be returned by StreamFiles method.
-	SetObjectsToStream(list []string)
-}
-
-// PreSort performs pre-processing of backup files by sorting them before reading.
-// It retrieves a list of objects from the specified path, sorts them according to the
-// backup file naming conventions, and configures the reader to stream the sorted list.
-// Returns an error if listing objects fails or if the sorting operation fails.
-func PreSort(ctx context.Context, r reader, path string) error {
-	// List all files first.
-	list, err := r.ListObjects(ctx, path)
-	if err != nil {
-		return err
-	}
-
-	// Sort files.
-	list, err = files.SortBackupFiles(list)
-	if err != nil {
-		return err
-	}
-
-	// Pass sorted list to reader.
-	r.SetObjectsToStream(list)
-
-	return nil
-}
 
 // CleanPath sanitizes the input path string based on the storage type (S3 or non-S3).
 // For S3 storage, it removes the root path "/" as S3 uses empty string for root.

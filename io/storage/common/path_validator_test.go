@@ -18,28 +18,26 @@ import (
 	"testing"
 )
 
-func TestValidateFilename(t *testing.T) {
+func TestValidateObjectKey(t *testing.T) {
 	tests := []struct {
-		name     string
-		filename string
-		wantErr  bool
+		name    string
+		key     string
+		wantErr bool
 	}{
 		{"empty", "", false},
-		{"valid", "metadata.asb", false},
-		{"valid_numbered", "001.asb", false},
-		{"dot", ".", true},
-		{"dotdot", "..", true},
-		{"slash", "dir/file", true},
-		{"backslash", "dir\\file", true},
-		{"null", "file\x00.asb", true},
-		{"absolute", "/etc/passwd", true},
+		{"single_component", "backup_0.asb", false},
+		{"nested_key", "folder/backup_0.asb", false},
+		{"leading_slash", "/absolute/key", true},
+		{"dotdot_segment", "folder/../escape", true},
+		{"null", "key\x00.asb", true},
+		{"backslash", "folder\\file", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateFilename(tt.filename)
+			err := ValidateObjectKey(tt.key)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateFilename() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ValidateObjectKey() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

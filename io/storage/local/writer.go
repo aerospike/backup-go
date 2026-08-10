@@ -272,14 +272,15 @@ func (w *Writer) GetOptions() options.Options {
 	return w.Options
 }
 
+// isNotDir reports whether err returned by os.OpenRoot means the path exists but is not a directory.
 func isNotDir(err error) bool {
 	if err == nil {
 		return false
 	}
-	// Check Unix syscall error
+
 	if errors.Is(err, syscall.ENOTDIR) {
 		return true
 	}
-	// Fallback check for unexported error strings
+
 	return strings.Contains(err.Error(), "not a directory")
 }

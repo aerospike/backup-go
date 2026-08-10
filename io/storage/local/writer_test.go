@@ -138,7 +138,7 @@ func TestWriter_NewWriter_WithDir_DevNull(t *testing.T) {
 
 func TestWriter_NewWriter_RejectsPathTraversal(t *testing.T) {
 	t.Parallel()
-	tmpDir := t.TempDir()
+	tmpDir := filepath.Join(t.TempDir(), "not-yet-created")
 	w := &Writer{Options: options.Options{
 		PathList: []string{tmpDir},
 		IsDir:    true,
@@ -148,8 +148,6 @@ func TestWriter_NewWriter_RejectsPathTraversal(t *testing.T) {
 		"../outside.asb",
 		"/absolute.asb",
 		"nested/file.asb",
-		`nested\file.asb`,
-		`C:\absolute.asb`,
 		".",
 		"..",
 		"invalid\x00.asb",
@@ -158,6 +156,7 @@ func TestWriter_NewWriter_RejectsPathTraversal(t *testing.T) {
 		require.Error(t, err, filename)
 	}
 
+	require.NoDirExists(t, tmpDir)
 	require.NoFileExists(t, filepath.Join(filepath.Dir(tmpDir), "outside.asb"))
 }
 

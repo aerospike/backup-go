@@ -16,39 +16,30 @@ package common
 
 import (
 	"fmt"
-	"path/filepath"
+	"slices"
 	"strings"
 )
 
-// ValidateFilename ensures that the filename is a single, safe path component
-// without directory traversal characters, absolute paths, or null bytes.
-func ValidateFilename(filename string) error {
-	if filename == "" {
+const parentDirName = ".."
+
+// ValidateObjectKey ensures a cloud object key cannot escape its intended prefix.
+// '/' is allowed as a key separator. Rejects NUL bytes, keys that start with '/',
+// and any path segment equal to '..'.
+func ValidateObjectKey(key string) error {
+	if key == "" {
 		return nil
 	}
 
-	if filename == "." {
-		return fmt.Errorf("filename must not be '.' (current directory)")
+	if strings.ContainsRune(key, '\x00') {
+		return fmt.Errorf("object key must not contain NUL bytes")
 	}
 
-	if filename == ".." {
-		return fmt.Errorf("filename must not be '..' (parent directory)")
+	if strings.HasPrefix(key, "/") {
+		return fmt.Errorf("object key must not start with '/'")
 	}
 
-	if strings.ContainsAny(filename, `/\`) {
-		return fmt.Errorf("filename must not contain path separators ('/' or '\\')")
-	}
-
-	if strings.ContainsRune(filename, '\x00') {
-		return fmt.Errorf("filename must not contain NUL bytes")
-	}
-
-	if filepath.IsAbs(filename) {
-		return fmt.Errorf("filename must not be an absolute path")
-	}
-
-	if filepath.VolumeName(filename) != "" {
-		return fmt.Errorf("filename must not contain a Windows volume name or UNC prefix")
+	if slices.Contains(strings.Split(key, "/"), parentDirName) {
+		return fmt.Errorf("object key must not contain '..' path segments")
 	}
 
 	return nil

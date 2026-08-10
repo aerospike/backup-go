@@ -25,7 +25,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 )
 
@@ -214,7 +213,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	}
 
 	// We ignore `fileName` if `Writer` was initialized .WithFile()
-	if err := common.ValidateFilename(filename); err != nil {
+	if err := ValidateFilename(filename); err != nil {
 		return nil, err
 	}
 

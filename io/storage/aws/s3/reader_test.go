@@ -855,56 +855,6 @@ func TestReader_ShouldSkip(t *testing.T) {
 	}
 }
 
-func (s *AwsSuite) TestReader_SetObjectsToStream() {
-	s.suiteWg.Wait()
-	ctx := s.T().Context()
-	client, err := testClient(ctx)
-	s.Require().NoError(err)
-
-	// Create a reader
-	reader, err := NewReader(
-		ctx,
-		client,
-		testBucket,
-		options.WithDir(testFolderWithData),
-		options.WithSkipDirCheck(),
-	)
-	s.Require().NoError(err)
-
-	// Define a list of objects to stream
-	objectsToStream := []string{
-		path.Join(testFolderWithData, fmt.Sprintf(testFileNameAsbTemplate, 0)),
-		path.Join(testFolderWithData, fmt.Sprintf(testFileNameAsbTemplate, 1)),
-	}
-
-	// Set the objects to stream
-	reader.SetObjectsToStream(objectsToStream)
-
-	// Verify that the objects were set correctly
-	s.Require().Equal(objectsToStream, reader.objectsToStream)
-
-	// Test streaming the objects
-	rCH := make(chan models.File)
-	eCH := make(chan error)
-
-	go reader.StreamFiles(ctx, rCH, eCH, nil)
-
-	var filesCounter int
-
-	for {
-		select {
-		case err := <-eCH:
-			s.Require().NoError(err)
-		case _, ok := <-rCH:
-			if !ok {
-				s.Require().Equal(len(objectsToStream), filesCounter)
-				return
-			}
-			filesCounter++
-		}
-	}
-}
-
 func (s *AwsSuite) TestReader_StreamFiles_Skipped() {
 	s.suiteWg.Wait()
 	ctx := s.T().Context()

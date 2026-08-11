@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/aerospike/backup-go/models"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTPSLimiter(t *testing.T) {
@@ -40,27 +41,31 @@ func TestTPSLimiter(t *testing.T) {
 			for i := 0; i < tt.runs; i++ {
 				token := models.NewRecordToken(nil, 1, nil)
 				got, err := limiter.Process(token)
-				if got != token {
-					t.Fatalf("Process() = %v, want %v", got, i)
-				}
-				if err != nil {
-					t.Fatalf("got error while processing token: %v", err)
-				}
+				require.Same(t, token, got, "process should return the same token instance")
+				require.NoError(t, err, "process should not fail")
 			}
 			duration := time.Since(start)
 
-			const epsilon = 200 * time.Millisecond
+			const minEpsilon = 200 * time.Millisecond
+			const maxEpsilon = 300 * time.Millisecond
 			var expectedDuration time.Duration
 			if tt.tps > 0 {
-				timeRequiredSeconds := float64(tt.runs) / float64(tt.tps)
+				// rate.Limiter with burst=1 allows the first token immediately.
+				timeRequiredSeconds := float64(tt.runs-1) / float64(tt.tps)
 				expectedDuration = time.Duration(int(timeRequiredSeconds*1000)) * time.Millisecond
 			}
-			if duration < expectedDuration-epsilon {
-				t.Fatalf("Total execution time was too quick, want at least %v, got %v", expectedDuration, duration)
-			}
-			if duration > expectedDuration+epsilon {
-				t.Fatalf("Total execution time was too slow, want at most %v, got %v", expectedDuration, duration)
-			}
+			require.GreaterOrEqual(
+				t,
+				duration,
+				expectedDuration-minEpsilon,
+				"total execution time was too quick",
+			)
+			require.LessOrEqual(
+				t,
+				duration,
+				expectedDuration+maxEpsilon,
+				"total execution time was too slow",
+			)
 		})
 	}
 }

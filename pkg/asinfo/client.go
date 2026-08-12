@@ -38,6 +38,7 @@ const (
 	indexTypeList      = "list"
 	indexTypeMapKeys   = "mapkeys"
 	indexTypeMapValues = "mapvalues"
+	indexTypeSet       = "set"
 
 	indexBinTypeNumeric     = "numeric"
 	indexBinTypeIntSigned   = "int signed"

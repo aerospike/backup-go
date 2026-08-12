@@ -54,6 +54,7 @@ const (
 	ListElementSIndex SIndexType = 'L'
 	MapKeySIndex      SIndexType = 'K'
 	MapValueSIndex    SIndexType = 'V'
+	SetSIndex         SIndexType = 'S'
 )
 
 type SIndexPath struct {

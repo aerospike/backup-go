@@ -208,6 +208,8 @@ func parseSIndex(sindexMap m.InfoMap) (*models.SIndex, error) {
 			sindexType = models.MapKeySIndex
 		case indexTypeMapValues:
 			sindexType = models.MapValueSIndex
+		case indexTypeSet:
+			sindexType = models.SetSIndex
 		default:
 			return nil, fmt.Errorf("invalid sindex index type: %s", val)
 		}

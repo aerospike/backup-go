@@ -342,7 +342,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 		{
 			name: "set index",
 			fields: fields{
-				reader: newTestCountingReader(" userdata1 testSet1 sindex1 S 1\n"),
+				reader: newTestCountingReader(" userdata1 testSet1 sindex1 S 1  E\n"),
 			},
 			want: &models.SIndex{
 				Namespace: "userdata1",

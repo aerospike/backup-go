@@ -171,8 +171,6 @@ func parseSIndexes(sindexListInfoResp string) ([]*models.SIndex, error) {
 func parseSIndex(sindexMap m.InfoMap) (*models.SIndex, error) {
 	si := &models.SIndex{}
 
-	fmt.Println("=========", sindexMap)
-
 	var err error
 	if si.Namespace, err = requireField(sindexMap, "ns"); err != nil {
 		return nil, err

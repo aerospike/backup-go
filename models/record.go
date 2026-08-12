@@ -64,6 +64,13 @@ type SIndexPath struct {
 	BinType    SIPathBinType
 }
 
+// NewEmptySIndexPath returns new SIndexPath for index without bins.
+func NewEmptySIndexPath() SIndexPath {
+	return SIndexPath{
+		BinType: EmptySIDataType,
+	}
+}
+
 type SIndex struct {
 	Namespace  string
 	Set        string

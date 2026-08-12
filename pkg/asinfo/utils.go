@@ -193,15 +193,19 @@ func parseSIndex(sindexMap m.InfoMap) (*models.SIndex, error) {
 		return nil, err
 	}
 
-	path, hasBin, err := parseSIndexPath(sindexMap)
-	switch {
-	case err != nil:
-		return nil, err
-	case hasBin:
-		si.Path = path
-	case si.IndexType != models.SetSIndex:
-		// Set indexes are the only kind allowed to have no bin.
-		return nil, fmt.Errorf("sindex missing bin")
+	if si.IndexType != models.SetSIndex {
+		path, hasBin, err := parseSIndexPath(sindexMap)
+		switch {
+		case err != nil:
+			return nil, err
+		case hasBin:
+			si.Path = path
+		case si.IndexType != models.SetSIndex:
+			// Set indexes are the only kind allowed to have no bin.
+			return nil, fmt.Errorf("sindex missing bin")
+		}
+	} else {
+		si.Path = models.NewEmptySIndexPath()
 	}
 
 	si.Expression = optionalField(sindexMap, "exp")
@@ -236,7 +240,7 @@ func optionalField(sindexMap m.InfoMap, key string) string {
 // hasBin reports whether the "bin" field was present at all.
 func parseSIndexPath(sindexMap m.InfoMap) (path models.SIndexPath, hasBin bool, err error) {
 	bin, ok := sindexMap["bin"]
-	if !ok && sindexMap["indextype"] != indexTypeSet {
+	if !ok {
 		return models.SIndexPath{}, false, nil
 	}
 

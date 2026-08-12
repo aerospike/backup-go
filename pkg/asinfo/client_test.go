@@ -847,6 +847,7 @@ func Test_parseSIndex(t *testing.T) {
 				Name:      "testindex",
 				Set:       "testset",
 				IndexType: models.SetSIndex,
+				Path:      models.NewEmptySIndexPath(),
 			},
 		},
 	}

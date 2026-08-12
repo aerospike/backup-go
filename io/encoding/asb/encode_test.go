@@ -33,7 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testEncoderConfig = NewEncoderConfig("test", false, false)
+var testEncoderConfig = NewEncoderConfig("test", false, &models.SIndexInfo{})
 
 func TestEncodeTokenRecord(t *testing.T) {
 	t.Parallel()

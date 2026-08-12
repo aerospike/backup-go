@@ -44,6 +44,8 @@ const (
 	StringSIDataType      SIPathBinType = 'S'
 	GEO2DSphereSIDataType SIPathBinType = 'G'
 	BlobSIDataType        SIPathBinType = 'B'
+	// EmptySIDataType is used for index without bins. For example, set indexes.
+	EmptySIDataType SIPathBinType = 'E'
 )
 
 type SIndexType byte
@@ -54,12 +56,20 @@ const (
 	ListElementSIndex SIndexType = 'L'
 	MapKeySIndex      SIndexType = 'K'
 	MapValueSIndex    SIndexType = 'V'
+	SetSIndex         SIndexType = 'S'
 )
 
 type SIndexPath struct {
 	BinName    string
 	B64Context string
 	BinType    SIPathBinType
+}
+
+// NewEmptySIndexPath returns new SIndexPath for index without bins.
+func NewEmptySIndexPath() SIndexPath {
+	return SIndexPath{
+		BinType: EmptySIDataType,
+	}
 }
 
 type SIndex struct {

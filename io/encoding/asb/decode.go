@@ -542,6 +542,8 @@ func (r *Decoder[T]) readSIndexType() (models.SIndexType, error) {
 		return models.MapKeySIndex, nil
 	case sindexTypeMapVal:
 		return models.MapValueSIndex, nil
+	case sindexTypeSet:
+		return models.SetSIndex, nil
 	}
 
 	return models.InvalidSIndex, fmt.Errorf("invalid secondary index type %c", b)
@@ -562,6 +564,8 @@ func (r *Decoder[T]) readSIndexBinType() (models.SIPathBinType, error) {
 		return models.GEO2DSphereSIDataType, nil
 	case sindexBinTypeBlob:
 		return models.BlobSIDataType, nil
+	case sindexBinTypeEmpty:
+		return models.EmptySIDataType, nil
 	}
 
 	return models.InvalidSIDataType, fmt.Errorf("invalid sindex path type %c", b)

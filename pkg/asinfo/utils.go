@@ -255,7 +255,9 @@ func parseSIndex(sindexMap m.InfoMap) (*models.SIndex, error) {
 
 		si.Path = path
 	} else {
-		return nil, fmt.Errorf("sindex missing bin")
+		if si.IndexType != models.SetSIndex {
+			return nil, fmt.Errorf("sindex missing bin")
+		}
 	}
 
 	// Set index expression value

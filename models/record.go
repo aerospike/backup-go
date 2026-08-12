@@ -58,9 +58,6 @@ const (
 	SetSIndex         SIndexType = 'S'
 )
 
-// TODO: remove this?
-const EmptyBinName = "empty"
-
 type SIndexPath struct {
 	BinName    string
 	B64Context string
@@ -70,7 +67,6 @@ type SIndexPath struct {
 // NewEmptySIndexPath returns new SIndexPath for index without bins.
 func NewEmptySIndexPath() SIndexPath {
 	return SIndexPath{
-		BinName: EmptyBinName,
 		BinType: EmptySIDataType,
 	}
 }

@@ -31,7 +31,7 @@ import (
 type recordReaderProcessor[T models.TokenConstraint] struct {
 	config          *ConfigBackup
 	aerospikeClient AerospikeClient
-	infoClient      InfoGetter
+	infoClient      ClusterInfo
 	state           *State
 	scanLimiter     scanlimiter.Limiter
 	rpsCollector    *metrics.Collector
@@ -44,7 +44,7 @@ type recordReaderProcessor[T models.TokenConstraint] struct {
 func newRecordReaderProcessor[T models.TokenConstraint](
 	config *ConfigBackup,
 	aerospikeClient AerospikeClient,
-	infoClient InfoGetter,
+	infoClient ClusterInfo,
 	state *State,
 	scanLimiter scanlimiter.Limiter,
 	rpsCollector *metrics.Collector,

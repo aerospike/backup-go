@@ -37,7 +37,7 @@ type HandlerBackupXDR struct {
 	writerProcessor *fileWriterProcessor[*models.ASBXToken]
 	encoder         Encoder[*models.ASBXToken]
 	config          *ConfigBackupXDR
-	infoClient      InfoGetter
+	clusterInfo     ClusterInfo
 	stats           *models.BackupStats
 
 	logger *slog.Logger
@@ -57,7 +57,8 @@ func newBackupXDRHandler(
 	aerospikeClient AerospikeClient,
 	writer Writer,
 	logger *slog.Logger,
-	infoClient InfoGetter,
+	clusterInfo ClusterInfo,
+	xdrInfo XDRInfo,
 ) (*HandlerBackupXDR, error) {
 	// Validate file size here, because this is entry point where we have configured writer and file limit.
 	if err := validateFileLimit(config.FileLimit, writer); err != nil {
@@ -71,7 +72,7 @@ func newBackupXDRHandler(
 	// Create handler base first to get the derived context.
 	base := newHandlerBase(ctx)
 
-	sIndexInfo, err := getSIndexInfo(base.ctx, infoClient, config.Namespace)
+	sIndexInfo, err := getSIndexInfo(base.ctx, clusterInfo, config.Namespace)
 	if err != nil {
 		base.cancel()
 		return nil, fmt.Errorf("failed to get sindex info: %w", err)
@@ -100,7 +101,7 @@ func newBackupXDRHandler(
 	readerProcessor := newRecordReaderProcessorXDR[*models.ASBXToken](
 		config,
 		aerospikeClient,
-		infoClient,
+		xdrInfo,
 		nil,
 		nil,
 		rpsCollector,
@@ -139,7 +140,7 @@ func newBackupXDRHandler(
 		readerProcessor: readerProcessor,
 		writerProcessor: writerProcessor,
 		config:          config,
-		infoClient:      infoClient,
+		clusterInfo:     clusterInfo,
 		stats:           stats,
 		logger:          logger,
 		rpsCollector:    rpsCollector,
@@ -162,7 +163,7 @@ func (bh *HandlerBackupXDR) run() {
 // backup starts the backup operation. It blocks until the backup is completed.
 func (bh *HandlerBackupXDR) backup(ctx context.Context) error {
 	// Count total records.
-	records, err := bh.infoClient.GetRecordCount(ctx, bh.config.Namespace, nil)
+	records, err := bh.clusterInfo.GetRecordCount(ctx, bh.config.Namespace, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get records count: %w", err)
 	}

@@ -23,7 +23,6 @@ import (
 	"github.com/aerospike/backup-go/internal/scanlimiter"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/asinfo"
-	models2 "github.com/aerospike/backup-go/pkg/asinfo/models"
 )
 
 const (
@@ -79,33 +78,9 @@ type AerospikeClient interface {
 // InfoGetter is an interface that abstracts methods for retrieving cluster information
 // and performing cluster operations.
 type InfoGetter interface {
-	GetRecordCount(ctx context.Context, namespace string, sets []string) (uint64, error)
-	GetRackNodes(ctx context.Context, rackID int) ([]string, error)
-	GetService(ctx context.Context, node string) (string, error)
-	GetVersion(ctx context.Context) (models2.AerospikeVersion, error)
-	GetSIndexes(ctx context.Context, namespace string) ([]*models.SIndex, error)
-	GetUDFs(ctx context.Context) ([]*models.UDF, error)
-	SupportsBatchWrite(ctx context.Context) (bool, error)
-	StartXDR(ctx context.Context, nodeName, dc, hostPort, namespace, rewind string, throughput int, forward bool) error
-	StopXDR(ctx context.Context, nodeName, dc string) error
-	BlockMRTWrites(ctx context.Context, nodeName, namespace string) error
-	UnBlockMRTWrites(ctx context.Context, nodeName, namespace string) error
-	GetSetsList(ctx context.Context, namespace string) ([]string, error)
-	GetStats(ctx context.Context, nodeName, dc, namespace string) (asinfo.Stats, error)
-	GetNamespacesList(ctx context.Context) ([]string, error)
-	GetStatus(ctx context.Context) (string, error)
-	GetDCsList(ctx context.Context) ([]string, error)
-	HasExpressionSIndex(ctx context.Context, namespace string) (bool, error)
-	GetPrimaryPartitions(ctx context.Context, node, namespace string) ([]int, error)
-	GetNodesNames() []string
-	GetPendingMigrations(ctx context.Context, namespace string) (uint64, error)
-	StartServerBackup(ctx context.Context,
-		namespace, storage, bucket, region, profile, accessKey, secretKey, endpoint string) (string, error)
-	StartServerRestore(ctx context.Context, jobID,
-		namespace, storage, bucket, region, profile, accessKey, secretKey, endpoint string) error
-	PrepareServerRestore(ctx context.Context, jobID, namespace string) error
-	GetBackupStatus(ctx context.Context) (float64, error)
-	HasSetSIndex(ctx context.Context, namespace string) (bool, error)
+	ClusterInfo
+	XDRInfo
+	ServerBackupInfo
 }
 
 // Client is the main entry point for the backup package.
@@ -333,7 +308,9 @@ func (c *Client) BackupXDR(
 		return nil, fmt.Errorf("failed to validate xdr backup config: %w", err)
 	}
 
-	handler, err := newBackupXDRHandler(ctx, config, c.aerospikeClient, writer, c.logger, c.infoClient)
+	handler, err := newBackupXDRHandler(
+		ctx, config, c.aerospikeClient, writer, c.logger, c.infoClient, c.infoClient,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backup xdr handler: %w", err)
 	}

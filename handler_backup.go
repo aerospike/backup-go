@@ -79,7 +79,7 @@ type BackupHandler struct {
 	logger                 *slog.Logger
 	firstFileHeaderWritten *atomic.Bool
 	limiter                *bandwidth.Limiter
-	infoClient             InfoGetter
+	infoClient             ClusterInfo
 	scanLimiter            scanlimiter.Limiter
 	id                     string
 
@@ -104,7 +104,7 @@ func newBackupHandler(
 	writer Writer,
 	reader StreamingReader,
 	scanLimiter scanlimiter.Limiter,
-	infoClient InfoGetter,
+	infoClient ClusterInfo,
 ) (*BackupHandler, error) {
 	// For estimates calculations, a writer will be nil.
 	var storageType string
@@ -642,7 +642,7 @@ func (bh *BackupHandler) cleanup() {
 	bh.pl.Swap(nil)
 }
 
-func getSIndexInfo(ctx context.Context, infoClient InfoGetter, namespace string) (*models.SIndexInfo, error) {
+func getSIndexInfo(ctx context.Context, infoClient ClusterInfo, namespace string) (*models.SIndexInfo, error) {
 	hasExpressionSIndex, err := infoClient.HasExpressionSIndex(ctx, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check if expression sindex exists: %w", err)

@@ -76,8 +76,6 @@ func (ic *Client) getSIndexes(node infoGetter, namespace string, policy *a.InfoP
 		return nil, fmt.Errorf("failed to parse sindexes response: %w", err)
 	}
 
-	fmt.Println("========", cmdResp)
-
 	return parseSIndexes(cmdResp)
 }
 
@@ -144,16 +142,15 @@ func parseSIndexes(sindexListInfoResp string) ([]*models.SIndex, error) {
 		return nil, fmt.Errorf("failed to parse sindex response: %w", err)
 	}
 
-	fmt.Println("++++++", sindexInfo)
-
 	// No sindexes
 	if sindexInfo == nil {
 		return nil, nil
 	}
 
-	sindexes := make([]*models.SIndex, len(sindexInfo))
+	// Rebuild slice from 0 len, as there can be empty values.
+	sindexes := make([]*models.SIndex, 0)
 
-	for i, sindexMap := range sindexInfo {
+	for _, sindexMap := range sindexInfo {
 		// Skip empty or nil maps.
 		if len(sindexMap) == 0 {
 			continue
@@ -164,7 +161,7 @@ func parseSIndexes(sindexListInfoResp string) ([]*models.SIndex, error) {
 			return nil, fmt.Errorf("failed to parse sindex: %w", err)
 		}
 
-		sindexes[i] = sindex
+		sindexes = append(sindexes, sindex)
 	}
 
 	return sindexes, nil
@@ -173,8 +170,6 @@ func parseSIndexes(sindexListInfoResp string) ([]*models.SIndex, error) {
 // parseSIndex parses a single InfoMap containing a sindex into a SecondaryIndex model
 func parseSIndex(sindexMap m.InfoMap) (*models.SIndex, error) {
 	si := &models.SIndex{}
-
-	fmt.Println("*****", sindexMap)
 
 	if val, ok := sindexMap["ns"]; ok {
 		si.Namespace = val
@@ -254,10 +249,8 @@ func parseSIndex(sindexMap m.InfoMap) (*models.SIndex, error) {
 		}
 
 		si.Path = path
-	} else {
-		if si.IndexType != models.SetSIndex {
-			return nil, fmt.Errorf("sindex missing bin")
-		}
+	} else if si.IndexType != models.SetSIndex {
+		return nil, fmt.Errorf("sindex missing bin")
 	}
 
 	// Set index expression value

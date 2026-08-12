@@ -71,6 +71,8 @@ func (ic *Client) getSIndexes(node infoGetter, namespace string, policy *a.InfoP
 		return nil, fmt.Errorf("failed to get sindexes: %w", err)
 	}
 
+	fmt.Println("========", response)
+
 	cmdResp, err := parseResultResponse(cmd, response)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse sindexes response: %w", err)

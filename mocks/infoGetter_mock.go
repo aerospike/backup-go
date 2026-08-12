@@ -1141,6 +1141,72 @@ func (_c *MockInfoGetter_HasExpressionSIndex_Call) RunAndReturn(run func(ctx con
 	return _c
 }
 
+// HasSetSIndex provides a mock function for the type MockInfoGetter
+func (_mock *MockInfoGetter) HasSetSIndex(ctx context.Context, namespace string) (bool, error) {
+	ret := _mock.Called(ctx, namespace)
+
+	if len(ret) == 0 {
+		panic("no return value specified for HasSetSIndex")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
+		return returnFunc(ctx, namespace)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) bool); ok {
+		r0 = returnFunc(ctx, namespace)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, namespace)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockInfoGetter_HasSetSIndex_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasSetSIndex'
+type MockInfoGetter_HasSetSIndex_Call struct {
+	*mock.Call
+}
+
+// HasSetSIndex is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+func (_e *MockInfoGetter_Expecter) HasSetSIndex(ctx interface{}, namespace interface{}) *MockInfoGetter_HasSetSIndex_Call {
+	return &MockInfoGetter_HasSetSIndex_Call{Call: _e.mock.On("HasSetSIndex", ctx, namespace)}
+}
+
+func (_c *MockInfoGetter_HasSetSIndex_Call) Run(run func(ctx context.Context, namespace string)) *MockInfoGetter_HasSetSIndex_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockInfoGetter_HasSetSIndex_Call) Return(b bool, err error) *MockInfoGetter_HasSetSIndex_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockInfoGetter_HasSetSIndex_Call) RunAndReturn(run func(ctx context.Context, namespace string) (bool, error)) *MockInfoGetter_HasSetSIndex_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PrepareServerRestore provides a mock function for the type MockInfoGetter
 func (_mock *MockInfoGetter) PrepareServerRestore(ctx context.Context, jobID string, namespace string) error {
 	ret := _mock.Called(ctx, jobID, namespace)

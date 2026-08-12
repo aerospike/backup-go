@@ -349,6 +349,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 				Set:       "testSet1",
 				Name:      "sindex1",
 				IndexType: models.SetSIndex,
+				Path:      models.NewEmptySIndexPath(),
 			},
 			wantErr: false,
 		},
@@ -3596,7 +3597,7 @@ func TestEncodeDecodeRecordRoundTrip(t *testing.T) {
 		VoidTime: 100,
 	}, 0, nil)
 
-	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, false))
+	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, &models.SIndexInfo{}))
 	var file bytes.Buffer
 	file.Write(encoder.GetHeader(0, true))
 
@@ -3660,7 +3661,7 @@ func BenchmarkDecodeRecordRoundTrip(b *testing.B) {
 		VoidTime: 100,
 	}, 0, nil)
 
-	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, false))
+	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, &models.SIndexInfo{}))
 	var payload bytes.Buffer
 	payload.Write(encoder.GetHeader(0, true))
 	if err := encoder.EncodeToken(token, &payload); err != nil {

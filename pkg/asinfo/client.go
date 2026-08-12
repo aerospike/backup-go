@@ -195,6 +195,22 @@ func (ic *Client) HasExpressionSIndex(ctx context.Context, namespace string) (bo
 	return false, nil
 }
 
+// HasSetSIndex checks whether the namespace contains set secondary indexes.
+func (ic *Client) HasSetSIndex(ctx context.Context, namespace string) (bool, error) {
+	list, err := ic.GetSIndexes(ctx, namespace)
+	if err != nil {
+		return false, err
+	}
+
+	for _, idx := range list {
+		if idx.IndexType == models.SetSIndex {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 // GetSIndexes returns list of SIndexes for the given namespace.
 func (ic *Client) GetSIndexes(ctx context.Context, namespace string) ([]*models.SIndex, error) {
 	var (

@@ -14,6 +14,8 @@
 
 package asb
 
+import "github.com/aerospike/backup-go/models"
+
 // EncoderConfig contains configuration options for the Encoder.
 type EncoderConfig struct {
 	// Namespace is the namespace to back up.
@@ -23,19 +25,26 @@ type EncoderConfig struct {
 	// HasExpressionSIndex indicates whether the backup contains an expression SIndex.
 	// In that case an asb metaVersion will be bumped.
 	HasExpressionSIndex bool
+	// HasSetSIndex indicates whether the backup contains a set SIndex.
+	HasSetSIndex bool
 }
 
 // NewEncoderConfig returns a new encoder EncoderConfig.
-func NewEncoderConfig(namespace string, compact, hasExpressionSIndex bool) *EncoderConfig {
+func NewEncoderConfig(namespace string, compact bool, sIndexInfo *models.SIndexInfo) *EncoderConfig {
 	return &EncoderConfig{
 		Namespace:           namespace,
 		Compact:             compact,
-		HasExpressionSIndex: hasExpressionSIndex,
+		HasExpressionSIndex: sIndexInfo.HasExpression,
+		HasSetSIndex:        sIndexInfo.HasSet,
 	}
 }
 
 // getVersion resolves version depending on the config.
 func (c *EncoderConfig) getVersion() *version {
+	if c.HasSetSIndex {
+		return version33
+	}
+
 	if c.HasExpressionSIndex {
 		return version32
 	}

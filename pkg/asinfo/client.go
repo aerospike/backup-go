@@ -213,36 +213,29 @@ func (ic *Client) GetVersion(ctx context.Context) (iModels.AerospikeVersion, err
 	return result, nil
 }
 
-// HasExpressionSIndex checks whether the namespace contains expression based secondary indexes.
-func (ic *Client) HasExpressionSIndex(ctx context.Context, namespace string) (bool, error) {
+// GetSIndexInfo returns information about secondary indexes in the given namespace.
+func (ic *Client) GetSIndexInfo(ctx context.Context, namespace string) (*models.SIndexInfo, error) {
 	list, err := ic.GetSIndexes(ctx, namespace)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
+
+	var hasSetSIndex, hasExpressionSIndex bool
 
 	for _, idx := range list {
 		if idx.Expression != "" {
-			return true, nil
+			hasExpressionSIndex = true
 		}
-	}
 
-	return false, nil
-}
-
-// HasSetSIndex checks whether the namespace contains set secondary indexes.
-func (ic *Client) HasSetSIndex(ctx context.Context, namespace string) (bool, error) {
-	list, err := ic.GetSIndexes(ctx, namespace)
-	if err != nil {
-		return false, err
-	}
-
-	for _, idx := range list {
 		if idx.IndexType == models.SetSIndex {
-			return true, nil
+			hasSetSIndex = true
 		}
 	}
 
-	return false, nil
+	return &models.SIndexInfo{
+		HasSet:        hasSetSIndex,
+		HasExpression: hasExpressionSIndex,
+	}, nil
 }
 
 // GetSIndexes returns list of SIndexes for the given namespace.

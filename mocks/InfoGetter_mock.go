@@ -745,6 +745,74 @@ func (_c *MockInfoGetter_GetRestoreStatus_Call) RunAndReturn(run func(ctx contex
 	return _c
 }
 
+// GetSIndexInfo provides a mock function for the type MockInfoGetter
+func (_mock *MockInfoGetter) GetSIndexInfo(ctx context.Context, namespace string) (*models.SIndexInfo, error) {
+	ret := _mock.Called(ctx, namespace)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSIndexInfo")
+	}
+
+	var r0 *models.SIndexInfo
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*models.SIndexInfo, error)); ok {
+		return returnFunc(ctx, namespace)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *models.SIndexInfo); ok {
+		r0 = returnFunc(ctx, namespace)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.SIndexInfo)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, namespace)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockInfoGetter_GetSIndexInfo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSIndexInfo'
+type MockInfoGetter_GetSIndexInfo_Call struct {
+	*mock.Call
+}
+
+// GetSIndexInfo is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+func (_e *MockInfoGetter_Expecter) GetSIndexInfo(ctx interface{}, namespace interface{}) *MockInfoGetter_GetSIndexInfo_Call {
+	return &MockInfoGetter_GetSIndexInfo_Call{Call: _e.mock.On("GetSIndexInfo", ctx, namespace)}
+}
+
+func (_c *MockInfoGetter_GetSIndexInfo_Call) Run(run func(ctx context.Context, namespace string)) *MockInfoGetter_GetSIndexInfo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockInfoGetter_GetSIndexInfo_Call) Return(sIndexInfo *models.SIndexInfo, err error) *MockInfoGetter_GetSIndexInfo_Call {
+	_c.Call.Return(sIndexInfo, err)
+	return _c
+}
+
+func (_c *MockInfoGetter_GetSIndexInfo_Call) RunAndReturn(run func(ctx context.Context, namespace string) (*models.SIndexInfo, error)) *MockInfoGetter_GetSIndexInfo_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetSIndexes provides a mock function for the type MockInfoGetter
 func (_mock *MockInfoGetter) GetSIndexes(ctx context.Context, namespace string) ([]*models.SIndex, error) {
 	ret := _mock.Called(ctx, namespace)
@@ -1203,138 +1271,6 @@ func (_c *MockInfoGetter_GetVersion_Call) Return(aerospikeVersion models0.Aerosp
 }
 
 func (_c *MockInfoGetter_GetVersion_Call) RunAndReturn(run func(ctx context.Context) (models0.AerospikeVersion, error)) *MockInfoGetter_GetVersion_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// HasExpressionSIndex provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) HasExpressionSIndex(ctx context.Context, namespace string) (bool, error) {
-	ret := _mock.Called(ctx, namespace)
-
-	if len(ret) == 0 {
-		panic("no return value specified for HasExpressionSIndex")
-	}
-
-	var r0 bool
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
-		return returnFunc(ctx, namespace)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) bool); ok {
-		r0 = returnFunc(ctx, namespace)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = returnFunc(ctx, namespace)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockInfoGetter_HasExpressionSIndex_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasExpressionSIndex'
-type MockInfoGetter_HasExpressionSIndex_Call struct {
-	*mock.Call
-}
-
-// HasExpressionSIndex is a helper method to define mock.On call
-//   - ctx context.Context
-//   - namespace string
-func (_e *MockInfoGetter_Expecter) HasExpressionSIndex(ctx interface{}, namespace interface{}) *MockInfoGetter_HasExpressionSIndex_Call {
-	return &MockInfoGetter_HasExpressionSIndex_Call{Call: _e.mock.On("HasExpressionSIndex", ctx, namespace)}
-}
-
-func (_c *MockInfoGetter_HasExpressionSIndex_Call) Run(run func(ctx context.Context, namespace string)) *MockInfoGetter_HasExpressionSIndex_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		run(
-			arg0,
-			arg1,
-		)
-	})
-	return _c
-}
-
-func (_c *MockInfoGetter_HasExpressionSIndex_Call) Return(b bool, err error) *MockInfoGetter_HasExpressionSIndex_Call {
-	_c.Call.Return(b, err)
-	return _c
-}
-
-func (_c *MockInfoGetter_HasExpressionSIndex_Call) RunAndReturn(run func(ctx context.Context, namespace string) (bool, error)) *MockInfoGetter_HasExpressionSIndex_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// HasSetSIndex provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) HasSetSIndex(ctx context.Context, namespace string) (bool, error) {
-	ret := _mock.Called(ctx, namespace)
-
-	if len(ret) == 0 {
-		panic("no return value specified for HasSetSIndex")
-	}
-
-	var r0 bool
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
-		return returnFunc(ctx, namespace)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) bool); ok {
-		r0 = returnFunc(ctx, namespace)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = returnFunc(ctx, namespace)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockInfoGetter_HasSetSIndex_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasSetSIndex'
-type MockInfoGetter_HasSetSIndex_Call struct {
-	*mock.Call
-}
-
-// HasSetSIndex is a helper method to define mock.On call
-//   - ctx context.Context
-//   - namespace string
-func (_e *MockInfoGetter_Expecter) HasSetSIndex(ctx interface{}, namespace interface{}) *MockInfoGetter_HasSetSIndex_Call {
-	return &MockInfoGetter_HasSetSIndex_Call{Call: _e.mock.On("HasSetSIndex", ctx, namespace)}
-}
-
-func (_c *MockInfoGetter_HasSetSIndex_Call) Run(run func(ctx context.Context, namespace string)) *MockInfoGetter_HasSetSIndex_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		run(
-			arg0,
-			arg1,
-		)
-	})
-	return _c
-}
-
-func (_c *MockInfoGetter_HasSetSIndex_Call) Return(b bool, err error) *MockInfoGetter_HasSetSIndex_Call {
-	_c.Call.Return(b, err)
-	return _c
-}
-
-func (_c *MockInfoGetter_HasSetSIndex_Call) RunAndReturn(run func(ctx context.Context, namespace string) (bool, error)) *MockInfoGetter_HasSetSIndex_Call {
 	_c.Call.Return(run)
 	return _c
 }

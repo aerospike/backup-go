@@ -72,7 +72,7 @@ func newBackupXDRHandler(
 	// Create handler base first to get the derived context.
 	base := newHandlerBase(ctx)
 
-	sIndexInfo, err := getSIndexInfo(base.ctx, clusterInfo, config.Namespace)
+	sIndexInfo, err := clusterInfo.GetSIndexInfo(base.ctx, config.Namespace)
 	if err != nil {
 		base.cancel()
 		return nil, fmt.Errorf("failed to get sindex info: %w", err)

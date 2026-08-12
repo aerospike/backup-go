@@ -44,7 +44,8 @@ const (
 	StringSIDataType      SIPathBinType = 'S'
 	GEO2DSphereSIDataType SIPathBinType = 'G'
 	BlobSIDataType        SIPathBinType = 'B'
-	EmptySIDataType       SIPathBinType = 'E' // For index without bins.
+	// EmptySIDataType is used for index without bins. For example, set indexes.
+	EmptySIDataType SIPathBinType = 'E'
 )
 
 type SIndexType byte

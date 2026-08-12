@@ -234,7 +234,7 @@ func optionalField(sindexMap m.InfoMap, key string) string {
 // hasBin reports whether the "bin" field was present at all.
 func parseSIndexPath(sindexMap m.InfoMap) (path models.SIndexPath, hasBin bool, err error) {
 	bin, ok := sindexMap["bin"]
-	if !ok {
+	if !ok && sindexMap["indextype"] != indexTypeSet {
 		return models.SIndexPath{}, false, nil
 	}
 

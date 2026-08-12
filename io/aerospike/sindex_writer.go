@@ -52,7 +52,7 @@ func newSindexWriter(
 func (rw *sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 	var sIndexType a.IndexType
 
-	fmt.Println("========", *si)
+	fmt.Printf("\n======== %+v", *si)
 
 	switch si.Path.BinType {
 	case models.NumericSIDataType:

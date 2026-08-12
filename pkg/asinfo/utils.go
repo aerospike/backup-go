@@ -71,12 +71,12 @@ func (ic *Client) getSIndexes(node infoGetter, namespace string, policy *a.InfoP
 		return nil, fmt.Errorf("failed to get sindexes: %w", err)
 	}
 
-	fmt.Println("========", response)
-
 	cmdResp, err := parseResultResponse(cmd, response)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse sindexes response: %w", err)
 	}
+
+	fmt.Println("========", cmdResp)
 
 	return parseSIndexes(cmdResp)
 }
@@ -144,6 +144,8 @@ func parseSIndexes(sindexListInfoResp string) ([]*models.SIndex, error) {
 		return nil, fmt.Errorf("failed to parse sindex response: %w", err)
 	}
 
+	fmt.Println("++++++", sindexInfo)
+
 	// No sindexes
 	if sindexInfo == nil {
 		return nil, nil
@@ -166,6 +168,8 @@ func parseSIndexes(sindexListInfoResp string) ([]*models.SIndex, error) {
 // parseSIndex parses a single InfoMap containing a sindex into a SecondaryIndex model
 func parseSIndex(sindexMap m.InfoMap) (*models.SIndex, error) {
 	si := &models.SIndex{}
+
+	fmt.Println("*****", sindexMap)
 
 	if val, ok := sindexMap["ns"]; ok {
 		si.Namespace = val

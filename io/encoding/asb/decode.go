@@ -518,9 +518,7 @@ func (r *Decoder[T]) readSIndex(isExpression bool) (*models.SIndex, error) {
 		}
 	}
 
-	if path.BinType != models.EmptySIDataType {
-		res.Path = path
-	}
+	res.Path = path
 
 	if err := expectChar(r.reader, asbNewLine); err != nil {
 		return nil, err

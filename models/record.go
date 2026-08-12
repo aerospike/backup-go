@@ -58,6 +58,7 @@ const (
 	SetSIndex         SIndexType = 'S'
 )
 
+// TODO: remove this?
 const EmptyBinName = "empty"
 
 type SIndexPath struct {

@@ -95,6 +95,7 @@ const (
 	sindexTypeList   byte = 'L'
 	sindexTypeMapKey byte = 'K'
 	sindexTypeMapVal byte = 'V'
+	sindexTypeSet    byte = 'S'
 )
 
 // sindex bin types

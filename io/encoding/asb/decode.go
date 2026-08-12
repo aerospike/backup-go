@@ -542,6 +542,8 @@ func (r *Decoder[T]) readSIndexType() (models.SIndexType, error) {
 		return models.MapKeySIndex, nil
 	case sindexTypeMapVal:
 		return models.MapValueSIndex, nil
+	case sindexTypeSet:
+		return models.SetSIndex, nil
 	}
 
 	return models.InvalidSIndex, fmt.Errorf("invalid secondary index type %c", b)

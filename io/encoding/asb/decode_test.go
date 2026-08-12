@@ -340,6 +340,19 @@ func TestASBReader_readSIndex(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "set index",
+			fields: fields{
+				reader: newTestCountingReader(" userdata1 testSet1 sindex1 S 1\n"),
+			},
+			want: &models.SIndex{
+				Namespace: "userdata1",
+				Set:       "testSet1",
+				Name:      "sindex1",
+				IndexType: models.SetSIndex,
+			},
+			wantErr: false,
+		},
+		{
 			name: "negative missing first space",
 			fields: fields{
 				reader: newTestCountingReader("userdata1 testSet1 sindex1 V 1 bin1 B\n"),

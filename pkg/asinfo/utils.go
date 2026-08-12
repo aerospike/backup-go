@@ -153,8 +153,13 @@ func parseSIndexes(sindexListInfoResp string) ([]*models.SIndex, error) {
 
 	sindexes := make([]*models.SIndex, len(sindexInfo))
 
-	for i, sindexStr := range sindexInfo {
-		sindex, err := parseSIndex(sindexStr)
+	for i, sindexMap := range sindexInfo {
+		// Skip empty or nil maps.
+		if len(sindexMap) == 0 {
+			continue
+		}
+
+		sindex, err := parseSIndex(sindexMap)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse sindex: %w", err)
 		}

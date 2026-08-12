@@ -47,6 +47,7 @@ func TestBackupHandler_GoroutineLeak_OnSuccess(t *testing.T) {
 	}).Maybe()
 	mockWriter.EXPECT().Remove(mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockInfoGetter.EXPECT().HasExpressionSIndex(mock.Anything, mock.Anything).Return(false, nil).Maybe()
+	mockInfoGetter.EXPECT().HasSetSIndex(mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 

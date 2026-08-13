@@ -53,11 +53,6 @@ type Reader struct {
 	// containerName contains name of the container to read from.
 	containerName string
 
-	// objectsToStream is used to predefine a list of objects that must be read from storage.
-	// If objectsToStream is not set, we iterate through objects in storage and load them.
-	// If set, we load objects from this slice directly.
-	objectsToStream []string
-
 	// objectsToWarm is used to track the current number of restoring objects.
 	objectsToWarm []string
 
@@ -143,12 +138,6 @@ func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error, skipPrefixes []string,
 ) {
 	defer close(readersCh)
-
-	// If objects were preloaded, we stream them.
-	if len(r.objectsToStream) > 0 {
-		r.streamSetObjects(ctx, readersCh, errorsCh)
-		return
-	}
 	// Init file skipper when skipPrefix is set.
 	if len(skipPrefixes) > 0 {
 		r.skipped = common.NewSkippedFiles(skipPrefixes)
@@ -372,18 +361,6 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 	}
 
 	return result, nil
-}
-
-// SetObjectsToStream set objects to stream.
-func (r *Reader) SetObjectsToStream(list []string) {
-	r.objectsToStream = list
-}
-
-// streamSetObjects streams preloaded objects.
-func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error) {
-	for i := range r.objectsToStream {
-		r.openObject(ctx, r.objectsToStream[i], readersCh, errorsCh, true)
-	}
 }
 
 func (r *Reader) rehydrateObject(ctx context.Context, path string, tier blob.AccessTier) error {

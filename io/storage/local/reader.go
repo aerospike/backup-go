@@ -36,11 +36,6 @@ type Reader struct {
 	// Optional parameters.
 	options.Options
 
-	// objectsToStream is used to predefine a list of objects that must be read from storage.
-	// If objectsToStream is not set, we iterate through objects in storage and load them.
-	// If set, we load objects from this slice directly.
-	objectsToStream []string
-
 	// total size of all objects in a path.
 	totalSize atomic.Int64
 	// total number of objects in a path.
@@ -73,7 +68,8 @@ func NewReader(_ context.Context, opts ...options.Opt) (*Reader, error) {
 	}
 
 	if r.CalculateTotalSize {
-		// We "lazy" calculate the total size of all files in a path for estimates calculations.
+		// Calculate directory size asynchronously in the background so that reader initialization
+		// remains non-blocking for large file trees.
 		go r.calculateTotalSize()
 	}
 
@@ -88,12 +84,6 @@ func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error, skipPrefixes []string,
 ) {
 	defer close(readersCh)
-
-	// If objects were preloaded, we stream them.
-	if len(r.objectsToStream) > 0 {
-		r.streamSetObjects(ctx, readersCh, errorsCh)
-		return
-	}
 	// Init file skipper when skipPrefix is set.
 	if len(skipPrefixes) > 0 {
 		r.skipped = common.NewSkippedFiles(skipPrefixes)
@@ -122,9 +112,26 @@ func (r *Reader) StreamFiles(
 func (r *Reader) streamDirectory(
 	ctx context.Context, path string, readersCh chan<- models.File, errorsCh chan<- error,
 ) {
-	fileInfo, err := os.ReadDir(path)
+	// os.OpenRoot sandboxes path operations inside the specified directory root,
+	// protecting against directory traversal vulnerability exploits.
+	root, err := os.OpenRoot(path)
 	if err != nil {
-		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to read path %s: %w", path, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open root %s: %w", path, err))
+		return
+	}
+
+	defer root.Close()
+
+	dirFile, err := root.Open(".")
+	if err != nil {
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open root directory: %w", err))
+		return
+	}
+	defer dirFile.Close()
+
+	fileInfo, err := dirFile.ReadDir(-1)
+	if err != nil {
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to read root %s: %w", path, err))
 		return
 	}
 
@@ -144,12 +151,10 @@ func (r *Reader) streamDirectory(
 			continue
 		}
 
-		filePath := filepath.Join(path, file.Name())
-
 		// Skip empty files.
 		info, err := file.Info()
 		if err != nil {
-			common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get file info %s: %w", filePath, err))
+			common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get file info %s in root %s: %w", file.Name(), path, err))
 			return
 		}
 
@@ -157,13 +162,15 @@ func (r *Reader) streamDirectory(
 			continue
 		}
 
-		if r.shouldSkip(filePath) {
+		// Apply application-level filter/validator rules.
+		if r.shouldSkip(file.Name()) {
 			// Since we are passing invalid files, we don't need to handle this
 			// error and write a test for it. Maybe we should log this information
 			// for the user so they know what is going on.
 			continue
 		}
 
+		filePath := filepath.Join(path, file.Name())
 		// If skipPrefix is set we save skipped filepath and continue.
 		if r.skipped.Skip(filePath) {
 			continue
@@ -171,12 +178,14 @@ func (r *Reader) streamDirectory(
 
 		var reader io.ReadCloser
 
-		reader, err = os.Open(filePath)
+		// Open the file relative to the secure root handle.
+		reader, err = root.Open(file.Name())
 		if err != nil {
-			common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open %s: %w", filePath, err))
+			common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open file %s in root %s: %w", file.Name(), path, err))
 			return
 		}
 
+		// Send open file reader handle downstream; caller is responsible for closing reader.
 		readersCh <- models.File{Reader: reader, Name: filepath.Base(file.Name())}
 	}
 }
@@ -202,30 +211,41 @@ func (r *Reader) StreamFile(
 // checkRestoreDirectory checks that the restore directory exists,
 // is a readable directory, and contains backup files of the correct format.
 func (r *Reader) checkRestoreDirectory(dir string) error {
-	dirInfo, err := os.Stat(dir)
+	root, err := os.OpenRoot(dir)
 	if err != nil {
-		// Handle the error
-		return fmt.Errorf("failed to get path info %s: %w", dir, err)
+		if errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("failed to get path info %s: %w", dir, err)
+		}
+
+		if isNotDir(err) { // it's a file, not a directory
+			return fmt.Errorf("%s is not a directory", dir)
+		}
+
+		return fmt.Errorf("failed to open root %s: %w", dir, err)
 	}
 
-	if !dirInfo.IsDir() {
-		// Handle the case when it's not a directory
-		return fmt.Errorf("%s is not a directory", dir)
-	}
+	defer root.Close()
 
-	fileInfo, err := os.ReadDir(dir)
+	dirFile, err := root.Open(".")
 	if err != nil {
-		return fmt.Errorf("failed to read path %s: %w", dir, err)
+		return fmt.Errorf("failed to open root directory: %w", err)
+	}
+	defer dirFile.Close()
+
+	fileInfo, err := dirFile.ReadDir(-1)
+	if err != nil {
+		return fmt.Errorf("failed to read root %s: %w", dir, err)
 	}
 
 	switch {
 	case r.Validator != nil:
+		// Fast-fail search: verify directory validness by finding at least one valid backup file.
 		for _, file := range fileInfo {
 			if file.IsDir() {
 				// Iterate over nested dirs recursively.
 				if r.WithNestedDir {
 					nestedDir := filepath.Join(dir, file.Name())
-					// If the nested folder is ok, then return nil.
+					// Short-circuit: return success immediately if any nested subdirectory is valid.
 					if err = r.checkRestoreDirectory(nestedDir); err == nil {
 						return nil
 					}
@@ -234,7 +254,7 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 				continue
 			}
 
-			// If we found a valid file, return.
+			// Short-circuit: return success as soon as one file matches validation criteria.
 			if err = r.Validator.Run(file.Name()); err == nil {
 				return nil
 			}
@@ -255,13 +275,26 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error) {
 	result := make([]string, 0)
 
-	fileInfo, err := os.ReadDir(path)
+	root, err := os.OpenRoot(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) && r.SkipDirCheck {
 			return nil, nil // Path doesn't exist, no error returned
 		}
 
-		return nil, fmt.Errorf("failed to read path %s: %w", path, err)
+		return nil, fmt.Errorf("failed to open root %s: %w", path, err)
+	}
+
+	defer root.Close()
+
+	dirFile, err := root.Open(".")
+	if err != nil {
+		return nil, fmt.Errorf("failed to open root directory: %w", err)
+	}
+	defer dirFile.Close()
+
+	fileInfo, err := dirFile.ReadDir(-1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read root %s: %w", path, err)
 	}
 
 	for i := range fileInfo {
@@ -291,18 +324,6 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 	}
 
 	return result, nil
-}
-
-// SetObjectsToStream sets objects to stream.
-func (r *Reader) SetObjectsToStream(list []string) {
-	r.objectsToStream = list
-}
-
-// streamSetObjects streams preloaded objects.
-func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error) {
-	for i := range r.objectsToStream {
-		r.StreamFile(ctx, r.objectsToStream[i], readersCh, errorsCh)
-	}
 }
 
 // GetType returns the type of the reader.
@@ -337,7 +358,7 @@ func (r *Reader) calculateTotalSize() {
 		totalNum += num
 	}
 
-	// set size when everything is ready.
+	// Atomically store calculated aggregate values.
 	r.totalSize.Store(totalSize)
 	r.totalNumber.Store(totalNum)
 }
@@ -357,9 +378,22 @@ func (r *Reader) calculateTotalSizeForPath(path string) (totalSize, totalNum int
 }
 
 func (r *Reader) calculateTotalSizeForDir(path string) (totalSize, totalNum int64, err error) {
-	fileInfo, err := os.ReadDir(path)
+	root, err := os.OpenRoot(path)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to read path %s: %w", path, err)
+		return 0, 0, fmt.Errorf("failed to open root %s: %w", path, err)
+	}
+
+	defer root.Close()
+
+	dirFile, err := root.Open(".")
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to open root directory: %w", err)
+	}
+	defer dirFile.Close()
+
+	fileInfo, err := dirFile.ReadDir(-1)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to read root %s: %w", path, err)
 	}
 
 	for _, file := range fileInfo {
@@ -416,7 +450,7 @@ func (r *Reader) GetNumber() int64 {
 	return r.totalNumber.Load()
 }
 
-// GetSkipped returns a list of file paths that were skipped during the `StreamFlies` with skipPrefix.
+// GetSkipped returns a list of file paths that were skipped during the `StreamFiles` with skipPrefix.
 func (r *Reader) GetSkipped() []string {
 	return r.skipped.GetSkipped()
 }

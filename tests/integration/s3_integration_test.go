@@ -21,7 +21,7 @@ import (
 
 const (
 	testBackupDir  = "/"
-	testBackupFile = "/backup_folder/backup_file.txt"
+	testBackupFile = "backup_folder/backup_file.txt"
 	testChunkSize  = 5242880
 
 	profile  = "minio"

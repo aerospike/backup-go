@@ -136,6 +136,54 @@ func TestWriter_NewWriter_WithDir_DevNull(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestWriter_NewWriter_RejectsPathTraversal(t *testing.T) {
+	t.Parallel()
+	tmpDir := filepath.Join(t.TempDir(), "not-yet-created")
+	w := &Writer{Options: options.Options{
+		PathList: []string{tmpDir},
+		IsDir:    true,
+	}}
+
+	for _, filename := range []string{
+		"../outside.asb",
+		"/absolute.asb",
+		"nested/file.asb",
+		".",
+		"..",
+		"invalid\x00.asb",
+	} {
+		_, err := w.NewWriter(t.Context(), filename)
+		require.Error(t, err, filename)
+	}
+
+	require.NoDirExists(t, tmpDir)
+	require.NoFileExists(t, filepath.Join(filepath.Dir(tmpDir), "outside.asb"))
+}
+
+func TestWriter_NewWriter_TruncatesAndUsesRestrictiveFileMode(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, testFileName)
+	require.NoError(t, os.WriteFile(filePath, []byte("old content that is longer"), 0o600))
+
+	w := &Writer{Options: options.Options{
+		PathList: []string{tmpDir},
+		IsDir:    true,
+	}}
+	writer, err := w.NewWriter(t.Context(), testFileName)
+	require.NoError(t, err)
+	_, err = writer.Write([]byte("new"))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	content, err := os.ReadFile(filePath)
+	require.NoError(t, err)
+	require.Equal(t, "new", string(content))
+	info, err := os.Stat(filePath)
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+}
+
 func TestWriter_NewWriter_WithFile_DevNull(t *testing.T) {
 	t.Parallel()
 

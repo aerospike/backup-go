@@ -31,12 +31,17 @@ type EncoderConfig struct {
 
 // NewEncoderConfig returns a new encoder EncoderConfig.
 func NewEncoderConfig(namespace string, compact bool, sIndexInfo *models.SIndexInfo) *EncoderConfig {
-	return &EncoderConfig{
-		Namespace:           namespace,
-		Compact:             compact,
-		HasExpressionSIndex: sIndexInfo.HasExpression,
-		HasSetSIndex:        sIndexInfo.HasSet,
+	c := &EncoderConfig{
+		Namespace: namespace,
+		Compact:   compact,
 	}
+
+	if sIndexInfo != nil {
+		c.HasExpressionSIndex = sIndexInfo.HasExpression
+		c.HasSetSIndex = sIndexInfo.HasSet
+	}
+
+	return c
 }
 
 // getVersion resolves version depending on the config.

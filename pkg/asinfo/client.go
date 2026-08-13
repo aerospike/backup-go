@@ -38,7 +38,6 @@ const (
 	indexTypeList      = "list"
 	indexTypeMapKeys   = "mapkeys"
 	indexTypeMapValues = "mapvalues"
-	indexTypeSet       = "set"
 
 	indexBinTypeNumeric     = "numeric"
 	indexBinTypeIntSigned   = "int signed"
@@ -213,29 +212,20 @@ func (ic *Client) GetVersion(ctx context.Context) (iModels.AerospikeVersion, err
 	return result, nil
 }
 
-// GetSIndexInfo returns information about secondary indexes in the given namespace.
-func (ic *Client) GetSIndexInfo(ctx context.Context, namespace string) (*models.SIndexInfo, error) {
+// HasExpressionSIndex checks whether the namespace contains expression based secondary indexes.
+func (ic *Client) HasExpressionSIndex(ctx context.Context, namespace string) (bool, error) {
 	list, err := ic.GetSIndexes(ctx, namespace)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
-
-	var hasSetSIndex, hasExpressionSIndex bool
 
 	for _, idx := range list {
 		if idx.Expression != "" {
-			hasExpressionSIndex = true
-		}
-
-		if idx.IndexType == models.SetSIndex {
-			hasSetSIndex = true
+			return true, nil
 		}
 	}
 
-	return &models.SIndexInfo{
-		HasSet:        hasSetSIndex,
-		HasExpression: hasExpressionSIndex,
-	}, nil
+	return false, nil
 }
 
 // GetSIndexes returns list of SIndexes for the given namespace.

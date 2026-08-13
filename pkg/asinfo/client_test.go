@@ -831,25 +831,6 @@ func Test_parseSIndex(t *testing.T) {
 			},
 			wantErr: true,
 		},
-		{
-			name: "set index type",
-			args: args{
-				// map[indexname:set_idx indextype:set ns:source-ns1 set:testRacks]]
-				sindexMap: models2.InfoMap{
-					"ns":        "test",
-					"indexname": "testindex",
-					"set":       "testset",
-					"indextype": indexTypeSet,
-				},
-			},
-			want: &models.SIndex{
-				Namespace: "test",
-				Name:      "testindex",
-				Set:       "testset",
-				IndexType: models.SetSIndex,
-				Path:      models.NewEmptySIndexPath(),
-			},
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

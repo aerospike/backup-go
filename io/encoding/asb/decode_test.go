@@ -340,20 +340,6 @@ func TestASBReader_readSIndex(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "set index",
-			fields: fields{
-				reader: newTestCountingReader(" userdata1 testSet1 sindex1 S 1  E\n"),
-			},
-			want: &models.SIndex{
-				Namespace: "userdata1",
-				Set:       "testSet1",
-				Name:      "sindex1",
-				IndexType: models.SetSIndex,
-				Path:      models.NewEmptySIndexPath(),
-			},
-			wantErr: false,
-		},
-		{
 			name: "negative missing first space",
 			fields: fields{
 				reader: newTestCountingReader("userdata1 testSet1 sindex1 V 1 bin1 B\n"),
@@ -3597,7 +3583,7 @@ func TestEncodeDecodeRecordRoundTrip(t *testing.T) {
 		VoidTime: 100,
 	}, 0, nil)
 
-	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, &models.SIndexInfo{}))
+	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, false))
 	var file bytes.Buffer
 	file.Write(encoder.GetHeader(0, true))
 
@@ -3661,7 +3647,7 @@ func BenchmarkDecodeRecordRoundTrip(b *testing.B) {
 		VoidTime: 100,
 	}, 0, nil)
 
-	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, &models.SIndexInfo{}))
+	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, false))
 	var payload bytes.Buffer
 	payload.Write(encoder.GetHeader(0, true))
 	if err := encoder.EncodeToken(token, &payload); err != nil {

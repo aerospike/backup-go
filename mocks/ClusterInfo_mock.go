@@ -447,74 +447,6 @@ func (_c *MockClusterInfo_GetRecordCount_Call) RunAndReturn(run func(ctx context
 	return _c
 }
 
-// GetSIndexInfo provides a mock function for the type MockClusterInfo
-func (_mock *MockClusterInfo) GetSIndexInfo(ctx context.Context, namespace string) (*models.SIndexInfo, error) {
-	ret := _mock.Called(ctx, namespace)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetSIndexInfo")
-	}
-
-	var r0 *models.SIndexInfo
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*models.SIndexInfo, error)); ok {
-		return returnFunc(ctx, namespace)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *models.SIndexInfo); ok {
-		r0 = returnFunc(ctx, namespace)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*models.SIndexInfo)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = returnFunc(ctx, namespace)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockClusterInfo_GetSIndexInfo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSIndexInfo'
-type MockClusterInfo_GetSIndexInfo_Call struct {
-	*mock.Call
-}
-
-// GetSIndexInfo is a helper method to define mock.On call
-//   - ctx context.Context
-//   - namespace string
-func (_e *MockClusterInfo_Expecter) GetSIndexInfo(ctx interface{}, namespace interface{}) *MockClusterInfo_GetSIndexInfo_Call {
-	return &MockClusterInfo_GetSIndexInfo_Call{Call: _e.mock.On("GetSIndexInfo", ctx, namespace)}
-}
-
-func (_c *MockClusterInfo_GetSIndexInfo_Call) Run(run func(ctx context.Context, namespace string)) *MockClusterInfo_GetSIndexInfo_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		run(
-			arg0,
-			arg1,
-		)
-	})
-	return _c
-}
-
-func (_c *MockClusterInfo_GetSIndexInfo_Call) Return(sIndexInfo *models.SIndexInfo, err error) *MockClusterInfo_GetSIndexInfo_Call {
-	_c.Call.Return(sIndexInfo, err)
-	return _c
-}
-
-func (_c *MockClusterInfo_GetSIndexInfo_Call) RunAndReturn(run func(ctx context.Context, namespace string) (*models.SIndexInfo, error)) *MockClusterInfo_GetSIndexInfo_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetSIndexes provides a mock function for the type MockClusterInfo
 func (_mock *MockClusterInfo) GetSIndexes(ctx context.Context, namespace string) ([]*models.SIndex, error) {
 	ret := _mock.Called(ctx, namespace)
@@ -895,6 +827,72 @@ func (_c *MockClusterInfo_GetVersion_Call) Return(aerospikeVersion models0.Aeros
 }
 
 func (_c *MockClusterInfo_GetVersion_Call) RunAndReturn(run func(ctx context.Context) (models0.AerospikeVersion, error)) *MockClusterInfo_GetVersion_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// HasExpressionSIndex provides a mock function for the type MockClusterInfo
+func (_mock *MockClusterInfo) HasExpressionSIndex(ctx context.Context, namespace string) (bool, error) {
+	ret := _mock.Called(ctx, namespace)
+
+	if len(ret) == 0 {
+		panic("no return value specified for HasExpressionSIndex")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
+		return returnFunc(ctx, namespace)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) bool); ok {
+		r0 = returnFunc(ctx, namespace)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, namespace)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClusterInfo_HasExpressionSIndex_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasExpressionSIndex'
+type MockClusterInfo_HasExpressionSIndex_Call struct {
+	*mock.Call
+}
+
+// HasExpressionSIndex is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+func (_e *MockClusterInfo_Expecter) HasExpressionSIndex(ctx interface{}, namespace interface{}) *MockClusterInfo_HasExpressionSIndex_Call {
+	return &MockClusterInfo_HasExpressionSIndex_Call{Call: _e.mock.On("HasExpressionSIndex", ctx, namespace)}
+}
+
+func (_c *MockClusterInfo_HasExpressionSIndex_Call) Run(run func(ctx context.Context, namespace string)) *MockClusterInfo_HasExpressionSIndex_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClusterInfo_HasExpressionSIndex_Call) Return(b bool, err error) *MockClusterInfo_HasExpressionSIndex_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockClusterInfo_HasExpressionSIndex_Call) RunAndReturn(run func(ctx context.Context, namespace string) (bool, error)) *MockClusterInfo_HasExpressionSIndex_Call {
 	_c.Call.Return(run)
 	return _c
 }

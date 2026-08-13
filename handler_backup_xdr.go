@@ -72,13 +72,13 @@ func newBackupXDRHandler(
 	// Create handler base first to get the derived context.
 	base := newHandlerBase(ctx)
 
-	sIndexInfo, err := clusterInfo.GetSIndexInfo(base.ctx, config.Namespace)
+	hasExprSind, err := clusterInfo.HasExpressionSIndex(base.ctx, config.Namespace)
 	if err != nil {
 		base.cancel()
-		return nil, fmt.Errorf("failed to get sindex info: %w", err)
+		return nil, fmt.Errorf("failed to check if expression sindex exists: %w", err)
 	}
 
-	encoder := NewEncoder[*models.ASBXToken](config.EncoderType, config.Namespace, false, sIndexInfo)
+	encoder := NewEncoder[*models.ASBXToken](config.EncoderType, config.Namespace, false, hasExprSind)
 
 	stats := models.NewBackupStats()
 

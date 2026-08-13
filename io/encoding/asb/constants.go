@@ -95,7 +95,6 @@ const (
 	sindexTypeList   byte = 'L'
 	sindexTypeMapKey byte = 'K'
 	sindexTypeMapVal byte = 'V'
-	sindexTypeSet    byte = 'S'
 )
 
 // sindex bin types
@@ -104,7 +103,6 @@ const (
 	sindexBinTypeNumeric byte = 'N'
 	sindexBinTypeGEO2D   byte = 'G'
 	sindexBinTypeBlob    byte = 'B'
-	sindexBinTypeEmpty   byte = 'E'
 )
 
 // literal asb tokens

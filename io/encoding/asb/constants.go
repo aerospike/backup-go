@@ -133,7 +133,6 @@ const (
 
 var (
 	space                = []byte(" ")
-	newLine              = []byte("\n")
 	delimsSpaceOrNewline = []byte{' ', asbNewLine}
 
 	globalSection          = []byte{markerGlobalSection}

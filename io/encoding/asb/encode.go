@@ -15,7 +15,6 @@
 package asb
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"slices"
@@ -79,9 +78,9 @@ func (e *Encoder[T]) EncodeToken(token T, dst []byte) ([]byte, error) {
 	case models.TokenTypeRecord:
 		dst, err = e.appendRecord(dst, t.Record)
 	case models.TokenTypeUDF:
-		dst, err = appendUDFToken(dst, t.UDF)
+		dst = appendUDFToASB(dst, t.UDF)
 	case models.TokenTypeSIndex:
-		dst, err = appendSIndexToken(dst, t.SIndex)
+		dst = appendSIndexToASB(dst, t.SIndex)
 	case models.TokenTypeInvalid:
 		err = errors.New("invalid token")
 	default:
@@ -98,17 +97,15 @@ func (e *Encoder[T]) EncodeToken(token T, dst []byte) ([]byte, error) {
 // GetHeader returns the header of the ASB file as a byte slice.
 // The header contains the version, namespace, and first file flag.
 func (e *Encoder[T]) GetHeader(isRecords bool) []byte {
-	buff := bytes.NewBuffer(make([]byte, 0, 1024))
-
-	writeVersionText(e.headerVersion(isRecords), buff)
-
-	writeNamespaceMetaText(e.config.Namespace, buff)
+	dst := make([]byte, 0, 1024)
+	dst = appendVersionText(dst, e.headerVersion(isRecords))
+	dst = appendNamespaceMetaText(dst, e.config.Namespace)
 
 	if !e.firstFileWritten.Swap(true) {
-		writeFirstMetaText(buff)
+		dst = appendFirstMetaText(dst)
 	}
 
-	return buff.Bytes()
+	return dst
 }
 
 func (e *Encoder[T]) headerVersion(isRecords bool) string {
@@ -424,61 +421,26 @@ func appendMetadataLine(dst, prefix []byte, value string) []byte {
 	return append(dst, '\n')
 }
 
-func appendUDFToken(dst []byte, udf *models.UDF) ([]byte, error) {
-	w := bytes.NewBuffer(dst)
-	_, err := udfToASB(udf, w)
-
-	return w.Bytes(), err
-}
-
-func appendSIndexToken(dst []byte, sindex *models.SIndex) ([]byte, error) {
-	w := bytes.NewBuffer(dst)
-	_, err := sindexToASB(sindex, w)
-
-	return w.Bytes(), err
-}
-
 // **** META DATA ****
 
-func writeVersionText(asbVersion string, w *bytes.Buffer) {
-	_, _ = writeBytes(w, tokenVersion, space, []byte(asbVersion))
+func appendVersionText(dst []byte, asbVersion string) []byte {
+	return appendLine(dst, tokenVersion, space, []byte(asbVersion))
 }
 
-func writeNamespaceMetaText(namespace string, w *bytes.Buffer) {
-	_, _ = writeBytes(w, metadataSection, space, namespaceToken, space, escapeASB(namespace))
+func appendNamespaceMetaText(dst []byte, namespace string) []byte {
+	return appendLine(dst, metadataSection, space, namespaceToken, space, escapeASB(namespace))
 }
 
-func writeFirstMetaText(w *bytes.Buffer) {
-	_, _ = writeBytes(w, metadataSection, space, tokenFirst)
+func appendFirstMetaText(dst []byte) []byte {
+	return appendLine(dst, metadataSection, space, tokenFirst)
 }
 
-func writeBytes(w *bytes.Buffer, data ...[]byte) (int, error) {
-	totalBytesWritten, err := writeRawBytes(w, data...)
-	if err != nil {
-		return totalBytesWritten, err
-	}
-
-	n, err := w.Write(newLine)
-	if err != nil {
-		return totalBytesWritten, err
-	}
-
-	return totalBytesWritten + n, nil
-}
-
-func writeRawBytes(w *bytes.Buffer, data ...[]byte) (int, error) {
-	totalBytesWritten := 0
-
+func appendLine(dst []byte, data ...[]byte) []byte {
 	for _, d := range data {
-		n, err := w.Write(d)
-		if err != nil {
-			return totalBytesWritten, err
-		}
-
-		totalBytesWritten += n
+		dst = append(dst, d...)
 	}
 
-	return totalBytesWritten, nil
+	return append(dst, '\n')
 }
 
 var needsEscape = [256]bool{
@@ -509,7 +471,7 @@ func appendEscapedDirect(dst []byte, value string) []byte {
 
 // **** SINDEX ****
 
-func sindexToASB(sindex *models.SIndex, w *bytes.Buffer) (int, error) {
+func appendSIndexToASB(dst []byte, sindex *models.SIndex) []byte {
 	sindexSection := globalSIndex
 	if sindex.Expression != "" {
 		sindexSection = globalSIndexExpression
@@ -543,17 +505,17 @@ func sindexToASB(sindex *models.SIndex, w *bytes.Buffer) (int, error) {
 		params = append(params, space, []byte(sindex.Expression))
 	}
 
-	return writeBytes(w, params...)
+	return appendLine(dst, params...)
 }
 
 // **** UDFs ****
 
-func udfToASB(udf *models.UDF, w *bytes.Buffer) (int, error) {
+func appendUDFToASB(dst []byte, udf *models.UDF) []byte {
 	var lenBuf [20]byte
 	contentLen := strconv.AppendInt(lenBuf[:0], int64(len(udf.Content)), 10)
 
-	return writeBytes(
-		w,
+	return appendLine(
+		dst,
 		globalSection,
 		space,
 		globalUDF,

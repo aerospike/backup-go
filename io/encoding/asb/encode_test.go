@@ -79,10 +79,7 @@ func TestEncodeTokenUDF(t *testing.T) {
 			Content: []byte(base64.StdEncoding.EncodeToString([]byte("content"))),
 		},
 	}
-	buff := &bytes.Buffer{}
-	_, err := udfToASB(token.UDF, buff)
-	require.NoError(t, err)
-	expected := buff.Bytes()
+	expected := appendUDFToASB(nil, token.UDF)
 
 	actual, err := encoder.EncodeToken(token, nil)
 	require.NoError(t, err)
@@ -107,10 +104,7 @@ func TestEncodeTokenSIndex(t *testing.T) {
 		},
 	}
 
-	buff := &bytes.Buffer{}
-	_, err := sindexToASB(token.SIndex, buff)
-	require.NoError(t, err)
-	expected := buff.Bytes()
+	expected := appendSIndexToASB(nil, token.SIndex)
 
 	actual, err := encoder.EncodeToken(token, nil)
 	require.NoError(t, err)
@@ -175,11 +169,9 @@ func TestEncodeSIndex(t *testing.T) {
 	}
 
 	expected := []byte("* i ns  name N 1 bin S\n")
-	buff := &bytes.Buffer{}
-	n, err := sindexToASB(sindex, buff)
-	require.Len(t, expected, n)
-	require.NoError(t, err)
-	require.Equal(t, expected, buff.Bytes())
+	got := appendSIndexToASB(nil, sindex)
+	require.Len(t, expected, len(got))
+	require.Equal(t, expected, got)
 }
 
 func TestGetHeaderFirst(t *testing.T) {
@@ -317,17 +309,12 @@ func Test__SIndexToASB(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			w := &bytes.Buffer{}
-			got, err := sindexToASB(tt.args.sindex, w)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("encodeSIndexToASB() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			got := appendSIndexToASB(nil, tt.args.sindex)
+			if len(got) != tt.want {
+				t.Errorf("appendSIndexToASB() = %v, want %v", len(got), tt.want)
 			}
-			if got != tt.want {
-				t.Errorf("encodeSIndexToASB() = %v, want %v", got, tt.want)
-			}
-			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("encodeSIndexToASB() = %v, want %v", gotW, tt.wantW)
+			if gotW := string(got); gotW != tt.wantW {
+				t.Errorf("appendSIndexToASB() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
@@ -1846,7 +1833,7 @@ func genKey() *a.Key {
 	return key
 }
 
-func Test_writeVersionText(t *testing.T) {
+func Test_appendVersionText(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		asbVersion string
@@ -1870,16 +1857,15 @@ func Test_writeVersionText(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			w := &bytes.Buffer{}
-			writeVersionText(tt.args.asbVersion, w)
-			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeVersionText() = %v, want %v", gotW, tt.wantW)
+			got := appendVersionText(nil, tt.args.asbVersion)
+			if gotW := string(got); gotW != tt.wantW {
+				t.Errorf("appendVersionText() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func Test_writeNamespaceMetaText(t *testing.T) {
+func Test_appendNamespaceMetaText(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		namespace string
@@ -1911,16 +1897,15 @@ func Test_writeNamespaceMetaText(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			w := &bytes.Buffer{}
-			writeNamespaceMetaText(tt.args.namespace, w)
-			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeNamespaceMetaText() = %v, want %v", gotW, tt.wantW)
+			got := appendNamespaceMetaText(nil, tt.args.namespace)
+			if gotW := string(got); gotW != tt.wantW {
+				t.Errorf("appendNamespaceMetaText() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func Test_writeFirstMetaText(t *testing.T) {
+func Test_appendFirstMetaText(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
@@ -1937,10 +1922,9 @@ func Test_writeFirstMetaText(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			w := &bytes.Buffer{}
-			writeFirstMetaText(w)
-			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeFirstMetaText() = %v, want %v", gotW, tt.wantW)
+			got := appendFirstMetaText(nil)
+			if gotW := string(got); gotW != tt.wantW {
+				t.Errorf("appendFirstMetaText() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
@@ -2192,7 +2176,7 @@ func Test_WriteRawBlobBin(t *testing.T) {
 	}
 }
 
-func Test_udfToASB(t *testing.T) {
+func Test_appendUDFToASB(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		udf *models.UDF
@@ -2232,17 +2216,12 @@ func Test_udfToASB(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			w := &bytes.Buffer{}
-			got, err := udfToASB(tt.args.udf, w)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("udfToASB() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			got := appendUDFToASB(nil, tt.args.udf)
+			if len(got) != tt.want {
+				t.Errorf("appendUDFToASB() = %v, want %v", len(got), tt.want)
 			}
-			if got != tt.want {
-				t.Errorf("udfToASB() = %v, want %v", got, tt.want)
-			}
-			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("udfToASB() = %v, want %v", gotW, tt.wantW)
+			if gotW := string(got); gotW != tt.wantW {
+				t.Errorf("appendUDFToASB() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}

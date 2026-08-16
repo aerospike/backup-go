@@ -12,16 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package asb
+package legacy_encoder_test
 
 import (
 	"bytes"
 	"fmt"
-	"strconv"
+	"sort"
+	"strings"
 	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	particleType "github.com/aerospike/aerospike-client-go/v8/types/particle_type"
+	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/encoding/asb/internal/legacy_encoder"
 	"github.com/aerospike/backup-go/models"
 )
@@ -145,23 +147,21 @@ func TestRecordEncoderPreservesPartialOutputOnError(t *testing.T) {
 	legacyBuf := bytes.NewBufferString("existing:")
 	legacyN, legacyErr := legacy_encoder.RecordToASB(false, record, legacyBuf)
 
-	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, false))
-	currentBuf := bytes.NewBufferString("existing:")
-	currentOut, currentErr := encoder.appendRecord(currentBuf.AvailableBuffer(), record)
-	_, writeErr := currentBuf.Write(currentOut)
-	if writeErr != nil {
-		t.Fatal(writeErr)
-	}
-	currentN := currentBuf.Len() - len("existing:")
+	encoder := asb.NewEncoder[*models.Token](asb.NewEncoderConfig("test", false, false))
+	token := &models.Token{Type: models.TokenTypeRecord, Record: record}
+	currentOut, currentErr := encoder.EncodeToken(token, []byte("existing:"))
 
-	if fmt.Sprint(legacyErr) != fmt.Sprint(currentErr) {
+	if legacyErr == nil || currentErr == nil {
+		t.Fatalf("expected errors: legacy=%v current=%v", legacyErr, currentErr)
+	}
+	if !strings.Contains(currentErr.Error(), legacyErr.Error()) {
 		t.Fatalf("error mismatch: legacy=%v current=%v", legacyErr, currentErr)
 	}
-	if legacyN != currentN {
-		t.Fatalf("bytes written mismatch: legacy=%d current=%d", legacyN, currentN)
+	if legacyN != len(currentOut)-len("existing:") {
+		t.Fatalf("bytes written mismatch: legacy=%d current=%d", legacyN, len(currentOut)-len("existing:"))
 	}
-	if !bytes.Equal(legacyBuf.Bytes(), currentBuf.Bytes()) {
-		t.Fatalf("partial output mismatch:\nlegacy=%q\ncurrent=%q", legacyBuf.Bytes(), currentBuf.Bytes())
+	if !bytes.Equal(legacyBuf.Bytes(), currentOut) {
+		t.Fatalf("partial output mismatch:\nlegacy=%q\ncurrent=%q", legacyBuf.Bytes(), currentOut)
 	}
 }
 
@@ -182,23 +182,20 @@ func TestRecordEncoderMetadataCacheHandlesNamespaceAndSetChanges(t *testing.T) {
 		recordEncoderFixture(keyA, a.BinMap{"value": 3}, 3, 30),
 	}
 
-	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, false))
+	encoder := asb.NewEncoder[*models.Token](asb.NewEncoderConfig("test", false, false))
 	for _, record := range records {
 		legacy := &bytes.Buffer{}
 		if _, err := legacy_encoder.RecordToASB(false, record, legacy); err != nil {
 			t.Fatal(err)
 		}
 
-		currentOut := &bytes.Buffer{}
-		out, err := encoder.appendRecord(currentOut.AvailableBuffer(), record)
+		token := &models.Token{Type: models.TokenTypeRecord, Record: record}
+		currentOut, err := encoder.EncodeToken(token, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := currentOut.Write(out); err != nil {
-			t.Fatal(err)
-		}
-		if !bytes.Equal(legacy.Bytes(), currentOut.Bytes()) {
-			t.Fatalf("output mismatch:\nlegacy=%q\ncurrent=%q", legacy.Bytes(), currentOut.Bytes())
+		if !bytes.Equal(legacy.Bytes(), currentOut) {
+			t.Fatalf("output mismatch:\nlegacy=%q\ncurrent=%q", legacy.Bytes(), currentOut)
 		}
 	}
 }
@@ -215,8 +212,8 @@ func TestEncodeTokenRecordMatchesLegacy(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			cfg := NewEncoderConfig("test", workload.compact, false)
-			encoder := NewEncoder[*models.Token](cfg)
+			cfg := asb.NewEncoderConfig("test", workload.compact, false)
+			encoder := asb.NewEncoder[*models.Token](cfg)
 			token := &models.Token{Type: models.TokenTypeRecord, Record: workload.record}
 
 			out, err := encoder.EncodeToken(token, nil)
@@ -224,66 +221,42 @@ func TestEncodeTokenRecordMatchesLegacy(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if len(workload.record.Bins) == 1 {
-				if !bytes.Equal(legacy.Bytes(), out) {
-					t.Fatalf("output mismatch:\nlegacy=%q\nencodeToken=%q", legacy.Bytes(), out)
-				}
-				return
-			}
-
-			if !bytes.Equal(sortBinOutput(legacy.String()), sortBinOutput(string(out))) {
-				t.Fatalf("output mismatch:\nlegacy=%q\nencodeToken=%q", legacy.Bytes(), out)
-			}
+			assertBytesMatchLegacy(t, legacy.Bytes(), out, len(workload.record.Bins))
 		})
 	}
 }
 
-func TestPrecomputedHeaderLines(t *testing.T) {
-	values := []uint32{0, 1, 9, 42, 99, 100, 101, 65535}
+func TestEncodeTokenRecordParity(t *testing.T) {
+	t.Parallel()
 
-	for _, value := range values {
-		t.Run("generation/"+strconv.FormatUint(uint64(value), 10), func(t *testing.T) {
-			got := string(appendGenerationLine(nil, value))
-			want := fmt.Sprintf("+ g %d\n", value)
-			if got != want {
-				t.Fatalf("appendGenerationLine(%d) = %q, want %q", value, got, want)
-			}
-		})
-		t.Run("binCount/"+strconv.FormatUint(uint64(value), 10), func(t *testing.T) {
-			got := string(appendBinCountLine(nil, value))
-			want := fmt.Sprintf("+ b %d\n", value)
-			if got != want {
-				t.Fatalf("appendBinCountLine(%d) = %q, want %q", value, got, want)
-			}
-		})
+	encoder := asb.NewEncoder[*models.Token](asb.NewEncoderConfig("test", false, false))
+
+	key, keyErr := a.NewKey("test", "demo", "1234")
+	if keyErr != nil {
+		t.Fatal(keyErr)
 	}
-}
 
-func assertRecordEncoderMatchesLegacy(t *testing.T, workload recordEncoderWorkload) {
-	t.Helper()
+	token := &models.Token{
+		Type: models.TokenTypeRecord,
+		Record: &models.Record{
+			Record: &a.Record{
+				Key:  key,
+				Bins: a.BinMap{"bin1": 0},
+			},
+		},
+	}
 
 	legacy := &bytes.Buffer{}
-	legacyN, legacyErr := legacy_encoder.RecordToASB(workload.compact, workload.record, legacy)
-
-	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", workload.compact, false))
-	currentOut, currentErr := encoder.appendRecord(nil, workload.record)
-
-	if fmt.Sprint(legacyErr) != fmt.Sprint(currentErr) {
-		t.Fatalf("error mismatch: legacy=%v current=%v", legacyErr, currentErr)
-	}
-	if legacyN != len(currentOut) {
-		t.Fatalf("bytes written mismatch: legacy=%d current=%d", legacyN, len(currentOut))
+	if _, err := legacy_encoder.RecordToASB(false, token.Record, legacy); err != nil {
+		t.Fatal(err)
 	}
 
-	if len(workload.record.Bins) == 1 {
-		if !bytes.Equal(legacy.Bytes(), currentOut) {
-			t.Fatalf("output mismatch:\nlegacy=%q\ncurrent=%q", legacy.Bytes(), currentOut)
-		}
-		return
+	actual, encodeErr := encoder.EncodeToken(token, nil)
+	if encodeErr != nil {
+		t.Fatal(encodeErr)
 	}
-
-	if !bytes.Equal(sortBinOutput(legacy.String()), sortBinOutput(string(currentOut))) {
-		t.Fatalf("output mismatch:\nlegacy=%q\ncurrent=%q", legacy.Bytes(), currentOut)
+	if !bytes.Equal(legacy.Bytes(), actual) {
+		t.Fatalf("output mismatch:\nlegacy=%q\ncurrent=%q", legacy.Bytes(), actual)
 	}
 }
 
@@ -298,12 +271,44 @@ func BenchmarkRecordEncoderWorkloads(b *testing.B) {
 		b.Run(workload.name+"/Legacy", func(b *testing.B) {
 			benchmarkLegacyRecordEncoder(b, workload)
 		})
-		b.Run(workload.name+"/Current", func(b *testing.B) {
-			benchmarkCurrentRecordEncoder(b, workload)
-		})
 		b.Run(workload.name+"/EncodeToken", func(b *testing.B) {
 			benchmarkEncodeTokenRecord(b, workload)
 		})
+	}
+}
+
+func assertRecordEncoderMatchesLegacy(t *testing.T, workload recordEncoderWorkload) {
+	t.Helper()
+
+	legacy := &bytes.Buffer{}
+	legacyN, legacyErr := legacy_encoder.RecordToASB(workload.compact, workload.record, legacy)
+
+	encoder := asb.NewEncoder[*models.Token](asb.NewEncoderConfig("test", workload.compact, false))
+	token := &models.Token{Type: models.TokenTypeRecord, Record: workload.record}
+	currentOut, currentErr := encoder.EncodeToken(token, nil)
+
+	if fmt.Sprint(legacyErr) != fmt.Sprint(currentErr) {
+		t.Fatalf("error mismatch: legacy=%v current=%v", legacyErr, currentErr)
+	}
+	if legacyN != len(currentOut) {
+		t.Fatalf("bytes written mismatch: legacy=%d current=%d", legacyN, len(currentOut))
+	}
+
+	assertBytesMatchLegacy(t, legacy.Bytes(), currentOut, len(workload.record.Bins))
+}
+
+func assertBytesMatchLegacy(t *testing.T, legacy, current []byte, binCount int) {
+	t.Helper()
+
+	if binCount == 1 {
+		if !bytes.Equal(legacy, current) {
+			t.Fatalf("output mismatch:\nlegacy=%q\ncurrent=%q", legacy, current)
+		}
+		return
+	}
+
+	if !bytes.Equal(sortBinOutput(string(legacy)), sortBinOutput(string(current))) {
+		t.Fatalf("output mismatch:\nlegacy=%q\ncurrent=%q", legacy, current)
 	}
 }
 
@@ -319,26 +324,11 @@ func benchmarkLegacyRecordEncoder(b *testing.B, workload recordEncoderWorkload) 
 	}
 }
 
-func benchmarkCurrentRecordEncoder(b *testing.B, workload recordEncoderWorkload) {
-	b.Helper()
-	b.ReportAllocs()
-	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", workload.compact, false))
-	out := make([]byte, 0, 4096)
-	for b.Loop() {
-		out = out[:0]
-		var err error
-		out, err = encoder.appendRecord(out, workload.record)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
 func benchmarkEncodeTokenRecord(b *testing.B, workload recordEncoderWorkload) {
 	b.Helper()
 	b.ReportAllocs()
-	cfg := NewEncoderConfig("test", workload.compact, false)
-	encoder := NewEncoder[*models.Token](cfg)
+	cfg := asb.NewEncoderConfig("test", workload.compact, false)
+	encoder := asb.NewEncoder[*models.Token](cfg)
 	token := &models.Token{Type: models.TokenTypeRecord, Record: workload.record}
 	out := make([]byte, 0, 4096)
 	for b.Loop() {
@@ -351,28 +341,8 @@ func benchmarkEncodeTokenRecord(b *testing.B, workload recordEncoderWorkload) {
 	}
 }
 
-func BenchmarkPrecomputedGenerationLine(b *testing.B) {
-	for _, value := range []uint32{1, 42, 101, 65535} {
-		b.Run(strconv.FormatUint(uint64(value), 10), func(b *testing.B) {
-			dst := make([]byte, 0, 16)
-			b.ReportAllocs()
-			for b.Loop() {
-				dst = dst[:0]
-				dst = appendGenerationLine(dst, value)
-			}
-		})
-	}
-}
-
-func BenchmarkPrecomputedBinCountLine(b *testing.B) {
-	for _, value := range []uint32{1, 42, 101, 65535} {
-		b.Run(strconv.FormatUint(uint64(value), 10), func(b *testing.B) {
-			dst := make([]byte, 0, 16)
-			b.ReportAllocs()
-			for b.Loop() {
-				dst = dst[:0]
-				dst = appendBinCountLine(dst, value)
-			}
-		})
-	}
+func sortBinOutput(s string) []byte {
+	var sorted sort.StringSlice = strings.Split(s, "\n")
+	sorted.Sort()
+	return []byte(strings.Join(sorted, "\n"))
 }

@@ -17,7 +17,6 @@ package legacy_encoder
 const (
 	boolTrueByte  byte = 'T'
 	boolFalseByte byte = 'F'
-	asbNewLine         = '\n'
 )
 
 var (

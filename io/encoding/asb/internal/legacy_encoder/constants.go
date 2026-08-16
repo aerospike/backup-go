@@ -14,42 +14,37 @@
 
 package legacy_encoder
 
-const (
-	boolTrueByte  byte = 'T'
-	boolFalseByte byte = 'F'
-	asbNewLine         = '\n'
-)
+import "github.com/aerospike/backup-go/io/encoding/asb/internal/lineprefix"
 
 var (
-	space                     = []byte(" ")
-	newLine                   = []byte("\n")
-	binBoolTypePrefix         = []byte("- Z ")
-	binIntTypePrefix          = []byte("- I ")
-	binFloatTypePrefix        = []byte("- D ")
-	binStringTypePrefix       = []byte("- S ")
-	binBytesTypePrefix        = []byte("- B ")
-	binBytesTypeCompactPrefix = []byte("- B! ")
-	binHLLTypePrefix          = []byte("- Y ")
-	binHLLTypeCompactPrefix   = []byte("- Y! ")
-	binGeoJSONTypePrefix      = []byte("- G ")
-	binNilTypePrefix          = []byte("- N ")
-	binMapTypePrefix          = []byte("- M ")
-	binMapTypeCompactPrefix   = []byte("- M! ")
-	binListTypePrefix         = []byte("- L ")
-	binListTypeCompactPrefix  = []byte("- L! ")
-	trueBytes                 = []byte{boolTrueByte}
-	falseBytes                = []byte{boolFalseByte}
-	namespacePrefix           = []byte("+ n ")
-	setPrefix                 = []byte("+ s ")
-	digestPrefix              = []byte("+ d ")
-	headerGeneration          = []byte("+ g ")
-	headerExpiration          = []byte("+ t ")
-	headerBinCount            = []byte("+ b ")
-
-	recordHeader     = []byte{'+'}
-	recordHeaderType = []byte{'k'}
-	headerTypeInt    = []byte{'I'}
-	headerTypeFloat  = []byte{'D'}
-	headerTypeString = []byte{'S'}
-	headerTypeBytes  = []byte{'B'}
+	space                     = lineprefix.Space
+	newLine                   = lineprefix.NewLine
+	binBoolTypePrefix         = lineprefix.BinBoolTypePrefix
+	binIntTypePrefix          = lineprefix.BinIntTypePrefix
+	binFloatTypePrefix        = lineprefix.BinFloatTypePrefix
+	binStringTypePrefix       = lineprefix.BinStringTypePrefix
+	binBytesTypePrefix        = lineprefix.BinBytesTypePrefix
+	binBytesTypeCompactPrefix = lineprefix.BinBytesTypeCompactPrefix
+	binHLLTypePrefix          = lineprefix.BinHLLTypePrefix
+	binHLLTypeCompactPrefix   = lineprefix.BinHLLTypeCompactPrefix
+	binGeoJSONTypePrefix      = lineprefix.BinGeoJSONTypePrefix
+	binNilTypePrefix          = lineprefix.BinNilTypePrefix
+	binMapTypePrefix          = lineprefix.BinMapTypePrefix
+	binMapTypeCompactPrefix   = lineprefix.BinMapTypeCompactPrefix
+	binListTypePrefix         = lineprefix.BinListTypePrefix
+	binListTypeCompactPrefix  = lineprefix.BinListTypeCompactPrefix
+	trueBytes                 = lineprefix.TrueBytes
+	falseBytes                = lineprefix.FalseBytes
+	namespacePrefix           = lineprefix.NamespacePrefix
+	setPrefix                 = lineprefix.SetPrefix
+	digestPrefix              = lineprefix.DigestPrefix
+	headerGeneration          = lineprefix.HeaderGeneration
+	headerExpiration          = lineprefix.HeaderExpiration
+	headerBinCount            = lineprefix.HeaderBinCount
+	recordHeader              = lineprefix.RecordHeader
+	recordHeaderType          = lineprefix.RecordHeaderType
+	headerTypeInt             = lineprefix.HeaderTypeInt
+	headerTypeFloat           = lineprefix.HeaderTypeFloat
+	headerTypeString          = lineprefix.HeaderTypeString
+	headerTypeBytes           = lineprefix.HeaderTypeBytes
 )

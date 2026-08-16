@@ -14,7 +14,11 @@
 
 package asb
 
-import "math"
+import (
+	"math"
+
+	"github.com/aerospike/backup-go/io/encoding/asb/internal/lineprefix"
+)
 
 // section names
 const (
@@ -132,8 +136,34 @@ const (
 )
 
 var (
-	space                = []byte(" ")
+	space                = lineprefix.Space
 	delimsSpaceOrNewline = []byte{' ', asbNewLine}
+
+	binBoolTypePrefix         = lineprefix.BinBoolTypePrefix
+	binIntTypePrefix          = lineprefix.BinIntTypePrefix
+	binFloatTypePrefix        = lineprefix.BinFloatTypePrefix
+	binStringTypePrefix       = lineprefix.BinStringTypePrefix
+	binBytesTypePrefix        = lineprefix.BinBytesTypePrefix
+	binBytesTypeCompactPrefix = lineprefix.BinBytesTypeCompactPrefix
+	binHLLTypePrefix          = lineprefix.BinHLLTypePrefix
+	binHLLTypeCompactPrefix   = lineprefix.BinHLLTypeCompactPrefix
+	binGeoJSONTypePrefix      = lineprefix.BinGeoJSONTypePrefix
+	binNilTypePrefix          = lineprefix.BinNilTypePrefix
+	binMapTypePrefix          = lineprefix.BinMapTypePrefix
+	binMapTypeCompactPrefix   = lineprefix.BinMapTypeCompactPrefix
+	binListTypePrefix         = lineprefix.BinListTypePrefix
+	binListTypeCompactPrefix  = lineprefix.BinListTypeCompactPrefix
+	namespacePrefix           = lineprefix.NamespacePrefix
+	setPrefix                 = lineprefix.SetPrefix
+	digestPrefix              = lineprefix.DigestPrefix
+	headerGeneration          = lineprefix.HeaderGeneration
+	headerExpiration          = lineprefix.HeaderExpiration
+	headerBinCount            = lineprefix.HeaderBinCount
+	userKeyIntPrefix          = lineprefix.UserKeyIntPrefix
+	userKeyFloatPrefix        = lineprefix.UserKeyFloatPrefix
+	userKeyStringPrefix       = lineprefix.UserKeyStringPrefix
+	userKeyBytesPrefix        = lineprefix.UserKeyBytesPrefix
+	sindexSizeOne             = lineprefix.SIndexSizeOne
 
 	globalSection          = []byte{markerGlobalSection}
 	globalSIndex           = []byte{globalTypeSIndex}

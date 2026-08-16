@@ -124,7 +124,7 @@ func (e *Encoder[T]) appendRecord(dst []byte, r *models.Record) ([]byte, error) 
 
 	var number [32]byte
 	dst = appendGenerationLine(dst, r.Generation)
-	dst = append(dst, "+ t "...)
+	dst = append(dst, headerExpiration...)
 	dst = append(dst, strconv.AppendInt(number[:0], r.VoidTime, 10)...)
 	dst = append(dst, '\n')
 	dst = appendBinCountLine(dst, uint32(len(r.Bins)))
@@ -149,14 +149,14 @@ func (e *Encoder[T]) appendRecordKey(dst []byte, key *a.Key) ([]byte, error) {
 		}
 	}
 
-	dst = e.recordNamespace.appendLine(dst, []byte("+ n "), key.Namespace())
+	dst = e.recordNamespace.appendLine(dst, namespacePrefix, key.Namespace())
 
-	dst = append(dst, "+ d "...)
+	dst = append(dst, digestPrefix...)
 	dst = appendBase64(dst, key.Digest())
 	dst = append(dst, '\n')
 
 	if set := key.SetName(); set != "" {
-		dst = e.recordSet.appendLine(dst, []byte("+ s "), set)
+		dst = e.recordSet.appendLine(dst, setPrefix, set)
 	}
 
 	return dst, nil
@@ -205,7 +205,7 @@ func appendUserKey(dst []byte, userKey a.Value) ([]byte, error) {
 func appendUserKeyInt(dst []byte, value int64) []byte {
 	var number [20]byte
 
-	dst = append(dst, "+ k I "...)
+	dst = append(dst, userKeyIntPrefix...)
 	dst = append(dst, strconv.AppendInt(number[:0], value, 10)...)
 
 	return append(dst, '\n')
@@ -214,7 +214,7 @@ func appendUserKeyInt(dst []byte, value int64) []byte {
 func appendUserKeyFloat(dst []byte, value float64) []byte {
 	var number [32]byte
 
-	dst = append(dst, "+ k D "...)
+	dst = append(dst, userKeyFloatPrefix...)
 	dst = append(dst, strconv.AppendFloat(number[:0], value, 'f', -1, 64)...)
 
 	return append(dst, '\n')
@@ -223,7 +223,7 @@ func appendUserKeyFloat(dst []byte, value float64) []byte {
 func appendUserKeyString(dst []byte, value string) []byte {
 	var number [20]byte
 
-	dst = append(dst, "+ k S "...)
+	dst = append(dst, userKeyStringPrefix...)
 	dst = append(dst, strconv.AppendInt(number[:0], int64(len(value)), 10)...)
 	dst = append(dst, ' ')
 	dst = append(dst, value...)
@@ -234,7 +234,7 @@ func appendUserKeyString(dst []byte, value string) []byte {
 func appendUserKeyBytes(dst, value []byte) []byte {
 	var number [20]byte
 
-	dst = append(dst, "+ k B "...)
+	dst = append(dst, userKeyBytesPrefix...)
 	dst = append(dst, strconv.AppendInt(number[:0], int64(base64.StdEncoding.EncodedLen(len(value))), 10)...)
 	dst = append(dst, ' ')
 	dst = appendBase64(dst, value)
@@ -245,7 +245,7 @@ func appendUserKeyBytes(dst, value []byte) []byte {
 func (e *Encoder[T]) appendRecordBin(dst []byte, name string, value any, number *[32]byte) ([]byte, error) {
 	switch value := value.(type) {
 	case bool:
-		dst = appendBinName(dst, []byte("- Z "), name, ' ')
+		dst = appendBinName(dst, binBoolTypePrefix, name, ' ')
 		if value {
 			dst = append(dst, 'T', '\n')
 		} else {
@@ -264,37 +264,37 @@ func (e *Encoder[T]) appendRecordBin(dst []byte, name string, value any, number 
 	case int:
 		return appendBinInt(dst, name, int64(value), number), nil
 	case float64:
-		dst = appendBinName(dst, []byte("- D "), name, ' ')
+		dst = appendBinName(dst, binFloatTypePrefix, name, ' ')
 		dst = append(dst, strconv.AppendFloat(number[:0], value, 'g', -1, 64)...)
 
 		return append(dst, '\n'), nil
 	case string:
-		return appendStringBin(dst, []byte("- S "), name, value, number), nil
+		return appendStringBin(dst, binStringTypePrefix, name, value, number), nil
 	case []byte:
 		if e.config.Compact {
-			return appendRawBin(dst, []byte("- B! "), name, value, number), nil
+			return appendRawBin(dst, binBytesTypeCompactPrefix, name, value, number), nil
 		}
 
-		return appendBase64Bin(dst, []byte("- B "), name, value, number), nil
+		return appendBase64Bin(dst, binBytesTypePrefix, name, value, number), nil
 	case a.HLLValue:
 		if e.config.Compact {
-			return appendRawBin(dst, []byte("- Y! "), name, value, number), nil
+			return appendRawBin(dst, binHLLTypeCompactPrefix, name, value, number), nil
 		}
 
-		return appendBase64Bin(dst, []byte("- Y "), name, value, number), nil
+		return appendBase64Bin(dst, binHLLTypePrefix, name, value, number), nil
 	case a.GeoJSONValue:
-		return appendStringBin(dst, []byte("- G "), name, string(value), number), nil
+		return appendStringBin(dst, binGeoJSONTypePrefix, name, string(value), number), nil
 	case *a.RawBlobValue:
 		return e.appendRawBlobBin(dst, name, value, number)
 	case nil:
-		return appendBinName(dst, []byte("- N "), name, '\n'), nil
+		return appendBinName(dst, binNilTypePrefix, name, '\n'), nil
 	default:
 		return dst, fmt.Errorf("unknown bin type: %T, key: %s", value, name)
 	}
 }
 
 func appendBinInt(dst []byte, name string, value int64, number *[32]byte) []byte {
-	dst = appendBinName(dst, []byte("- I "), name, ' ')
+	dst = appendBinName(dst, binIntTypePrefix, name, ' ')
 	dst = append(dst, strconv.AppendInt(number[:0], value, 10)...)
 
 	return append(dst, '\n')
@@ -333,16 +333,16 @@ func (e *Encoder[T]) appendRawBlobBin(
 	switch value.ParticleType {
 	case particleType.MAP:
 		if e.config.Compact {
-			return appendRawBin(dst, []byte("- M! "), name, value.Data, number), nil
+			return appendRawBin(dst, binMapTypeCompactPrefix, name, value.Data, number), nil
 		}
 
-		return appendBase64Bin(dst, []byte("- M "), name, value.Data, number), nil
+		return appendBase64Bin(dst, binMapTypePrefix, name, value.Data, number), nil
 	case particleType.LIST:
 		if e.config.Compact {
-			return appendRawBin(dst, []byte("- L! "), name, value.Data, number), nil
+			return appendRawBin(dst, binListTypeCompactPrefix, name, value.Data, number), nil
 		}
 
-		return appendBase64Bin(dst, []byte("- L "), name, value.Data, number), nil
+		return appendBase64Bin(dst, binListTypePrefix, name, value.Data, number), nil
 	default:
 		return dst, fmt.Errorf("invalid raw blob bin particle type: %v", value.ParticleType)
 	}
@@ -372,7 +372,7 @@ func appendGenerationLine(dst []byte, generation uint32) []byte {
 
 	var number [32]byte
 
-	dst = append(dst, "+ g "...)
+	dst = append(dst, headerGeneration...)
 	dst = append(dst, strconv.AppendUint(number[:0], uint64(generation), 10)...)
 
 	return append(dst, '\n')
@@ -385,7 +385,7 @@ func appendBinCountLine(dst []byte, binCount uint32) []byte {
 
 	var number [32]byte
 
-	dst = append(dst, "+ b "...)
+	dst = append(dst, headerBinCount...)
 	dst = append(dst, strconv.AppendUint(number[:0], uint64(binCount), 10)...)
 
 	return append(dst, '\n')
@@ -424,21 +424,27 @@ func appendMetadataLine(dst, prefix []byte, value string) []byte {
 // **** META DATA ****
 
 func appendVersionText(dst []byte, asbVersion string) []byte {
-	return appendLine(dst, tokenVersion, space, []byte(asbVersion))
+	dst = append(dst, tokenVersion...)
+	dst = append(dst, space...)
+	dst = append(dst, asbVersion...)
+
+	return append(dst, '\n')
 }
 
 func appendNamespaceMetaText(dst []byte, namespace string) []byte {
-	return appendLine(dst, metadataSection, space, namespaceToken, space, escapeASB(namespace))
+	dst = append(dst, metadataSection...)
+	dst = append(dst, space...)
+	dst = append(dst, namespaceToken...)
+	dst = append(dst, space...)
+	dst = appendEscapedDirect(dst, namespace)
+
+	return append(dst, '\n')
 }
 
 func appendFirstMetaText(dst []byte) []byte {
-	return appendLine(dst, metadataSection, space, tokenFirst)
-}
-
-func appendLine(dst []byte, data ...[]byte) []byte {
-	for _, d := range data {
-		dst = append(dst, d...)
-	}
+	dst = append(dst, metadataSection...)
+	dst = append(dst, space...)
+	dst = append(dst, tokenFirst...)
 
 	return append(dst, '\n')
 }
@@ -447,10 +453,6 @@ var needsEscape = [256]bool{
 	'\\': true,
 	' ':  true,
 	'\n': true,
-}
-
-func escapeASB(s string) []byte {
-	return appendEscapedDirect(nil, s)
 }
 
 func appendEscapedDirect(dst []byte, value string) []byte {
@@ -472,40 +474,41 @@ func appendEscapedDirect(dst []byte, value string) []byte {
 // **** SINDEX ****
 
 func appendSIndexToASB(dst []byte, sindex *models.SIndex) []byte {
-	sindexSection := globalSIndex
+	dst = append(dst, globalSection...)
+	dst = append(dst, space...)
+
 	if sindex.Expression != "" {
-		sindexSection = globalSIndexExpression
+		dst = append(dst, globalSIndexExpression...)
+	} else {
+		dst = append(dst, globalSIndex...)
 	}
 
-	params := [][]byte{
-		globalSection,
-		space,
-		sindexSection,
-		space,
-		escapeASB(sindex.Namespace),
-		space,
-		escapeASB(sindex.Set),
-		space,
-		escapeASB(sindex.Name),
-		space,
-		{byte(sindex.IndexType)},
-		space,
-		[]byte("1"),
-		space,
-		escapeASB(sindex.Path.BinName),
-		space,
-		{byte(sindex.Path.BinType)},
-	}
+	dst = append(dst, space...)
+	dst = appendEscapedDirect(dst, sindex.Namespace)
+	dst = append(dst, space...)
+	dst = appendEscapedDirect(dst, sindex.Set)
+	dst = append(dst, space...)
+	dst = appendEscapedDirect(dst, sindex.Name)
+	dst = append(dst, space...)
+	dst = append(dst, byte(sindex.IndexType))
+	dst = append(dst, space...)
+	dst = append(dst, sindexSizeOne...)
+	dst = append(dst, space...)
+	dst = appendEscapedDirect(dst, sindex.Path.BinName)
+	dst = append(dst, space...)
+	dst = append(dst, byte(sindex.Path.BinType))
 
 	if sindex.Path.B64Context != "" {
-		params = append(params, space, []byte(sindex.Path.B64Context))
+		dst = append(dst, space...)
+		dst = append(dst, sindex.Path.B64Context...)
 	}
 
 	if sindex.Expression != "" {
-		params = append(params, space, []byte(sindex.Expression))
+		dst = append(dst, space...)
+		dst = append(dst, sindex.Expression...)
 	}
 
-	return appendLine(dst, params...)
+	return append(dst, '\n')
 }
 
 // **** UDFs ****
@@ -514,18 +517,17 @@ func appendUDFToASB(dst []byte, udf *models.UDF) []byte {
 	var lenBuf [20]byte
 	contentLen := strconv.AppendInt(lenBuf[:0], int64(len(udf.Content)), 10)
 
-	return appendLine(
-		dst,
-		globalSection,
-		space,
-		globalUDF,
-		space,
-		[]byte{byte(udf.UDFType)},
-		space,
-		escapeASB(udf.Name),
-		space,
-		contentLen,
-		space,
-		udf.Content,
-	)
+	dst = append(dst, globalSection...)
+	dst = append(dst, space...)
+	dst = append(dst, globalUDF...)
+	dst = append(dst, space...)
+	dst = append(dst, byte(udf.UDFType))
+	dst = append(dst, space...)
+	dst = appendEscapedDirect(dst, udf.Name)
+	dst = append(dst, space...)
+	dst = append(dst, contentLen...)
+	dst = append(dst, space...)
+	dst = append(dst, udf.Content...)
+
+	return append(dst, '\n')
 }

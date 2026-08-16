@@ -98,7 +98,7 @@ func TestEscapeASB(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test both to ensure logic parity
 			resOld := escapeASBOld(tt.input)
-			resNew := escapeASB(tt.input)
+			resNew := appendEscapedDirect(nil, tt.input)
 
 			if !bytes.Equal(resOld, tt.expected) {
 				t.Errorf("Old implementation failed [%s]: expected %q, got %q", tt.name, tt.expected, resOld)
@@ -127,7 +127,7 @@ func BenchmarkEscapeOld_Clean(b *testing.B) {
 
 func BenchmarkEscapeNew_Clean(b *testing.B) {
 	for b.Loop() {
-		escapeASB(cleanStr)
+		appendEscapedDirect(nil, cleanStr)
 	}
 }
 
@@ -139,7 +139,7 @@ func BenchmarkEscapeOld_Dirty(b *testing.B) {
 
 func BenchmarkEscapeNew_Dirty(b *testing.B) {
 	for b.Loop() {
-		escapeASB(dirtyStr)
+		appendEscapedDirect(nil, dirtyStr)
 	}
 }
 
@@ -151,7 +151,7 @@ func BenchmarkEscapeOld_LongTrailing(b *testing.B) {
 
 func BenchmarkEscapeNew_LongTrailing(b *testing.B) {
 	for b.Loop() {
-		escapeASB(longStr)
+		appendEscapedDirect(nil, longStr)
 	}
 }
 

@@ -188,7 +188,7 @@ func TestGetHeaderFirst(t *testing.T) {
 	require.Equal(t, secondExpected, string(secondHeader))
 }
 
-func Test_escapeASBS(t *testing.T) {
+func Test_appendEscapedDirect(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		s string
@@ -216,8 +216,8 @@ func Test_escapeASBS(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := escapeASB(tt.args.s); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("escapeASB() = %v, want %v", got, tt.want)
+			if got := appendEscapedDirect(nil, tt.args.s); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("appendEscapedDirect() = %v, want %v", got, tt.want)
 			}
 		})
 	}

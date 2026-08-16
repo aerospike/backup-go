@@ -14,11 +14,7 @@
 
 package asb
 
-import (
-	"math"
-
-	"github.com/aerospike/backup-go/io/encoding/asb/internal/lineprefix"
-)
+import "math"
 
 // section names
 const (
@@ -136,34 +132,34 @@ const (
 )
 
 var (
-	space                = lineprefix.Space
+	space                = []byte(" ")
 	delimsSpaceOrNewline = []byte{' ', asbNewLine}
 
-	binBoolTypePrefix         = lineprefix.BinBoolTypePrefix
-	binIntTypePrefix          = lineprefix.BinIntTypePrefix
-	binFloatTypePrefix        = lineprefix.BinFloatTypePrefix
-	binStringTypePrefix       = lineprefix.BinStringTypePrefix
-	binBytesTypePrefix        = lineprefix.BinBytesTypePrefix
-	binBytesTypeCompactPrefix = lineprefix.BinBytesTypeCompactPrefix
-	binHLLTypePrefix          = lineprefix.BinHLLTypePrefix
-	binHLLTypeCompactPrefix   = lineprefix.BinHLLTypeCompactPrefix
-	binGeoJSONTypePrefix      = lineprefix.BinGeoJSONTypePrefix
-	binNilTypePrefix          = lineprefix.BinNilTypePrefix
-	binMapTypePrefix          = lineprefix.BinMapTypePrefix
-	binMapTypeCompactPrefix   = lineprefix.BinMapTypeCompactPrefix
-	binListTypePrefix         = lineprefix.BinListTypePrefix
-	binListTypeCompactPrefix  = lineprefix.BinListTypeCompactPrefix
-	namespacePrefix           = lineprefix.NamespacePrefix
-	setPrefix                 = lineprefix.SetPrefix
-	digestPrefix              = lineprefix.DigestPrefix
-	headerGeneration          = lineprefix.HeaderGeneration
-	headerExpiration          = lineprefix.HeaderExpiration
-	headerBinCount            = lineprefix.HeaderBinCount
-	userKeyIntPrefix          = lineprefix.UserKeyIntPrefix
-	userKeyFloatPrefix        = lineprefix.UserKeyFloatPrefix
-	userKeyStringPrefix       = lineprefix.UserKeyStringPrefix
-	userKeyBytesPrefix        = lineprefix.UserKeyBytesPrefix
-	sindexSizeOne             = lineprefix.SIndexSizeOne
+	binBoolTypePrefix         = []byte("- Z ")
+	binIntTypePrefix          = []byte("- I ")
+	binFloatTypePrefix        = []byte("- D ")
+	binStringTypePrefix       = []byte("- S ")
+	binBytesTypePrefix        = []byte("- B ")
+	binBytesTypeCompactPrefix = []byte("- B! ")
+	binHLLTypePrefix          = []byte("- Y ")
+	binHLLTypeCompactPrefix   = []byte("- Y! ")
+	binGeoJSONTypePrefix      = []byte("- G ")
+	binNilTypePrefix          = []byte("- N ")
+	binMapTypePrefix          = []byte("- M ")
+	binMapTypeCompactPrefix   = []byte("- M! ")
+	binListTypePrefix         = []byte("- L ")
+	binListTypeCompactPrefix  = []byte("- L! ")
+	namespacePrefix           = []byte("+ n ")
+	setPrefix                 = []byte("+ s ")
+	digestPrefix              = []byte("+ d ")
+	headerGeneration          = []byte("+ g ")
+	headerExpiration          = []byte("+ t ")
+	headerBinCount            = []byte("+ b ")
+	userKeyIntPrefix          = []byte("+ k I ")
+	userKeyFloatPrefix        = []byte("+ k D ")
+	userKeyStringPrefix       = []byte("+ k S ")
+	userKeyBytesPrefix        = []byte("+ k B ")
+	sindexSizeOne             = []byte("1")
 
 	globalSection          = []byte{markerGlobalSection}
 	globalSIndex           = []byte{globalTypeSIndex}

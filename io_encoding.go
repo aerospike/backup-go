@@ -15,7 +15,6 @@
 package backup
 
 import (
-	"bytes"
 	"io"
 	"log/slog"
 
@@ -36,7 +35,7 @@ const (
 //
 //go:generate mockery --name Encoder
 type Encoder[T models.TokenConstraint] interface {
-	EncodeToken(T, *bytes.Buffer) error
+	EncodeToken(T, []byte) ([]byte, error)
 	GetHeader(bool) []byte
 	GenerateFilename(prefix, suffix string) string
 }

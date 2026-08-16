@@ -27,6 +27,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	particleType "github.com/aerospike/aerospike-client-go/v8/types/particle_type"
+	"github.com/aerospike/backup-go/io/encoding/asb/internal/legacy_encoder"
 	"github.com/aerospike/backup-go/models"
 	"github.com/segmentio/asm/base64"
 	"github.com/stretchr/testify/assert"
@@ -56,14 +57,13 @@ func TestEncodeTokenRecord(t *testing.T) {
 	}
 
 	buff := &bytes.Buffer{}
-	_, err := recordToASB(encoder.config.Compact, token.Record, buff)
+	_, err := legacy_encoder.RecordToASB(encoder.config.Compact, token.Record, buff)
 	require.NoError(t, err)
 	expected := bytes.Clone(buff.Bytes())
 
-	actual := &bytes.Buffer{}
-	err = encoder.EncodeToken(token, actual)
+	actual, err := encoder.EncodeToken(token, nil)
 	require.NoError(t, err)
-	require.Equal(t, expected, actual.Bytes())
+	require.Equal(t, expected, actual)
 }
 
 func TestEncodeTokenUDF(t *testing.T) {
@@ -84,10 +84,9 @@ func TestEncodeTokenUDF(t *testing.T) {
 	require.NoError(t, err)
 	expected := buff.Bytes()
 
-	actual := &bytes.Buffer{}
-	err = encoder.EncodeToken(token, actual)
+	actual, err := encoder.EncodeToken(token, nil)
 	require.NoError(t, err)
-	require.Equal(t, expected, actual.Bytes())
+	require.Equal(t, expected, actual)
 }
 
 func TestEncodeTokenSIndex(t *testing.T) {
@@ -113,10 +112,9 @@ func TestEncodeTokenSIndex(t *testing.T) {
 	require.NoError(t, err)
 	expected := buff.Bytes()
 
-	actual := &bytes.Buffer{}
-	err = encoder.EncodeToken(token, actual)
+	actual, err := encoder.EncodeToken(token, nil)
 	require.NoError(t, err)
-	require.Equal(t, expected, actual.Bytes())
+	require.Equal(t, expected, actual)
 }
 
 func TestEncodeTokenInvalid(t *testing.T) {
@@ -129,8 +127,7 @@ func TestEncodeTokenInvalid(t *testing.T) {
 	}
 
 	token.Type = models.TokenTypeInvalid
-	actual := &bytes.Buffer{}
-	err := encoder.EncodeToken(token, actual)
+	_, err := encoder.EncodeToken(token, nil)
 	require.Error(t, err)
 }
 
@@ -157,7 +154,7 @@ func TestEncodeRecord(t *testing.T) {
 	expected := fmt.Sprintf(recTemplate, base64Encode(key.Digest()), recExpr)
 
 	buff := &bytes.Buffer{}
-	n, err := recordToASB(encoder.config.Compact, rec, buff)
+	n, err := legacy_encoder.RecordToASB(encoder.config.Compact, rec, buff)
 	require.NoError(t, err)
 	actual := buff.Bytes()
 	require.Equal(t, len(actual), n)
@@ -336,7 +333,7 @@ func Test__SIndexToASB(t *testing.T) {
 	}
 }
 
-func Test_binToASB(t *testing.T) {
+func Test_BinToASB(t *testing.T) {
 	t.Parallel()
 	geoJSONStr := `{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [0,0]]]}`
 	type args struct {
@@ -554,7 +551,7 @@ func Test_binToASB(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			dst := &bytes.Buffer{}
-			n, err := binToASB(tt.args.k, false, tt.args.v, dst)
+			n, err := legacy_encoder.BinToASB(tt.args.k, false, tt.args.v, dst)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("encodeBinToASB() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -570,7 +567,7 @@ func Test_binToASB(t *testing.T) {
 	}
 }
 
-func Test_boolToASB(t *testing.T) {
+func Test_BoolToASB(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		b bool
@@ -585,26 +582,26 @@ func Test_boolToASB(t *testing.T) {
 			args: args{
 				b: true,
 			},
-			want: trueBytes,
+			want: []byte{boolTrueByte},
 		},
 		{
 			name: "positive false",
 			args: args{
 				b: false,
 			},
-			want: falseBytes,
+			want: []byte{boolFalseByte},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := boolToASB(tt.args.b)
+			got := legacy_encoder.BoolToASB(tt.args.b)
 			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
-func Test_binsToASB(t *testing.T) {
+func Test_BinsToASB(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		bins a.BinMap
@@ -639,7 +636,7 @@ func Test_binsToASB(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			dst := &bytes.Buffer{}
-			n, err := binsToASB(false, tt.args.bins, dst)
+			n, err := legacy_encoder.BinsToASB(false, tt.args.bins, dst)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("encodeBinsToASB() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -663,7 +660,7 @@ func sortBinOutput(s string) []byte {
 	return []byte(strings.Join(sorted, "\n"))
 }
 
-func Test_userKeyToASB(t *testing.T) {
+func Test_UserKeyToASB(t *testing.T) {
 	t.Parallel()
 	encVal := base64Encode([]byte("hello"))
 	type args struct {
@@ -729,23 +726,23 @@ func Test_userKeyToASB(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			dst := &bytes.Buffer{}
-			n, err := userKeyToASB(tt.args.userKey, dst)
+			n, err := legacy_encoder.UserKeyToASB(tt.args.userKey, dst)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("userKeyToASB() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.UserKeyToASB() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			got := dst.Bytes()
 			if n != len(got) {
-				t.Errorf("userKeyToASB() bytes written = %v, want %v", n, len(got))
+				t.Errorf("legacy_encoder.UserKeyToASB() bytes written = %v, want %v", n, len(got))
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("userKeyToASB() = %v, want %v", string(got), string(tt.want))
+				t.Errorf("legacy_encoder.UserKeyToASB() = %v, want %v", string(got), string(tt.want))
 			}
 		})
 	}
 }
 
-func Test_keyToASB(t *testing.T) {
+func Test_KeyToASB(t *testing.T) {
 	t.Parallel()
 	NoSetKey, _ := a.NewKey("ns", "", 1)
 	stringKey, _ := a.NewKey("ns", "set", "hello")
@@ -785,23 +782,23 @@ func Test_keyToASB(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			dst := &bytes.Buffer{}
-			n, err := keyToASB(tt.args.k, dst)
+			n, err := legacy_encoder.KeyToASB(tt.args.k, dst)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("keyToASB() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.KeyToASB() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			got := dst.Bytes()
 			if n != len(got) {
-				t.Errorf("keyToASB() bytes written = %v, want %v", n, len(got))
+				t.Errorf("legacy_encoder.KeyToASB() bytes written = %v, want %v", n, len(got))
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("keyToASB() = %v, want %v", string(got), string(tt.want))
+				t.Errorf("legacy_encoder.KeyToASB() = %v, want %v", string(got), string(tt.want))
 			}
 		})
 	}
 }
 
-func Test_recordToASB(t *testing.T) {
+func Test_RecordToASB(t *testing.T) {
 	t.Parallel()
 	var recExpr int64 = 10
 	key, _ := a.NewKey("test", "demo", "1234")
@@ -857,25 +854,25 @@ func Test_recordToASB(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			dst := &bytes.Buffer{}
-			n, err := recordToASB(false, tt.args.r, dst)
+			n, err := legacy_encoder.RecordToASB(false, tt.args.r, dst)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("recordToASB() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.RecordToASB() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			got := dst.Bytes()
 			if n != len(got) {
-				t.Errorf("recordToASB() bytes written = %v, want %v", n, len(got))
+				t.Errorf("legacy_encoder.RecordToASB() bytes written = %v, want %v", n, len(got))
 			}
 			sortedGot := sortBinOutput(string(got))
 			sortedWant := sortBinOutput(string(tt.want))
 			if !reflect.DeepEqual(sortedGot, sortedWant) {
-				t.Errorf("recordToASB() = %v, want %v", string(got), string(tt.want))
+				t.Errorf("legacy_encoder.RecordToASB() = %v, want %v", string(got), string(tt.want))
 			}
 		})
 	}
 }
 
-func Test_writeRecordHeaderGeneration(t *testing.T) {
+func Test_WriteRecordHeaderGeneration(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		generation uint32
@@ -900,22 +897,22 @@ func Test_writeRecordHeaderGeneration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeRecordHeaderGeneration(tt.args.generation, w)
+			got, err := legacy_encoder.WriteRecordHeaderGeneration(tt.args.generation, w)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeRecordHeaderGeneration() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.WriteRecordHeaderGeneration() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("writeRecordHeaderGeneration() = %v, want %v", got, tt.want)
+				t.Errorf("legacy_encoder.WriteRecordHeaderGeneration() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeRecordHeaderGeneration() = %v, want %v", gotW, tt.wantW)
+				t.Errorf("legacy_encoder.WriteRecordHeaderGeneration() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func Test_writeRecordHeaderExpiration(t *testing.T) {
+func Test_WriteRecordHeaderExpiration(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		expiration int64
@@ -940,22 +937,22 @@ func Test_writeRecordHeaderExpiration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeRecordHeaderExpiration(tt.args.expiration, w)
+			got, err := legacy_encoder.WriteRecordHeaderExpiration(tt.args.expiration, w)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeRecordHeaderExpiration() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.WriteRecordHeaderExpiration() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("writeRecordHeaderExpiration() = %v, want %v", got, tt.want)
+				t.Errorf("legacy_encoder.WriteRecordHeaderExpiration() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeRecordHeaderExpiration() = %v, want %v", gotW, tt.wantW)
+				t.Errorf("legacy_encoder.WriteRecordHeaderExpiration() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func Test_writeRecordHeaderBinCount(t *testing.T) {
+func Test_WriteRecordHeaderBinCount(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		binCount int
@@ -980,22 +977,22 @@ func Test_writeRecordHeaderBinCount(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeRecordHeaderBinCount(tt.args.binCount, w)
+			got, err := legacy_encoder.WriteRecordHeaderBinCount(tt.args.binCount, w)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeRecordHeaderBinCount() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.WriteRecordHeaderBinCount() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("writeRecordHeaderBinCount() = %v, want %v", got, tt.want)
+				t.Errorf("legacy_encoder.WriteRecordHeaderBinCount() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeRecordHeaderBinCount() = %v, want %v", gotW, tt.wantW)
+				t.Errorf("legacy_encoder.WriteRecordHeaderBinCount() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func Test_writeBinInt(t *testing.T) {
+func Test_WriteBinInt(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		name string
@@ -1031,22 +1028,22 @@ func Test_writeBinInt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeBinInt(tt.args.name, tt.args.v, w)
+			got, err := legacy_encoder.WriteBinInt(tt.args.name, tt.args.v, w)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeBinInt() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.WriteBinInt() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("writeBinInt() = %v, want %v", got, tt.want)
+				t.Errorf("legacy_encoder.WriteBinInt() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeBinInt() = %v, want %v", gotW, tt.wantW)
+				t.Errorf("legacy_encoder.WriteBinInt() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func Test_writeBinFloat(t *testing.T) {
+func Test_WriteBinFloat(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		name string
@@ -1082,22 +1079,22 @@ func Test_writeBinFloat(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeBinFloat(tt.args.name, tt.args.v, w)
+			got, err := legacy_encoder.WriteBinFloat(tt.args.name, tt.args.v, w)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeBinFloat() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.WriteBinFloat() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("writeBinFloat() = %v, want %v", got, tt.want)
+				t.Errorf("legacy_encoder.WriteBinFloat() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeBinFloat() = %v, want %v", gotW, tt.wantW)
+				t.Errorf("legacy_encoder.WriteBinFloat() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func Test_writeBinString(t *testing.T) {
+func Test_WriteBinString(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		name string
@@ -1133,22 +1130,22 @@ func Test_writeBinString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeBinString(tt.args.name, tt.args.v, w)
+			got, err := legacy_encoder.WriteBinString(tt.args.name, tt.args.v, w)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeBinString() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.WriteBinString() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("writeBinString() = %v, want %v", got, tt.want)
+				t.Errorf("legacy_encoder.WriteBinString() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeBinString() = %v, want %v", gotW, tt.wantW)
+				t.Errorf("legacy_encoder.WriteBinString() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func Test_writeBinBytes(t *testing.T) {
+func Test_WriteBinBytes(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		compact bool
@@ -1201,22 +1198,22 @@ func Test_writeBinBytes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeBinBytes(tt.args.name, tt.args.compact, tt.args.v, w)
+			got, err := legacy_encoder.WriteBinBytes(tt.args.name, tt.args.compact, tt.args.v, w)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeBinBytes() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.WriteBinBytes() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("writeBinBytes() = %v, want %v", got, tt.want)
+				t.Errorf("legacy_encoder.WriteBinBytes() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeBinBytes() = %v, want %v", gotW, tt.wantW)
+				t.Errorf("legacy_encoder.WriteBinBytes() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func Test_writeBinHLL(t *testing.T) {
+func Test_WriteBinHLL(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		compact bool
@@ -1269,22 +1266,22 @@ func Test_writeBinHLL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeBinHLL(tt.args.name, tt.args.compact, tt.args.v, w)
+			got, err := legacy_encoder.WriteBinHLL(tt.args.name, tt.args.compact, tt.args.v, w)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeBinHLL() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.WriteBinHLL() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("writeBinHLL() = %v, want %v", got, tt.want)
+				t.Errorf("legacy_encoder.WriteBinHLL() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeBinHLL() = %v, want %v", gotW, tt.wantW)
+				t.Errorf("legacy_encoder.WriteBinHLL() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func Test_writeBinGeoJSON(t *testing.T) {
+func Test_WriteBinGeoJSON(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		name string
@@ -1328,22 +1325,22 @@ func Test_writeBinGeoJSON(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeBinGeoJSON(tt.args.name, tt.args.v, w)
+			got, err := legacy_encoder.WriteBinGeoJSON(tt.args.name, tt.args.v, w)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeBinGeoJSON() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.WriteBinGeoJSON() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("writeBinGeoJSON() = %v, want %v", got, tt.want)
+				t.Errorf("legacy_encoder.WriteBinGeoJSON() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeBinGeoJSON() = %v, want %v", gotW, tt.wantW)
+				t.Errorf("legacy_encoder.WriteBinGeoJSON() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func Test_writeBinNil(t *testing.T) {
+func Test_WriteBinNil(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		name string
@@ -1376,22 +1373,22 @@ func Test_writeBinNil(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeBinNil(tt.args.name, w)
+			got, err := legacy_encoder.WriteBinNil(tt.args.name, w)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeBinNil() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.WriteBinNil() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("writeBinNil() = %v, want %v", got, tt.want)
+				t.Errorf("legacy_encoder.WriteBinNil() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeBinNil() = %v, want %v", gotW, tt.wantW)
+				t.Errorf("legacy_encoder.WriteBinNil() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func Test_writeRecordNamespace(t *testing.T) {
+func Test_WriteRecordNamespace(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		namespace string
@@ -1424,22 +1421,22 @@ func Test_writeRecordNamespace(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeRecordNamespace(tt.args.namespace, w)
+			got, err := legacy_encoder.WriteRecordNamespace(tt.args.namespace, w)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeRecordNamespace() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.WriteRecordNamespace() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("writeRecordNamespace() = %v, want %v", got, tt.want)
+				t.Errorf("legacy_encoder.WriteRecordNamespace() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeRecordNamespace() = %v, want %v", gotW, tt.wantW)
+				t.Errorf("legacy_encoder.WriteRecordNamespace() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func Test_writeRecordDigest(t *testing.T) {
+func Test_WriteRecordDigest(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		digest []byte
@@ -1464,22 +1461,22 @@ func Test_writeRecordDigest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeRecordDigest(tt.args.digest, w)
+			got, err := legacy_encoder.WriteRecordDigest(tt.args.digest, w)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeRecordDigest() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.WriteRecordDigest() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("writeRecordDigest() = %v, want %v", got, tt.want)
+				t.Errorf("legacy_encoder.WriteRecordDigest() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeRecordDigest() = %v, want %v", gotW, tt.wantW)
+				t.Errorf("legacy_encoder.WriteRecordDigest() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func Test_writeRecordSet(t *testing.T) {
+func Test_WriteRecordSet(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		setName string
@@ -1512,22 +1509,22 @@ func Test_writeRecordSet(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeRecordSet(tt.args.setName, w)
+			got, err := legacy_encoder.WriteRecordSet(tt.args.setName, w)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeRecordSet() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.WriteRecordSet() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("writeRecordSet() = %v, want %v", got, tt.want)
+				t.Errorf("legacy_encoder.WriteRecordSet() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeRecordSet() = %v, want %v", gotW, tt.wantW)
+				t.Errorf("legacy_encoder.WriteRecordSet() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func Test_writeUserKeyInt(t *testing.T) {
+func Test_WriteUserKeyInt(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		v int64
@@ -1552,22 +1549,22 @@ func Test_writeUserKeyInt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeUserKeyInt(tt.args.v, w)
+			got, err := legacy_encoder.WriteUserKeyInt(tt.args.v, w)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeUserKeyInt() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.WriteUserKeyInt() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("writeUserKeyInt() = %v, want %v", got, tt.want)
+				t.Errorf("legacy_encoder.WriteUserKeyInt() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeUserKeyInt() = %v, want %v", gotW, tt.wantW)
+				t.Errorf("legacy_encoder.WriteUserKeyInt() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func Test_writeUserKeyFloat(t *testing.T) {
+func Test_WriteUserKeyFloat(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		v float64
@@ -1592,22 +1589,22 @@ func Test_writeUserKeyFloat(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeUserKeyFloat(tt.args.v, w)
+			got, err := legacy_encoder.WriteUserKeyFloat(tt.args.v, w)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeUserKeyFloat() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.WriteUserKeyFloat() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("writeUserKeyFloat() = %v, want %v", got, tt.want)
+				t.Errorf("legacy_encoder.WriteUserKeyFloat() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeUserKeyFloat() = %v, want %v", gotW, tt.wantW)
+				t.Errorf("legacy_encoder.WriteUserKeyFloat() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func Test_writeUserKeyString(t *testing.T) {
+func Test_WriteUserKeyString(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		v string
@@ -1632,22 +1629,22 @@ func Test_writeUserKeyString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeUserKeyString(tt.args.v, w)
+			got, err := legacy_encoder.WriteUserKeyString(tt.args.v, w)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeUserKeyString() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.WriteUserKeyString() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("writeUserKeyString() = %v, want %v", got, tt.want)
+				t.Errorf("legacy_encoder.WriteUserKeyString() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeUserKeyString() = %v, want %v", gotW, tt.wantW)
+				t.Errorf("legacy_encoder.WriteUserKeyString() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func Test_writeUserKeyBytes(t *testing.T) {
+func Test_WriteUserKeyBytes(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		v []byte
@@ -1672,16 +1669,16 @@ func Test_writeUserKeyBytes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeUserKeyBytes(tt.args.v, w)
+			got, err := legacy_encoder.WriteUserKeyBytes(tt.args.v, w)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeUserKeyBytes() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.WriteUserKeyBytes() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("writeUserKeyBytes() = %v, want %v", got, tt.want)
+				t.Errorf("legacy_encoder.WriteUserKeyBytes() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeUserKeyBytes() = %v, want %v", gotW, tt.wantW)
+				t.Errorf("legacy_encoder.WriteUserKeyBytes() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
@@ -1731,7 +1728,7 @@ func BenchmarkEncodeRecord(b *testing.B) {
 	buff := &bytes.Buffer{}
 	for b.Loop() {
 		buff.Reset()
-		if _, err := recordToASB(encoder.config.Compact, rec, buff); err != nil {
+		if _, err := legacy_encoder.RecordToASB(encoder.config.Compact, rec, buff); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -1779,19 +1776,22 @@ func BenchmarkEncodeTokenRecordAllDataTypes(b *testing.B) {
 		},
 	}
 
-	out := bytes.NewBuffer(make([]byte, 0, 4096))
-	if err := encoder.EncodeToken(token, out); err != nil {
-		b.Fatal(err)
+	out := make([]byte, 0, 4096)
+	var encodeErr error
+	out, encodeErr = encoder.EncodeToken(token, out)
+	if encodeErr != nil {
+		b.Fatal(encodeErr)
 	}
 
-	b.SetBytes(int64(out.Len()))
+	b.SetBytes(int64(len(out)))
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for b.Loop() {
-		out.Reset()
-		if err := encoder.EncodeToken(token, out); err != nil {
-			b.Fatal(err)
+		out = out[:0]
+		out, encodeErr = encoder.EncodeToken(token, out)
+		if encodeErr != nil {
+			b.Fatal(encodeErr)
 		}
 	}
 }
@@ -1946,7 +1946,7 @@ func Test_writeFirstMetaText(t *testing.T) {
 	}
 }
 
-func Test_blobBinToASB(t *testing.T) {
+func Test_BlobBinToASB(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		name      string
@@ -1971,14 +1971,14 @@ func Test_blobBinToASB(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := blobBinToASB(tt.args.val, tt.args.bytesType, tt.args.name); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("blobBinToASB() = %s, want %s", got, tt.want)
+			if got := legacy_encoder.BlobBinToASB(tt.args.val, tt.args.bytesType, tt.args.name); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("legacy_encoder.BlobBinToASB() = %s, want %s", got, tt.want)
 			}
 		})
 	}
 }
 
-func Test_writeRawListBin(t *testing.T) {
+func Test_WriteRawListBin(t *testing.T) {
 	t.Parallel()
 	data := []byte("hello")
 	b64Data := base64.StdEncoding.EncodeToString(data)
@@ -2035,22 +2035,22 @@ func Test_writeRawListBin(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeRawListBin(tt.args.cdt, tt.args.name, tt.args.compact, w)
+			got, err := legacy_encoder.WriteRawListBin(tt.args.cdt, tt.args.name, tt.args.compact, w)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeRawListBin() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.WriteRawListBin() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("writeRawListBin() = %v, want %v", got, tt.want)
+				t.Errorf("legacy_encoder.WriteRawListBin() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeRawListBin() = %v, want %v", gotW, tt.wantW)
+				t.Errorf("legacy_encoder.WriteRawListBin() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func Test_writeRawMapBin(t *testing.T) {
+func Test_WriteRawMapBin(t *testing.T) {
 	t.Parallel()
 	data := []byte("hello")
 	b64Data := base64.StdEncoding.EncodeToString(data)
@@ -2107,22 +2107,22 @@ func Test_writeRawMapBin(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeRawMapBin(tt.args.cdt, tt.args.name, tt.args.compact, w)
+			got, err := legacy_encoder.WriteRawMapBin(tt.args.cdt, tt.args.name, tt.args.compact, w)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeRawMapBin() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.WriteRawMapBin() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("writeRawMapBin() = %v, want %v", got, tt.want)
+				t.Errorf("legacy_encoder.WriteRawMapBin() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeRawMapBin() = %v, want %v", gotW, tt.wantW)
+				t.Errorf("legacy_encoder.WriteRawMapBin() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
 }
 
-func Test_writeRawBlobBin(t *testing.T) {
+func Test_WriteRawBlobBin(t *testing.T) {
 	t.Parallel()
 	data := []byte("hello")
 	b64Data := base64.StdEncoding.EncodeToString(data)
@@ -2177,16 +2177,16 @@ func Test_writeRawBlobBin(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := &bytes.Buffer{}
-			got, err := writeRawBlobBin(tt.args.cdt, tt.args.name, false, w)
+			got, err := legacy_encoder.WriteRawBlobBin(tt.args.cdt, tt.args.name, false, w)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("writeRawBlobBin() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("legacy_encoder.WriteRawBlobBin() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("writeRawBlobBin() = %v, want %v", got, tt.want)
+				t.Errorf("legacy_encoder.WriteRawBlobBin() = %v, want %v", got, tt.want)
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("writeRawBlobBin() = %v, want %v", gotW, tt.wantW)
+				t.Errorf("legacy_encoder.WriteRawBlobBin() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}

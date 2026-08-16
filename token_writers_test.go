@@ -76,19 +76,16 @@ func TestTokenWriter(t *testing.T) {
 	invalidToken := &models.Token{Type: models.TokenTypeInvalid}
 
 	mockEncoder := mocks.NewMockEncoder[*models.Token](t)
-	mockEncoder.EXPECT().EncodeToken(recToken, mock.Anything).RunAndReturn(func(_ *models.Token, w *bytes.Buffer) error {
-		_, _ = w.WriteString("encoded rec ")
-		return nil
+	mockEncoder.EXPECT().EncodeToken(recToken, mock.Anything).RunAndReturn(func(_ *models.Token, dst []byte) ([]byte, error) {
+		return append(dst, "encoded rec "...), nil
 	})
-	mockEncoder.EXPECT().EncodeToken(SIndexToken, mock.Anything).RunAndReturn(func(_ *models.Token, w *bytes.Buffer) error {
-		_, _ = w.WriteString("encoded sindex ")
-		return nil
+	mockEncoder.EXPECT().EncodeToken(SIndexToken, mock.Anything).RunAndReturn(func(_ *models.Token, dst []byte) ([]byte, error) {
+		return append(dst, "encoded sindex "...), nil
 	})
-	mockEncoder.EXPECT().EncodeToken(UDFToken, mock.Anything).RunAndReturn(func(_ *models.Token, w *bytes.Buffer) error {
-		_, _ = w.WriteString("encoded UDF ")
-		return nil
+	mockEncoder.EXPECT().EncodeToken(UDFToken, mock.Anything).RunAndReturn(func(_ *models.Token, dst []byte) ([]byte, error) {
+		return append(dst, "encoded UDF "...), nil
 	})
-	mockEncoder.EXPECT().EncodeToken(invalidToken, mock.Anything).Return(errors.New("error"))
+	mockEncoder.EXPECT().EncodeToken(invalidToken, mock.Anything).Return(nil, errors.New("error"))
 
 	b := bytes.Buffer{}
 	dst := newBufferWriteCloser(&b)
@@ -115,7 +112,7 @@ func TestTokenWriter(t *testing.T) {
 		Record: &a.Record{},
 	}
 	failRecToken := models.NewRecordToken(failRec, 0, nil)
-	mockEncoder.EXPECT().EncodeToken(failRecToken, mock.Anything).Return(errors.New("error"))
+	mockEncoder.EXPECT().EncodeToken(failRecToken, mock.Anything).Return(nil, errors.New("error"))
 	_, err = writer.Write(failRecToken)
 	require.Error(t, err)
 

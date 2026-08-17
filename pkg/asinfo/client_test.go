@@ -17,6 +17,7 @@ package asinfo
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"reflect"
 	"testing"
 
@@ -67,6 +68,7 @@ func newClient(
 		cluster:     cluster,
 		policy:      policy,
 		retryPolicy: retryPolicy,
+		logger:      slog.Default(),
 	}
 
 	ic.cmdDict = newCmdDict(models2.AerospikeVersionRecentInfoCommands)
@@ -840,6 +842,9 @@ func Test_parseSIndex(t *testing.T) {
 				t.Errorf("parseSIndex() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+			if tt.name == "negative invalid indextype" {
+				require.ErrorIs(t, err, ErrInvalidSIndexType)
+			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("parseSIndex() = %v, want %v", got, tt.want)
 			}
@@ -1291,17 +1296,39 @@ func Test_parseSIndexResponse(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "negative bad sindex",
+			name: "negative bad sindex bin type",
 			args: args{
 				sindexInfoResp: "ns=test:set=testset:indexname=testindex:bin=testbin:type=BADTYPE:indextype=default:context=null:state=RW",
 			},
 			wantErr: true,
 		},
+		{
+			name: "positive skips invalid indextype",
+			args: args{
+				sindexInfoResp: "ns=test:set=testset:indexname=validindex:bin=testbin:type=numeric:indextype=default:context=null:state=RW;ns=test:set=testset:indexname=badindex:bin=testbin:type=numeric:indextype=badtype:context=null:state=RW",
+			},
+			want: []*models.SIndex{
+				{
+					Namespace: "test",
+					Name:      "validindex",
+					Set:       "testset",
+					Path: models.SIndexPath{
+						BinName: "testbin",
+						BinType: models.NumericSIDataType,
+					},
+					IndexType: models.BinSIndex,
+				},
+				nil,
+			},
+		},
 	}
+	mockNodeGetter := mocks.NewMockNodeGetter(t)
+	ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := parseSIndexes(tt.args.sindexInfoResp)
+			got, err := ic.parseSIndexes(tt.args.sindexInfoResp)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseSIndexResponse() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1818,7 +1845,7 @@ func TestClient_EnableDisableXDR(t *testing.T) {
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
 
 	nodes := ic.GetNodesNames()
@@ -1838,7 +1865,7 @@ func TestClient_BlockUnblockMRTWrites(t *testing.T) {
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
 
 	nodes := ic.GetNodesNames()
@@ -1911,7 +1938,7 @@ func TestClient_GetSIndexes(t *testing.T) {
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
 
 	ctx := t.Context()
@@ -1926,7 +1953,7 @@ func TestClient_GetUDFs(t *testing.T) {
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
 
 	ctx := t.Context()
@@ -1941,7 +1968,7 @@ func TestClient_GetRecordCount(t *testing.T) {
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
 
 	ctx := t.Context()
@@ -1954,7 +1981,7 @@ func TestClient_XDR(t *testing.T) {
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
 
 	nodes := ic.GetNodesNames()
@@ -1984,7 +2011,7 @@ func TestClient_GetSets(t *testing.T) {
 	aerr = client.PutBins(wp, k, b)
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
 
 	ctx := t.Context()
@@ -2001,7 +2028,7 @@ func TestClient_getRackNodes(t *testing.T) {
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
 
 	ctx := t.Context()
@@ -2018,7 +2045,7 @@ func TestClient_getService(t *testing.T) {
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
 
 	nodes := ic.GetNodesNames()
@@ -2033,7 +2060,7 @@ func TestClient_GetNamespacesList(t *testing.T) {
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
 
 	ctx := t.Context()
@@ -2050,7 +2077,7 @@ func TestClient_GetStatus(t *testing.T) {
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
 
 	ctx := t.Context()
@@ -2065,7 +2092,7 @@ func TestClient_GetDCsList(t *testing.T) {
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
 
 	node, err := ic.cluster.GetRandomNode()
@@ -2089,7 +2116,7 @@ func TestClient_GetReplicas(t *testing.T) {
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
 
 	node, err := ic.cluster.GetRandomNode()
@@ -2106,7 +2133,7 @@ func TestClient_GetPendingMigrations(t *testing.T) {
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
 
 	ctx := t.Context()
@@ -2120,7 +2147,7 @@ func TestClient_GetBackupStatus(t *testing.T) {
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
 
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
 
 	ctx := t.Context()

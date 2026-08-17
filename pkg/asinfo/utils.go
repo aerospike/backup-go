@@ -18,7 +18,9 @@ import (
 	"cmp"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strconv"
 	"strings"
@@ -76,7 +78,7 @@ func (ic *Client) getSIndexes(node infoGetter, namespace string, policy *a.InfoP
 		return nil, fmt.Errorf("failed to parse sindexes response: %w", err)
 	}
 
-	return parseSIndexes(cmdResp)
+	return ic.parseSIndexes(cmdResp)
 }
 
 func (ic *Client) buildSindexCmd(namespace string, getCtx bool) string {
@@ -136,7 +138,7 @@ func parseAerospikeVersion(versionStr string) (m.AerospikeVersion, error) {
 	}, nil
 }
 
-func parseSIndexes(sindexListInfoResp string) ([]*models.SIndex, error) {
+func (ic *Client) parseSIndexes(sindexListInfoResp string) ([]*models.SIndex, error) {
 	sindexInfo, err := parseSindexListResponse(sindexListInfoResp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse sindex response: %w", err)
@@ -150,8 +152,21 @@ func parseSIndexes(sindexListInfoResp string) ([]*models.SIndex, error) {
 	sindexes := make([]*models.SIndex, len(sindexInfo))
 
 	for i, sindexStr := range sindexInfo {
+		// Skip empty or nil maps.
+		if len(sindexStr) == 0 {
+			continue
+		}
+
 		sindex, err := parseSIndex(sindexStr)
 		if err != nil {
+			if errors.Is(err, ErrInvalidSIndexType) {
+				ic.logger.Warn("skipping sindex with invalid type",
+					slog.String("sindex", sindexStr["indexname"]),
+					slog.String("type", sindexStr["indextype"]))
+
+				continue
+			}
+
 			return nil, fmt.Errorf("failed to parse sindex: %w", err)
 		}
 
@@ -198,7 +213,7 @@ func parseSIndex(sindexMap m.InfoMap) (*models.SIndex, error) {
 		case indexTypeMapValues:
 			sindexType = models.MapValueSIndex
 		default:
-			return nil, fmt.Errorf("invalid sindex index type: %s", val)
+			return nil, fmt.Errorf("%w: %s", ErrInvalidSIndexType, val)
 		}
 
 		si.IndexType = sindexType

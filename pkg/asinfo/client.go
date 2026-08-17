@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"regexp"
 	"slices"
@@ -54,6 +55,7 @@ var (
 	ErrReplicationFactorZero = errors.New("replication factor is zero")
 	ErrNoNode                = errors.New("no node found")
 	ErrNotFound              = errors.New("not found")
+	ErrInvalidSIndexType     = errors.New("invalid sindex index type")
 
 	secretAgentValRegex = regexp.MustCompile(`(.+?)=secrets:(.+?):(.+?)`)
 )
@@ -77,6 +79,7 @@ type Client struct {
 	policy      *a.InfoPolicy
 	retryPolicy *models.RetryPolicy
 	cmdDict     map[int]string
+	logger      *slog.Logger
 }
 
 // NewClient initializes and returns a new asinfo Client instance with the provided Aerospike client,
@@ -85,6 +88,7 @@ func NewClient(
 	cluster NodeGetter,
 	policy *a.InfoPolicy,
 	retryPolicy *models.RetryPolicy,
+	logger *slog.Logger,
 ) (*Client, error) {
 	if retryPolicy == nil {
 		retryPolicy = models.NewDefaultRetryPolicy()
@@ -94,6 +98,7 @@ func NewClient(
 		cluster:     cluster,
 		policy:      policy,
 		retryPolicy: retryPolicy,
+		logger:      logger,
 	}
 	// On init we can use context.Background(), as we don't need to do any async operations.
 	ctx := context.Background()

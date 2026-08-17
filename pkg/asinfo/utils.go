@@ -149,9 +149,9 @@ func (ic *Client) parseSIndexes(sindexListInfoResp string) ([]*models.SIndex, er
 		return nil, nil
 	}
 
-	sindexes := make([]*models.SIndex, len(sindexInfo))
+	sindexes := make([]*models.SIndex, 0)
 
-	for i, sindexStr := range sindexInfo {
+	for _, sindexStr := range sindexInfo {
 		// Skip empty or nil maps.
 		if len(sindexStr) == 0 {
 			continue
@@ -170,7 +170,7 @@ func (ic *Client) parseSIndexes(sindexListInfoResp string) ([]*models.SIndex, er
 			return nil, fmt.Errorf("failed to parse sindex: %w", err)
 		}
 
-		sindexes[i] = sindex
+		sindexes = append(sindexes, sindex)
 	}
 
 	return sindexes, nil

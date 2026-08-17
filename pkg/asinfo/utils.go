@@ -145,12 +145,12 @@ func (ic *Client) parseSIndexes(sindexListInfoResp string, noWarn bool) ([]*mode
 		return nil, fmt.Errorf("failed to parse sindex response: %w", err)
 	}
 
-	// No sindexes
-	if sindexInfo == nil {
+	// No sindexes.
+	if len(sindexInfo) == 0 {
 		return nil, nil
 	}
 
-	sindexes := make([]*models.SIndex, 0)
+	sindexes := make([]*models.SIndex, 0, len(sindexInfo))
 
 	for _, sindexMap := range sindexInfo {
 		// Skip empty or nil maps.
@@ -159,22 +159,32 @@ func (ic *Client) parseSIndexes(sindexListInfoResp string, noWarn bool) ([]*mode
 		}
 
 		sindex, err := parseSIndex(sindexMap)
-		if err != nil {
-			if errors.Is(err, ErrInvalidSIndexType) && !noWarn {
-				ic.logger.Warn("skipping sindex with invalid type",
-					slog.String("sindex", sindexMap["indexname"]),
-					slog.String("type", sindexMap["indextype"]))
 
-				continue
-			}
-
+		switch {
+		case err == nil:
+			sindexes = append(sindexes, sindex)
+		case errors.Is(err, ErrInvalidSIndexType):
+			ic.warnInvalidSIndexType(noWarn, sindexMap)
+		default:
 			return nil, fmt.Errorf("failed to parse sindex: %w", err)
 		}
-
-		sindexes = append(sindexes, sindex)
 	}
 
 	return sindexes, nil
+}
+
+// warnInvalidSIndexType logs a warning if the sindex type is invalid.
+// We should warn only when we try to back up indexes, but we also call this function for index type check,
+// in that case we silence error with noWarn = true.
+func (ic *Client) warnInvalidSIndexType(noWarn bool, sindexMap map[string]string) {
+	if noWarn {
+		return
+	}
+
+	ic.logger.Warn("skipping sindex with invalid type",
+		slog.String("sindex", sindexMap["indexname"]),
+		slog.String("type", sindexMap["indextype"]),
+	)
 }
 
 // parseSIndex parses a single InfoMap containing a sindex into a SecondaryIndex model

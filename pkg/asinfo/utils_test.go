@@ -76,10 +76,10 @@ func TestClient_parseSIndexes_skipsInvalidIndexType(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "returns error for invalid indextype when noWarn is true",
-			resp:    invalidSIndexType,
-			noWarn:  true,
-			wantErr: true,
+			name:   "silently skips invalid indextype when noWarn is true",
+			resp:   invalidSIndexType,
+			noWarn: true,
+			want:   []*models.SIndex{},
 		},
 	}
 
@@ -93,11 +93,7 @@ func TestClient_parseSIndexes_skipsInvalidIndexType(t *testing.T) {
 			got, err := ic.parseSIndexes(tt.resp, tt.noWarn)
 			if tt.wantErr {
 				require.Error(t, err)
-				if tt.noWarn {
-					require.ErrorIs(t, err, ErrInvalidSIndexType)
-				} else {
-					require.NotErrorIs(t, err, ErrInvalidSIndexType)
-				}
+				require.NotErrorIs(t, err, ErrInvalidSIndexType)
 
 				return
 			}
@@ -111,6 +107,8 @@ func TestClient_parseSIndexes_skipsInvalidIndexType(t *testing.T) {
 func TestClient_parseSIndexes_logsSkippedInvalidIndexType(t *testing.T) {
 	t.Parallel()
 
+	const invalidSIndexType = "ns=test:set=testset:indexname=badindex:bin=testbin:type=numeric:indextype=badtype:context=null:state=RW"
+
 	var logBuf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelWarn}))
 
@@ -118,11 +116,17 @@ func TestClient_parseSIndexes_logsSkippedInvalidIndexType(t *testing.T) {
 	ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 	ic.logger = logger
 
-	resp := "ns=test:set=testset:indexname=badindex:bin=testbin:type=numeric:indextype=badtype:context=null:state=RW"
-	got, err := ic.parseSIndexes(resp, false)
+	got, err := ic.parseSIndexes(invalidSIndexType, false)
 	require.NoError(t, err)
 	require.Empty(t, got)
 	require.Contains(t, logBuf.String(), "skipping sindex with invalid type")
 	require.Contains(t, logBuf.String(), "badindex")
 	require.Contains(t, logBuf.String(), "badtype")
+
+	logBuf.Reset()
+
+	got, err = ic.parseSIndexes(invalidSIndexType, true)
+	require.NoError(t, err)
+	require.Empty(t, got)
+	require.Empty(t, logBuf.String())
 }

@@ -47,27 +47,38 @@ func TestClient_parseSIndexes_skipsInvalidIndexType(t *testing.T) {
 	tests := []struct {
 		name    string
 		resp    string
+		noWarn  bool
 		want    []*models.SIndex
 		wantErr bool
 	}{
 		{
-			name: "skips invalid indextype and keeps valid sindex",
-			resp: validSIndex + ";" + invalidSIndexType,
-			want: []*models.SIndex{valid, nil},
+			name:   "skips invalid indextype and keeps valid sindex",
+			resp:   validSIndex + ";" + invalidSIndexType,
+			noWarn: false,
+			want:   []*models.SIndex{valid},
 		},
 		{
-			name: "skips sindex with invalid indextype only",
-			resp: invalidSIndexType,
-			want: []*models.SIndex{nil},
+			name:   "skips sindex with invalid indextype only",
+			resp:   invalidSIndexType,
+			noWarn: false,
+			want:   []*models.SIndex{},
 		},
 		{
-			name: "skips empty sindex entry",
-			resp: validSIndex + ";;" + invalidSIndexType,
-			want: []*models.SIndex{valid, nil, nil},
+			name:   "skips empty sindex entry",
+			resp:   validSIndex + ";;" + invalidSIndexType,
+			noWarn: false,
+			want:   []*models.SIndex{valid},
 		},
 		{
 			name:    "returns error for invalid bin type",
 			resp:    "ns=test:set=testset:indexname=testindex:bin=testbin:type=BADTYPE:indextype=default:context=null:state=RW",
+			noWarn:  false,
+			wantErr: true,
+		},
+		{
+			name:    "returns error for invalid indextype when noWarn is true",
+			resp:    invalidSIndexType,
+			noWarn:  true,
 			wantErr: true,
 		},
 	}
@@ -79,10 +90,14 @@ func TestClient_parseSIndexes_skipsInvalidIndexType(t *testing.T) {
 			mockNodeGetter := mocks.NewMockNodeGetter(t)
 			ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
 
-			got, err := ic.parseSIndexes(tt.resp)
+			got, err := ic.parseSIndexes(tt.resp, tt.noWarn)
 			if tt.wantErr {
 				require.Error(t, err)
-				require.NotErrorIs(t, err, ErrInvalidSIndexType)
+				if tt.noWarn {
+					require.ErrorIs(t, err, ErrInvalidSIndexType)
+				} else {
+					require.NotErrorIs(t, err, ErrInvalidSIndexType)
+				}
 
 				return
 			}
@@ -104,9 +119,10 @@ func TestClient_parseSIndexes_logsSkippedInvalidIndexType(t *testing.T) {
 	ic.logger = logger
 
 	resp := "ns=test:set=testset:indexname=badindex:bin=testbin:type=numeric:indextype=badtype:context=null:state=RW"
-	got, err := ic.parseSIndexes(resp)
+	got, err := ic.parseSIndexes(resp, false)
 	require.NoError(t, err)
-	require.Equal(t, []*models.SIndex{nil}, got)
+	require.Empty(t, got)
 	require.Contains(t, logBuf.String(), "skipping sindex with invalid type")
 	require.Contains(t, logBuf.String(), "badindex")
+	require.Contains(t, logBuf.String(), "badtype")
 }

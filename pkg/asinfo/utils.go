@@ -57,7 +57,8 @@ func parseResultResponse(cmd string, result map[string]string) (string, error) {
 	return v, nil
 }
 
-func (ic *Client) getSIndexes(node infoGetter, namespace string, policy *a.InfoPolicy) ([]*models.SIndex, error) {
+func (ic *Client) requestSIndexes(node infoGetter, namespace string, policy *a.InfoPolicy, noWarn bool,
+) ([]*models.SIndex, error) {
 	supportsSIndexCTX := m.AerospikeVersionSupportsSIndexContext
 
 	version, err := ic.getAerospikeVersion(node, policy)
@@ -78,7 +79,7 @@ func (ic *Client) getSIndexes(node infoGetter, namespace string, policy *a.InfoP
 		return nil, fmt.Errorf("failed to parse sindexes response: %w", err)
 	}
 
-	return ic.parseSIndexes(cmdResp)
+	return ic.parseSIndexes(cmdResp, noWarn)
 }
 
 func (ic *Client) buildSindexCmd(namespace string, getCtx bool) string {
@@ -138,7 +139,7 @@ func parseAerospikeVersion(versionStr string) (m.AerospikeVersion, error) {
 	}, nil
 }
 
-func (ic *Client) parseSIndexes(sindexListInfoResp string) ([]*models.SIndex, error) {
+func (ic *Client) parseSIndexes(sindexListInfoResp string, noWarn bool) ([]*models.SIndex, error) {
 	sindexInfo, err := parseSindexListResponse(sindexListInfoResp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse sindex response: %w", err)
@@ -151,18 +152,18 @@ func (ic *Client) parseSIndexes(sindexListInfoResp string) ([]*models.SIndex, er
 
 	sindexes := make([]*models.SIndex, 0)
 
-	for _, sindexStr := range sindexInfo {
+	for _, sindexMap := range sindexInfo {
 		// Skip empty or nil maps.
-		if len(sindexStr) == 0 {
+		if len(sindexMap) == 0 {
 			continue
 		}
 
-		sindex, err := parseSIndex(sindexStr)
+		sindex, err := parseSIndex(sindexMap)
 		if err != nil {
-			if errors.Is(err, ErrInvalidSIndexType) {
+			if errors.Is(err, ErrInvalidSIndexType) && !noWarn {
 				ic.logger.Warn("skipping sindex with invalid type",
-					slog.String("sindex", sindexStr["indexname"]),
-					slog.String("type", sindexStr["indextype"]))
+					slog.String("sindex", sindexMap["indexname"]),
+					slog.String("type", sindexMap["indextype"]))
 
 				continue
 			}

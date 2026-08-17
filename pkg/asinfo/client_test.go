@@ -1194,7 +1194,7 @@ func Test_getSIndexes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := ic.getSIndexes(tt.args.conn, tt.args.namespace, tt.args.policy)
+			got, err := ic.requestSIndexes(tt.args.conn, tt.args.namespace, tt.args.policy, false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getSIndexes() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1318,7 +1318,6 @@ func Test_parseSIndexResponse(t *testing.T) {
 					},
 					IndexType: models.BinSIndex,
 				},
-				nil,
 			},
 		},
 	}
@@ -1328,7 +1327,7 @@ func Test_parseSIndexResponse(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := ic.parseSIndexes(tt.args.sindexInfoResp)
+			got, err := ic.parseSIndexes(tt.args.sindexInfoResp, false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseSIndexResponse() error = %v, wantErr %v", err, tt.wantErr)
 				return

@@ -27,7 +27,7 @@ import (
 	"github.com/segmentio/asm/base64"
 )
 
-const maxPrecomputedHeaderUint = 100
+const maxPrecomputedHeaderUint = 1000
 
 var (
 	generationLines [maxPrecomputedHeaderUint + 1][]byte
@@ -49,12 +49,20 @@ type Encoder[T models.TokenConstraint] struct {
 	recordSet        recentLine
 	firstFileWritten atomic.Bool
 	id               atomic.Int64
+
+	// cacheLine enables recentLine caching for namespace/set metadata lines.
+	// cacheGen enables precomputed generation and bin-count header lines (<= 1000).
+	// Both default to true; see BenchmarkEncoderCache in encode_test.go.
+	cacheLine bool
+	cacheGen  bool
 }
 
 // NewEncoder creates a new Encoder.
 func NewEncoder[T models.TokenConstraint](cfg *EncoderConfig) *Encoder[T] {
 	return &Encoder[T]{
-		config: cfg,
+		config:    cfg,
+		cacheLine: true,
+		cacheGen:  true,
 	}
 }
 
@@ -123,11 +131,11 @@ func (e *Encoder[T]) appendRecord(dst []byte, r *models.Record) ([]byte, error) 
 	}
 
 	var number [32]byte
-	dst = appendGenerationLine(dst, r.Generation)
+	dst = appendGenerationLine(dst, r.Generation, e.cacheGen)
 	dst = append(dst, headerExpiration...)
 	dst = append(dst, strconv.AppendInt(number[:0], r.VoidTime, 10)...)
 	dst = append(dst, '\n')
-	dst = appendBinCountLine(dst, uint32(len(r.Bins)))
+	dst = appendBinCountLine(dst, uint32(len(r.Bins)), e.cacheGen)
 
 	for name, value := range r.Bins {
 		dst, err = e.appendRecordBin(dst, name, value, &number)
@@ -149,14 +157,14 @@ func (e *Encoder[T]) appendRecordKey(dst []byte, key *a.Key) ([]byte, error) {
 		}
 	}
 
-	dst = e.recordNamespace.appendLine(dst, namespacePrefix, key.Namespace())
+	dst = e.recordNamespace.appendLine(dst, namespacePrefix, key.Namespace(), e.cacheLine)
 
 	dst = append(dst, digestPrefix...)
 	dst = appendBase64(dst, key.Digest())
 	dst = append(dst, '\n')
 
 	if set := key.SetName(); set != "" {
-		dst = e.recordSet.appendLine(dst, setPrefix, set)
+		dst = e.recordSet.appendLine(dst, setPrefix, set, e.cacheLine)
 	}
 
 	return dst, nil
@@ -365,8 +373,8 @@ func appendBase64(dst, value []byte) []byte {
 	return dst
 }
 
-func appendGenerationLine(dst []byte, generation uint32) []byte {
-	if generation <= maxPrecomputedHeaderUint {
+func appendGenerationLine(dst []byte, generation uint32, cache bool) []byte {
+	if cache && generation <= maxPrecomputedHeaderUint {
 		return append(dst, generationLines[generation]...)
 	}
 
@@ -378,8 +386,8 @@ func appendGenerationLine(dst []byte, generation uint32) []byte {
 	return append(dst, '\n')
 }
 
-func appendBinCountLine(dst []byte, binCount uint32) []byte {
-	if binCount <= maxPrecomputedHeaderUint {
+func appendBinCountLine(dst []byte, binCount uint32, cache bool) []byte {
+	if cache && binCount <= maxPrecomputedHeaderUint {
 		return append(dst, binCountLines[binCount]...)
 	}
 
@@ -391,27 +399,25 @@ func appendBinCountLine(dst []byte, binCount uint32) []byte {
 	return append(dst, '\n')
 }
 
-type cachedLine struct {
+type recentLine struct {
 	value string
 	line  []byte
 }
 
-// recentLine caches the most recently used metadata line. The hot path uses
-// only an atomic load and string comparison, so it is effective for sequential
-// records while remaining correct when namespaces or sets change.
-type recentLine struct {
-	entry atomic.Pointer[cachedLine]
-}
-
-func (c *recentLine) appendLine(dst, prefix []byte, value string) []byte {
-	if entry := c.entry.Load(); entry != nil && entry.value == value {
-		return append(dst, entry.line...)
+// recentLine caches the most recently used metadata line for sequential records.
+func (c *recentLine) appendLine(dst, prefix []byte, value string, cache bool) []byte {
+	if !cache {
+		return appendMetadataLine(dst, prefix, value)
 	}
 
-	line := appendMetadataLine(nil, prefix, value)
-	c.entry.Store(&cachedLine{value: value, line: line})
+	if c.value == value {
+		return append(dst, c.line...)
+	}
 
-	return append(dst, line...)
+	c.value = value
+	c.line = appendMetadataLine(c.line[:0], prefix, value)
+
+	return append(dst, c.line...)
 }
 
 func appendMetadataLine(dst, prefix []byte, value string) []byte {

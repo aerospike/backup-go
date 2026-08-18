@@ -1057,45 +1057,211 @@ func TestPrecomputedHeaderLines(t *testing.T) {
 
 	for _, value := range values {
 		t.Run("generation/"+strconv.FormatUint(uint64(value), 10), func(t *testing.T) {
-			got := string(appendGenerationLine(nil, value))
 			want := fmt.Sprintf("+ g %d\n", value)
-			if got != want {
-				t.Fatalf("appendGenerationLine(%d) = %q, want %q", value, got, want)
+			for _, cache := range []bool{false, true} {
+				got := string(appendGenerationLine(nil, value, cache))
+				if got != want {
+					t.Fatalf("appendGenerationLine(%d, cache=%v) = %q, want %q", value, cache, got, want)
+				}
 			}
 		})
 		t.Run("binCount/"+strconv.FormatUint(uint64(value), 10), func(t *testing.T) {
-			got := string(appendBinCountLine(nil, value))
 			want := fmt.Sprintf("+ b %d\n", value)
-			if got != want {
-				t.Fatalf("appendBinCountLine(%d) = %q, want %q", value, got, want)
+			for _, cache := range []bool{false, true} {
+				got := string(appendBinCountLine(nil, value, cache))
+				if got != want {
+					t.Fatalf("appendBinCountLine(%d, cache=%v) = %q, want %q", value, cache, got, want)
+				}
 			}
 		})
 	}
 }
 
 func BenchmarkPrecomputedGenerationLine(b *testing.B) {
-	for _, value := range []uint32{1, 42, 101, 65535} {
-		b.Run(strconv.FormatUint(uint64(value), 10), func(b *testing.B) {
-			dst := make([]byte, 0, 16)
-			b.ReportAllocs()
-			for b.Loop() {
-				dst = dst[:0]
-				dst = appendGenerationLine(dst, value)
+	for _, cache := range []bool{false, true} {
+		b.Run(fmt.Sprintf("cache=%v", cache), func(b *testing.B) {
+			for _, value := range []uint32{1, 42, 101, 65535} {
+				b.Run(strconv.FormatUint(uint64(value), 10), func(b *testing.B) {
+					dst := make([]byte, 0, 16)
+					b.ReportAllocs()
+					for b.Loop() {
+						dst = dst[:0]
+						dst = appendGenerationLine(dst, value, cache)
+					}
+				})
 			}
 		})
 	}
 }
 
 func BenchmarkPrecomputedBinCountLine(b *testing.B) {
-	for _, value := range []uint32{1, 42, 101, 65535} {
-		b.Run(strconv.FormatUint(uint64(value), 10), func(b *testing.B) {
-			dst := make([]byte, 0, 16)
-			b.ReportAllocs()
-			for b.Loop() {
-				dst = dst[:0]
-				dst = appendBinCountLine(dst, value)
+	for _, cache := range []bool{false, true} {
+		b.Run(fmt.Sprintf("cache=%v", cache), func(b *testing.B) {
+			for _, value := range []uint32{1, 42, 101, 65535} {
+				b.Run(strconv.FormatUint(uint64(value), 10), func(b *testing.B) {
+					dst := make([]byte, 0, 16)
+					b.ReportAllocs()
+					for b.Loop() {
+						dst = dst[:0]
+						dst = appendBinCountLine(dst, value, cache)
+					}
+				})
 			}
 		})
+	}
+}
+
+func newEncoderWithCache(cacheLine, cacheGen bool) *Encoder[*models.Token] {
+	encoder := NewEncoder[*models.Token](testEncoderConfig)
+	encoder.cacheLine = cacheLine
+	encoder.cacheGen = cacheGen
+
+	return encoder
+}
+
+func cacheBenchmarkRecord(key *a.Key, generation uint32) *models.Record {
+	return &models.Record{
+		Record: &a.Record{
+			Key:        key,
+			Bins:       a.BinMap{"bin1": int64(42), "bin2": "hello", "bin3": true},
+			Generation: generation,
+		},
+		VoidTime: 1712345678,
+	}
+}
+
+func cacheBenchmarkToken(key *a.Key, generation uint32) *models.Token {
+	return &models.Token{
+		Type:   models.TokenTypeRecord,
+		Record: cacheBenchmarkRecord(key, generation),
+	}
+}
+
+// BenchmarkEncoderCache compares EncodeToken throughput for all cacheLine/cacheGen combinations.
+func BenchmarkEncoderCache(b *testing.B) {
+	key, err := a.NewKey("test", "demo", "benchmark-key")
+	require.NoError(b, err)
+
+	keyA, err := a.NewKey("namespace_a", "set_a", "key")
+	require.NoError(b, err)
+
+	keyB, err := a.NewKey("namespace_b", "set_b", "key")
+	require.NoError(b, err)
+
+	sameRecord := cacheBenchmarkToken(key, 42)
+
+	alternatingTokens := []*models.Token{
+		cacheBenchmarkToken(keyA, 1),
+		cacheBenchmarkToken(keyB, 2),
+	}
+
+	varyingGenTokens := make([]*models.Token, 50)
+	for i := range varyingGenTokens {
+		varyingGenTokens[i] = cacheBenchmarkToken(key, uint32(i+1))
+	}
+
+	highGenRecord := cacheBenchmarkToken(key, 5000)
+
+	warmOut, warmErr := newEncoderWithCache(false, false).EncodeToken(sameRecord, nil)
+	require.NoError(b, warmErr)
+	b.SetBytes(int64(len(warmOut)))
+
+	type cacheConfig struct {
+		name      string
+		cacheLine bool
+		cacheGen  bool
+	}
+
+	cacheConfigs := []cacheConfig{
+		{name: "NoCache", cacheLine: false, cacheGen: false},
+		{name: "CacheLine", cacheLine: true, cacheGen: false},
+		{name: "CacheGen", cacheLine: false, cacheGen: true},
+		{name: "CacheBoth", cacheLine: true, cacheGen: true},
+	}
+
+	for _, cfg := range cacheConfigs {
+		b.Run("SameRecord/"+cfg.name, func(b *testing.B) {
+			benchmarkEncoderCacheSameRecord(b, newEncoderWithCache(cfg.cacheLine, cfg.cacheGen), sameRecord)
+		})
+		b.Run("AlternatingMetadata/"+cfg.name, func(b *testing.B) {
+			benchmarkEncoderCacheAlternatingMetadata(b, newEncoderWithCache(cfg.cacheLine, cfg.cacheGen), alternatingTokens)
+		})
+		b.Run("VaryingGeneration/"+cfg.name, func(b *testing.B) {
+			benchmarkEncoderCacheVaryingGeneration(b, newEncoderWithCache(cfg.cacheLine, cfg.cacheGen), varyingGenTokens)
+		})
+		b.Run("HighGeneration/"+cfg.name, func(b *testing.B) {
+			benchmarkEncoderCacheHighGeneration(b, newEncoderWithCache(cfg.cacheLine, cfg.cacheGen), highGenRecord)
+		})
+	}
+}
+
+func benchmarkEncoderCacheSameRecord(b *testing.B, encoder *Encoder[*models.Token], token *models.Token) {
+	b.Helper()
+	b.ReportAllocs()
+
+	out := make([]byte, 0, 4096)
+	for b.Loop() {
+		out = out[:0]
+
+		var err error
+		out, err = encoder.EncodeToken(token, out)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func benchmarkEncoderCacheAlternatingMetadata(b *testing.B, encoder *Encoder[*models.Token], tokens []*models.Token) {
+	b.Helper()
+	b.ReportAllocs()
+
+	out := make([]byte, 0, 4096)
+	i := 0
+	for b.Loop() {
+		out = out[:0]
+
+		var err error
+		out, err = encoder.EncodeToken(tokens[i&1], out)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		i++
+	}
+}
+
+func benchmarkEncoderCacheVaryingGeneration(b *testing.B, encoder *Encoder[*models.Token], tokens []*models.Token) {
+	b.Helper()
+	b.ReportAllocs()
+
+	out := make([]byte, 0, 4096)
+	i := 0
+	for b.Loop() {
+		out = out[:0]
+
+		var err error
+		out, err = encoder.EncodeToken(tokens[i%len(tokens)], out)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		i++
+	}
+}
+
+func benchmarkEncoderCacheHighGeneration(b *testing.B, encoder *Encoder[*models.Token], token *models.Token) {
+	b.Helper()
+	b.ReportAllocs()
+
+	out := make([]byte, 0, 4096)
+	for b.Loop() {
+		out = out[:0]
+
+		var err error
+		out, err = encoder.EncodeToken(token, out)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 

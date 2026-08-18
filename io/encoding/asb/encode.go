@@ -30,8 +30,9 @@ import (
 const maxPrecomputedHeaderUint = 1000
 
 var (
-	generationLines [maxPrecomputedHeaderUint + 1][]byte
-	binCountLines   [maxPrecomputedHeaderUint + 1][]byte
+	generationLines   [maxPrecomputedHeaderUint + 1][]byte
+	binCountLines     [maxPrecomputedHeaderUint + 1][]byte
+	voidTimeNeverLine []byte
 )
 
 func init() {
@@ -39,6 +40,8 @@ func init() {
 		generationLines[i] = fmt.Appendf(nil, "+ g %d\n", i)
 		binCountLines[i] = fmt.Appendf(nil, "+ b %d\n", i)
 	}
+
+	voidTimeNeverLine = []byte("+ t 0\n")
 }
 
 // Encoder contains logic for encoding backup data into the .asb format.
@@ -51,7 +54,7 @@ type Encoder[T models.TokenConstraint] struct {
 	id               atomic.Int64
 
 	// cacheLine enables recentLine caching for namespace/set metadata lines.
-	// cacheGen enables precomputed generation and bin-count header lines (<= 1000).
+	// cacheGen enables precomputed generation, bin-count, and never-expire void-time lines.
 	// Both default to true; see BenchmarkEncoderCache in encode_test.go.
 	cacheLine bool
 	cacheGen  bool
@@ -132,9 +135,7 @@ func (e *Encoder[T]) appendRecord(dst []byte, r *models.Record) ([]byte, error) 
 
 	var number [32]byte
 	dst = appendGenerationLine(dst, r.Generation, e.cacheGen)
-	dst = append(dst, headerExpiration...)
-	dst = append(dst, strconv.AppendInt(number[:0], r.VoidTime, 10)...)
-	dst = append(dst, '\n')
+	dst = appendVoidTimeLine(dst, r.VoidTime, e.cacheGen, number[:0])
 	dst = appendBinCountLine(dst, uint32(len(r.Bins)), e.cacheGen)
 
 	for name, value := range r.Bins {
@@ -371,6 +372,17 @@ func appendBase64(dst, value []byte) []byte {
 	base64.StdEncoding.Encode(dst[offset:], value)
 
 	return dst
+}
+
+func appendVoidTimeLine(dst []byte, voidTime int64, cache bool, buf []byte) []byte {
+	if cache && voidTime == models.VoidTimeNeverExpire {
+		return append(dst, voidTimeNeverLine...)
+	}
+
+	dst = append(dst, headerExpiration...)
+	dst = append(dst, strconv.AppendInt(buf, voidTime, 10)...)
+
+	return append(dst, '\n')
 }
 
 func appendGenerationLine(dst []byte, generation uint32, cache bool) []byte {

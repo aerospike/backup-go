@@ -1077,6 +1077,33 @@ func TestPrecomputedHeaderLines(t *testing.T) {
 	}
 }
 
+func TestPrecomputedVoidTimeLine(t *testing.T) {
+	t.Parallel()
+
+	var buf [32]byte
+	want := "+ t 0\n"
+
+	gotCached := string(appendVoidTimeLine(nil, models.VoidTimeNeverExpire, true, buf[:0]))
+	if gotCached != want {
+		t.Fatalf("appendVoidTimeLine(0, cache=true) = %q, want %q", gotCached, want)
+	}
+
+	gotUncached := string(appendVoidTimeLine(nil, models.VoidTimeNeverExpire, false, buf[:0]))
+	if gotUncached != want {
+		t.Fatalf("appendVoidTimeLine(0, cache=false) = %q, want %q", gotUncached, want)
+	}
+
+	for _, voidTime := range []int64{1, 1712345678} {
+		wantLine := fmt.Sprintf("+ t %d\n", voidTime)
+		for _, cache := range []bool{false, true} {
+			got := string(appendVoidTimeLine(nil, voidTime, cache, buf[:0]))
+			if got != wantLine {
+				t.Fatalf("appendVoidTimeLine(%d, cache=%v) = %q, want %q", voidTime, cache, got, wantLine)
+			}
+		}
+	}
+}
+
 func BenchmarkPrecomputedGenerationLine(b *testing.B) {
 	for _, cache := range []bool{false, true} {
 		b.Run(fmt.Sprintf("cache=%v", cache), func(b *testing.B) {
@@ -1119,21 +1146,21 @@ func newEncoderWithCache(cacheLine, cacheGen bool) *Encoder[*models.Token] {
 	return encoder
 }
 
-func cacheBenchmarkRecord(key *a.Key, generation uint32) *models.Record {
+func cacheBenchmarkRecord(key *a.Key, generation uint32, voidTime int64) *models.Record {
 	return &models.Record{
 		Record: &a.Record{
 			Key:        key,
 			Bins:       a.BinMap{"bin1": int64(42), "bin2": "hello", "bin3": true},
 			Generation: generation,
 		},
-		VoidTime: 1712345678,
+		VoidTime: voidTime,
 	}
 }
 
-func cacheBenchmarkToken(key *a.Key, generation uint32) *models.Token {
+func cacheBenchmarkToken(key *a.Key, generation uint32, voidTime int64) *models.Token {
 	return &models.Token{
 		Type:   models.TokenTypeRecord,
-		Record: cacheBenchmarkRecord(key, generation),
+		Record: cacheBenchmarkRecord(key, generation, voidTime),
 	}
 }
 
@@ -1148,19 +1175,18 @@ func BenchmarkEncoderCache(b *testing.B) {
 	keyB, err := a.NewKey("namespace_b", "set_b", "key")
 	require.NoError(b, err)
 
-	sameRecord := cacheBenchmarkToken(key, 42)
-
+	sameRecord := cacheBenchmarkToken(key, 42, 1712345678)
 	alternatingTokens := []*models.Token{
-		cacheBenchmarkToken(keyA, 1),
-		cacheBenchmarkToken(keyB, 2),
+		cacheBenchmarkToken(keyA, 1, 1712345678),
+		cacheBenchmarkToken(keyB, 2, 1712345678),
 	}
 
 	varyingGenTokens := make([]*models.Token, 50)
 	for i := range varyingGenTokens {
-		varyingGenTokens[i] = cacheBenchmarkToken(key, uint32(i+1))
+		varyingGenTokens[i] = cacheBenchmarkToken(key, uint32(i+1), 1712345678)
 	}
 
-	highGenRecord := cacheBenchmarkToken(key, 5000)
+	highGenRecord := cacheBenchmarkToken(key, 5000, 1712345678)
 
 	warmOut, warmErr := newEncoderWithCache(false, false).EncodeToken(sameRecord, nil)
 	require.NoError(b, warmErr)
@@ -1191,6 +1217,41 @@ func BenchmarkEncoderCache(b *testing.B) {
 		})
 		b.Run("HighGeneration/"+cfg.name, func(b *testing.B) {
 			benchmarkEncoderCacheHighGeneration(b, newEncoderWithCache(cfg.cacheLine, cfg.cacheGen), highGenRecord)
+		})
+	}
+}
+
+// BenchmarkEncoderNeverExpireVoidTime measures EncodeToken with VoidTime 0 (never expire).
+// cacheGen precomputes the "+ t 0\n" line alongside generation and bin-count lines.
+func BenchmarkEncoderNeverExpireVoidTime(b *testing.B) {
+	key, err := a.NewKey("test", "demo", "benchmark-key")
+	require.NoError(b, err)
+
+	neverExpireRecord := cacheBenchmarkToken(key, 42, models.VoidTimeNeverExpire)
+
+	warmOut, warmErr := newEncoderWithCache(true, false).EncodeToken(neverExpireRecord, nil)
+	require.NoError(b, warmErr)
+	b.SetBytes(int64(len(warmOut)))
+
+	for _, cacheGen := range []bool{false, true} {
+		b.Run(fmt.Sprintf("cacheGen=%v", cacheGen), func(b *testing.B) {
+			encoder := newEncoderWithCache(true, cacheGen)
+			benchmarkEncoderCacheSameRecord(b, encoder, neverExpireRecord)
+		})
+	}
+}
+
+func BenchmarkAppendVoidTimeLine(b *testing.B) {
+	var buf [32]byte
+	for _, cache := range []bool{false, true} {
+		b.Run(fmt.Sprintf("VoidTime0/cache=%v", cache), func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				dst := appendVoidTimeLine(nil, models.VoidTimeNeverExpire, cache, buf[:0])
+				if len(dst) == 0 {
+					b.Fatal("empty output")
+				}
+			}
 		})
 	}
 }

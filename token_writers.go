@@ -15,7 +15,6 @@
 package backup
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -93,7 +92,7 @@ type tokenWriter[T models.TokenConstraint] struct {
 	output    io.WriteCloser
 	logger    *slog.Logger
 	stateInfo *stateInfo
-	buf       bytes.Buffer
+	buf       []byte
 }
 
 type stateInfo struct {
@@ -131,9 +130,12 @@ func newTokenWriter[T models.TokenConstraint](
 
 // Write encodes v and writes it to the output.
 func (w *tokenWriter[T]) Write(v T) (int, error) {
-	w.buf.Reset()
+	w.buf = w.buf[:0]
 
-	if err := w.encoder.EncodeToken(v, &w.buf); err != nil {
+	var err error
+
+	w.buf, err = w.encoder.EncodeToken(v, w.buf)
+	if err != nil {
 		return 0, fmt.Errorf("failed to encode token: %w", err)
 	}
 
@@ -147,7 +149,7 @@ func (w *tokenWriter[T]) Write(v T) (int, error) {
 		}
 	}
 
-	return w.output.Write(w.buf.Bytes())
+	return w.output.Write(w.buf)
 }
 
 // Close releases resources associated with the tokenWriter and ensures the underlying writer is properly closed.

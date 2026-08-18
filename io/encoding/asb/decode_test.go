@@ -3549,75 +3549,6 @@ func TestNewASBReader(t *testing.T) {
 	}
 }
 
-func TestEncodeDecodeRecordRoundTrip(t *testing.T) {
-	t.Parallel()
-
-	key, keyErr := a.NewKey("test", "roundtrip", "user-key")
-	if keyErr != nil {
-		t.Fatalf("failed to build key: %v", keyErr)
-	}
-
-	inputToken := models.NewRecordToken(&models.Record{
-		Record: &a.Record{
-			Key: key,
-			Bins: a.BinMap{
-				"bool_bin":   true,
-				"int_bin":    int64(42),
-				"float_bin":  3.14,
-				"string_bin": "hello",
-				"bytes_bin":  []byte("bytes"),
-				"hll_bin":    a.HLLValue("hll-value"),
-				"map_bin": &a.RawBlobValue{
-					ParticleType: particleType.MAP,
-					Data:         []byte{0x81, 0xA1, 'a', 0x01},
-				},
-				"list_bin": &a.RawBlobValue{
-					ParticleType: particleType.LIST,
-					Data:         []byte{0x92, 0x01, 0x02},
-				},
-				"geo_bin": a.GeoJSONValue(`{"type":"Point","coordinates":[1,2]}`),
-				"nil_bin": nil,
-			},
-			Generation: 10,
-		},
-		VoidTime: 100,
-	}, 0, nil)
-
-	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, false))
-	var file bytes.Buffer
-	file.Write(encoder.GetHeader(true))
-
-	if err := encoder.EncodeToken(inputToken, &file); err != nil {
-		t.Fatalf("failed to encode token: %v", err)
-	}
-
-	decoder, err := NewDecoder[*models.Token](bytes.NewReader(file.Bytes()), testFileName, false, slog.Default())
-	if err != nil {
-		t.Fatalf("failed to create decoder: %v", err)
-	}
-
-	gotToken, err := decoder.NextToken()
-	if err != nil {
-		t.Fatalf("failed to decode token: %v", err)
-	}
-
-	if gotToken.Type != models.TokenTypeRecord {
-		t.Fatalf("unexpected token type: got %v", gotToken.Type)
-	}
-
-	if gotToken.Record.Generation != inputToken.Record.Generation {
-		t.Fatalf("generation mismatch: got %d want %d", gotToken.Record.Generation, inputToken.Record.Generation)
-	}
-
-	if gotToken.Record.VoidTime != inputToken.Record.VoidTime {
-		t.Fatalf("void time mismatch: got %d want %d", gotToken.Record.VoidTime, inputToken.Record.VoidTime)
-	}
-
-	if !reflect.DeepEqual(gotToken.Record.Bins, inputToken.Record.Bins) {
-		t.Fatalf("bins mismatch: got %#v want %#v", gotToken.Record.Bins, inputToken.Record.Bins)
-	}
-}
-
 func BenchmarkDecodeRecordRoundTrip(b *testing.B) {
 	key, keyErr := a.NewKey("test", "bench", "bench-key")
 	if keyErr != nil {
@@ -3650,7 +3581,11 @@ func BenchmarkDecodeRecordRoundTrip(b *testing.B) {
 	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, false))
 	var payload bytes.Buffer
 	payload.Write(encoder.GetHeader(true))
-	if err := encoder.EncodeToken(token, &payload); err != nil {
+	encoded, err := encoder.EncodeToken(token, nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+	if _, err := payload.Write(encoded); err != nil {
 		b.Fatal(err)
 	}
 

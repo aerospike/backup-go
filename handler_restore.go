@@ -59,8 +59,8 @@ type StreamingReader interface {
 	GetSkipped() []string
 }
 
-// RestoreHandler handles a restore job using the given reader.
-type RestoreHandler[T models.TokenConstraint] struct {
+// restoreHandler handles a restore job using the given reader.
+type restoreHandler[T models.TokenConstraint] struct {
 	*handlerBase
 
 	readProcessor  *fileReaderProcessor[T]
@@ -78,7 +78,7 @@ type RestoreHandler[T models.TokenConstraint] struct {
 	id string
 }
 
-// newRestoreHandler creates a new RestoreHandler.
+// newRestoreHandler creates a new restoreHandler.
 func newRestoreHandler[T models.TokenConstraint](
 	ctx context.Context,
 	config *ConfigRestore,
@@ -86,7 +86,7 @@ func newRestoreHandler[T models.TokenConstraint](
 	logger *slog.Logger,
 	reader StreamingReader,
 	infoClient ClusterInfo,
-) (*RestoreHandler[T], error) {
+) (*restoreHandler[T], error) {
 	id := uuid.NewString()[:6]
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestore, reader.GetType())
 	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeRestore, id)
@@ -146,7 +146,7 @@ func newRestoreHandler[T models.TokenConstraint](
 		return nil, fmt.Errorf("failed to create bandwidth limiter: %w", err)
 	}
 
-	return &RestoreHandler[T]{
+	return &restoreHandler[T]{
 		handlerBase:    base,
 		readProcessor:  readProcessor,
 		writeProcessor: writeProcessor,
@@ -160,7 +160,7 @@ func newRestoreHandler[T models.TokenConstraint](
 	}, nil
 }
 
-func (rh *RestoreHandler[T]) run() {
+func (rh *restoreHandler[T]) run() {
 	rh.stats.Start()
 
 	go estimates.PrintFilesNumber(rh.ctx, rh.readProcessor.reader.GetNumber, rh.logger)
@@ -173,7 +173,7 @@ func (rh *RestoreHandler[T]) run() {
 	})
 }
 
-func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
+func (rh *restoreHandler[T]) restore(ctx context.Context) error {
 	dataReaders := rh.readProcessor.newDataReaders(ctx)
 
 	if err := rh.runPipeline(ctx, dataReaders); err != nil {
@@ -190,7 +190,7 @@ func (rh *RestoreHandler[T]) restore(ctx context.Context) error {
 	return nil
 }
 
-func (rh *RestoreHandler[T]) restoreMetadata(ctx context.Context) error {
+func (rh *restoreHandler[T]) restoreMetadata(ctx context.Context) error {
 	metadataReaders := rh.readProcessor.newMetadataReaders(ctx)
 
 	if len(metadataReaders) == 0 {
@@ -208,7 +208,7 @@ func (rh *RestoreHandler[T]) restoreMetadata(ctx context.Context) error {
 	return nil
 }
 
-func (rh *RestoreHandler[T]) runPipeline(ctx context.Context, dataReaders []pipe.Reader[T]) error {
+func (rh *restoreHandler[T]) runPipeline(ctx context.Context, dataReaders []pipe.Reader[T]) error {
 	dataWriters, err := rh.writeProcessor.newDataWriters(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create writer workers: %w", err)
@@ -236,7 +236,7 @@ func (rh *RestoreHandler[T]) runPipeline(ctx context.Context, dataReaders []pipe
 	return pl.Run(ctx)
 }
 
-func (rh *RestoreHandler[T]) getComposeProcessor(ctx context.Context) (pipe.ProcessorCreator[T], error) {
+func (rh *restoreHandler[T]) getComposeProcessor(ctx context.Context) (pipe.ProcessorCreator[T], error) {
 	switch rh.config.EncoderType {
 	case EncoderTypeASB:
 		// Namespace Source and Destination
@@ -268,12 +268,12 @@ func (rh *RestoreHandler[T]) getComposeProcessor(ctx context.Context) (pipe.Proc
 }
 
 // GetStats returns the stats of the restore job.
-func (rh *RestoreHandler[T]) GetStats() *models.RestoreStats {
+func (rh *restoreHandler[T]) GetStats() *models.RestoreStats {
 	return rh.stats
 }
 
 // Wait waits for the restore job to complete and returns an error if the job failed.
-func (rh *RestoreHandler[T]) Wait(ctx context.Context) error {
+func (rh *restoreHandler[T]) Wait(ctx context.Context) error {
 	err := rh.waitForCompletion(ctx)
 
 	rh.cleanup() // clean up resources.
@@ -282,7 +282,7 @@ func (rh *RestoreHandler[T]) Wait(ctx context.Context) error {
 }
 
 // GetMetrics returns the metrics of the restore job.
-func (rh *RestoreHandler[T]) GetMetrics() *models.Metrics {
+func (rh *restoreHandler[T]) GetMetrics() *models.Metrics {
 	if rh == nil {
 		return nil
 	}
@@ -303,7 +303,7 @@ func (rh *RestoreHandler[T]) GetMetrics() *models.Metrics {
 
 // cleanup stops the collection of stats and metrics for the restore job,
 // including RestoreStats, RPS, and KBPS tracking.
-func (rh *RestoreHandler[T]) cleanup() {
+func (rh *restoreHandler[T]) cleanup() {
 	rh.stats.Stop()
 	rh.rpsCollector.Stop()
 	rh.kbpsCollector.Stop()
@@ -315,3 +315,5 @@ func (rh *RestoreHandler[T]) cleanup() {
 
 	rh.pl.Swap(nil)
 }
+
+var _ RestoreHandler = (*restoreHandler[*models.Token])(nil)

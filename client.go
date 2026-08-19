@@ -241,6 +241,13 @@ func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) *a.ScanPolicy {
 	return p
 }
 
+// BackupHandler represents backup handler interface.
+type BackupHandler interface {
+	GetStats() *models.BackupStats
+	Wait(ctx context.Context) error
+	GetMetrics() *models.Metrics
+}
+
 // Backup starts a backup operation that writes data to a provided writer.
 //   - ctx can be used to cancel the backup operation.
 //   - config is the configuration for the backup operation.
@@ -251,7 +258,7 @@ func (c *Client) Backup(
 	config *ConfigBackup,
 	writer Writer,
 	reader StreamingReader,
-) (*BackupHandler, error) {
+) (BackupHandler, error) {
 	if config == nil {
 		return nil, fmt.Errorf("backup config required")
 	}
@@ -286,8 +293,8 @@ func (c *Client) Backup(
 	return handler, nil
 }
 
-// Restorer represents restore handler interface.
-type Restorer interface {
+// RestoreHandler represents restore handler interface.
+type RestoreHandler interface {
 	GetStats() *models.RestoreStats
 	Wait(ctx context.Context) error
 	GetMetrics() *models.Metrics
@@ -302,7 +309,7 @@ func (c *Client) Restore(
 	ctx context.Context,
 	config *ConfigRestore,
 	streamingReader StreamingReader,
-) (Restorer, error) {
+) (RestoreHandler, error) {
 	if config == nil {
 		return nil, fmt.Errorf("restore config required")
 	}

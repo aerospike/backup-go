@@ -241,6 +241,16 @@ func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) *a.ScanPolicy {
 	return p
 }
 
+// BackupHandler represents a backup operation started by [Client.Backup].
+type BackupHandler interface {
+	// GetStats returns the stats of the backup job.
+	GetStats() *models.BackupStats
+	// Wait waits for the backup job to complete and returns an error if the job failed.
+	Wait(ctx context.Context) error
+	// GetMetrics returns metrics of the backup job.
+	GetMetrics() *models.Metrics
+}
+
 // Backup starts a backup operation that writes data to a provided writer.
 //   - ctx can be used to cancel the backup operation.
 //   - config is the configuration for the backup operation.
@@ -251,7 +261,7 @@ func (c *Client) Backup(
 	config *ConfigBackup,
 	writer Writer,
 	reader StreamingReader,
-) (*BackupHandler, error) {
+) (BackupHandler, error) {
 	if config == nil {
 		return nil, fmt.Errorf("backup config required")
 	}
@@ -286,10 +296,13 @@ func (c *Client) Backup(
 	return handler, nil
 }
 
-// Restorer represents restore handler interface.
-type Restorer interface {
+// RestoreHandler represents a restore operation started by [Client.Restore].
+type RestoreHandler interface {
+	// GetStats returns the stats of the restore job.
 	GetStats() *models.RestoreStats
+	// Wait waits for the restore job to complete and returns an error if the job failed.
 	Wait(ctx context.Context) error
+	// GetMetrics returns the metrics of the restore job.
 	GetMetrics() *models.Metrics
 }
 
@@ -302,7 +315,7 @@ func (c *Client) Restore(
 	ctx context.Context,
 	config *ConfigRestore,
 	streamingReader StreamingReader,
-) (Restorer, error) {
+) (RestoreHandler, error) {
 	if config == nil {
 		return nil, fmt.Errorf("restore config required")
 	}

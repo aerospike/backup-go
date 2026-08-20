@@ -241,10 +241,13 @@ func (c *Client) getUsableScanPolicy(p *a.ScanPolicy) *a.ScanPolicy {
 	return p
 }
 
-// BackupHandler represents backup handler interface.
+// BackupHandler represents a backup operation started by [Client.Backup].
 type BackupHandler interface {
+	// GetStats returns the stats of the backup job.
 	GetStats() *models.BackupStats
+	// Wait waits for the backup job to complete and returns an error if the job failed.
 	Wait(ctx context.Context) error
+	// GetMetrics returns metrics of the backup job.
 	GetMetrics() *models.Metrics
 }
 
@@ -293,10 +296,13 @@ func (c *Client) Backup(
 	return handler, nil
 }
 
-// RestoreHandler represents restore handler interface.
+// RestoreHandler represents a restore operation started by [Client.Restore].
 type RestoreHandler interface {
+	// GetStats returns the stats of the restore job.
 	GetStats() *models.RestoreStats
+	// Wait waits for the restore job to complete and returns an error if the job failed.
 	Wait(ctx context.Context) error
+	// GetMetrics returns the metrics of the restore job.
 	GetMetrics() *models.Metrics
 }
 

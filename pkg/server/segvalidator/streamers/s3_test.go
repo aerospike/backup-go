@@ -320,3 +320,117 @@ func TestIsNotFound(t *testing.T) {
 		t.Error("isNotFound(NoSuchBucket) = true, want a missing bucket to be a failure")
 	}
 }
+
+func TestS3Store_ListingFails(t *testing.T) {
+	t.Parallel()
+
+	b := newTestBackupTree(t, 1, 1, 0, 0)
+	// A bucket the client cannot reach is a failure of the listing, not an
+	// empty backup.
+	st := &s3Store{client: newFakeBucket(b.files), bucket: "no-such-bucket"}
+
+	if err := st.listLevel(t.Context(), testBackupID, func(levelEntry) error { return nil }); err == nil {
+		t.Error("listLevel() of an unreachable bucket succeeded, want an error")
+	}
+
+	if err := st.listFiles(t.Context(), testBackupID, func(file) error { return nil }); err == nil {
+		t.Error("listFiles() of an unreachable bucket succeeded, want an error")
+	}
+}
+
+func TestS3Store_GetFails(t *testing.T) {
+	t.Parallel()
+
+	st := &s3Store{client: &failingBucket{err: errBucket}, bucket: testBucket}
+
+	_, err := st.open(t.Context(), path.Join(testBackupID, "manifest.json"))
+
+	if !errors.Is(err, errBucket) {
+		t.Fatalf("open() error = %v, want the failure of the request", err)
+	}
+
+	// A request that failed says nothing about whether the object is there.
+	if errors.Is(err, ErrSegmentMissing) {
+		t.Error("open() error = ErrSegmentMissing, want a failed request")
+	}
+}
+
+// errBucket is what a bucket that will not answer reports.
+var errBucket = errors.New("bucket is unreachable")
+
+// failingBucket fails every request made of it.
+type failingBucket struct {
+	err error
+}
+
+func (f *failingBucket) ListObjectsV2(context.Context, *s3.ListObjectsV2Input, ...func(*s3.Options),
+) (*s3.ListObjectsV2Output, error) {
+	return nil, f.err
+}
+
+func (f *failingBucket) GetObject(context.Context, *s3.GetObjectInput, ...func(*s3.Options),
+) (*s3.GetObjectOutput, error) {
+	return nil, f.err
+}
+
+func TestS3Store_ListLevelStopsOnTheCaller(t *testing.T) {
+	t.Parallel()
+
+	b := newTestBackupTree(t, 4, 1, 0, 0)
+	st := &s3Store{client: newFakeBucket(b.files), bucket: testBucket}
+	dir := path.Join(testBackupID, namespacesDir, testNS, string(QueryStream), dataDir)
+
+	seen := 0
+
+	err := st.listLevel(t.Context(), dir, func(levelEntry) error {
+		seen++
+
+		return errStopListing
+	})
+	if err != nil {
+		t.Fatalf("listLevel() error = %v, want the listing to stop without failing", err)
+	}
+
+	if seen != 1 {
+		t.Errorf("listLevel() handed over %d partitions after the first one stopped it, want 1", seen)
+	}
+
+	errCaller := errors.New("caller failed")
+
+	if err := st.listLevel(t.Context(), dir, func(levelEntry) error {
+		return errCaller
+	}); !errors.Is(err, errCaller) {
+		t.Errorf("listLevel() error = %v, want the failure of the caller", err)
+	}
+}
+
+func TestS3Store_ListLevelSkipsDirectoryMarkers(t *testing.T) {
+	t.Parallel()
+
+	b := newTestBackupTree(t, 1, 1, 0, 0)
+	dir := path.Join(testBackupID, namespacesDir, testNS, string(QueryStream), dataDir)
+
+	// A bucket written through a console holds an empty object per directory,
+	// and one written by something careless holds a doubled separator, which
+	// names a directory with no name at all.
+	b.put(dir+"/", nil)
+	b.put(dir+"//stray", nil)
+
+	st := &s3Store{client: newFakeBucket(b.files), bucket: testBucket}
+
+	var found []levelEntry
+
+	if err := st.listLevel(t.Context(), dir, func(e levelEntry) error {
+		found = append(found, e)
+
+		return nil
+	}); err != nil {
+		t.Fatalf("listLevel() error = %v", err)
+	}
+
+	for _, e := range found {
+		if e.Name == "" || strings.HasSuffix(e.Path, "/") {
+			t.Errorf("listLevel() returned %+v, want neither a marker nor a nameless directory", e)
+		}
+	}
+}

@@ -15,6 +15,7 @@
 package streamers
 
 import (
+	"encoding/json"
 	"errors"
 	"math/rand/v2"
 	"strings"
@@ -390,5 +391,95 @@ func TestSeedForIsStable(t *testing.T) {
 
 	if seedFor(1, 1) == seedFor(2, 1) {
 		t.Error("two runs share the seed of a piece of work")
+	}
+}
+
+func TestDecodeManifest_PartitionNamedDirectly(t *testing.T) {
+	t.Parallel()
+
+	// A manifest writes its partition as a number, which names the directory
+	// holding it. One that names the directory itself is taken at its word.
+	header, _, err := decodeAll(t, `{"partition_id":"node-a","segments":[]}`)
+	if err != nil {
+		t.Fatalf("decodeManifest() error = %v", err)
+	}
+
+	if header.Partition != "node-a" {
+		t.Fatalf("partition = %q, want %q", header.Partition, "node-a")
+	}
+}
+
+func TestDecodeManifest_RejectsBrokenFields(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		body string
+	}{
+		{name: "field name is not a string", body: `{1:2}`},
+		{name: "partition is unreadable", body: `{"partition_id":tru}`},
+		{name: "field the manifest does not finish", body: `{"trailing":{"nested":`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, _, err := decodeAll(t, tt.body); err == nil {
+				t.Fatal("decodeManifest() succeeded, want an error")
+			}
+		})
+	}
+}
+
+func TestReadKey(t *testing.T) {
+	t.Parallel()
+
+	// readKey reads whatever field name comes next, so which one it is does
+	// not matter beyond it being one a manifest writes.
+	const field = "namespace"
+
+	tests := []struct {
+		name    string
+		body    string
+		wantKey string
+		wantErr bool
+	}{
+		{name: "field name", body: `{"` + field + `":1}`, wantKey: field},
+		{name: "nothing to read", body: ``, wantErr: true},
+		{name: "not a field name", body: `["` + field + `"]`, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			dec := json.NewDecoder(strings.NewReader(tt.body))
+
+			if tt.wantKey != "" {
+				// Step over the opening brace, so the next token is the key.
+				if err := expectDelim(dec, '{'); err != nil {
+					t.Fatalf("expectDelim() error = %v", err)
+				}
+			}
+
+			key, err := readKey(dec)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("readKey() = %q, want an error", key)
+				}
+
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("readKey() unexpected error: %v", err)
+			}
+
+			if key != tt.wantKey {
+				t.Fatalf("readKey() = %q, want %q", key, tt.wantKey)
+			}
+		})
 	}
 }

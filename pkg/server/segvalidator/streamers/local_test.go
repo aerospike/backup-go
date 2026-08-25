@@ -146,3 +146,102 @@ func writeBackup(t *testing.T, root string, b *testBackup) {
 		}
 	}
 }
+
+func TestLocalStore_PathOutsideTheRoot(t *testing.T) {
+	t.Parallel()
+
+	st := &localStore{root: t.TempDir()}
+
+	// A backup lives under the root directory, and nothing that would leave
+	// it is read, listed or resolved.
+	outside := "../elsewhere"
+
+	if err := st.listLevel(t.Context(), outside, func(levelEntry) error { return nil }); err == nil {
+		t.Error("listLevel() outside the root succeeded, want an error")
+	}
+
+	if err := st.listFiles(t.Context(), outside, func(file) error { return nil }); err == nil {
+		t.Error("listFiles() outside the root succeeded, want an error")
+	}
+
+	if _, err := st.open(t.Context(), outside); err == nil {
+		t.Error("open() outside the root succeeded, want an error")
+	}
+}
+
+func TestLocalStore_DirectoryThatIsAFile(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "notadir"), []byte("x"), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	st := &localStore{root: root}
+
+	// A path that exists but is not a directory is a failure, unlike a
+	// directory that is simply not there.
+	if err := st.listLevel(t.Context(), "notadir", func(levelEntry) error { return nil }); err == nil {
+		t.Error("listLevel() of a file succeeded, want an error")
+	}
+
+	// The same goes for reading through it.
+	if _, err := st.open(t.Context(), "notadir/below"); err == nil {
+		t.Error("open() through a file succeeded, want an error")
+	} else if errors.Is(err, ErrSegmentMissing) {
+		t.Errorf("open() error = %v, want a failure and not a missing segment", err)
+	}
+}
+
+func TestLocalStore_ListingStopsOnTheCaller(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeBackup(t, root, newTestBackupTree(t, 2, 2, 0, 0))
+
+	st := &localStore{root: root}
+	dir := path.Join(testBackupID, namespacesDir, testNS, string(QueryStream), dataDir)
+
+	seen := 0
+
+	// A caller that has seen enough ends the listing without failing it.
+	err := st.listLevel(t.Context(), dir, func(levelEntry) error {
+		seen++
+
+		return errStopListing
+	})
+	if err != nil {
+		t.Fatalf("listLevel() error = %v, want the listing to stop without failing", err)
+	}
+
+	if seen != 1 {
+		t.Errorf("listLevel() handed over %d entries after the first one stopped it, want 1", seen)
+	}
+
+	// A caller that fails is a failure of the listing.
+	errCaller := errors.New("caller failed")
+
+	if err := st.listLevel(t.Context(), dir, func(levelEntry) error {
+		return errCaller
+	}); !errors.Is(err, errCaller) {
+		t.Errorf("listLevel() error = %v, want the failure of the caller", err)
+	}
+
+	if err := st.listFiles(t.Context(), dir, func(file) error {
+		return errCaller
+	}); !errors.Is(err, errCaller) {
+		t.Errorf("listFiles() error = %v, want the failure of the caller", err)
+	}
+}
+
+func TestLocalStore_StoragePathOfAnUnrelatedFile(t *testing.T) {
+	t.Parallel()
+
+	// A path that cannot be expressed relative to the root is handed back as
+	// it is rather than being turned into nonsense.
+	st := &localStore{root: filepath.Join("relative", "root")}
+
+	if got := st.storagePath(filepath.Join(string(filepath.Separator), "elsewhere", "s.seg")); got == "" {
+		t.Fatal("storagePath() = \"\", want the path it was given")
+	}
+}

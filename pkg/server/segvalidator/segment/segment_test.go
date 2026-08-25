@@ -313,6 +313,20 @@ func TestValidate(t *testing.T) {
 			wantErr: ErrRecordOutOfBounds,
 		},
 		{
+			// A header claiming fewer rblocks than a header itself needs
+			// describes a record no record can be.
+			name: "record smaller than the minimum",
+			build: func(t *testing.T) []byte {
+				t.Helper()
+				rec := buildRecord(t, defaultSpec())
+				flags := binary.LittleEndian.Uint32(rec[4:8])
+				binary.LittleEndian.PutUint32(rec[4:8], (flags&^flagNRBlocksMask)|1)
+
+				return rec
+			},
+			wantErr: ErrRecordTooSmall,
+		},
+		{
 			name: "zero generation",
 			build: func(t *testing.T) []byte {
 				t.Helper()

@@ -22,10 +22,12 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
+	"log/slog"
 	"slices"
 	"sync/atomic"
 	"testing"
 
+	"github.com/aerospike/backup-go/pkg/server/segvalidator/models"
 	"github.com/aerospike/backup-go/pkg/server/segvalidator/segment"
 	"github.com/aerospike/backup-go/pkg/server/segvalidator/streamers"
 )
@@ -656,5 +658,131 @@ func TestNewSegValidatorValidation(t *testing.T) {
 
 	if v.logger == nil || v.parallel < 1 || v.maxIssues != defaultMaxIssues {
 		t.Errorf("options out of range changed the defaults: %+v", v)
+	}
+}
+
+// errReader fails partway through a segment, which is what a storage that
+// stops answering in the middle of a download looks like.
+type errReader struct{ err error }
+
+func (r errReader) Read([]byte) (int, error) {
+	return 0, r.err
+}
+
+func TestSegValidator_SegmentReadFails(t *testing.T) {
+	t.Parallel()
+
+	errRead := errors.New("connection reset")
+
+	streamer := newStubStreamer(decodeSegmentHex(t, fixtureSegmentHex), 1)
+	streamer.openFunc = func(string) (io.ReadCloser, error) {
+		return io.NopCloser(errReader{err: errRead}), nil
+	}
+
+	// A download that dies halfway is what is wrong with that segment, not a
+	// reason to abandon the run.
+	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
+	if err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+
+	if len(report.Issues) != 1 || !errors.Is(report.Issues[0].Err, errRead) {
+		t.Fatalf("Validate() issues = %+v, want the read failure", report.Issues)
+	}
+
+	// Nothing was parsed, so the failure points at no record in particular.
+	if report.Issues[0].RecordIndex != models.UnknownRecordIndex {
+		t.Errorf("issue record index = %d, want %d",
+			report.Issues[0].RecordIndex, models.UnknownRecordIndex)
+	}
+
+	if report.InvalidSegments != 1 || report.ValidSegments != 0 {
+		t.Errorf("valid = %d, invalid = %d, want 0 and 1", report.ValidSegments, report.InvalidSegments)
+	}
+}
+
+func TestSegValidator_StreamerManifestIssuesAreCapped(t *testing.T) {
+	t.Parallel()
+
+	const maxIssues = 1
+
+	streamer := newStubStreamer(decodeSegmentHex(t, fixtureSegmentHex), 1)
+	streamer.stats = streamers.Stats{
+		ManifestIssues: []streamers.ManifestIssue{
+			{Err: streamers.ErrManifestUnusable, Namespace: stubNS, Path: stubManifestPath(0)},
+			{Err: streamers.ErrManifestUnusable, Namespace: stubNS, Path: stubManifestPath(1)},
+		},
+		ManifestsFound:  2,
+		ManifestsFailed: 2,
+	}
+
+	report, err := newTestSegValidator(t, streamer, WithMaxIssues(maxIssues)).Validate(t.Context(), CheckAll)
+	if err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+
+	m := report.Manifests
+
+	if len(m.Issues) != maxIssues || m.Problems != 2 {
+		t.Fatalf("manifest report describes %d of %d problems, want %d described and 2 counted",
+			len(m.Issues), m.Problems, maxIssues)
+	}
+
+	if !m.Truncated() {
+		t.Error("Truncated() = false, want a report describing fewer problems than it counted")
+	}
+}
+
+func TestNewSegValidator_Options(t *testing.T) {
+	t.Parallel()
+
+	const (
+		parallel  = 3
+		maxIssues = 7
+	)
+
+	logger := slog.New(slog.DiscardHandler)
+
+	v, err := NewSegValidator(newStubStreamer(nil, 0),
+		WithLogger(logger), WithParallel(parallel), WithMaxIssues(maxIssues))
+	if err != nil {
+		t.Fatalf("NewSegValidator() error = %v", err)
+	}
+
+	if v.logger != logger {
+		t.Error("WithLogger() did not set the logger")
+	}
+
+	if v.parallel != parallel {
+		t.Errorf("parallel = %d, want %d", v.parallel, parallel)
+	}
+
+	if v.maxIssues != maxIssues {
+		t.Errorf("maxIssues = %d, want %d", v.maxIssues, maxIssues)
+	}
+}
+
+func TestSegValidator_ContextCancelledMidRun(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	streamer := newStubStreamer(decodeSegmentHex(t, fixtureSegmentHex), 1_000_000)
+	// A run canceled once it is under way stops where it is instead of
+	// walking the rest of the backup.
+	streamer.openFunc = func(string) (io.ReadCloser, error) {
+		cancel()
+
+		return io.NopCloser(bytes.NewReader(streamer.payload)), nil
+	}
+
+	_, err := newTestSegValidator(t, streamer, WithParallel(1)).Validate(ctx, CheckAll)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Validate() error = %v, want context.Canceled", err)
+	}
+
+	if opened := streamer.opened.Load(); opened > 1_000 {
+		t.Errorf("downloaded %d segments after the run was canceled, want it to stop", opened)
 	}
 }

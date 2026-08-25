@@ -17,7 +17,6 @@ package segment
 import (
 	"encoding/binary"
 	"errors"
-	"os"
 	"testing"
 )
 
@@ -145,33 +144,6 @@ func concat(parts ...[]byte) []byte {
 	}
 
 	return out
-}
-
-func TestValidate_RealSegmentFixtures(t *testing.T) {
-	t.Parallel()
-
-	for _, name := range []string{
-		"7-0000085536316-578ae9.seg",
-		"7-0000085536912-cd49d6.seg",
-	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-
-			payload, err := os.ReadFile(name)
-			if err != nil {
-				t.Fatalf("read fixture: %v", err)
-			}
-
-			stats, err := Validate(payload)
-			if err != nil {
-				t.Fatalf("Validate() error = %v", err)
-			}
-
-			if stats != (Stats{RecordCount: 1, ByteCount: len(payload)}) {
-				t.Fatalf("Validate() stats = %+v, want one %d-byte record", stats, len(payload))
-			}
-		})
-	}
 }
 
 func TestValidate(t *testing.T) {

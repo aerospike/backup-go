@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package server
+package lister
 
 import (
 	"cmp"
@@ -28,7 +28,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aerospike/backup-go/pkg/server/models"
+	"github.com/aerospike/backup-go/pkg/server/lister/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"

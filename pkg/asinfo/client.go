@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"slices"
 	"strconv"
@@ -29,6 +30,14 @@ import (
 )
 
 const errCmdRespPrefix = "ERROR"
+
+const (
+	sindexIndextypeDefault   = "default"
+	sindexIndextypeNone      = "none"
+	sindexIndextypeMapValues = "mapvalues"
+	sindexTypeNumeric        = "numeric"
+	sindexTypeGeoJSON        = "geojson"
+)
 
 var (
 	aerospikeVersionRegex = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)`)
@@ -52,6 +61,7 @@ var (
 var (
 	ErrReplicationFactorZero = errors.New("replication factor is zero")
 	ErrNoNode                = errors.New("no node found")
+	ErrInvalidSIndexType     = errors.New("invalid sindex index type")
 )
 
 func (av AerospikeVersion) String() string {
@@ -101,6 +111,7 @@ type Client struct {
 	policy      *a.InfoPolicy
 	retryPolicy *models.RetryPolicy
 	cmdDict     map[int]string
+	logger      *slog.Logger
 }
 
 // NewClient initializes and returns a new asinfo Client instance with the provided Aerospike client,
@@ -109,6 +120,7 @@ func NewClient(
 	cluster NodeGetter,
 	policy *a.InfoPolicy,
 	retryPolicy *models.RetryPolicy,
+	logger *slog.Logger,
 ) (*Client, error) {
 	if retryPolicy == nil {
 		retryPolicy = models.NewDefaultRetryPolicy()
@@ -118,6 +130,7 @@ func NewClient(
 		cluster:     cluster,
 		policy:      policy,
 		retryPolicy: retryPolicy,
+		logger:      logger,
 	}
 	// On init we can use context.Background(), as we don't need to do any async operations.
 	ctx := context.Background()
@@ -199,7 +212,7 @@ func (ic *Client) GetVersion(ctx context.Context) (AerospikeVersion, error) {
 
 // HasExpressionSIndex checks whether the namespace contains expression based secondary indexes.
 func (ic *Client) HasExpressionSIndex(ctx context.Context, namespace string) (bool, error) {
-	list, err := ic.GetSIndexes(ctx, namespace)
+	list, err := ic.getSIndexes(ctx, namespace, true)
 	if err != nil {
 		return false, err
 	}
@@ -211,28 +224,6 @@ func (ic *Client) HasExpressionSIndex(ctx context.Context, namespace string) (bo
 	}
 
 	return false, nil
-}
-
-// GetSIndexes returns list of SIndexes for the given namespace.
-func (ic *Client) GetSIndexes(ctx context.Context, namespace string) ([]*models.SIndex, error) {
-	var (
-		indexes []*models.SIndex
-		err     error
-	)
-
-	err = executeWithRetry(ctx, ic.retryPolicy, func() error {
-		node, aErr := ic.cluster.GetRandomNode()
-		if aErr != nil {
-			return aErr.Unwrap()
-		}
-
-		var indErr error
-		indexes, indErr = ic.getSIndexes(node, namespace, ic.policy)
-
-		return indErr
-	})
-
-	return indexes, err
 }
 
 // GetUDFs returns list of UDFs.
@@ -973,7 +964,34 @@ func parseResultResponse(cmd string, result map[string]string) (string, error) {
 	return v, nil
 }
 
-func (ic *Client) getSIndexes(node infoGetter, namespace string, policy *a.InfoPolicy) ([]*models.SIndex, error) {
+// GetSIndexes returns list of SIndexes for the given namespace.
+func (ic *Client) GetSIndexes(ctx context.Context, namespace string) ([]*models.SIndex, error) {
+	return ic.getSIndexes(ctx, namespace, false)
+}
+
+func (ic *Client) getSIndexes(ctx context.Context, namespace string, noWarn bool) ([]*models.SIndex, error) {
+	var (
+		indexes []*models.SIndex
+		err     error
+	)
+
+	err = executeWithRetry(ctx, ic.retryPolicy, func() error {
+		node, aErr := ic.cluster.GetRandomNode()
+		if aErr != nil {
+			return aErr.Unwrap()
+		}
+
+		var indErr error
+		indexes, indErr = ic.requestSIndexes(node, namespace, ic.policy, noWarn)
+
+		return indErr
+	})
+
+	return indexes, err
+}
+
+func (ic *Client) requestSIndexes(node infoGetter, namespace string, policy *a.InfoPolicy, noWarn bool,
+) ([]*models.SIndex, error) {
 	supportsSIndexCTX := AerospikeVersionSupportsSIndexContext
 
 	version, err := ic.getAerospikeVersion(node, policy)
@@ -994,7 +1012,7 @@ func (ic *Client) getSIndexes(node infoGetter, namespace string, policy *a.InfoP
 		return nil, fmt.Errorf("failed to parse sindexes response: %w", err)
 	}
 
-	return parseSIndexes(cmdResp)
+	return ic.parseSIndexes(cmdResp, noWarn)
 }
 
 func (ic *Client) buildSindexCmd(namespace string, getCtx bool) string {
@@ -1054,29 +1072,52 @@ func parseAerospikeVersion(versionStr string) (AerospikeVersion, error) {
 	}, nil
 }
 
-func parseSIndexes(sindexListInfoResp string) ([]*models.SIndex, error) {
+func (ic *Client) parseSIndexes(sindexListInfoResp string, noWarn bool) ([]*models.SIndex, error) {
 	sindexInfo, err := parseSindexListResponse(sindexListInfoResp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse sindex response: %w", err)
 	}
 
-	// No sindexes
-	if sindexInfo == nil {
+	// No sindexes.
+	if len(sindexInfo) == 0 {
 		return nil, nil
 	}
 
-	sindexes := make([]*models.SIndex, len(sindexInfo))
+	sindexes := make([]*models.SIndex, 0, len(sindexInfo))
 
-	for i, sindexStr := range sindexInfo {
-		sindex, err := parseSIndex(sindexStr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse sindex: %w", err)
+	for _, sindexMap := range sindexInfo {
+		// Skip empty or nil maps.
+		if len(sindexMap) == 0 {
+			continue
 		}
 
-		sindexes[i] = sindex
+		sindex, err := parseSIndex(sindexMap)
+
+		switch {
+		case err == nil:
+			sindexes = append(sindexes, sindex)
+		case errors.Is(err, ErrInvalidSIndexType):
+			ic.warnInvalidSIndexType(noWarn, sindexMap)
+		default:
+			return nil, fmt.Errorf("failed to parse sindex: %w", err)
+		}
 	}
 
 	return sindexes, nil
+}
+
+// warnInvalidSIndexType logs a warning if the sindex type is invalid.
+// We should warn only when we try to back up indexes, but we also call this function for index type check,
+// in that case we silence error with noWarn = true.
+func (ic *Client) warnInvalidSIndexType(noWarn bool, sindexMap map[string]string) {
+	if noWarn {
+		return
+	}
+
+	ic.logger.Warn("skipping sindex with invalid type",
+		slog.String("sindex", sindexMap["indexname"]),
+		slog.String("type", sindexMap["indextype"]),
+	)
 }
 
 // parseSIndex parses a single infoMap containing a sindex into a SecondaryIndex model
@@ -1107,16 +1148,16 @@ func parseSIndex(sindexMap infoMap) (*models.SIndex, error) {
 		var sindexType models.SIndexType
 
 		switch strings.ToLower(val) {
-		case "default", "none":
+		case sindexIndextypeDefault, sindexIndextypeNone:
 			sindexType = models.BinSIndex
 		case "list":
 			sindexType = models.ListElementSIndex
 		case "mapkeys":
 			sindexType = models.MapKeySIndex
-		case "mapvalues":
+		case sindexIndextypeMapValues:
 			sindexType = models.MapValueSIndex
 		default:
-			return nil, fmt.Errorf("invalid sindex index type: %s", val)
+			return nil, fmt.Errorf("%w: %s", ErrInvalidSIndexType, val)
 		}
 
 		si.IndexType = sindexType
@@ -1133,13 +1174,13 @@ func parseSIndex(sindexMap infoMap) (*models.SIndex, error) {
 			var binType models.SIPathBinType
 
 			switch strings.ToLower(val) {
-			case "numeric", "int signed":
+			case sindexTypeNumeric, "int signed":
 				binType = models.NumericSIDataType
 			case "string", "text":
 				binType = models.StringSIDataType
 			case "blob":
 				binType = models.BlobSIDataType
-			case "geo2dsphere", "geojson":
+			case "geo2dsphere", sindexTypeGeoJSON:
 				binType = models.GEO2DSphereSIDataType
 			default:
 				return nil, fmt.Errorf("invalid sindex type: %s", val)

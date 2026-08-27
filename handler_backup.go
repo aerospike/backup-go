@@ -137,10 +137,16 @@ func newBackupHandler(
 		}
 	}
 
-	hasExpressionSIndex, err := infoClient.HasExpressionSIndex(base.ctx, config.Namespace)
-	if err != nil {
-		base.cancel()
-		return nil, fmt.Errorf("failed to check if expression sindex exists: %w", err)
+	var (
+		hasExpressionSIndex bool
+		err                 error
+	)
+	if !config.NoIndexes {
+		hasExpressionSIndex, err = infoClient.HasExpressionSIndex(base.ctx, config.Namespace)
+		if err != nil {
+			base.cancel()
+			return nil, fmt.Errorf("failed to check if expression sindex exists: %w", err)
+		}
 	}
 
 	encoder := NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact, hasExpressionSIndex)

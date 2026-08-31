@@ -41,11 +41,6 @@ type Reader struct {
 	// bucketName contains name of the bucket to read from.
 	bucketName string
 
-	// objectsToStream is used to predefine a list of objects that must be read from storage.
-	// If objectsToStream is not set, we iterate through objects in storage and load them.
-	// If set, we load objects from this slice directly.
-	objectsToStream []string
-
 	// total size of all objects in a path.
 	totalSize atomic.Int64
 	// total number of objects in a path.
@@ -90,12 +85,6 @@ func NewReader(
 		}
 	}
 
-	if r.IsDir && r.SortFiles && len(r.PathList) == 1 {
-		if err := common.PreSort(ctx, r, r.PathList[0]); err != nil {
-			return nil, fmt.Errorf("failed to pre sort: %w", err)
-		}
-	}
-
 	if r.CalculateTotalSize {
 		// We "lazy" calculate the total size of all files in a path for estimates calculations.
 		go r.calculateTotalSize(ctx)
@@ -110,12 +99,6 @@ func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error, skipPrefixes []string,
 ) {
 	defer close(readersCh)
-
-	// If objects were preloaded, we stream them.
-	if len(r.objectsToStream) > 0 {
-		r.streamSetObjects(ctx, readersCh, errorsCh)
-		return
-	}
 	// Init file skipper when skipPrefix is set.
 	if len(skipPrefixes) > 0 {
 		r.skipped = common.NewSkippedFiles(skipPrefixes)
@@ -321,18 +304,6 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 	}
 
 	return result, nil
-}
-
-// SetObjectsToStream sets the objects to stream.
-func (r *Reader) SetObjectsToStream(list []string) {
-	r.objectsToStream = list
-}
-
-// streamSetObjects streams preloaded objects.
-func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error) {
-	for i := range r.objectsToStream {
-		r.openObject(ctx, r.objectsToStream[i], readersCh, errorsCh, true)
-	}
 }
 
 // shouldSkip determines whether the file should be skipped.

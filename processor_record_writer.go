@@ -63,7 +63,7 @@ func (rw *recordWriterProcessor[T]) newDataWriters(ctx context.Context) ([]pipe.
 
 	// Determine the parallelism based on the encoder type and batch writes support.
 	switch {
-	case rw.config.EncoderType == EncoderTypeASBX, rw.config.DisableBatchWrites:
+	case rw.config.DisableBatchWrites:
 		parallelism = rw.config.Parallel
 	default:
 		parallelism = rw.config.MaxAsyncBatches

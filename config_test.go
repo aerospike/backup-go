@@ -66,10 +66,6 @@ func TestBackupConfig_validate(t *testing.T) {
 
 	config.SetList = append(config.SetList, models.MonitorRecordsSetName)
 	require.ErrorContains(t, config.validate(), "mrt monitor set is not allowed")
-	config = NewDefaultBackupConfig()
-
-	config.EncoderType = EncoderTypeASBX
-	require.ErrorContains(t, config.validate(), "encoder type")
 
 	config = NewDefaultBackupConfig()
 	config.RackList = []int{1, 1}

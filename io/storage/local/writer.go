@@ -22,6 +22,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
+	"syscall"
 
 	"github.com/aerospike/backup-go/io/storage/options"
 )
@@ -48,13 +50,6 @@ func NewWriter(ctx context.Context, opts ...options.Opt) (*Writer, error) {
 		return nil, fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
 	}
 
-	// If directory does not exist, we don't need to check it for emptiness.
-	// For writer we don't support PathList, so our path will always be the first element of PathList.
-	path := w.PathList[0]
-	if !w.IsDir {
-		path = filepath.Dir(w.PathList[0])
-	}
-
 	if w.ChunkSize == 0 {
 		w.ChunkSize = defaultBufferSize
 	}
@@ -64,13 +59,15 @@ func NewWriter(ctx context.Context, opts ...options.Opt) (*Writer, error) {
 		return w, nil
 	}
 
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return w, nil
-	}
-
 	if w.IsDir && !w.SkipDirCheck {
 		// Check if backup dir is empty.
 		isEmpty, err := isEmptyDirectory(w.PathList[0])
+		if errors.Is(err, os.ErrNotExist) {
+			// The directory is created lazily by NewWriter when the first
+			// backup file is opened.
+			return w, nil
+		}
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
 		}
@@ -98,17 +95,10 @@ func createDirIfNotExist(path string, isDir bool) error {
 		path = filepath.Dir(path)
 	}
 
-	_, err := os.Stat(path)
-
-	switch {
-	case err == nil:
-		// ok.
-	case os.IsNotExist(err):
-		if err = os.MkdirAll(path, os.ModePerm); err != nil {
-			return fmt.Errorf("failed to create directory: %w", err)
-		}
-	default:
-		return fmt.Errorf("failed to get stats for directory %s: %w", path, err)
+	// Create directly instead of checking with Stat first. A separate check
+	// can become stale before MkdirAll runs if another process changes path.
+	if err := os.MkdirAll(path, 0o700); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	return nil
@@ -138,73 +128,69 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		return ctx.Err()
 	}
 
-	info, err := os.Stat(targetPath)
-
-	switch {
-	case err == nil:
-		// ok.
-	case os.IsNotExist(err):
-		// File doesn't exist, it's ok.
-		return nil
-	default:
-		return fmt.Errorf("failed to stat targetPath %s: %w", targetPath, err)
-	}
-	// if it is a file.
-	if !info.IsDir() {
-		if err = os.Remove(targetPath); err != nil {
-			return fmt.Errorf("failed to remove file %s: %w", targetPath, err)
-		}
-
-		return nil
-	}
-
 	if w.WithNestedDir {
-		if err = os.RemoveAll(targetPath); err != nil {
+		// RemoveAll is intentionally used directly. Stat-then-remove would
+		// make the deletion decision on a stale path if it changes meanwhile.
+		if err := os.RemoveAll(targetPath); err != nil {
 			return fmt.Errorf("failed to remove targetPath %s: %w", targetPath, err)
 		}
 
 		return nil
 	}
 
-	// If it is a dir.
-	files, err := os.ReadDir(targetPath)
+	root, err := os.OpenRoot(targetPath)
 	if err != nil {
-		return fmt.Errorf("failed to read directory %s: %w", targetPath, err)
+		if errors.Is(err, os.ErrNotExist) { // not exists, nothing to delete
+			return nil
+		}
+
+		if isNotDir(err) { // it's a file, remove a single file
+			if err = os.Remove(targetPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return fmt.Errorf("failed to remove file %s: %w", targetPath, err)
+			}
+
+			return nil
+		}
+
+		return fmt.Errorf("failed to open %s: %w", targetPath, err)
+	}
+
+	defer root.Close()
+
+	f, err := root.Open(".")
+	if err != nil {
+		return fmt.Errorf("failed to open root directory %s: %w", targetPath, err)
+	}
+	defer f.Close()
+
+	files, err := f.ReadDir(-1)
+	if err != nil {
+		return fmt.Errorf("failed to read root directory %s: %w", targetPath, err)
 	}
 
 	for _, file := range files {
-		filePath := filepath.Join(targetPath, file.Name())
 		// Skip folders.
 		if file.IsDir() {
 			continue
 		}
 		// If validator is set, remove only valid files.
 		if w.Validator != nil {
-			if err = w.Validator.Run(filePath); err != nil {
+			// Pass the base filename to the validator, exactly as read from the directory.
+			if err = w.Validator.Run(file.Name()); err != nil {
 				continue
 			}
 		}
 
-		if err = os.Remove(filePath); err != nil {
-			return fmt.Errorf("failed to remove file %s: %w", filePath, err)
+		if err = root.Remove(file.Name()); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+
+			return fmt.Errorf("failed to remove file %s: %w", file.Name(), err)
 		}
 	}
 
 	return nil
-}
-
-// bufferedFile is a wrapper around a `bufio.Writer` and a `io.Closer`.
-type bufferedFile struct {
-	*bufio.Writer
-	closer io.Closer
-}
-
-// Close flushes the writer and closes the closer.
-func (bf *bufferedFile) Close() error {
-	flushErr := bf.Flush()
-	closeErr := bf.closer.Close()
-
-	return errors.Join(flushErr, closeErr)
 }
 
 // NewWriter creates a new backup file in the given directory.
@@ -220,28 +206,56 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		return noopWriter{}, nil
 	}
 
+	// Validate generated names before touching the filesystem, so rejected
+	// filenames do not create directories as a side effect.
+	if err := ValidateFilename(filename); err != nil {
+		return nil, err
+	}
+
 	// Create directory only if we have something to back up to this directory.
 	err := createDirIfNotExist(w.PathList[0], w.IsDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare backup directory: %w", err)
 	}
 
-	// We ignore `fileName` if `Writer` was initialized .WithFile()
-	var filePath string
-
 	switch {
 	case w.IsDir:
-		// If it is directory.
-		filePath = filepath.Join(w.PathList[0], filename)
+		// Directory backup writes files under PathList[0] by generated filename.
+		root, err := os.OpenRoot(w.PathList[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to open root %s: %w", w.PathList[0], err)
+		}
+		defer root.Close()
+
+		file, err := root.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open file %s in root %s: %w", filename, w.PathList[0], err)
+		}
+
+		return &bufferedFile{bufio.NewWriterSize(file, w.ChunkSize), file}, nil
+
 	case !w.IsDir && filename != "":
 		// If it is metadata file and we backup to one file.
-		filePath = filepath.Join(filepath.Dir(w.PathList[0]), filename)
-	default:
-		// If we backup to one file.
-		filePath = w.PathList[0]
+		dir := filepath.Dir(w.PathList[0])
+
+		root, err := os.OpenRoot(dir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open root %s: %w", dir, err)
+		}
+		defer root.Close()
+
+		file, err := root.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open file %s in root %s: %w", filename, dir, err)
+		}
+
+		return &bufferedFile{bufio.NewWriterSize(file, w.ChunkSize), file}, nil
 	}
 
-	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, 0o666)
+	// If we backup to one file (filename is empty).
+	filePath := w.PathList[0]
+
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file %s: %w", filePath, err)
 	}
@@ -257,4 +271,17 @@ func (w *Writer) GetType() string {
 // GetOptions returns initialized options for the writer.
 func (w *Writer) GetOptions() options.Options {
 	return w.Options
+}
+
+// isNotDir reports whether err returned by os.OpenRoot means the path exists but is not a directory.
+func isNotDir(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if errors.Is(err, syscall.ENOTDIR) {
+		return true
+	}
+
+	return strings.Contains(err.Error(), "not a directory")
 }

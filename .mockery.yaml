@@ -18,10 +18,6 @@ packages:
     config:
       dir: ./io/aerospike/mocks
       pkgname: mocks
-  github.com/aerospike/backup-go/io/aerospike/xdr:
-    config:
-      dir: ./io/aerospike/xdr/mocks
-      pkgname: mocks
   github.com/aerospike/backup-go/io/encoding/asb:
     config:
       dir: ./io/encoding/asb/mocks
@@ -56,7 +52,7 @@ packages:
     config:
       dir: ./io/storage/gcp/storage/mocks
       pkgname: mocks
-  github.com/aerospike/backup-go/pkg/server:
+  github.com/aerospike/backup-go/pkg/server/lister:
     config:
-      dir: ./pkg/server/mocks
+      dir: ./pkg/server/lister/mocks
       pkgname: mocks

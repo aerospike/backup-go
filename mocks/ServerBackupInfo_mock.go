@@ -39,25 +39,27 @@ func (_m *MockServerBackupInfo) EXPECT() *MockServerBackupInfo_Expecter {
 }
 
 // GetBackupStatus provides a mock function for the type MockServerBackupInfo
-func (_mock *MockServerBackupInfo) GetBackupStatus(ctx context.Context) (float64, error) {
-	ret := _mock.Called(ctx)
+func (_mock *MockServerBackupInfo) GetBackupStatus(ctx context.Context, jobID string) (*models.ResponseBackupState, error) {
+	ret := _mock.Called(ctx, jobID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetBackupStatus")
 	}
 
-	var r0 float64
+	var r0 *models.ResponseBackupState
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context) (float64, error)); ok {
-		return returnFunc(ctx)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*models.ResponseBackupState, error)); ok {
+		return returnFunc(ctx, jobID)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context) float64); ok {
-		r0 = returnFunc(ctx)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *models.ResponseBackupState); ok {
+		r0 = returnFunc(ctx, jobID)
 	} else {
-		r0 = ret.Get(0).(float64)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.ResponseBackupState)
+		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = returnFunc(ctx)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, jobID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -71,29 +73,35 @@ type MockServerBackupInfo_GetBackupStatus_Call struct {
 
 // GetBackupStatus is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockServerBackupInfo_Expecter) GetBackupStatus(ctx interface{}) *MockServerBackupInfo_GetBackupStatus_Call {
-	return &MockServerBackupInfo_GetBackupStatus_Call{Call: _e.mock.On("GetBackupStatus", ctx)}
+//   - jobID string
+func (_e *MockServerBackupInfo_Expecter) GetBackupStatus(ctx interface{}, jobID interface{}) *MockServerBackupInfo_GetBackupStatus_Call {
+	return &MockServerBackupInfo_GetBackupStatus_Call{Call: _e.mock.On("GetBackupStatus", ctx, jobID)}
 }
 
-func (_c *MockServerBackupInfo_GetBackupStatus_Call) Run(run func(ctx context.Context)) *MockServerBackupInfo_GetBackupStatus_Call {
+func (_c *MockServerBackupInfo_GetBackupStatus_Call) Run(run func(ctx context.Context, jobID string)) *MockServerBackupInfo_GetBackupStatus_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
 }
 
-func (_c *MockServerBackupInfo_GetBackupStatus_Call) Return(f float64, err error) *MockServerBackupInfo_GetBackupStatus_Call {
-	_c.Call.Return(f, err)
+func (_c *MockServerBackupInfo_GetBackupStatus_Call) Return(responseBackupState *models.ResponseBackupState, err error) *MockServerBackupInfo_GetBackupStatus_Call {
+	_c.Call.Return(responseBackupState, err)
 	return _c
 }
 
-func (_c *MockServerBackupInfo_GetBackupStatus_Call) RunAndReturn(run func(ctx context.Context) (float64, error)) *MockServerBackupInfo_GetBackupStatus_Call {
+func (_c *MockServerBackupInfo_GetBackupStatus_Call) RunAndReturn(run func(ctx context.Context, jobID string) (*models.ResponseBackupState, error)) *MockServerBackupInfo_GetBackupStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }

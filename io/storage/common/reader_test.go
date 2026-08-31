@@ -15,77 +15,10 @@
 package common
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
-
-// mockReader implements the reader interface for testing
-type mockReader struct {
-	mock.Mock
-}
-
-func (m *mockReader) ListObjects(ctx context.Context, path string) ([]string, error) {
-	args := m.Called(ctx, path)
-	return args.Get(0).([]string), args.Error(1)
-}
-
-func (m *mockReader) SetObjectsToStream(list []string) {
-	m.Called(list)
-}
-
-// TestPreSort verifies the PreSort function's behavior for sorting backup files
-func TestPreSort(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name        string
-		inputFiles  []string
-		sortedFiles []string
-		expectError bool
-	}{
-		{
-			name:        "empty list",
-			inputFiles:  []string{},
-			sortedFiles: []string{},
-			expectError: false,
-		},
-		{
-			name:        "single file",
-			inputFiles:  []string{"0_backup_1.asbx"},
-			sortedFiles: []string{"0_backup_1.asbx"},
-			expectError: false,
-		},
-		{
-			name:        "multiple files",
-			inputFiles:  []string{"0_backup_2.asbx", "0_backup_1.asbx", "0_backup_3.asbx"},
-			sortedFiles: []string{"0_backup_1.asbx", "0_backup_2.asbx", "0_backup_3.asbx"},
-			expectError: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			ctx := t.Context()
-			r := new(mockReader)
-
-			r.On("ListObjects", ctx, "test/path").Return(tt.inputFiles, nil)
-			r.On("SetObjectsToStream", tt.sortedFiles).Return()
-
-			err := PreSort(ctx, r, "test/path")
-
-			if tt.expectError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-			r.AssertExpectations(t)
-		})
-	}
-}
 
 // TestCleanPath verifies the CleanPath function's behavior for different input paths
 func TestCleanPath(t *testing.T) {

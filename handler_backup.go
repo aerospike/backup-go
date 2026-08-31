@@ -64,9 +64,9 @@ type Writer interface {
 	GetOptions() options.Options
 }
 
-// BackupHandler handles a backup job.
+// backupHandler handles a backup job.
 // noinspection GoNameStartsWithPackageName
-type BackupHandler struct {
+type backupHandler struct {
 	*handlerBase
 
 	readerProcessor *recordReaderProcessor[*models.Token]
@@ -95,7 +95,7 @@ type BackupHandler struct {
 	kbpsCollector *metrics.Collector
 }
 
-// newBackupHandler creates a new BackupHandler.
+// newBackupHandler creates a new backupHandler.
 func newBackupHandler(
 	ctx context.Context,
 	config *ConfigBackup,
@@ -105,7 +105,7 @@ func newBackupHandler(
 	reader StreamingReader,
 	scanLimiter scanlimiter.Limiter,
 	infoClient ClusterInfo,
-) (*BackupHandler, error) {
+) (*backupHandler, error) {
 	// For estimates calculations, a writer will be nil.
 	var storageType string
 
@@ -200,7 +200,7 @@ func newBackupHandler(
 		return nil, fmt.Errorf("failed to create bandwidth limiter: %w", err)
 	}
 
-	bh := &BackupHandler{
+	bh := &backupHandler{
 		handlerBase:            base,
 		config:                 config,
 		aerospikeClient:        ac,
@@ -251,7 +251,7 @@ func newBackupHandler(
 
 // run runs the backup job.
 // currently this should only be run once.
-func (bh *BackupHandler) run() {
+func (bh *backupHandler) run() {
 	bh.stats.Start()
 
 	go estimates.PrintBackupEstimate(bh.ctx, bh.stats, bh.GetMetrics, bh.logger)
@@ -264,7 +264,7 @@ func (bh *BackupHandler) run() {
 }
 
 // getEstimate calculates backup size estimate.
-func (bh *BackupHandler) getEstimate(ctx context.Context, recordsNumber int64) (uint64, error) {
+func (bh *backupHandler) getEstimate(ctx context.Context, recordsNumber int64) (uint64, error) {
 	if recordsNumber < 0 {
 		return 0, fmt.Errorf("samples records number is negative")
 	}
@@ -298,7 +298,7 @@ func (bh *BackupHandler) getEstimate(ctx context.Context, recordsNumber int64) (
 	result /= compressRatio
 
 	// Calculate and add estimated backup file headers size.
-	header := bh.encoder.GetHeader(0, false)
+	header := bh.encoder.GetHeader(false)
 	numFiles := bh.config.ParallelWrite
 
 	if bh.config.FileLimit > 0 {
@@ -312,7 +312,7 @@ func (bh *BackupHandler) getEstimate(ctx context.Context, recordsNumber int64) (
 }
 
 // getEstimateSamples returns a slice of samples and its content for estimate calculations.
-func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber int64,
+func (bh *backupHandler) getEstimateSamples(ctx context.Context, recordsNumber int64,
 ) (samples []float64, samplesData []byte, err error) {
 	scanPolicy := *bh.config.ScanPolicy
 	scanPolicy.MaxRecords = recordsNumber
@@ -357,7 +357,7 @@ func (bh *BackupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 }
 
 // backup starts the backup operation. It blocks until the backup is completed.
-func (bh *BackupHandler) backup(ctx context.Context) error {
+func (bh *backupHandler) backup(ctx context.Context) error {
 	// Create the data writers.
 	writers, dataWriters, err := bh.writerProcessor.newDataWriters(ctx)
 	if err != nil {
@@ -390,7 +390,7 @@ func (bh *BackupHandler) backup(ctx context.Context) error {
 	return bh.runBackupPipeline(ctx, dataWriters)
 }
 
-func (bh *BackupHandler) runBackupPipeline(ctx context.Context, dataWriters []pipe.Writer[*models.Token]) error {
+func (bh *backupHandler) runBackupPipeline(ctx context.Context, dataWriters []pipe.Writer[*models.Token]) error {
 	// Setup data processors
 	dataProcessors := newDataProcessor(
 		processors.NewRecordCounter[*models.Token](&bh.stats.ReadRecords),
@@ -429,7 +429,7 @@ func (bh *BackupHandler) runBackupPipeline(ctx context.Context, dataWriters []pi
 	return pl.Run(ctx)
 }
 
-func (bh *BackupHandler) backupMetadata(ctx context.Context, writer io.WriteCloser) error {
+func (bh *backupHandler) backupMetadata(ctx context.Context, writer io.WriteCloser) error {
 	metaWriter, err := bh.writerProcessor.newMetaWriter(ctx, writer)
 	if err != nil {
 		return err
@@ -448,7 +448,7 @@ func (bh *BackupHandler) backupMetadata(ctx context.Context, writer io.WriteClos
 	return nil
 }
 
-func (bh *BackupHandler) startRecordCounting(ctx context.Context) {
+func (bh *backupHandler) startRecordCounting(ctx context.Context) {
 	// Run immediately on startup.
 	bh.updateRecordCount(ctx)
 
@@ -466,7 +466,7 @@ func (bh *BackupHandler) startRecordCounting(ctx context.Context) {
 	}
 }
 
-func (bh *BackupHandler) updateRecordCount(ctx context.Context) {
+func (bh *backupHandler) updateRecordCount(ctx context.Context) {
 	records, err := bh.recordCounter.countRecords(ctx, bh.infoClient)
 	if err != nil {
 		bh.logger.Warn("failed to count records", slog.Any("error", err))
@@ -476,7 +476,7 @@ func (bh *BackupHandler) updateRecordCount(ctx context.Context) {
 	bh.stats.TotalRecords.Store(records)
 }
 
-func (bh *BackupHandler) backupSIndexesAndUDFs(
+func (bh *backupHandler) backupSIndexesAndUDFs(
 	ctx context.Context,
 	writer io.WriteCloser,
 ) error {
@@ -506,13 +506,18 @@ func (bh *BackupHandler) backupSIndexesAndUDFs(
 }
 
 // GetStats returns the stats of the backup job.
-func (bh *BackupHandler) GetStats() *models.BackupStats {
+func (bh *backupHandler) GetStats() *models.BackupStats {
 	return bh.stats
 }
 
 // Wait waits for the backup job to complete and returns an error if the job failed.
-func (bh *BackupHandler) Wait(ctx context.Context) error {
+func (bh *backupHandler) Wait(ctx context.Context) error {
 	err := bh.waitForCompletion(ctx)
+
+	if bh.state != nil {
+		// Wait for the asynchronous state writer to finish flushing.
+		bh.state.wait()
+	}
 
 	// If the err is nil, we can remove the state file.
 	if err == nil && bh.state != nil {
@@ -527,7 +532,7 @@ func (bh *BackupHandler) Wait(ctx context.Context) error {
 	return err
 }
 
-func (bh *BackupHandler) backupSIndexes(
+func (bh *backupHandler) backupSIndexes(
 	ctx context.Context,
 	writer io.WriteCloser,
 ) error {
@@ -565,7 +570,7 @@ func (bh *BackupHandler) backupSIndexes(
 	return sIndexPipeline.Run(ctx)
 }
 
-func (bh *BackupHandler) backupUDFs(
+func (bh *backupHandler) backupUDFs(
 	ctx context.Context,
 	writer io.WriteCloser,
 ) error {
@@ -604,7 +609,7 @@ func (bh *BackupHandler) backupUDFs(
 }
 
 // GetMetrics returns metrics of the backup job.
-func (bh *BackupHandler) GetMetrics() *models.Metrics {
+func (bh *backupHandler) GetMetrics() *models.Metrics {
 	if bh == nil {
 		return nil
 	}
@@ -624,7 +629,7 @@ func (bh *BackupHandler) GetMetrics() *models.Metrics {
 }
 
 // stateSuffixGenerator returns state suffix generator.
-func (bh *BackupHandler) stateSuffixGenerator() string {
+func (bh *backupHandler) stateSuffixGenerator() string {
 	suffix := ""
 	if bh.state != nil {
 		suffix = bh.state.getFileSuffix()
@@ -635,7 +640,7 @@ func (bh *BackupHandler) stateSuffixGenerator() string {
 
 // cleanup stops the collection of stats and metrics for the backup job,
 // including BackupStats, RPS, and KBPS tracking.
-func (bh *BackupHandler) cleanup() {
+func (bh *backupHandler) cleanup() {
 	bh.stats.Stop()
 	bh.rpsCollector.Stop()
 	bh.kbpsCollector.Stop()
@@ -647,3 +652,5 @@ func (bh *BackupHandler) cleanup() {
 
 	bh.pl.Swap(nil)
 }
+
+var _ BackupHandler = (*backupHandler)(nil)

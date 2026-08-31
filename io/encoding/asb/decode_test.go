@@ -3599,7 +3599,7 @@ func TestEncodeDecodeRecordRoundTrip(t *testing.T) {
 
 	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, &models.SIndexInfo{}))
 	var file bytes.Buffer
-	file.Write(encoder.GetHeader(0, true))
+	file.Write(encoder.GetHeader(true))
 
 	if err := encoder.EncodeToken(inputToken, &file); err != nil {
 		t.Fatalf("failed to encode token: %v", err)
@@ -3663,7 +3663,7 @@ func BenchmarkDecodeRecordRoundTrip(b *testing.B) {
 
 	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, &models.SIndexInfo{}))
 	var payload bytes.Buffer
-	payload.Write(encoder.GetHeader(0, true))
+	payload.Write(encoder.GetHeader(true))
 	if err := encoder.EncodeToken(token, &payload); err != nil {
 		b.Fatal(err)
 	}

@@ -17,6 +17,7 @@ package backup
 import (
 	"context"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -58,6 +59,9 @@ type State struct {
 	writer Writer
 	// logger for logging errors.
 	logger *slog.Logger
+
+	// serveDone is closed after the state writer has stopped.
+	serveDone chan struct{}
 }
 
 // NewState creates and returns a State instance. If continuing a previous
@@ -102,6 +106,7 @@ func newState(
 		FileName:          filepath.Base(config.StateFile),
 		writer:            writer,
 		logger:            logger,
+		serveDone:         make(chan struct{}),
 	}
 
 	// Run watcher on initialization.
@@ -124,6 +129,7 @@ func newStateFromFile(
 	if err != nil {
 		return nil, fmt.Errorf("failed to open state file: %w", err)
 	}
+	defer f.Close()
 
 	dec := gob.NewDecoder(f)
 
@@ -135,6 +141,7 @@ func newStateFromFile(
 	s.ctx = ctx
 	s.writer = writer
 	s.logger = logger
+	s.serveDone = make(chan struct{})
 	s.RecordsStateChan = make(chan models.PartitionFilterSerialized)
 	s.SaveCommandChan = make(chan int)
 	s.Counter++
@@ -153,10 +160,22 @@ func newStateFromFile(
 
 // serve dumps files to disk.
 func (s *State) serve() {
+	defer close(s.serveDone)
+
 	for {
 		select {
 		case <-s.ctx.Done():
-			return
+			// Finish commands that were already submitted before stopping.
+			for {
+				select {
+				case msg := <-s.SaveCommandChan:
+					if err := s.dump(msg); err != nil {
+						s.logger.Error("failed to dump state", slog.Any("error", err))
+					}
+				default:
+					return
+				}
+			}
 		case msg := <-s.SaveCommandChan:
 			if err := s.dump(msg); err != nil {
 				s.logger.Error("failed to dump state", slog.Any("error", err))
@@ -166,16 +185,21 @@ func (s *State) serve() {
 	}
 }
 
-func (s *State) dump(n int) error {
+func (s *State) dump(n int) (err error) {
 	// Skip meta data.
 	if n == metadataFileID {
 		return nil
 	}
 
-	file, err := s.writer.NewWriter(s.ctx, s.FileName)
+	// State updates must finish even when the backup context is canceled;
+	// otherwise the file may remain truncated and unusable for continuation.
+	file, err := s.writer.NewWriter(context.WithoutCancel(s.ctx), s.FileName)
 	if err != nil {
 		return fmt.Errorf("failed to create state file %s: %w", s.FileName, err)
 	}
+	defer func() {
+		err = errors.Join(err, file.Close())
+	}()
 
 	enc := gob.NewEncoder(file)
 
@@ -188,13 +212,13 @@ func (s *State) dump(n int) error {
 		return fmt.Errorf("failed to encode state data: %w", err)
 	}
 
-	if err = file.Close(); err != nil {
-		return fmt.Errorf("failed to close state file: %w", err)
-	}
-
 	s.logger.Debug("state file dumped", slog.String("path", s.FileName), slog.Time("savedAt", time.Now()))
 
 	return nil
+}
+
+func (s *State) wait() {
+	<-s.serveDone
 }
 
 func (s *State) initState(pf []*a.PartitionFilter) error {

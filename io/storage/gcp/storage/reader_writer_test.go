@@ -21,7 +21,6 @@ import (
 	"io"
 	"net/http"
 	"path"
-	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -29,7 +28,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/aerospike/backup-go/internal/util/files"
+	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 	"github.com/googleapis/gax-go/v2"
@@ -62,13 +61,11 @@ const (
 
 	testFolderNameTemplate    = "folder_%d/"
 	testFileNameTemplate      = "backup_%d.asb"
-	testFileNameTemplateAsbx  = "%d_backup_%d.asbx"
 	testFileNameTemplateWrong = "file_%d.zip"
 	testFileNameOneFile       = "one_file.any"
 	testMetadataPrefix        = "metadata_"
 
 	testFileContent        = "content"
-	testFileContentAsbx    = "content-asbx"
 	testFileContentSorted1 = "sorted1"
 	testFileContentSorted2 = "sorted2"
 	testFileContentSorted3 = "sorted3"
@@ -107,7 +104,6 @@ func TestGCPSuite(t *testing.T) {
 	suite.Run(t, s)
 }
 
-//nolint:gocyclo //it is a test function for filling data. No need to split it.
 func fillTestData(ctx context.Context, client *storage.Client) error {
 	bucket := client.Bucket(testBucketName)
 
@@ -233,35 +229,6 @@ func fillTestData(ctx context.Context, client *storage.Client) error {
 		if err := writeContent(sw, testFileContent); err != nil {
 			return err
 		}
-
-		fileName = fmt.Sprintf("%s%s", testFolderMixedBackups, fmt.Sprintf(testFileNameTemplateAsbx, 0, i))
-		sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
-		sw.ContentType = fileType
-		if err := writeContent(sw, testFileContentAsbx); err != nil {
-			return err
-		}
-	}
-
-	// unsorted files.
-	fileName := fmt.Sprintf("%s%s", testReadFolderSorted, fmt.Sprintf(testFileNameTemplateAsbx, 0, 3))
-	sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
-	sw.ContentType = fileType
-	if err := writeContent(sw, testFileContentSorted3); err != nil {
-		return err
-	}
-
-	fileName = fmt.Sprintf("%s%s", testReadFolderSorted, fmt.Sprintf(testFileNameTemplateAsbx, 0, 1))
-	sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
-	sw.ContentType = fileType
-	if err := writeContent(sw, testFileContentSorted1); err != nil {
-		return err
-	}
-
-	fileName = fmt.Sprintf("%s%s", testReadFolderSorted, fmt.Sprintf(testFileNameTemplateAsbx, 0, 2))
-	sw = client.Bucket(testBucketName).Object(fileName).NewWriter(ctx)
-	sw.ContentType = fileType
-	if err := writeContent(sw, testFileContentSorted2); err != nil {
-		return err
 	}
 
 	return nil
@@ -282,7 +249,7 @@ func writeContent(sw *storage.Writer, content string) error {
 type validatorMock struct{}
 
 func (mock validatorMock) Run(fileName string) error {
-	if !strings.HasSuffix(fileName, files.ExtensionASB) {
+	if !strings.HasSuffix(fileName, asb.Extension) {
 		return fmt.Errorf("file name must end with .asb")
 	}
 	return nil
@@ -326,54 +293,6 @@ func (s *GCPSuite) TestReader_StreamFilesOk() {
 				return
 			}
 			filesCounter++
-		}
-	}
-}
-
-func (s *GCPSuite) TestReader_WithSorting() {
-	s.suiteWg.Wait()
-
-	ctx := s.T().Context()
-	client, err := storage.NewClient(
-		ctx,
-		option.WithEndpoint(testServiceAddress),
-		option.WithoutAuthentication(),
-	)
-	s.Require().NoError(err)
-
-	reader, err := NewReader(
-		ctx,
-		client,
-		testBucketName,
-		options.WithDir(testReadFolderSorted),
-		options.WithSorting(),
-		options.WithCalculateTotalSize(),
-	)
-	s.Require().NoError(err)
-
-	rCH := make(chan models.File)
-	eCH := make(chan error)
-
-	go reader.StreamFiles(ctx, rCH, eCH, nil)
-
-	var filesCounter int
-
-	for {
-		select {
-		case err := <-eCH:
-			s.Require().NoError(err)
-		case f, ok := <-rCH:
-			if !ok {
-				s.Require().Equal(3, filesCounter)
-				return
-			}
-			filesCounter++
-
-			result, err := readAll(f.Reader)
-			expecting := fmt.Sprintf("%s%d", "sorted", filesCounter)
-
-			s.Require().NoError(err)
-			s.Require().Equal(expecting, result)
 		}
 	}
 }
@@ -483,7 +402,7 @@ func (s *GCPSuite) TestWriter_WriteEmptyDir() {
 	s.Require().NoError(err)
 
 	for i := range testFilesNumber {
-		fileName := fmt.Sprintf("%s%s", testWriteFolderEmpty, fmt.Sprintf(testFileNameTemplate, i))
+		fileName := fmt.Sprintf(testFileNameTemplate, i)
 		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContent))
@@ -535,7 +454,7 @@ func (s *GCPSuite) TestWriter_WriteNotEmptyDir() {
 	s.Require().NoError(err)
 
 	for i := range testFilesNumber {
-		fileName := fmt.Sprintf("%s%s", testWriteFolderWithData, fmt.Sprintf(testFileNameTemplate, i))
+		fileName := fmt.Sprintf(testFileNameTemplate, i)
 		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContent))
@@ -567,7 +486,7 @@ func (s *GCPSuite) TestWriter_WriteMixedDir() {
 	s.Require().NoError(err)
 
 	for i := range testFilesNumber {
-		fileName := fmt.Sprintf("%s%s", testWriteFolderMixedData, fmt.Sprintf(testFileNameTemplate, i))
+		fileName := fmt.Sprintf(testFileNameTemplate, i)
 		w, err := writer.NewWriter(ctx, fileName)
 		s.Require().NoError(err)
 		n, err := w.Write([]byte(testFileContent))
@@ -829,79 +748,6 @@ func (s *GCPSuite) TestReader_StreamFilesList() {
 			filesCounter++
 		}
 	}
-}
-
-func (s *GCPSuite) TestReader_StreamFilesPreloaded() {
-	s.suiteWg.Wait()
-	ctx := s.T().Context()
-	client, err := storage.NewClient(
-		ctx,
-		option.WithEndpoint(testServiceAddress),
-		option.WithoutAuthentication(),
-	)
-	s.Require().NoError(err)
-
-	reader, err := NewReader(
-		ctx,
-		client,
-		testBucketName,
-		options.WithDir(testFolderMixedBackups),
-	)
-	s.Require().NoError(err)
-
-	list, err := reader.ListObjects(ctx, testFolderMixedBackups)
-	s.Require().NoError(err)
-
-	_, asbxList := filterList(list)
-	reader.SetObjectsToStream(asbxList)
-
-	rCH := make(chan models.File)
-	eCH := make(chan error)
-
-	go reader.StreamFiles(ctx, rCH, eCH, nil)
-
-	var filesCounter int
-
-	for {
-		select {
-		case err := <-eCH:
-			s.Require().NoError(err)
-		case f, ok := <-rCH:
-			if !ok {
-				s.Require().Equal(5, filesCounter)
-				return
-			}
-			filesCounter++
-
-			result, err := readAll(f.Reader)
-			s.Require().NoError(err)
-			s.Require().Equal(testFileContentAsbx, result)
-		}
-	}
-}
-
-func filterList(list []string) (asbList, asbxList []string) {
-	for i := range list {
-		switch filepath.Ext(list[i]) {
-		case files.ExtensionASB:
-			asbList = append(asbList, list[i])
-		case files.ExtensionASBX:
-			asbxList = append(asbxList, list[i])
-		}
-	}
-	return asbList, asbxList
-}
-
-func readAll(r io.ReadCloser) (string, error) {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return "", fmt.Errorf("failed to read data: %w", err)
-	}
-	if err := r.Close(); err != nil {
-		return "", fmt.Errorf("failed to close reader: %w", err)
-	}
-
-	return string(data), nil
 }
 
 func (s *GCPSuite) TestReader_StreamFiles_Skipped() {

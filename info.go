@@ -18,7 +18,6 @@ import (
 	"context"
 
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pkg/asinfo"
 	infoModels "github.com/aerospike/backup-go/pkg/asinfo/models"
 )
 
@@ -42,19 +41,6 @@ type ClusterInfo interface {
 	GetClusterStable(ctx context.Context, namespace string) (bool, error)
 }
 
-// XDRInfo provides XDR replication control and monitoring.
-//
-//go:generate mockery --name XDRInfo
-type XDRInfo interface {
-	StartXDR(ctx context.Context, nodeName, dc, hostPort, namespace, rewind string, throughput int, forward bool) error
-	StopXDR(ctx context.Context, nodeName, dc string) error
-	GetStats(ctx context.Context, nodeName, dc, namespace string) (asinfo.Stats, error)
-	GetDCsList(ctx context.Context) ([]string, error)
-	BlockMRTWrites(ctx context.Context, nodeName, namespace string) error
-	UnBlockMRTWrites(ctx context.Context, nodeName, namespace string) error
-	GetNodesNames() []string
-}
-
 // ServerBackupInfo provides server-side backup and restore job control.
 //
 //go:generate mockery --name BackupInfo
@@ -62,6 +48,6 @@ type ServerBackupInfo interface {
 	StartServerBackup(ctx context.Context, request *infoModels.RequestBackup) (string, error)
 	StartServerRestore(ctx context.Context, request *infoModels.RequestRestore) error
 	PrepareServerRestore(ctx context.Context, jobID, namespace string) error
-	GetBackupStatus(ctx context.Context) (float64, error)
+	GetBackupStatus(ctx context.Context, jobID string) (*infoModels.ResponseBackupState, error)
 	GetRestoreStatus(ctx context.Context, namespace string) (string, error)
 }

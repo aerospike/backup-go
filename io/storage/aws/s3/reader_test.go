@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aerospike/backup-go/internal/util/files"
+	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/storage/aws/s3/mocks"
 	"github.com/aerospike/backup-go/io/storage/options"
 	optMocks "github.com/aerospike/backup-go/io/storage/options/mocks"
@@ -306,7 +306,7 @@ func (s *AwsSuite) TestReader_StreamPathList() {
 
 	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == files.ExtensionASB {
+		if filepath.Ext(fileName) == asb.Extension {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -357,7 +357,7 @@ func (s *AwsSuite) TestReader_StreamFilesList() {
 
 	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == files.ExtensionASB {
+		if filepath.Ext(fileName) == asb.Extension {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -398,127 +398,6 @@ func (s *AwsSuite) TestReader_StreamFilesList() {
 	}
 }
 
-func (s *AwsSuite) TestReader_WithSorting() {
-	s.suiteWg.Wait()
-	ctx := s.T().Context()
-	client, err := testClient(ctx)
-	s.Require().NoError(err)
-
-	mockValidator := new(optMocks.Mockvalidator)
-	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == files.ExtensionASBX {
-			return nil
-		}
-		return fmt.Errorf("invalid file extension")
-	})
-
-	reader, err := NewReader(
-		ctx,
-		client,
-		testBucket,
-		options.WithDir(testFolderSorted),
-		options.WithValidator(mockValidator),
-		options.WithSorting(),
-	)
-	s.Require().NoError(err)
-
-	rCH := make(chan models.File)
-	eCH := make(chan error)
-
-	go reader.StreamFiles(ctx, rCH, eCH, nil)
-
-	var filesCounter int
-
-	for {
-		select {
-		case err := <-eCH:
-			s.Require().NoError(err)
-		case f, ok := <-rCH:
-			if !ok {
-				s.Require().Equal(3, filesCounter)
-				return
-			}
-			filesCounter++
-
-			result, err := readAll(f.Reader)
-			expecting := fmt.Sprintf("%s%d", "sorted", filesCounter)
-
-			s.Require().NoError(err)
-			s.Require().Equal(expecting, result)
-		}
-	}
-}
-
-func (s *AwsSuite) TestReader_StreamFilesPreloaded() {
-	s.suiteWg.Wait()
-	ctx := s.T().Context()
-	client, err := testClient(ctx)
-	s.Require().NoError(err)
-
-	reader, err := NewReader(
-		ctx,
-		client,
-		testBucket,
-		options.WithDir(testFolderMixed),
-	)
-	s.Require().NoError(err)
-
-	list, err := reader.ListObjects(ctx, testFolderMixed)
-	s.Require().NoError(err)
-
-	_, asbxList := filterList(list)
-
-	reader.SetObjectsToStream(asbxList)
-
-	rCH := make(chan models.File)
-	eCH := make(chan error)
-
-	go reader.StreamFiles(ctx, rCH, eCH, nil)
-
-	var filesCounter int
-
-	for {
-		select {
-		case err := <-eCH:
-			s.Require().NoError(err)
-		case f, ok := <-rCH:
-			if !ok {
-				s.Require().Equal(5, filesCounter)
-				return
-			}
-			filesCounter++
-
-			result, err := readAll(f.Reader)
-			s.Require().NoError(err)
-			s.Require().Equal(testFileContentAsbx, result)
-		}
-	}
-}
-
-func filterList(list []string) (asbList, asbxList []string) {
-	for i := range list {
-		switch filepath.Ext(list[i]) {
-		case files.ExtensionASB:
-			asbList = append(asbList, list[i])
-		case files.ExtensionASBX:
-			asbxList = append(asbxList, list[i])
-		}
-	}
-	return asbList, asbxList
-}
-
-func readAll(r io.ReadCloser) (string, error) {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return "", fmt.Errorf("failed to read data: %w", err)
-	}
-	if err := r.Close(); err != nil {
-		return "", fmt.Errorf("failed to close reader: %w", err)
-	}
-
-	return string(data), nil
-}
-
 func (s *AwsSuite) TestReader_StreamFilesOk() {
 	s.suiteWg.Wait()
 	ctx := s.T().Context()
@@ -527,7 +406,7 @@ func (s *AwsSuite) TestReader_StreamFilesOk() {
 
 	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == files.ExtensionASB {
+		if filepath.Ext(fileName) == asb.Extension {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -571,7 +450,7 @@ func (s *AwsSuite) TestReader_StreamFilesEmpty() {
 
 	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == files.ExtensionASB {
+		if filepath.Ext(fileName) == asb.Extension {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -595,7 +474,7 @@ func (s *AwsSuite) TestReader_StreamFilesMixed() {
 
 	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == files.ExtensionASB {
+		if filepath.Ext(fileName) == asb.Extension {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -976,56 +855,6 @@ func TestReader_ShouldSkip(t *testing.T) {
 	}
 }
 
-func (s *AwsSuite) TestReader_SetObjectsToStream() {
-	s.suiteWg.Wait()
-	ctx := s.T().Context()
-	client, err := testClient(ctx)
-	s.Require().NoError(err)
-
-	// Create a reader
-	reader, err := NewReader(
-		ctx,
-		client,
-		testBucket,
-		options.WithDir(testFolderWithData),
-		options.WithSkipDirCheck(),
-	)
-	s.Require().NoError(err)
-
-	// Define a list of objects to stream
-	objectsToStream := []string{
-		path.Join(testFolderWithData, fmt.Sprintf(testFileNameAsbTemplate, 0)),
-		path.Join(testFolderWithData, fmt.Sprintf(testFileNameAsbTemplate, 1)),
-	}
-
-	// Set the objects to stream
-	reader.SetObjectsToStream(objectsToStream)
-
-	// Verify that the objects were set correctly
-	s.Require().Equal(objectsToStream, reader.objectsToStream)
-
-	// Test streaming the objects
-	rCH := make(chan models.File)
-	eCH := make(chan error)
-
-	go reader.StreamFiles(ctx, rCH, eCH, nil)
-
-	var filesCounter int
-
-	for {
-		select {
-		case err := <-eCH:
-			s.Require().NoError(err)
-		case _, ok := <-rCH:
-			if !ok {
-				s.Require().Equal(len(objectsToStream), filesCounter)
-				return
-			}
-			filesCounter++
-		}
-	}
-}
-
 func (s *AwsSuite) TestReader_StreamFiles_Skipped() {
 	s.suiteWg.Wait()
 	ctx := s.T().Context()
@@ -1034,7 +863,7 @@ func (s *AwsSuite) TestReader_StreamFiles_Skipped() {
 
 	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == files.ExtensionASB {
+		if filepath.Ext(fileName) == asb.Extension {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")

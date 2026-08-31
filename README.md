@@ -8,7 +8,7 @@ transactionally consistent backups.
 
 ## Official tools powered by this library
 - [Aerospike Backup Service](https://github.com/aerospike/aerospike-backup-service)
-- [Aerospike Backup CLI](https://github.com/aerospike/aerospike-backup-cli)
+- [Aerospike Backup CLI](https://github.com/aerospike/absctl)
 
 ## Features
 

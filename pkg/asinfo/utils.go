@@ -268,7 +268,7 @@ func parseSIndexType(val string) (models.SIndexType, error) {
 		return models.SetSIndex, nil
 	default:
 		var zero models.SIndexType
-		return zero, fmt.Errorf("invalid sindex index type: %s", val)
+		return zero, fmt.Errorf("%w: %s", ErrInvalidSIndexType, val)
 	}
 }
 

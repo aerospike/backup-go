@@ -15,7 +15,6 @@
 package backup
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -1226,11 +1225,10 @@ func TestRestoreExpiredRecords(t *testing.T) {
 		}
 
 		token := models.NewRecordToken(modelRec, 0, nil)
-		var buf bytes.Buffer
-		err = encoder.EncodeToken(token, &buf)
+		encoded, err := encoder.EncodeToken(token, nil)
 		require.NoError(t, err)
 
-		_, err = w.Write(buf.Bytes())
+		_, err = w.Write(encoded)
 		require.NoError(t, err)
 	}
 

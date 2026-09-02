@@ -582,24 +582,22 @@ func (_c *MockInfoGetter_GetRestoreStatus_Call) RunAndReturn(run func(ctx contex
 }
 
 // GetSIndexInfo provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) GetSIndexInfo(ctx context.Context, namespace string) (*models0.SIndexInfo, error) {
+func (_mock *MockInfoGetter) GetSIndexInfo(ctx context.Context, namespace string) (models0.SIndexInfo, error) {
 	ret := _mock.Called(ctx, namespace)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetSIndexInfo")
 	}
 
-	var r0 *models0.SIndexInfo
+	var r0 models0.SIndexInfo
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*models0.SIndexInfo, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (models0.SIndexInfo, error)); ok {
 		return returnFunc(ctx, namespace)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *models0.SIndexInfo); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) models0.SIndexInfo); ok {
 		r0 = returnFunc(ctx, namespace)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*models0.SIndexInfo)
-		}
+		r0 = ret.Get(0).(models0.SIndexInfo)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = returnFunc(ctx, namespace)
@@ -639,12 +637,12 @@ func (_c *MockInfoGetter_GetSIndexInfo_Call) Run(run func(ctx context.Context, n
 	return _c
 }
 
-func (_c *MockInfoGetter_GetSIndexInfo_Call) Return(sIndexInfo *models0.SIndexInfo, err error) *MockInfoGetter_GetSIndexInfo_Call {
+func (_c *MockInfoGetter_GetSIndexInfo_Call) Return(sIndexInfo models0.SIndexInfo, err error) *MockInfoGetter_GetSIndexInfo_Call {
 	_c.Call.Return(sIndexInfo, err)
 	return _c
 }
 
-func (_c *MockInfoGetter_GetSIndexInfo_Call) RunAndReturn(run func(ctx context.Context, namespace string) (*models0.SIndexInfo, error)) *MockInfoGetter_GetSIndexInfo_Call {
+func (_c *MockInfoGetter_GetSIndexInfo_Call) RunAndReturn(run func(ctx context.Context, namespace string) (models0.SIndexInfo, error)) *MockInfoGetter_GetSIndexInfo_Call {
 	_c.Call.Return(run)
 	return _c
 }

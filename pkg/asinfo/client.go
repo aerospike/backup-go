@@ -200,10 +200,10 @@ func (ic *Client) GetVersion(ctx context.Context) (iModels.AerospikeVersion, err
 }
 
 // GetSIndexInfo returns information about secondary indexes in the given namespace.
-func (ic *Client) GetSIndexInfo(ctx context.Context, namespace string) (*models.SIndexInfo, error) {
+func (ic *Client) GetSIndexInfo(ctx context.Context, namespace string) (models.SIndexInfo, error) {
 	list, err := ic.getSIndexes(ctx, namespace, true)
 	if err != nil {
-		return nil, err
+		return models.SIndexInfo{}, err
 	}
 
 	var hasSetSIndex, hasExpressionSIndex bool
@@ -218,7 +218,7 @@ func (ic *Client) GetSIndexInfo(ctx context.Context, namespace string) (*models.
 		}
 	}
 
-	return &models.SIndexInfo{
+	return models.SIndexInfo{
 		HasSet:        hasSetSIndex,
 		HasExpression: hasExpressionSIndex,
 	}, nil

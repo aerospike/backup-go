@@ -43,7 +43,7 @@ type Encoder[T models.TokenConstraint] interface {
 
 // NewEncoder returns a new Encoder according to `EncoderType`.
 func NewEncoder[T models.TokenConstraint](
-	eType EncoderType, namespace string, compact bool, sIndexInfo *models.SIndexInfo,
+	eType EncoderType, namespace string, compact bool, sIndexInfo models.SIndexInfo,
 ) Encoder[T] {
 	switch eType {
 	// As at the moment only one `ASB` Encoder supported, we use such construction.

@@ -448,24 +448,22 @@ func (_c *MockClusterInfo_GetRecordCount_Call) RunAndReturn(run func(ctx context
 }
 
 // GetSIndexInfo provides a mock function for the type MockClusterInfo
-func (_mock *MockClusterInfo) GetSIndexInfo(ctx context.Context, namespace string) (*models.SIndexInfo, error) {
+func (_mock *MockClusterInfo) GetSIndexInfo(ctx context.Context, namespace string) (models.SIndexInfo, error) {
 	ret := _mock.Called(ctx, namespace)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetSIndexInfo")
 	}
 
-	var r0 *models.SIndexInfo
+	var r0 models.SIndexInfo
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*models.SIndexInfo, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (models.SIndexInfo, error)); ok {
 		return returnFunc(ctx, namespace)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *models.SIndexInfo); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) models.SIndexInfo); ok {
 		r0 = returnFunc(ctx, namespace)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*models.SIndexInfo)
-		}
+		r0 = ret.Get(0).(models.SIndexInfo)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = returnFunc(ctx, namespace)
@@ -505,12 +503,12 @@ func (_c *MockClusterInfo_GetSIndexInfo_Call) Run(run func(ctx context.Context, 
 	return _c
 }
 
-func (_c *MockClusterInfo_GetSIndexInfo_Call) Return(sIndexInfo *models.SIndexInfo, err error) *MockClusterInfo_GetSIndexInfo_Call {
+func (_c *MockClusterInfo_GetSIndexInfo_Call) Return(sIndexInfo models.SIndexInfo, err error) *MockClusterInfo_GetSIndexInfo_Call {
 	_c.Call.Return(sIndexInfo, err)
 	return _c
 }
 
-func (_c *MockClusterInfo_GetSIndexInfo_Call) RunAndReturn(run func(ctx context.Context, namespace string) (*models.SIndexInfo, error)) *MockClusterInfo_GetSIndexInfo_Call {
+func (_c *MockClusterInfo_GetSIndexInfo_Call) RunAndReturn(run func(ctx context.Context, namespace string) (models.SIndexInfo, error)) *MockClusterInfo_GetSIndexInfo_Call {
 	_c.Call.Return(run)
 	return _c
 }

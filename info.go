@@ -35,7 +35,7 @@ type ClusterInfo interface {
 	GetSetsList(ctx context.Context, namespace string) ([]string, error)
 	GetNamespacesList(ctx context.Context) ([]string, error)
 	GetStatus(ctx context.Context) (string, error)
-	GetSIndexInfo(ctx context.Context, namespace string) (*models.SIndexInfo, error)
+	GetSIndexInfo(ctx context.Context, namespace string) (models.SIndexInfo, error)
 	GetPrimaryPartitions(ctx context.Context, node, namespace string) ([]int, error)
 	GetPendingMigrations(ctx context.Context, namespace string) (uint64, error)
 	GetClusterStable(ctx context.Context, namespace string) (bool, error)

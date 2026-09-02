@@ -148,7 +148,7 @@ func newBackupHandler(
 	}
 
 	var (
-		sIndexInfo *models.SIndexInfo
+		sIndexInfo models.SIndexInfo
 		err        error
 	)
 	if !config.NoIndexes {

@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// This is the sample referenced from README.md: it backs up a namespace to a
+// local directory and restores it back, using the default configuration with
+// only a few fields adjusted. Every other option is documented on the
+// ConfigBackup and ConfigRestore types.
+//
+// It expects an Aerospike server on 127.0.0.1:3000 with the "test" namespace.
 package main
 
 import (
@@ -25,11 +31,14 @@ import (
 	"github.com/aerospike/backup-go/io/storage/options"
 )
 
+const backupDir = "backups_folder"
+
 func main() {
 	aerospikeClient, aerr := aerospike.NewClient("127.0.0.1", 3000)
 	if aerr != nil {
-		panic(aerr)
+		log.Fatal(aerr)
 	}
+	defer aerospikeClient.Close()
 
 	backupClient, err := backup.NewClient(aerospikeClient)
 	if err != nil {
@@ -38,60 +47,79 @@ func main() {
 
 	ctx := context.Background()
 
-	// For backup to single file use local.WithFile(fileName)
-	writers, err := local.NewWriter(
+	runBackup(ctx, backupClient)
+	runRestore(ctx, backupClient)
+}
+
+func runBackup(ctx context.Context, backupClient *backup.Client) {
+	// To back up into a single file use options.WithFile(fileName) instead.
+	writer, err := local.NewWriter(
 		ctx,
 		options.WithRemoveFiles(),
-		options.WithDir("backups_folder"),
+		options.WithDir(backupDir),
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	backupCfg := backup.NewDefaultBackupConfig()
-	backupCfg.Namespace = "test"
-	backupCfg.ParallelRead = 10
-	backupCfg.ParallelWrite = 10
+	cfg := backup.NewDefaultBackupConfig()
+	// NewDefaultBackupConfig already sets Namespace to "test", but set it
+	// explicitly so the namespace being backed up is obvious.
+	cfg.Namespace = "test"
+	cfg.ParallelRead = 10
+	cfg.ParallelWrite = 10
 
-	backupHandler, err := backupClient.Backup(ctx, backupCfg, writers, nil)
+	// Estimate does not write anything; it samples records to predict the size.
+	estimate, err := backupClient.Estimate(ctx, cfg, 1000)
+	if err != nil {
+		log.Printf("Estimate failed: %v", err)
+	} else {
+		log.Printf("Estimated backup size: %d bytes", estimate)
+	}
+
+	// The last argument is a reader, needed only to resume from a state file.
+	handler, err := backupClient.Backup(ctx, cfg, writer, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Use backupHandler.Wait(ctx) to wait for the job to finish or fail.
-	// You can use different context here, and if it is canceled
-	// backupClient.Backup(ctx, backupCfg, writers) context will be cancelled too.
-	err = backupHandler.Wait(ctx)
-	if err != nil {
-		log.Printf("Backup failed: %v", err)
+	// Wait blocks until the job finishes or fails. Its context governs only the
+	// waiting; the job itself is bound to the context passed to Backup, so
+	// canceling that one stops the job.
+	if err := handler.Wait(ctx); err != nil {
+		log.Fatalf("Backup failed: %v", err)
 	}
 
-	restoreCfg := backup.NewDefaultRestoreConfig()
-	restoreCfg.Parallel = 5
+	stats := handler.GetStats()
+	log.Printf("Backed up %d records into %d file(s), %d bytes",
+		stats.GetReadRecords(), stats.GetFileCount(), stats.GetBytesWritten())
+}
 
-	// For restore from single file use local.WithFile(fileName)
+func runRestore(ctx context.Context, backupClient *backup.Client) {
+	// To restore from a single file use options.WithFile(fileName) instead.
+	// The validator makes the reader skip files that are not ASB backups.
 	reader, err := local.NewReader(
 		ctx,
-		options.WithDir("backups_folder"),
+		options.WithDir(backupDir),
 		options.WithValidator(asb.NewValidator()),
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	restoreHandler, err := backupClient.Restore(ctx, restoreCfg, reader)
+	cfg := backup.NewDefaultRestoreConfig()
+	cfg.Parallel = 5
+
+	handler, err := backupClient.Restore(ctx, cfg, reader)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Use restoreHandler.Wait(ctx) to wait for the job to finish or fail.
-	// You can use different context here, and if it is canceled
-	// backupClient.Restore(ctx, restoreCfg, streamingReader) context will be cancelled too.
-	err = restoreHandler.Wait(ctx)
-	if err != nil {
-		log.Printf("Restore failed: %v", err)
+	if err := handler.Wait(ctx); err != nil {
+		log.Fatalf("Restore failed: %v", err)
 	}
 
-	// optionally check the stats of the restore job
-	_ = restoreHandler.GetStats()
+	stats := handler.GetStats()
+	log.Printf("Restored %d records, %d skipped, %d expired",
+		stats.GetRecordsInserted(), stats.GetRecordsSkipped(), stats.GetRecordsExpired())
 }

@@ -23,11 +23,11 @@ const (
 	HandlerTypeRestore HandlerType = "restore"
 )
 
-func WithHandler(logger *slog.Logger, id string, handlerType HandlerType, storageTpe string) *slog.Logger {
+func WithHandler(logger *slog.Logger, id string, handlerType HandlerType, storageType string) *slog.Logger {
 	group := slog.Group("handler",
 		slog.String("id", id),
 		slog.String("type", string(handlerType)),
-		slog.String("storage", storageTpe),
+		slog.String("storage", storageType),
 	)
 
 	return logger.With(group)

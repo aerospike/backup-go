@@ -3,400 +3,221 @@
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/aerospike/backup-go)](https://pkg.go.dev/github.com/aerospike/backup-go)
 [![codecov](https://codecov.io/gh/aerospike/backup-go/graph/badge.svg?token=S0gfl2zCcZ)](https://codecov.io/gh/aerospike/backup-go)
 
-A Go library for backing up and restoring [Aerospike](https://aerospike.com/) data, with support for both standard and
-transactionally consistent backups.
+A Go library for backing up and restoring [Aerospike](https://aerospike.com/) data.
+
+Backups are written in the ASB (Aerospike Backup) text format, optionally compressed and
+encrypted, to a local directory or to S3, Google Cloud Storage or Azure Blob Storage.
 
 ## Official tools powered by this library
+
 - [Aerospike Backup Service](https://github.com/aerospike/aerospike-backup-service)
 - [Aerospike Backup CLI](https://github.com/aerospike/absctl)
 
-## Features
+## Install
 
-- Standard backup and restore operations
-- Flexible backup configurations including:
-  - Partition-based backups
-  - Node-based backups
-  - Incremental backups using modification time filters
-  - Compression (ZSTD)
-  - Encryption (AES-128/256)
-  - [Secret Agent](https://aerospike.com/docs/tools/secret-agent) integration
-- Multiple backup formats:
-  - ASB (Aerospike Backup) text format
-- Configurable parallelism for both reading and writing
-- Support for backup file size limits and state preservation
-- Bandwidth and records-per-second rate limiting
+```bash
+go get github.com/aerospike/backup-go
+```
 
-## Design
+Requires Go 1.25+ and [Aerospike Go client](https://github.com/aerospike/aerospike-client-go) v8.
 
-This Aerospike backup package is built around the [Aerospike Go client](https://github.com/aerospike/aerospike-client-go).
-The package uses a client structure to start backup and restore jobs. The client structure is thread safe,
-backup and restore jobs can be started in multiple goroutines. When the client is used to start backup and restore
-jobs, a handler is immediately returned that is used to check the job's status, errors, and wait for it to finish.
+## Stability
 
-### Key Components
+This module is at **v0.x and makes no API compatibility promise**. Exported names may change
+in any release. Pin an exact version and read the release notes before upgrading.
 
-- **Client**: The main entry point for backup operations
-- **Writers/Readers**: Handle backup data I/O
-- **Configurations**: Define backup/restore behavior
+## How it works
 
-## Usage
+A `Client` wraps an Aerospike client and starts jobs. Every job is asynchronous: the call
+returns a handler as soon as the job starts, and the handler is used to wait for the result
+and to read stats and metrics. A `Client` is safe for concurrent use.
 
-### Standard Backup
+Three operations are available:
 
-The regular backup operation backs up data from an Aerospike database based on a user-defined
-configuration. First, a scan operation uses the configured scope to query the database and
-retrieve matching records. Then, a decoder converts the retrieved data into the `asb` format,
-which is subsequently stored by a supported writer.
+| Method | Purpose |
+| --- | --- |
+| `Client.Backup(ctx, cfg, writer, reader)` | Read records from a cluster and write a backup. The `reader` is only used to resume from a state file; pass `nil` otherwise. |
+| `Client.Restore(ctx, cfg, reader)` | Read a backup and write the records back into a cluster. |
+| `Client.Estimate(ctx, cfg, samples)` | Sample records to predict the backup size, writing nothing. |
+
+The context given to `Backup` and `Restore` governs the job itself — canceling it stops the
+job. The context given to `Wait` governs only the waiting, so it may be a different one.
+
+## Backup
 
 ```go
-package main
+asClient, aerr := aerospike.NewClient("127.0.0.1", 3000)
+if aerr != nil {
+	log.Fatal(aerr)
+}
 
-import (
-	"context"
-	"log"
+backupClient, err := backup.NewClient(asClient)
+if err != nil {
+	log.Fatal(err)
+}
 
-	"github.com/aerospike/aerospike-client-go/v8"
-	"github.com/aerospike/backup-go"
-	"github.com/aerospike/backup-go/io/storage/local"
-	"github.com/aerospike/backup-go/io/storage/options"
+ctx := context.Background()
+
+// For a backup to a single file use options.WithFile(fileName).
+writer, err := local.NewWriter(
+	ctx,
+	options.WithRemoveFiles(),
+	options.WithDir("backups_folder"),
 )
-
-func main() {
-	// Create Aerospike client.
-	aerospikeClient, aerr := aerospike.NewClient("127.0.0.1", 3000)
-	if aerr != nil {
-		log.Fatal(aerr)
-	}
-
-	// Create backup client.
-	backupClient, err := backup.NewClient(aerospikeClient)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	ctx := context.Background()
-
-	// Configure writers for backup.
-	// For backup to single file use local.WithFile(fileName).
-	writers, err := local.NewWriter(
-		ctx,
-		options.WithRemoveFiles(),
-		options.WithDir("backups_folder"),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Configure backup.
-	backupCfg := backup.NewDefaultBackupConfig()
-	backupCfg.Namespace = "test"
-	backupCfg.ParallelRead = 10
-	backupCfg.ParallelWrite = 10
-
-	// Start backup.
-	backupHandler, err := backupClient.Backup(ctx, backupCfg, writers, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Wait for completion.
-	// Use backupHandler.Wait(ctx) to wait for the job to finish or fail.
-	// You can use different context here, and if it is canceled
-	// backupClient.Backup(ctx, backupCfg, writers) context will be cancelled too.
-	if err = backupHandler.Wait(ctx); err != nil {
-		log.Printf("Backup failed: %v", err)
-	}
+if err != nil {
+	log.Fatal(err)
 }
+
+cfg := backup.NewDefaultBackupConfig()
+cfg.Namespace = "source-ns" // defaults to "test", so set it explicitly
+cfg.ParallelRead = 10
+cfg.ParallelWrite = 10
+
+// The last argument is a reader, needed only to resume from a state file.
+handler, err := backupClient.Backup(ctx, cfg, writer, nil)
+if err != nil {
+	log.Fatal(err)
+}
+
+if err := handler.Wait(ctx); err != nil {
+	log.Printf("Backup failed: %v", err)
+}
+
+stats := handler.GetStats()
 ```
 
-### Restore
-
-The restore operation reads backup files `asb` formats and restores them using
-the configured backup client.
+## Restore
 
 ```go
-func main() {
-    // ... create clients as above ...
-
-    // Configure restore
-    restoreCfg := backup.NewDefaultRestoreConfig()
-    restoreCfg.Parallel = 5
-
-    // Optional: configure namespace mapping
-    source := "source-ns"
-    dest := "dest-ns"
-    restoreCfg.Namespace = &backup.RestoreNamespaceConfig{
-        Source:      &source,
-        Destination: &dest,
-    }
-
-    // Create reader for restore
-    reader, err := local.NewReader(
-        options.WithValidator(asb.NewValidator()),
-        options.WithDir("backups_folder"),
-    )
-    if err != nil {
-        panic(err)
-    }
-
-    // Start restore
-    restoreHandler, err := backupClient.Restore(ctx, restoreCfg, reader)
-    if err != nil {
-        panic(err)
-    }
-
-    // Wait for completion
-    if err = restoreHandler.Wait(ctx); err != nil {
-        log.Printf("Restore failed: %v", err)
-    }
-
-    // Check restore statistics
-    stats := restoreHandler.GetStats()
+// For a restore from a single file use options.WithFile(fileName).
+reader, err := local.NewReader(
+	ctx,
+	options.WithDir("backups_folder"),
+	options.WithValidator(asb.NewValidator()),
+)
+if err != nil {
+	log.Fatal(err)
 }
+
+cfg := backup.NewDefaultRestoreConfig()
+cfg.Parallel = 5
+
+// Optional: restore into a different namespace.
+source, dest := "source-ns", "dest-ns"
+cfg.Namespace = &backup.RestoreNamespaceConfig{
+	Source:      &source,
+	Destination: &dest,
+}
+
+handler, err := backupClient.Restore(ctx, cfg, reader)
+if err != nil {
+	log.Fatal(err)
+}
+
+if err := handler.Wait(ctx); err != nil {
+	log.Printf("Restore failed: %v", err)
+}
+
+stats := handler.GetStats()
 ```
-## Configuration Options
 
-<details>
-<summary>Backup Configuration</summary>
+A complete, compiling program that does both is in
+[examples/readme/main.go](examples/readme/main.go). The `examples` directory also has
+runnable programs for [S3](examples/aws/s3/main.go),
+[GCP](examples/gcp/storage/main.go) and [Azure](examples/azure/blob/main.go).
 
-### Backup Configuration
+## Storage backends
+
+A destination is a `Writer`, a source is a `StreamingReader`. All backends take the shared
+functional options from `io/storage/options`, so switching storage means swapping the
+constructor.
+
+| Import | Storage |
+| --- | --- |
+| `github.com/aerospike/backup-go/io/storage/local` | Local directory or file |
+| `github.com/aerospike/backup-go/io/storage/aws/s3` | AWS S3 and S3-compatible |
+| `github.com/aerospike/backup-go/io/storage/gcp/storage` | Google Cloud Storage |
+| `github.com/aerospike/backup-go/io/storage/azure/blob` | Azure Blob Storage |
+| `github.com/aerospike/backup-go/io/storage/std` | stdin / stdout |
+
+## Supported imports
+
+These import paths are what consumers are expected to use:
+
+- `github.com/aerospike/backup-go` — clients, configs, handlers
+- `github.com/aerospike/backup-go/models` — stats, metrics, retry policy
+- `github.com/aerospike/backup-go/io/storage/...` — storage backends and their options
+- `github.com/aerospike/backup-go/io/encoding/asb` — ASB format and its file validator
+- `github.com/aerospike/backup-go/pkg/asinfo` — Aerospike info command client
+- `github.com/aerospike/backup-go/pkg/secret-agent` — Secret Agent client
+
+Packages under `pkg/server` are **under active development** and change without notice.
+
+Everything else is a building block of the library rather than part of its supported
+surface, and may change in any release — in particular `pipe`, `io/aerospike`,
+`io/compression`, `io/encryption`, `io/counter`, `io/lazy`, `io/sized`, `pkg/estimates`, and
+everything under `internal/`. Compression and encryption are configured through
+`CompressionPolicy` and `EncryptionPolicy` on the config, not by importing those packages
+directly.
+
+## Configuration
+
+Configs are plain structs created by `NewDefaultBackupConfig` and `NewDefaultRestoreConfig`,
+then adjusted field by field. Every field is documented on
+[pkg.go.dev](https://pkg.go.dev/github.com/aerospike/backup-go#ConfigBackup) — scope
+(`Namespace`, `SetList`, `NodeList`, `RackList`, `PartitionFilters`), incremental filters
+(`ModAfter`, `ModBefore`, `NoTTLOnly`), parallelism, rate limiting (`RecordsPerSecond` and
+`Bandwidth`, raw bytes per second applied as given), output (`FileLimit`, `OutputFilePrefix`)
+and resume (`StateFile` with `Continue`).
+
+Two behaviours worth knowing before you start:
+
+- `NewDefaultBackupConfig` sets `Namespace` to `"test"`, not to an empty string.
+- `Backup`, `Restore` and `Estimate` fill a nil `ScanPolicy` / `WritePolicy` in **on the
+  config you pass**, using a copy of the Aerospike client's default. That value stays on the
+  config after the call, so use a fresh config per operation if that matters to you.
+
+### Encryption and compression
+
+`AES-128` / `AES-256`, with the key read from a file, an environment variable or the
+[Secret Agent](https://aerospike.com/docs/tools/secret-agent), and ZSTD compression. The same
+policies must be set on the restore config to read such a backup back.
 
 ```go
-type ConfigBackup struct {
-    // InfoPolicy applies to Aerospike Info requests made during backup and
-    // restore. If nil, the Aerospike client's default policy will be used.
-    InfoPolicy *a.InfoPolicy
-    // ScanPolicy applies to Aerospike scan operations made during backup and
-    // restore. If nil, the Aerospike client's default policy will be used.
-    ScanPolicy *a.ScanPolicy
-    // Only include records that last changed before the given time (optional).
-    ModBefore *time.Time
-    // Only include records that last changed after the given time (optional).
-    ModAfter *time.Time
-    // Encryption details.
-    EncryptionPolicy *EncryptionPolicy
-    // Compression details.
-    CompressionPolicy *CompressionPolicy
-    // Secret agent config.
-    SecretAgentConfig *SecretAgentConfig
-    // PartitionFilters specifies the Aerospike partitions to back up.
-    // Partition filters can be ranges, individual partitions,
-    // or records after a specific digest within a single partition.
-    // Note:
-    // if not default partition filter NewPartitionFilterAll() is used,
-    // each partition filter is an individual task which cannot be parallelized,
-    // so you can only achieve as much parallelism as there are partition filters.
-    // You may increase parallelism by dividing up partition ranges manually.
-    // AfterDigest:
-    // afterDigest filter can be applied with
-    // NewPartitionFilterAfterDigest(namespace, digest string) (*a.PartitionFilter, error)
-    // Backup records after record digest in record's partition plus all succeeding partitions.
-    // Used to resume backup with last record received from previous incomplete backup.
-    // This parameter will overwrite PartitionFilters.Begin value.
-    // Can't be used in full backup mode.
-    // This parameter is mutually exclusive with partition-list (not implemented).
-    // Format: base64 encoded string.
-    // Example: EjRWeJq83vEjRRI0VniavN7xI0U=
-    PartitionFilters []*a.PartitionFilter
-    // Namespace is the Aerospike namespace to back up.
-    Namespace string
-    // NodeList contains a list of nodes to back up.
-    // <IP addr 1>:<port 1>[,<IP addr 2>:<port 2>[,...]]
-    // <IP addr 1>:<TLS_NAME 1>:<port 1>[,<IP addr 2>:<TLS_NAME 2>:<port 2>[,...]]
-    // Backup the given cluster nodes only.
-    // If it is set, ParallelNodes automatically set to true.
-    // This argument is mutually exclusive with partition-list/AfterDigest arguments.
-    NodeList []string
-    // SetList is the Aerospike set to back up (optional, given an empty list,
-    // all sets will be backed up).
-    SetList []string
-    // The list of backup bin names
-    // (optional, given an empty list, all bins will be backed up)
-    BinList []string
-    // ParallelNodes specifies how to perform scan.
-    // If set to true, we launch parallel workers for nodes; otherwise workers run in parallel for partitions.
-    // Excludes PartitionFilters param.
-    ParallelNodes bool
-    // ParallelRead is the number of concurrent scans to run against the Aerospike cluster.
-    ParallelRead int
-    // ParallelWrite is the number of concurrent backup files writing.
-    ParallelWrite int
-    // Don't back up any records.
-    NoRecords bool
-    // Don't back up any secondary indexes.
-    NoIndexes bool
-    // Don't back up any UDFs.
-    NoUDFs bool
-    // RecordsPerSecond limits backup records per second (rps) rate.
-    // Will not apply rps limit if RecordsPerSecond is zero (default).
-    RecordsPerSecond int
-    // Limits backup bandwidth (bytes per second).
-    // Will not apply rps limit if Bandwidth is zero (default).
-    Bandwidth int
-    // File size limit (in bytes) for the backup. If a backup file exceeds this
-    // size threshold, a new file will be created. 0 for no file size limit.
-    FileLimit int64
-    // Do not apply base-64 encoding to BLOBs: Bytes, HLL, RawMap, RawList.
-    // Results in smaller backup files.
-    Compact bool
-    // Only include records that have no ttl set (persistent records).
-    NoTTLOnly bool
-    // Name of a state file that will be saved in backup directory.
-    // Works only with FileLimit parameter.
-    // As we reach FileLimit and close file, the current state will be saved.
-    // Works only for default and/or partition backup.
-    // Not work with ParallelNodes or NodeList.
-    StateFile string
-    // Resumes an interrupted/failed backup from where it was left off, given the .state file
-    // that was generated from the interrupted/failed run.
-    // Works only for default and/or partition backup. Not work with ParallelNodes or NodeList.
-    Continue bool
-    // How many records will be read on one iteration for continuation backup.
-    // Affects size if overlap on resuming backup after an error.
-    // By default, it must be zero. If any value is set, reading from Aerospike will be paginated.
-    // Which affects the performance and RAM usage.
-    PageSize int64
-    // If set to true, the same number of workers will be created for each stage of the pipeline.
-    // Each worker will be connected to the next stage worker with a separate unbuffered channel.
-    PipelinesMode pipeline.Mode
-    // When using directory parameter, prepend a prefix to the names of the generated files.
-    OutputFilePrefix string
-    // Retry policy for info commands.
-    InfoRetryPolicy *models.RetryPolicy
+cfg.EncryptionPolicy = &backup.EncryptionPolicy{
+	Mode:    backup.EncryptAES256,
+	KeyFile: &keyFilePath,
+}
+cfg.CompressionPolicy = &backup.CompressionPolicy{
+	Mode:  backup.CompressZSTD,
+	Level: 3,
 }
 ```
-</details>
 
-<details>
-<summary>Restore Configuration</summary>
-
-### Restore Configuration
+### Partition filters
 
 ```go
-type ConfigRestore struct {
-    // InfoPolicy applies to Aerospike Info requests made during backup and restore
-    // If nil, the Aerospike client's default policy will be used.
-    InfoPolicy *a.InfoPolicy
-    // WritePolicy applies to Aerospike write operations made during backup and restore
-    // If nil, the Aerospike client's default policy will be used.
-    WritePolicy *a.WritePolicy
-    // Namespace details for the restore operation.
-    // By default, the data is restored to the namespace from which it was taken.
-    Namespace *RestoreNamespaceConfig `json:"namespace,omitempty"`
-    // Encryption details.
-    EncryptionPolicy *EncryptionPolicy
-    // Compression details.
-    CompressionPolicy *CompressionPolicy
-    // Configuration of retries for each restore write operation.
-    // If nil, no retries will be performed.
-    RetryPolicy *models.RetryPolicy
-    // Secret agent config.
-    SecretAgentConfig *SecretAgentConfig
-    // The sets to restore (optional, given an empty list, all sets will be restored).
-    SetList []string
-    // The bins to restore (optional, given an empty list, all bins will be restored).
-    BinList []string
-    // Parallel is the number of concurrent record readers from backup files.
-    Parallel int
-    // RecordsPerSecond limits restore records per second (rps) rate.
-    // Will not apply rps limit if RecordsPerSecond is zero (default).
-    RecordsPerSecond int
-    // Limits restore bandwidth (bytes per second).
-    // Will not apply rps limit if Bandwidth is zero (default).
-    Bandwidth int
-    // Don't restore any records.
-    NoRecords bool
-    // Don't restore any secondary indexes.
-    NoIndexes bool
-    // Don't restore any UDFs.
-    NoUDFs bool
-    // Disables the use of batch writes when restoring records to the Aerospike cluster.
-    DisableBatchWrites bool
-    // The max allowed number of records per batch write call.
-    BatchSize int
-    // Max number of parallel writers to target AS cluster.
-    MaxAsyncBatches int
-    // Amount of extra time-to-live to add to records that have expirable void-times.
-    // Must be set in seconds.
-    ExtraTTL int64
-    // Ignore permanent record-specific error.
-    // E.g.: AEROSPIKE_RECORD_TOO_BIG.
-    // By default, such errors are not ignored and restore terminates.
-    IgnoreRecordError bool
-    // Retry policy for info commands.
-    InfoRetryPolicy *models.RetryPolicy
+cfg.PartitionFilters = []*aerospike.PartitionFilter{
+	backup.NewPartitionFilterByRange(0, 100),
+	backup.NewPartitionFilterByID(200),
 }
-```
-</details>
 
-## Advanced Features
-
-### Encryption
-
-The library supports `AES-128` and `AES-256` encryption with keys from:
-- Files
-- Environment variables
-- Aerospike Secret Agent
-
-```go
-// For backup encryption.
-backupCfg.EncryptionPolicy = &backup.EncryptionPolicy{
-    Mode:     backup.EncryptAES256,
-    KeyFile:  &keyFilePath,
+// The digest-based constructors also return an error.
+afterDigest, err := backup.NewPartitionFilterAfterDigest("source-ns", "/+Ptyjj06wW9zx0AnxOmq45xJzs=")
+if err != nil {
+	log.Fatal(err)
 }
+
+cfg.PartitionFilters = append(cfg.PartitionFilters, afterDigest)
 ```
 
-```go
-// For restore encrypted backup.
-restoreCfg.EncryptionPolicy = &backup.EncryptionPolicy{
-    Mode:     backup.EncryptAES256,
-    KeyFile:  &keyFilePath,
-}
-```
+Each filter is a separate task that cannot be split further, so parallelism is capped by the
+number of filters. Split ranges manually to get more.
 
-### Compression
+## Contributing
 
-ZSTD compression is supported with configurable compression levels:
-
-```go
-// For backup compression.
-backupCfg.CompressionPolicy = &backup.CompressionPolicy{
-    Mode:  backup.CompressZSTD,
-    Level: 3,
-}
-```
-
-```go
-// For restore compressed backup.
-restoreCfg.CompressionPolicy = &backup.CompressionPolicy{
-    Mode:  backup.CompressZSTD,
-    Level: 3,
-}
-```
-
-### Partition Filters
-
-Backup specific partitions or ranges:
-
-```go
-backupCfg.PartitionFilters = []*aerospike.PartitionFilter{
-  // Filter by partition range.
-  backup.NewPartitionFilterByRange(0, 100),
-  // Filter by partition id.
-  backup.NewPartitionFilterByID(200),
-  // Filter by partition by exact partition digest.
-  backup.NewPartitionFilterByDigest("source-ns1", "/+Ptyjj06wW9zx0AnxOmq45xJzs=")
-  // Filter all records after digest.
-  backup.NewPartitionFilterAfterDigest("source-ns1", "/+Ptyjj06wW9zx0AnxOmq45xJzs=")
-}
-```
-
-## Prerequisites
-
-- Go v1.23.0+
-- [Aerospike Go client](https://github.com/aerospike/aerospike-client-go) v8
-- [Mockery](https://github.com/vektra/mockery) for test mocks
+See [CONTRIBUTING.md](CONTRIBUTING.md) for build, test and mock generation.
 
 ## License
 
-Apache License, Version 2.0. See [LICENSE](LICENSE) file for details.
+Apache License, Version 2.0. See [LICENSE](LICENSE) for details.

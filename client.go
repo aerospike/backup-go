@@ -82,17 +82,23 @@ type InfoGetter interface {
 
 // Client is the main entry point for the backup package.
 // It wraps an aerospike client and provides methods to start backup and restore operations.
+//
+// A Client is safe for concurrent use: backup and restore jobs may be started
+// from multiple goroutines.
+//
 // Example usage:
 //
-//	asc, aerr := a.NewClientWithPolicy(...)	// create an aerospike client
+//	asc, aerr := a.NewClientWithPolicy(...) // create an aerospike client
 //	if aerr != nil {
 //		// handle error
 //	}
 //
-//	backupClient, err := backup.NewClient(asc)	// create a backup client
+//	backupClient, err := backup.NewClient(asc) // create a backup client
 //	if err != nil {
 //		// handle error
 //	}
+//
+//	ctx := context.Background()
 //
 //	writers, err := local.NewWriter(
 //		ctx,
@@ -103,21 +109,22 @@ type InfoGetter interface {
 //		// handle error
 //	}
 //
-//	// use the backup client to start backup and restore operations
-//	ctx := context.Background()
-//	backupHandler, err := backupClient.Backup(ctx, writers, nil)
+//	cfg := backup.NewDefaultBackupConfig()
+//	cfg.Namespace = "source-ns"
+//
+//	// the last argument is a reader, needed only to resume from a state file
+//	backupHandler, err := backupClient.Backup(ctx, cfg, writers, nil)
 //	if err != nil {
 //		// handle error
 //	}
 //
-//	// optionally, check the stats of the backup operation
-//	stats := backupHandler.Stats()
-//
 //	// use the backupHandler to wait for the backup operation to finish
-//	ctx := context.Background()
 //	if err = backupHandler.Wait(ctx); err != nil {
 //		// handle error
 //	}
+//
+//	// optionally, check the stats of the backup operation
+//	stats := backupHandler.GetStats()
 type Client struct {
 	aerospikeClient AerospikeClient
 	infoClient      InfoGetter
@@ -254,6 +261,11 @@ type BackupHandler interface {
 //   - config is the configuration for the backup operation.
 //   - writer creates new writers for the backup operation.
 //   - reader is used only for reading a state file for continuation operations.
+//
+// Backup modifies config: if config.ScanPolicy is nil, it is filled in with a
+// copy of the Aerospike client's default scan policy, and that value stays on
+// the config after the call returns. Pass a fresh config, or set ScanPolicy
+// explicitly, if you reuse the same config for several operations.
 func (c *Client) Backup(
 	ctx context.Context,
 	config *ConfigBackup,
@@ -268,7 +280,8 @@ func (c *Client) Backup(
 		return nil, fmt.Errorf("aerospike client is nil")
 	}
 
-	// copy the policies so we don't modify the original
+	// Fill in the default policy on the caller's config. The default itself is
+	// copied, so the Aerospike client's own policy is not modified.
 	config.ScanPolicy = c.getUsableScanPolicy(config.ScanPolicy)
 
 	if err := config.validate(); err != nil {
@@ -309,6 +322,11 @@ type RestoreHandler interface {
 //   - ctx can be used to cancel the restore operation.
 //   - config is the configuration for the restore operation.
 //   - streamingReader provides readers with access to backup data.
+//
+// Restore modifies config: if config.WritePolicy is nil, it is filled in with a
+// copy of the Aerospike client's default write policy, and that value stays on
+// the config after the call returns. Pass a fresh config, or set WritePolicy
+// explicitly, if you reuse the same config for several operations.
 func (c *Client) Restore(
 	ctx context.Context,
 	config *ConfigRestore,
@@ -322,7 +340,8 @@ func (c *Client) Restore(
 		return nil, fmt.Errorf("aerospike client is nil")
 	}
 
-	// copy the policies so we don't modify the original
+	// Fill in the default policy on the caller.s config. The default itself is
+	// copied, so the Aerospike client.s own policy is not modified.
 	config.WritePolicy = c.getUsableWritePolicy(config.WritePolicy)
 
 	if err := config.validate(); err != nil {
@@ -363,6 +382,9 @@ func (c *Client) InfoClient() InfoGetter {
 //   - ctx can be used to cancel the calculation operation.
 //   - config is the backup configuration for the calculation operation.
 //   - estimateSamples is the number of records to be scanned for calculations.
+//
+// Like [Client.Backup], Estimate fills a nil config.ScanPolicy in on the passed
+// config, and that value stays there after the call returns.
 func (c *Client) Estimate(
 	ctx context.Context,
 	config *ConfigBackup,
@@ -375,7 +397,8 @@ func (c *Client) Estimate(
 		return 0, fmt.Errorf("aerospike client is nil")
 	}
 
-	// copy the policies so we don't modify the original
+	// Fill in the default policy on the caller's config. The default itself is
+	// copied, so the Aerospike client's own policy is not modified.
 	config.ScanPolicy = c.getUsableScanPolicy(config.ScanPolicy)
 
 	if err := config.validate(); err != nil {

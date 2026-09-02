@@ -48,12 +48,11 @@ type ConfigRestore struct {
 	// RecordsPerSecond limits restore records per second (rps) rate.
 	// Will not apply rps limit if RecordsPerSecond is zero (default).
 	RecordsPerSecond int
-	// Limits restore bandwidth (bytes per second).
-	// The lower bound is 8MiB (maximum size of the Aerospike record).
-	// Effective limit value is calculated using the formula:
-	// Bandwidth * base64ratio + metaOverhead
-	// Where: base64ratio = 1.34, metaOverhead = 16 * 1024
-	// Will not apply rps limit if Bandwidth is zero (default).
+	// Bandwidth limits the restore read rate, in bytes per second.
+	// The value is applied as given, with no adjustment.
+	// It is measured on the encoded size of the records read from the backup,
+	// not on the write traffic sent to the Aerospike cluster.
+	// Will not apply a bandwidth limit if Bandwidth is zero (default).
 	Bandwidth int64
 	// Don't restore any records.
 	NoRecords bool
@@ -74,7 +73,7 @@ type ConfigRestore struct {
 	// E.g.: AEROSPIKE_RECORD_TOO_BIG.
 	// By default, such errors are not ignored and restore terminates.
 	IgnoreRecordError bool
-	// MetricsEnabled indicates whether backup metrics collection and reporting are enabled.
+	// MetricsEnabled indicates whether restore metrics collection and reporting are enabled.
 	MetricsEnabled bool
 	// ValidateOnly indicates whether restore should only validate the backup files.
 	ValidateOnly bool
@@ -97,7 +96,8 @@ func NewDefaultRestoreConfig() *ConfigRestore {
 
 func (c *ConfigRestore) validate() error {
 	if c.Parallel < MinParallel || c.Parallel > MaxParallel {
-		return fmt.Errorf("parallel must be between 1 and 1024, got %d", c.Parallel)
+		return fmt.Errorf("parallel must be between %d and %d, got %d",
+			MinParallel, MaxParallel, c.Parallel)
 	}
 
 	if err := c.Namespace.validate(); err != nil {

@@ -34,7 +34,7 @@ func TestFanout_Validation(t *testing.T) {
 	inputs := make([]chan *models.Token, testParallel)
 	outputs := make([]chan *models.Token, testParallel*2)
 
-	fan, err := NewFanout[*models.Token](inputs, outputs, Fixed)
+	fan, err := NewFanout(inputs, outputs, Fixed)
 	require.Nil(t, fan)
 	require.ErrorContains(t, err, "number for Fixed strategy")
 }
@@ -53,7 +53,7 @@ func TestFanout_RunDefault(t *testing.T) {
 		outputs[i] = make(chan *models.Token, testBuffer)
 	}
 
-	fan, err := NewFanout[*models.Token](inputs, outputs, RoundRobin)
+	fan, err := NewFanout(inputs, outputs, RoundRobin)
 	require.NoError(t, err)
 
 	// Generate data.
@@ -103,7 +103,7 @@ func TestFanout_RunStraight(t *testing.T) {
 		outputs[i] = make(chan *models.Token, testBuffer)
 	}
 
-	fan, err := NewFanout[*models.Token](inputs, outputs, Fixed)
+	fan, err := NewFanout(inputs, outputs, Fixed)
 	require.NoError(t, err)
 
 	// Generate data.
@@ -155,7 +155,7 @@ func TestFanout_RunDefaultContextCancel(t *testing.T) {
 		outputs[i] = make(chan *models.Token, testBuffer)
 	}
 
-	fan, err := NewFanout[*models.Token](inputs, outputs, RoundRobin)
+	fan, err := NewFanout(inputs, outputs, RoundRobin)
 	require.NoError(t, err)
 
 	// Generate data.
@@ -211,7 +211,7 @@ func TestFanout_RunStraightContextCancel(t *testing.T) {
 		outputs[i] = make(chan *models.Token, testBuffer)
 	}
 
-	fan, err := NewFanout[*models.Token](inputs, outputs, Fixed)
+	fan, err := NewFanout(inputs, outputs, Fixed)
 	require.NoError(t, err)
 
 	// Generate data.

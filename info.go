@@ -22,8 +22,6 @@ import (
 )
 
 // ClusterInfo provides cluster metadata and introspection for client-side backup and restore.
-//
-//go:generate mockery --name ClusterInfo
 type ClusterInfo interface {
 	GetRecordCount(ctx context.Context, namespace string, sets []string) (uint64, error)
 	GetRackNodes(ctx context.Context, rackID int) ([]string, error)
@@ -42,8 +40,6 @@ type ClusterInfo interface {
 }
 
 // ServerBackupInfo provides server-side backup and restore job control.
-//
-//go:generate mockery --name BackupInfo
 type ServerBackupInfo interface {
 	StartServerBackup(ctx context.Context, request *infoModels.RequestBackup) (string, error)
 	StartServerRestore(ctx context.Context, request *infoModels.RequestRestore) error

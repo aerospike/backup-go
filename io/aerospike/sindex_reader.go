@@ -25,8 +25,6 @@ import (
 )
 
 // sindexGetter is an interface for getting secondary indexes.
-//
-//go:generate mockery --name sindexGetter
 type sindexGetter interface {
 	GetSIndexes(ctx context.Context, namespace string) ([]*models.SIndex, error)
 }

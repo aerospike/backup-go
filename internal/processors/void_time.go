@@ -15,7 +15,6 @@
 package processors
 
 import (
-	"fmt"
 	"log/slog"
 
 	cltime "github.com/aerospike/backup-go/internal/citrusleaf_time"
@@ -27,7 +26,7 @@ import (
 // voidTimeSetter is a DataProcessor that sets the VoidTime of a record based on its TTL
 // It is used during backup to set the VoidTime of records from their TTL
 // The VoidTime is the time at which the record will expire and is usually what is encoded in backups
-type voidTimeSetter[T models.TokenConstraint] struct {
+type voidTimeSetter struct {
 	// getNow returns the current time since the citrusleaf epoch
 	// It is a field so that it can be mocked in tests
 	getNow func() cltime.CLTime
@@ -35,26 +34,22 @@ type voidTimeSetter[T models.TokenConstraint] struct {
 }
 
 // NewVoidTimeSetter creates a new VoidTimeProcessor
-func NewVoidTimeSetter[T models.TokenConstraint](logger *slog.Logger) Processor[T] {
+func NewVoidTimeSetter(logger *slog.Logger) Processor {
 	id := uuid.NewString()
 	logger = logging.WithProcessor(logger, id, logging.ProcessorTypeVoidTime)
 	logger.Debug("created new VoidTime processor")
 
-	return &voidTimeSetter[T]{
+	return &voidTimeSetter{
 		getNow: cltime.Now,
 		logger: logger,
 	}
 }
 
 // Process sets the VoidTime of a record based on its TTL.
-func (p *voidTimeSetter[T]) Process(token T) (T, error) {
-	t, ok := any(token).(*models.Token)
-	if !ok {
-		return nil, fmt.Errorf("unsupported token type %T for void time", token)
-	}
+func (p *voidTimeSetter) Process(t *models.Token) (*models.Token, error) {
 	// if the token is not a record, we don't need to process it
 	if t.Type != models.TokenTypeRecord {
-		return token, nil
+		return t, nil
 	}
 
 	record := t.Record
@@ -66,5 +61,5 @@ func (p *voidTimeSetter[T]) Process(token T) (T, error) {
 		record.VoidTime = now.Seconds + int64(record.Expiration)
 	}
 
-	return any(t).(T), nil
+	return t, nil
 }

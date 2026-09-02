@@ -23,7 +23,7 @@ import (
 
 // tpsLimiter is a type representing a Token Per Second limiter.
 // it does not allow processing more than tps amount of tokens per second.
-type tpsLimiter[T models.TokenConstraint] struct {
+type tpsLimiter struct {
 	ctx     context.Context
 	limiter *rate.Limiter
 	tps     int
@@ -31,12 +31,12 @@ type tpsLimiter[T models.TokenConstraint] struct {
 
 // NewTPSLimiter Create a new TPS limiter.
 // n — allowed  number of tokens per second, n = 0 means no limit.
-func NewTPSLimiter[T models.TokenConstraint](ctx context.Context, n int) Processor[T] {
+func NewTPSLimiter(ctx context.Context, n int) Processor {
 	if n == 0 {
-		return &noopProcessor[T]{}
+		return &noopProcessor{}
 	}
 
-	return &tpsLimiter[T]{
+	return &tpsLimiter{
 		ctx:     ctx,
 		tps:     n,
 		limiter: rate.NewLimiter(rate.Limit(n), 1),
@@ -44,13 +44,13 @@ func NewTPSLimiter[T models.TokenConstraint](ctx context.Context, n int) Process
 }
 
 // Process delays pipeline if it's needed to match desired rate.
-func (t *tpsLimiter[T]) Process(token T) (T, error) {
+func (t *tpsLimiter) Process(token *models.Token) (*models.Token, error) {
 	if t.tps == 0 {
 		return token, nil
 	}
 
 	if err := t.limiter.Wait(t.ctx); err != nil {
-		var zero T
+		var zero *models.Token
 		return zero, err
 	}
 

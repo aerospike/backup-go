@@ -36,7 +36,7 @@ type recordWriter interface {
 // RestoreWriter satisfies the DataWriter interface.
 // It writes the types from the models package to an Aerospike client
 // It is used to restore data from a backup.
-type RestoreWriter[T models.TokenConstraint] struct {
+type RestoreWriter struct {
 	*sindexWriter
 	*udfWriter
 	recordWriter
@@ -44,7 +44,7 @@ type RestoreWriter[T models.TokenConstraint] struct {
 }
 
 // NewRestoreWriter creates a new RestoreWriter.
-func NewRestoreWriter[T models.TokenConstraint](
+func NewRestoreWriter(
 	ctx context.Context,
 	asc dbWriter,
 	writePolicy *a.WritePolicy,
@@ -55,7 +55,7 @@ func NewRestoreWriter[T models.TokenConstraint](
 	retryPolicy *models.RetryPolicy,
 	rpsCollector *metrics.Collector,
 	ignoreRecordError bool,
-) *RestoreWriter[T] {
+) *RestoreWriter {
 	logger = logging.WithWriter(logger, uuid.NewString(), logging.WriterTypeRestore)
 	logger.Debug("created new restore writer",
 		slog.Bool("useBatchWrites", useBatchWrites),
@@ -63,7 +63,7 @@ func NewRestoreWriter[T models.TokenConstraint](
 		slog.Bool("ignoreRecordError", ignoreRecordError),
 	)
 
-	return &RestoreWriter[T]{
+	return &RestoreWriter{
 		sindexWriter: newSindexWriter(ctx, asc, writePolicy, retryPolicy, logger),
 		udfWriter:    newUdfWriter(ctx, asc, writePolicy, retryPolicy, logger),
 		recordWriter: newRecordWriter(
@@ -121,7 +121,7 @@ func newRecordWriter(
 }
 
 // Write writes the types from the models package to an Aerospike DB.
-func (rw *RestoreWriter[T]) Write(data T) (int, error) {
+func (rw *RestoreWriter) Write(data *models.Token) (int, error) {
 	switch v := any(data).(type) {
 	case *models.Token:
 		return rw.writeToken(v)
@@ -130,7 +130,7 @@ func (rw *RestoreWriter[T]) Write(data T) (int, error) {
 	}
 }
 
-func (rw *RestoreWriter[T]) writeToken(token *models.Token) (int, error) {
+func (rw *RestoreWriter) writeToken(token *models.Token) (int, error) {
 	switch token.Type {
 	case models.TokenTypeRecord:
 		return int(token.Size), rw.writeRecord(token.Record)
@@ -146,7 +146,7 @@ func (rw *RestoreWriter[T]) writeToken(token *models.Token) (int, error) {
 }
 
 // Close satisfies the pipe.Writer interface.
-func (rw *RestoreWriter[T]) Close() error {
+func (rw *RestoreWriter) Close() error {
 	rw.logger.Debug("close restore writer")
 	return rw.close()
 }

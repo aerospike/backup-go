@@ -25,15 +25,15 @@ import (
 // Pool is a pool of chains.
 // All chains in a pool are running in parallel.
 // Pools are communicating via fanout.
-type Pool[T models.TokenConstraint] struct {
-	Chains []*Chain[T]
+type Pool struct {
+	Chains []*Chain
 	// Outputs and Inputs are mutually exclusive.
-	Inputs  []chan T
-	Outputs []chan T
+	Inputs  []chan *models.Token
+	Outputs []chan *models.Token
 }
 
 // Run runs all chains in the pool.
-func (p *Pool[T]) Run(ctx context.Context) error {
+func (p *Pool) Run(ctx context.Context) error {
 	errGroup, ctx := errgroup.WithContext(ctx)
 
 	for i := range p.Chains {
@@ -48,19 +48,19 @@ func (p *Pool[T]) Run(ctx context.Context) error {
 }
 
 // ProcessorCreator is a function type that defines a creator for a Processor.
-type ProcessorCreator[T models.TokenConstraint] func() Processor[T]
+type ProcessorCreator func() Processor
 
 // NewReaderPool returns a new pool of Reader and Processor chains for backup operations,
 // with the specified parallelism.
-func NewReaderPool[T models.TokenConstraint](readers []Reader[T], pc ProcessorCreator[T]) *Pool[T] {
-	chains := make([]*Chain[T], len(readers))
-	outputs := make([]chan T, len(readers))
+func NewReaderPool(readers []Reader, pc ProcessorCreator) *Pool {
+	chains := make([]*Chain, len(readers))
+	outputs := make([]chan *models.Token, len(readers))
 
 	for i := range readers {
-		chains[i], outputs[i] = NewReaderChain[T](readers[i], pc())
+		chains[i], outputs[i] = NewReaderChain(readers[i], pc())
 	}
 
-	return &Pool[T]{
+	return &Pool{
 		Chains:  chains,
 		Outputs: outputs,
 	}
@@ -68,22 +68,22 @@ func NewReaderPool[T models.TokenConstraint](readers []Reader[T], pc ProcessorCr
 
 // NewWriterPool creates a new pool of Writer chains for backup operations,
 // with the specified parallelism and bandwidth.
-func NewWriterPool[T models.TokenConstraint](writers []Writer[T], limiter *bandwidth.Limiter) *Pool[T] {
-	chains := make([]*Chain[T], len(writers))
-	inputs := make([]chan T, len(writers))
+func NewWriterPool(writers []Writer, limiter *bandwidth.Limiter) *Pool {
+	chains := make([]*Chain, len(writers))
+	inputs := make([]chan *models.Token, len(writers))
 
 	for i := range writers {
-		chains[i], inputs[i] = NewWriterChain[T](writers[i], limiter)
+		chains[i], inputs[i] = NewWriterChain(writers[i], limiter)
 	}
 
-	return &Pool[T]{
+	return &Pool{
 		Chains: chains,
 		Inputs: inputs,
 	}
 }
 
 // Close closing channels and cleaning links.
-func (p *Pool[T]) Close() {
+func (p *Pool) Close() {
 	// Nullify objects, so GC can free this memory.
 	p.Chains = nil
 	p.Inputs = nil

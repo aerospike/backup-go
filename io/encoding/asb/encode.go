@@ -29,7 +29,7 @@ import (
 
 // Encoder contains logic for encoding backup data into the .asb format.
 // This is a stateful object that must be created for every backup operation.
-type Encoder[T models.TokenConstraint] struct {
+type Encoder struct {
 	config *EncoderConfig
 
 	firstFileWritten atomic.Bool
@@ -37,19 +37,19 @@ type Encoder[T models.TokenConstraint] struct {
 }
 
 // NewEncoder creates a new Encoder.
-func NewEncoder[T models.TokenConstraint](cfg *EncoderConfig) *Encoder[T] {
-	return &Encoder[T]{
+func NewEncoder(cfg *EncoderConfig) *Encoder {
+	return &Encoder{
 		config: cfg,
 	}
 }
 
 // GenerateFilename generates a file name for the given namespace.
-func (e *Encoder[T]) GenerateFilename(prefix, suffix string) string {
+func (e *Encoder) GenerateFilename(prefix, suffix string) string {
 	return prefix + e.config.Namespace + "_" + strconv.FormatInt(e.id.Add(1), 10) + suffix + ".asb"
 }
 
 // EncodeToken encodes a token to the ASB format, writing to the provided buffer.
-func (e *Encoder[T]) EncodeToken(token T, w *bytes.Buffer) error {
+func (e *Encoder) EncodeToken(token *models.Token, w *bytes.Buffer) error {
 	t, ok := any(token).(*models.Token)
 	if !ok {
 		return fmt.Errorf("unsupported token type %T for ASB encoder", token)
@@ -82,7 +82,7 @@ func (e *Encoder[T]) EncodeToken(token T, w *bytes.Buffer) error {
 
 // GetHeader returns the header of the ASB file as a byte slice.
 // The header contains the version, namespace, and first file flag.
-func (e *Encoder[T]) GetHeader(isRecords bool) []byte {
+func (e *Encoder) GetHeader(isRecords bool) []byte {
 	// capacity is arbitrary, just probably enough to avoid reallocations
 	buff := bytes.NewBuffer(make([]byte, 0, 1024))
 
@@ -97,7 +97,7 @@ func (e *Encoder[T]) GetHeader(isRecords bool) []byte {
 	return buff.Bytes()
 }
 
-func (e *Encoder[T]) headerVersion(isRecords bool) string {
+func (e *Encoder) headerVersion(isRecords bool) string {
 	if isRecords {
 		return version31.toString()
 	}

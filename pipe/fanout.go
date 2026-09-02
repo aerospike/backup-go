@@ -40,9 +40,9 @@ const (
 
 // Fanout routes messages between chain pools.
 // FanoutStrategy controls the distribution of messages to output channels.
-type Fanout[T models.TokenConstraint] struct {
-	Inputs  []chan T
-	Outputs []chan T
+type Fanout struct {
+	Inputs  []chan *models.Token
+	Outputs []chan *models.Token
 
 	strategy FanoutStrategy
 	// for RoundRobin
@@ -50,12 +50,12 @@ type Fanout[T models.TokenConstraint] struct {
 }
 
 // NewFanout returns a new Fanout.
-func NewFanout[T models.TokenConstraint](
-	inputs []chan T,
-	outputs []chan T,
+func NewFanout(
+	inputs []chan *models.Token,
+	outputs []chan *models.Token,
 	strategy FanoutStrategy,
-) (*Fanout[T], error) {
-	f := &Fanout[T]{
+) (*Fanout, error) {
+	f := &Fanout{
 		Inputs:   inputs,
 		Outputs:  outputs,
 		strategy: strategy,
@@ -83,7 +83,7 @@ func NewFanout[T models.TokenConstraint](
 }
 
 // Run starts routing messages in separate goroutines based on the defined fanout strategy.
-func (f *Fanout[T]) Run(ctx context.Context) {
+func (f *Fanout) Run(ctx context.Context) {
 	var wg sync.WaitGroup
 
 	for i, input := range f.Inputs {
@@ -97,7 +97,7 @@ func (f *Fanout[T]) Run(ctx context.Context) {
 }
 
 // Close closes all output channels.
-func (f *Fanout[T]) Close() {
+func (f *Fanout) Close() {
 	for _, output := range f.Outputs {
 		close(output)
 	}
@@ -105,7 +105,7 @@ func (f *Fanout[T]) Close() {
 
 // processInput listens for incoming data on the input channel
 // and routes it based on the fanout strategy or context state.
-func (f *Fanout[T]) processInput(ctx context.Context, index int, input <-chan T) {
+func (f *Fanout) processInput(ctx context.Context, index int, input <-chan *models.Token) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -121,7 +121,7 @@ func (f *Fanout[T]) processInput(ctx context.Context, index int, input <-chan T)
 }
 
 // routeData routes a given piece of data based on the current fanout strategy (Fixed, RoundRobin, or Split).
-func (f *Fanout[T]) routeData(ctx context.Context, index int, data T) {
+func (f *Fanout) routeData(ctx context.Context, index int, data *models.Token) {
 	switch f.strategy {
 	case Fixed: // Send it to the current index.
 	case RoundRobin:
@@ -136,14 +136,14 @@ func (f *Fanout[T]) routeData(ctx context.Context, index int, data T) {
 }
 
 // roundRobin returns the next output chain index, distributing tokens in a fair, rotating manner.
-func (f *Fanout[T]) roundRobin(_ T) int {
+func (f *Fanout) roundRobin(_ *models.Token) int {
 	index := f.currentIndex.Add(1) % uint64(len(f.Outputs))
 
 	return int(index)
 }
 
 // GetMetrics returns the accumulated length for input and output channels.
-func (f *Fanout[T]) GetMetrics() (in, out int) {
+func (f *Fanout) GetMetrics() (in, out int) {
 	if f.Inputs != nil {
 		for _, input := range f.Inputs {
 			in += len(input)

@@ -26,8 +26,6 @@ import (
 )
 
 // udfGetter is an interface for getting UDFs.
-//
-//go:generate mockery --name udfGetter
 type udfGetter interface {
 	GetUDFs(ctx context.Context) ([]*models.UDF, error)
 }

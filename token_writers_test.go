@@ -75,7 +75,7 @@ func TestTokenWriter(t *testing.T) {
 
 	invalidToken := &models.Token{Type: models.TokenTypeInvalid}
 
-	mockEncoder := mocks.NewMockEncoder[*models.Token](t)
+	mockEncoder := mocks.NewMockEncoder(t)
 	mockEncoder.EXPECT().EncodeToken(recToken, mock.Anything).RunAndReturn(func(_ *models.Token, w *bytes.Buffer) error {
 		_, _ = w.WriteString("encoded rec ")
 		return nil
@@ -92,7 +92,7 @@ func TestTokenWriter(t *testing.T) {
 
 	b := bytes.Buffer{}
 	dst := newBufferWriteCloser(&b)
-	writer := newTokenWriter[*models.Token](mockEncoder, dst, slog.Default(), nil)
+	writer := newTokenWriter(mockEncoder, dst, slog.Default(), nil)
 	require.NotNil(t, writer)
 
 	_, err := writer.Write(recToken)
@@ -126,7 +126,7 @@ func TestTokenWriter(t *testing.T) {
 func TestTokenStatsWriter(t *testing.T) {
 	t.Parallel()
 
-	mockWriter := pipemocks.NewMockWriter[*models.Token](t)
+	mockWriter := pipemocks.NewMockWriter(t)
 
 	mockWriter.EXPECT().Write(models.NewRecordToken(&models.Record{}, 0, nil)).Return(1, nil)
 	mockWriter.EXPECT().Write(models.NewSIndexToken(&models.SIndex{}, 0)).Return(1, nil)
@@ -138,7 +138,7 @@ func TestTokenStatsWriter(t *testing.T) {
 	mockStats.EXPECT().AddUDFs(uint32(1))
 	mockStats.EXPECT().AddSIndexes(uint32(1))
 
-	writer := newWriterWithTokenStats[*models.Token](mockWriter, mockStats, slog.Default())
+	writer := newWriterWithTokenStats(mockWriter, mockStats, slog.Default())
 	require.NotNil(t, writer)
 
 	_, err := writer.Write(models.NewRecordToken(&models.Record{}, 0, nil))
@@ -160,13 +160,13 @@ func TestTokenStatsWriter(t *testing.T) {
 func TestTokenStatsWriterWriterFailed(t *testing.T) {
 	t.Parallel()
 
-	mockWriter := pipemocks.NewMockWriter[*models.Token](t)
+	mockWriter := pipemocks.NewMockWriter(t)
 
 	mockWriter.EXPECT().Write(models.NewSIndexToken(&models.SIndex{}, 0)).Return(0, errors.New("error"))
 
 	mockStats := mocks.NewMockstatsSetterToken(t)
 
-	writer := newWriterWithTokenStats[*models.Token](mockWriter, mockStats, slog.Default())
+	writer := newWriterWithTokenStats(mockWriter, mockStats, slog.Default())
 	require.NotNil(t, writer)
 
 	_, err := writer.Write(models.NewSIndexToken(&models.SIndex{}, 0))

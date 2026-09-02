@@ -20,38 +20,37 @@ import (
 	"sync"
 
 	"github.com/aerospike/backup-go/internal/bandwidth"
-	"github.com/aerospike/backup-go/models"
 	"golang.org/x/sync/errgroup"
 )
 
 // Pipe is running and managing everything.
-type Pipe[T models.TokenConstraint] struct {
-	readPool  *Pool[T]
-	writePool *Pool[T]
-	fanout    *Fanout[T]
+type Pipe struct {
+	readPool  *Pool
+	writePool *Pool
+	fanout    *Fanout
 	// Mutex used to avoid race condition on metrics check after a pipeline was stopped.
 	fanMu sync.Mutex
 }
 
 // NewPipe creates a new backup/restore pipeline.
-func NewPipe[T models.TokenConstraint](
-	pc ProcessorCreator[T],
-	readers []Reader[T],
-	writers []Writer[T],
+func NewPipe(
+	pc ProcessorCreator,
+	readers []Reader,
+	writers []Writer,
 	limiter *bandwidth.Limiter,
 	strategy FanoutStrategy,
-) (*Pipe[T], error) {
-	readPool := NewReaderPool[T](readers, pc)
-	writePool := NewWriterPool[T](writers, limiter)
+) (*Pipe, error) {
+	readPool := NewReaderPool(readers, pc)
+	writePool := NewWriterPool(writers, limiter)
 	// Swap channels!
 	// Output of readPool is an input of fanout.
 	// Input of writePool is an output of fanout.
-	fanout, err := NewFanout[T](readPool.Outputs, writePool.Inputs, strategy)
+	fanout, err := NewFanout(readPool.Outputs, writePool.Inputs, strategy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create fanout: %w", err)
 	}
 
-	return &Pipe[T]{
+	return &Pipe{
 		readPool:  readPool,
 		writePool: writePool,
 		fanout:    fanout,
@@ -59,7 +58,7 @@ func NewPipe[T models.TokenConstraint](
 }
 
 // Run starts the pipe with readers, writers and fanout.
-func (p *Pipe[T]) Run(ctx context.Context) error {
+func (p *Pipe) Run(ctx context.Context) error {
 	errGroup, ctx := errgroup.WithContext(ctx)
 
 	// Run a readers pool. Each reader in a pool has an output channel, that sends data to fanout.
@@ -82,7 +81,7 @@ func (p *Pipe[T]) Run(ctx context.Context) error {
 }
 
 // GetMetrics returns the accumulated length for input and output channels.
-func (p *Pipe[T]) GetMetrics() (in, out int) {
+func (p *Pipe) GetMetrics() (in, out int) {
 	// Lock before reading metrics from fanout.
 	p.fanMu.Lock()
 	defer p.fanMu.Unlock()
@@ -95,7 +94,7 @@ func (p *Pipe[T]) GetMetrics() (in, out int) {
 }
 
 // Close clean memory for GC.
-func (p *Pipe[T]) Close() {
+func (p *Pipe) Close() {
 	if p.readPool != nil {
 		p.readPool.Close()
 		p.readPool = nil

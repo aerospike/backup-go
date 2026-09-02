@@ -440,12 +440,12 @@ func (r *Reader) shouldSkip(name string) bool {
 	return r.Validator != nil && r.Validator.Run(name) != nil
 }
 
-// GetSize returns the size of asb/asbx file/dir that was initialized.
+// GetSize returns the size of asb file/dir that was initialized.
 func (r *Reader) GetSize() int64 {
 	return r.totalSize.Load()
 }
 
-// GetNumber returns the number of asb/asbx files/dirs that was initialized.
+// GetNumber returns the number of asb files/dirs that was initialized.
 func (r *Reader) GetNumber() int64 {
 	return r.totalNumber.Load()
 }

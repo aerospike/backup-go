@@ -28,7 +28,7 @@ import (
 )
 
 // recordReaderProcessor configures and creates record readers pipelines.
-type recordReaderProcessor[T models.TokenConstraint] struct {
+type recordReaderProcessor struct {
 	config          *ConfigBackup
 	aerospikeClient AerospikeClient
 	infoClient      ClusterInfo
@@ -41,7 +41,7 @@ type recordReaderProcessor[T models.TokenConstraint] struct {
 }
 
 // newRecordReaderProcessor returns a new record reader processor.
-func newRecordReaderProcessor[T models.TokenConstraint](
+func newRecordReaderProcessor(
 	config *ConfigBackup,
 	aerospikeClient AerospikeClient,
 	infoClient ClusterInfo,
@@ -50,10 +50,10 @@ func newRecordReaderProcessor[T models.TokenConstraint](
 	rpsCollector *metrics.Collector,
 	logger *slog.Logger,
 	throttler *aerospike.ThrottleLimiter,
-) *recordReaderProcessor[T] {
+) *recordReaderProcessor {
 	logger.Debug("created new records reader processor")
 
-	return &recordReaderProcessor[T]{
+	return &recordReaderProcessor{
 		config:          config,
 		aerospikeClient: aerospikeClient,
 		infoClient:      infoClient,
@@ -65,7 +65,7 @@ func newRecordReaderProcessor[T models.TokenConstraint](
 	}
 }
 
-func (rr *recordReaderProcessor[T]) newAerospikeReadWorkers(ctx context.Context) ([]pipe.Reader[*models.Token], error) {
+func (rr *recordReaderProcessor) newAerospikeReadWorkers(ctx context.Context) ([]pipe.Reader, error) {
 	scanPolicy := *rr.config.ScanPolicy
 
 	// we need to set the RawCDT flag
@@ -91,7 +91,7 @@ func (rr *recordReaderProcessor[T]) newAerospikeReadWorkers(ctx context.Context)
 	}
 
 	// If we have multiply partition filters, we shrink workers to number of filters.
-	readers := make([]pipe.Reader[*models.Token], len(partitionGroups))
+	readers := make([]pipe.Reader, len(partitionGroups))
 
 	// Create record readers for each partition group.
 	for i := range partitionGroups {
@@ -112,7 +112,7 @@ func (rr *recordReaderProcessor[T]) newAerospikeReadWorkers(ctx context.Context)
 }
 
 // newPartitionGroups creates the partition groups from the partition filters.
-func (rr *recordReaderProcessor[T]) newPartitionGroups() ([]*a.PartitionFilter, error) {
+func (rr *recordReaderProcessor) newPartitionGroups() ([]*a.PartitionFilter, error) {
 	var err error
 
 	partitionGroups := rr.config.PartitionFilters
@@ -135,7 +135,7 @@ func (rr *recordReaderProcessor[T]) newPartitionGroups() ([]*a.PartitionFilter, 
 }
 
 // newPartitionGroupsFromNodes creates the partition groups from the primary partitions for the configured nodes.
-func (rr *recordReaderProcessor[T]) newPartitionGroupsFromNodes(ctx context.Context) ([]*a.PartitionFilter, error) {
+func (rr *recordReaderProcessor) newPartitionGroupsFromNodes(ctx context.Context) ([]*a.PartitionFilter, error) {
 	partIDs, err := rr.getPrimaryPartitions(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get primary partitions: %w", err)
@@ -150,7 +150,7 @@ func (rr *recordReaderProcessor[T]) newPartitionGroupsFromNodes(ctx context.Cont
 }
 
 // getPrimaryPartitions gets the primary partitions for the configured nodes.
-func (rr *recordReaderProcessor[T]) getPrimaryPartitions(ctx context.Context) ([]int, error) {
+func (rr *recordReaderProcessor) getPrimaryPartitions(ctx context.Context) ([]int, error) {
 	nodes, err := rr.getNodes(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get nodes: %w", err)
@@ -176,7 +176,7 @@ func (rr *recordReaderProcessor[T]) getPrimaryPartitions(ctx context.Context) ([
 
 // getNodes gets active nodes from the cluster. The nodes are filtered by the node list and rack list
 // if provided.
-func (rr *recordReaderProcessor[T]) getNodes(ctx context.Context) ([]*a.Node, error) {
+func (rr *recordReaderProcessor) getNodes(ctx context.Context) ([]*a.Node, error) {
 	nodesToFilter := rr.config.NodeList
 
 	if len(rr.config.RackList) > 0 {
@@ -209,7 +209,7 @@ func (rr *recordReaderProcessor[T]) getNodes(ctx context.Context) ([]*a.Node, er
 
 // filterNodes iterates over the nodes and selects only those nodes that are in nodesList.
 // Returns a slice of filtered *a.Node and error.
-func (rr *recordReaderProcessor[T]) filterNodes(ctx context.Context, nodesList []string, nodes []*a.Node,
+func (rr *recordReaderProcessor) filterNodes(ctx context.Context, nodesList []string, nodes []*a.Node,
 ) ([]*a.Node, error) {
 	if len(nodesList) == 0 {
 		return nodes, nil
@@ -261,7 +261,7 @@ func (rr *recordReaderProcessor[T]) filterNodes(ctx context.Context, nodesList [
 }
 
 // newRecordReaderConfig creates a new record reader config for the given partition filter and scan policy.
-func (rr *recordReaderProcessor[T]) newRecordReaderConfig(
+func (rr *recordReaderProcessor) newRecordReaderConfig(
 	partitionFilter *a.PartitionFilter,
 	scanPolicy *a.ScanPolicy,
 ) *aerospike.RecordReaderConfig {

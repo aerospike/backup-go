@@ -28,7 +28,7 @@ import (
 )
 
 // fileReaderProcessor configures and creates file readers pipelines for restoring data.
-type fileReaderProcessor[T models.TokenConstraint] struct {
+type fileReaderProcessor struct {
 	reader StreamingReader
 	config *ConfigRestore
 
@@ -46,7 +46,7 @@ type fileReaderProcessor[T models.TokenConstraint] struct {
 
 // newFileReaderProcessor returns a new file reader processor.
 // encryptionKey is the key for decryption; pass nil when encryption is disabled.
-func newFileReaderProcessor[T models.TokenConstraint](
+func newFileReaderProcessor(
 	reader StreamingReader,
 	config *ConfigRestore,
 	encryptionKey []byte,
@@ -54,10 +54,10 @@ func newFileReaderProcessor[T models.TokenConstraint](
 	readersCh chan models.File,
 	errorsCh chan error,
 	logger *slog.Logger,
-) *fileReaderProcessor[T] {
+) *fileReaderProcessor {
 	logger.Debug("created file reader processor")
 
-	return &fileReaderProcessor[T]{
+	return &fileReaderProcessor{
 		reader:        reader,
 		config:        config,
 		encryptionKey: encryptionKey,
@@ -70,7 +70,7 @@ func newFileReaderProcessor[T models.TokenConstraint](
 }
 
 // newDataReaders creates the data readers for restoring data.
-func (fr *fileReaderProcessor[T]) newDataReaders(ctx context.Context) []pipe.Reader[T] {
+func (fr *fileReaderProcessor) newDataReaders(ctx context.Context) []pipe.Reader {
 	var skipPrefixes []string
 	if fr.config.ApplyMetadataLast {
 		skipPrefixes = []string{metadataFileNamePrefix}
@@ -79,7 +79,7 @@ func (fr *fileReaderProcessor[T]) newDataReaders(ctx context.Context) []pipe.Rea
 	// Start lazy file reading.
 	go fr.reader.StreamFiles(ctx, fr.readersCh, fr.errorsCh, skipPrefixes)
 
-	readWorkers := make([]pipe.Reader[T], fr.parallel)
+	readWorkers := make([]pipe.Reader, fr.parallel)
 
 	for i := 0; i < fr.parallel; i++ {
 		readWorkers[i] = newTokenReader(fr.readersCh, fr.logger, fr.initDecoder)
@@ -89,7 +89,7 @@ func (fr *fileReaderProcessor[T]) newDataReaders(ctx context.Context) []pipe.Rea
 }
 
 // initDecoder initializes the decoder for the given reader.
-func (fr *fileReaderProcessor[T]) initDecoder(r io.ReadCloser, fileName string) (Decoder[T], error) {
+func (fr *fileReaderProcessor) initDecoder(r io.ReadCloser, fileName string) (Decoder, error) {
 	reader, err := fr.wrapReader(r)
 	if err != nil {
 		return nil, err
@@ -97,8 +97,7 @@ func (fr *fileReaderProcessor[T]) initDecoder(r io.ReadCloser, fileName string) 
 
 	reader = metrics.NewReader(reader, fr.kbpsCollector)
 
-	d, err := NewDecoder[T](
-		fr.config.EncoderType,
+	d, err := NewDecoder(
 		reader,
 		fileName,
 		fr.config.IgnoreUnknownFields,
@@ -112,7 +111,7 @@ func (fr *fileReaderProcessor[T]) initDecoder(r io.ReadCloser, fileName string) 
 }
 
 // newMetadataReaders creates the metadata readers for restoring metadata.
-func (fr *fileReaderProcessor[T]) newMetadataReaders(ctx context.Context) []pipe.Reader[T] {
+func (fr *fileReaderProcessor) newMetadataReaders(ctx context.Context) []pipe.Reader {
 	mdFiles := fr.reader.GetSkipped()
 
 	if len(mdFiles) == 0 {
@@ -129,7 +128,7 @@ func (fr *fileReaderProcessor[T]) newMetadataReaders(ctx context.Context) []pipe
 		close(mdReadersCh)
 	}()
 
-	readWorkers := make([]pipe.Reader[T], fr.parallel)
+	readWorkers := make([]pipe.Reader, fr.parallel)
 	for i := 0; i < fr.parallel; i++ {
 		readWorkers[i] = newTokenReader(mdReadersCh, fr.logger, fr.initDecoder)
 	}
@@ -138,7 +137,7 @@ func (fr *fileReaderProcessor[T]) newMetadataReaders(ctx context.Context) []pipe
 }
 
 // wrapReader applies encryption and compression wrappers to the reader based on the configuration.
-func (fr *fileReaderProcessor[T]) wrapReader(reader io.ReadCloser) (io.ReadCloser, error) {
+func (fr *fileReaderProcessor) wrapReader(reader io.ReadCloser) (io.ReadCloser, error) {
 	r, err := newEncryptionReader(fr.encryptionKey, reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create encryption reader: %w", err)

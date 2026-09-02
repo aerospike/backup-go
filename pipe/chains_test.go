@@ -49,7 +49,7 @@ func testToken() *models.Token {
 func TestChains_ReaderBackupChain(t *testing.T) {
 	t.Parallel()
 
-	readerMock := mocks.NewMockReader[*models.Token](t)
+	readerMock := mocks.NewMockReader(t)
 
 	var mockCounter int
 	readerMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
@@ -64,10 +64,10 @@ func TestChains_ReaderBackupChain(t *testing.T) {
 
 	readerMock.EXPECT().Close()
 
-	processorMock := mocks.NewMockProcessor[*models.Token](t)
+	processorMock := mocks.NewMockProcessor(t)
 	processorMock.EXPECT().Process(testToken()).Return(testToken(), nil)
 
-	readChain, output := NewReaderChain[*models.Token](readerMock, processorMock)
+	readChain, output := NewReaderChain(readerMock, processorMock)
 	require.NotNil(t, readChain)
 	require.NotNil(t, output)
 
@@ -90,7 +90,7 @@ func TestChains_ReaderBackupChain(t *testing.T) {
 func TestChains_ReaderBackupChainContextCancel(t *testing.T) {
 	t.Parallel()
 
-	readerMock := mocks.NewMockReader[*models.Token](t)
+	readerMock := mocks.NewMockReader(t)
 	ctx, cancel := context.WithCancel(t.Context())
 
 	readerMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
@@ -100,10 +100,10 @@ func TestChains_ReaderBackupChainContextCancel(t *testing.T) {
 
 	readerMock.EXPECT().Close()
 
-	processorMock := mocks.NewMockProcessor[*models.Token](t)
+	processorMock := mocks.NewMockProcessor(t)
 	processorMock.EXPECT().Process(testToken()).Return(testToken(), nil)
 
-	readChain, output := NewReaderChain[*models.Token](readerMock, processorMock)
+	readChain, output := NewReaderChain(readerMock, processorMock)
 	require.NotNil(t, readChain)
 	require.NotNil(t, output)
 
@@ -128,7 +128,7 @@ func TestChains_ReaderBackupChainContextCancel(t *testing.T) {
 func TestChains_ReaderBackupChainContextCancelSecond(t *testing.T) {
 	t.Parallel()
 
-	readerMock := mocks.NewMockReader[*models.Token](t)
+	readerMock := mocks.NewMockReader(t)
 	ctx, cancel := context.WithCancel(t.Context())
 
 	var mockCounter int
@@ -144,10 +144,10 @@ func TestChains_ReaderBackupChainContextCancelSecond(t *testing.T) {
 
 	readerMock.EXPECT().Close()
 
-	processorMock := mocks.NewMockProcessor[*models.Token](t)
+	processorMock := mocks.NewMockProcessor(t)
 	processorMock.EXPECT().Process(testToken()).Return(testToken(), nil)
 
-	readChain, output := NewReaderChain[*models.Token](readerMock, processorMock)
+	readChain, output := NewReaderChain(readerMock, processorMock)
 	require.NotNil(t, readChain)
 	require.NotNil(t, output)
 
@@ -170,7 +170,7 @@ func TestChains_ReaderBackupChainContextCancelSecond(t *testing.T) {
 func TestChains_ReaderBackupChainContextReaderError(t *testing.T) {
 	t.Parallel()
 
-	readerMock := mocks.NewMockReader[*models.Token](t)
+	readerMock := mocks.NewMockReader(t)
 
 	var mockCounter int
 	readerMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
@@ -185,10 +185,10 @@ func TestChains_ReaderBackupChainContextReaderError(t *testing.T) {
 
 	readerMock.EXPECT().Close()
 
-	processorMock := mocks.NewMockProcessor[*models.Token](t)
+	processorMock := mocks.NewMockProcessor(t)
 	processorMock.EXPECT().Process(testToken()).Return(testToken(), nil)
 
-	readChain, output := NewReaderChain[*models.Token](readerMock, processorMock)
+	readChain, output := NewReaderChain(readerMock, processorMock)
 	require.NotNil(t, readChain)
 	require.NotNil(t, output)
 
@@ -209,7 +209,7 @@ func TestChains_ReaderBackupChainContextReaderError(t *testing.T) {
 func TestChains_ReaderBackupChainContextProcessorError(t *testing.T) {
 	t.Parallel()
 
-	readerMock := mocks.NewMockReader[*models.Token](t)
+	readerMock := mocks.NewMockReader(t)
 
 	readerMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
 		time.Sleep(testDelay)
@@ -218,10 +218,10 @@ func TestChains_ReaderBackupChainContextProcessorError(t *testing.T) {
 
 	readerMock.EXPECT().Close()
 
-	processorMock := mocks.NewMockProcessor[*models.Token](t)
+	processorMock := mocks.NewMockProcessor(t)
 	processorMock.EXPECT().Process(testToken()).Return(nil, errTest)
 
-	readChain, output := NewReaderChain[*models.Token](readerMock, processorMock)
+	readChain, output := NewReaderChain(readerMock, processorMock)
 	require.NotNil(t, readChain)
 	require.NotNil(t, output)
 
@@ -242,7 +242,7 @@ func TestChains_ReaderBackupChainContextProcessorError(t *testing.T) {
 func TestChains_ReaderBackupChainContextProcessorFiltered(t *testing.T) {
 	t.Parallel()
 
-	readerMock := mocks.NewMockReader[*models.Token](t)
+	readerMock := mocks.NewMockReader(t)
 
 	var mockCounterRead int
 	readerMock.EXPECT().Read(mock.Anything).RunAndReturn(func(context.Context) (*models.Token, error) {
@@ -257,7 +257,7 @@ func TestChains_ReaderBackupChainContextProcessorFiltered(t *testing.T) {
 
 	readerMock.EXPECT().Close()
 
-	processorMock := mocks.NewMockProcessor[*models.Token](t)
+	processorMock := mocks.NewMockProcessor(t)
 	var mockCounterProc int
 	processorMock.EXPECT().Process(testToken()).RunAndReturn(func(*models.Token) (*models.Token, error) {
 		if mockCounterProc < testCount {
@@ -269,7 +269,7 @@ func TestChains_ReaderBackupChainContextProcessorFiltered(t *testing.T) {
 		return testToken(), nil
 	})
 
-	readChain, output := NewReaderChain[*models.Token](readerMock, processorMock)
+	readChain, output := NewReaderChain(readerMock, processorMock)
 	require.NotNil(t, readChain)
 	require.NotNil(t, output)
 
@@ -290,7 +290,7 @@ func TestChains_ReaderBackupChainContextProcessorFiltered(t *testing.T) {
 func TestChains_WriterBackupChain(t *testing.T) {
 	t.Parallel()
 
-	writerMock := mocks.NewMockWriter[*models.Token](t)
+	writerMock := mocks.NewMockWriter(t)
 
 	var mockCounterWrite int
 	writerMock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
@@ -300,7 +300,7 @@ func TestChains_WriterBackupChain(t *testing.T) {
 
 	writerMock.EXPECT().Close().Return(nil)
 
-	writeChain, input := NewWriterChain[*models.Token](writerMock, nil)
+	writeChain, input := NewWriterChain(writerMock, nil)
 	require.NotNil(t, writeChain)
 	require.NotNil(t, input)
 
@@ -328,7 +328,7 @@ func TestChains_WriterBackupChain(t *testing.T) {
 func TestChains_WriterBackupChainContextCancel(t *testing.T) {
 	t.Parallel()
 
-	writerMock := mocks.NewMockWriter[*models.Token](t)
+	writerMock := mocks.NewMockWriter(t)
 	ctx, cancel := context.WithCancel(t.Context())
 
 	var mockCounterWrite int
@@ -339,7 +339,7 @@ func TestChains_WriterBackupChainContextCancel(t *testing.T) {
 
 	writerMock.EXPECT().Close().Return(nil)
 
-	writeChain, input := NewWriterChain[*models.Token](writerMock, nil)
+	writeChain, input := NewWriterChain(writerMock, nil)
 	require.NotNil(t, writeChain)
 	require.NotNil(t, input)
 
@@ -369,7 +369,7 @@ func TestChains_WriterBackupChainContextCancel(t *testing.T) {
 func TestChains_WriterBackupChainWriterError(t *testing.T) {
 	t.Parallel()
 
-	writerMock := mocks.NewMockWriter[*models.Token](t)
+	writerMock := mocks.NewMockWriter(t)
 
 	writerMock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
 		return testSize, errTest
@@ -377,7 +377,7 @@ func TestChains_WriterBackupChainWriterError(t *testing.T) {
 
 	writerMock.EXPECT().Close().Return(nil)
 
-	writeChain, input := NewWriterChain[*models.Token](writerMock, nil)
+	writeChain, input := NewWriterChain(writerMock, nil)
 	require.NotNil(t, writeChain)
 	require.NotNil(t, input)
 
@@ -404,7 +404,7 @@ func TestChains_WriterBackupChainWriterError(t *testing.T) {
 func TestChains_WriterBackupChainCloseError(t *testing.T) {
 	t.Parallel()
 
-	writerMock := mocks.NewMockWriter[*models.Token](t)
+	writerMock := mocks.NewMockWriter(t)
 
 	writerMock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
 		return testSize, nil
@@ -412,7 +412,7 @@ func TestChains_WriterBackupChainCloseError(t *testing.T) {
 
 	writerMock.EXPECT().Close().Return(errTest)
 
-	writeChain, input := NewWriterChain[*models.Token](writerMock, nil)
+	writeChain, input := NewWriterChain(writerMock, nil)
 	require.NotNil(t, writeChain)
 	require.NotNil(t, input)
 
@@ -440,7 +440,7 @@ func TestChains_WriterBackupChainCloseError(t *testing.T) {
 func TestChains_WriterBackupChainBothError(t *testing.T) {
 	t.Parallel()
 
-	writerMock := mocks.NewMockWriter[*models.Token](t)
+	writerMock := mocks.NewMockWriter(t)
 
 	writerMock.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
 		return testSize, errTest
@@ -448,7 +448,7 @@ func TestChains_WriterBackupChainBothError(t *testing.T) {
 
 	writerMock.EXPECT().Close().Return(errTest)
 
-	writeChain, input := NewWriterChain[*models.Token](writerMock, nil)
+	writeChain, input := NewWriterChain(writerMock, nil)
 	require.NotNil(t, writeChain)
 	require.NotNil(t, input)
 

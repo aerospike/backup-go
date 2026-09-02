@@ -35,7 +35,7 @@ func TestTPSLimiter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			limiter := NewTPSLimiter[*models.Token](t.Context(), tt.tps)
+			limiter := NewTPSLimiter(t.Context(), tt.tps)
 
 			start := time.Now()
 			for i := 0; i < tt.runs; i++ {

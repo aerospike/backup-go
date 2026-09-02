@@ -47,10 +47,10 @@ func TestTokenReader_ReadSingleToken(t *testing.T) {
 	mockReader := new(MockReadCloser)
 	readersCh <- models.File{Reader: mockReader}
 
-	mockDecoder := mocks.NewMockDecoder[*models.Token](t)
+	mockDecoder := mocks.NewMockDecoder(t)
 	mockDecoder.EXPECT().NextToken().Return(&models.Token{Type: models.TokenTypeRecord}, nil).Once()
 
-	convertFn := func(io.ReadCloser, string) (Decoder[*models.Token], error) {
+	convertFn := func(io.ReadCloser, string) (Decoder, error) {
 		return mockDecoder, nil
 	}
 
@@ -70,11 +70,11 @@ func TestTokenReader_ReadMultipleTokensFromSingleReader(t *testing.T) {
 	mockReader := new(MockReadCloser)
 	readersCh <- models.File{Reader: mockReader}
 
-	mockDecoder := mocks.NewMockDecoder[*models.Token](t)
+	mockDecoder := mocks.NewMockDecoder(t)
 	mockDecoder.EXPECT().NextToken().Return(&models.Token{Type: models.TokenTypeRecord}, nil).Times(3)
 	mockDecoder.EXPECT().NextToken().Return((*models.Token)(nil), io.EOF).Once()
 
-	convertFn := func(io.ReadCloser, string) (Decoder[*models.Token], error) {
+	convertFn := func(io.ReadCloser, string) (Decoder, error) {
 		return mockDecoder, nil
 	}
 
@@ -105,15 +105,15 @@ func TestTokenReader_ReadFromMultipleReaders(t *testing.T) {
 	readersCh <- models.File{Reader: mockReader1}
 	readersCh <- models.File{Reader: mockReader2}
 
-	mockDecoder1 := mocks.NewMockDecoder[*models.Token](t)
+	mockDecoder1 := mocks.NewMockDecoder(t)
 	mockDecoder1.EXPECT().NextToken().Return(&models.Token{Type: models.TokenTypeRecord}, nil).Once()
 	mockDecoder1.EXPECT().NextToken().Return((*models.Token)(nil), io.EOF).Once()
 
-	mockDecoder2 := mocks.NewMockDecoder[*models.Token](t)
+	mockDecoder2 := mocks.NewMockDecoder(t)
 	mockDecoder2.EXPECT().NextToken().Return(&models.Token{Type: models.TokenTypeUDF}, nil).Once()
 
 	currentDecoder := mockDecoder1
-	convertFn := func(io.ReadCloser, string) (Decoder[*models.Token], error) {
+	convertFn := func(io.ReadCloser, string) (Decoder, error) {
 		defer func() {
 			currentDecoder = mockDecoder2
 		}()
@@ -147,7 +147,7 @@ func TestTokenReader_ReadFromClosedChannel(t *testing.T) {
 	readersCh := make(chan models.File)
 	close(readersCh)
 
-	tr := newTokenReader[*models.Token](readersCh, logger, nil)
+	tr := newTokenReader(readersCh, logger, nil)
 
 	token, err := tr.Read(t.Context())
 	assert.Equal(t, io.EOF, err)
@@ -160,11 +160,11 @@ func TestTokenReader_ReadWithDecoderError(t *testing.T) {
 	mockReader := new(MockReadCloser)
 	readersCh <- models.File{Reader: mockReader}
 
-	mockDecoder := mocks.NewMockDecoder[*models.Token](t)
+	mockDecoder := mocks.NewMockDecoder(t)
 	expectedErr := io.ErrUnexpectedEOF
 	mockDecoder.EXPECT().NextToken().Return((*models.Token)(nil), expectedErr).Once()
 
-	convertFn := func(io.ReadCloser, string) (Decoder[*models.Token], error) {
+	convertFn := func(io.ReadCloser, string) (Decoder, error) {
 		return mockDecoder, nil
 	}
 
@@ -181,7 +181,7 @@ func TestTokenReader_ReadWithDecoderError(t *testing.T) {
 func TestTokenReader_Close(t *testing.T) {
 	logger := slog.Default()
 	readersCh := make(chan models.File)
-	tr := newTokenReader[*models.Token](readersCh, logger, nil)
+	tr := newTokenReader(readersCh, logger, nil)
 
 	// Close is a no-op, so we just ensure it doesn't panic
 	assert.NotPanics(t, func() {

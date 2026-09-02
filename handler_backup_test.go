@@ -15,10 +15,13 @@
 package backup
 
 import (
+	"bytes"
+	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -101,4 +104,82 @@ func TestBackupHandler_GoroutineLeak_OnSuccess(t *testing.T) {
 	require.LessOrEqual(t, leaked, 0,
 		"goroutine leak detected: started with %d, ended with %d (leaked %d).",
 		initialGoroutines, finalGoroutines, leaked)
+}
+
+// syncBuffer is a concurrency safe io.Writer, so log records emitted by handler
+// goroutines can be inspected without racing the test.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.String()
+}
+
+func TestBackupHandler_Wait_StateCleanupFailureKeepsSuccess(t *testing.T) {
+	t.Parallel()
+
+	testDir := t.TempDir()
+	stateFile := filepath.Join(testDir, "state_file")
+
+	// Setup mocks
+	mockAerospikeClient := mocks.NewMockAerospikeClient(t)
+	mockWriter := mocks.NewMockWriter(t)
+	mockReader := mocks.NewMockStreamingReader(t)
+	mockInfoGetter := mocks.NewMockClusterInfo(t)
+
+	// Configure mock expectations
+	mockWriter.EXPECT().GetType().Return("local").Maybe()
+	mockWriter.EXPECT().GetOptions().Return(options.Options{
+		IsDir: true,
+	}).Maybe()
+	// Removing the state file fails, which must not affect the backup result.
+	mockWriter.EXPECT().Remove(mock.Anything, mock.Anything).
+		Return(errors.New("permission denied")).Once()
+	mockInfoGetter.EXPECT().GetSIndexInfo(mock.Anything, mock.Anything).Return(models.SIndexInfo{}, nil).Maybe()
+
+	logs := &syncBuffer{}
+	logger := slog.New(slog.NewTextHandler(logs, nil))
+
+	cfg := NewDefaultBackupConfig()
+	cfg.Namespace = "test"
+	cfg.StateFile = stateFile
+	cfg.PageSize = 100000
+	cfg.PartitionFilters = []*a.PartitionFilter{
+		NewPartitionFilterByID(1),
+	}
+	cfg.NoRecords = true // Skip actual backup
+	cfg.NoUDFs = true
+	cfg.NoIndexes = true
+
+	handler, err := newBackupHandler(
+		t.Context(),
+		cfg,
+		mockAerospikeClient,
+		logger,
+		mockWriter,
+		mockReader,
+		nil, // scanLimiter
+		mockInfoGetter,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, handler)
+
+	// Simulate successful backup completion.
+	handler.done <- struct{}{}
+
+	// The job succeeded, so a failing state file cleanup is only logged.
+	require.NoError(t, handler.Wait(t.Context()))
+	require.Contains(t, logs.String(), "failed to cleanup state")
 }

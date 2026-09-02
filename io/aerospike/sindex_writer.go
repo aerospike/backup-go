@@ -61,6 +61,8 @@ func (rw *sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 		sIndexType = a.BLOB
 	case models.GEO2DSphereSIDataType:
 		sIndexType = a.GEO2DSPHERE
+	case models.EmptySIDataType:
+		// skip.
 	default:
 		return fmt.Errorf("invalid sindex bin type: %c", si.Path.BinType)
 	}
@@ -76,6 +78,8 @@ func (rw *sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 		sIndexCollectionType = a.ICT_MAPKEYS
 	case models.MapValueSIndex:
 		sIndexCollectionType = a.ICT_MAPVALUES
+	case models.SetSIndex:
+		sIndexCollectionType = a.ICT_SET
 	default:
 		return fmt.Errorf("invalid sindex collection type: %c", si.IndexType)
 	}

@@ -186,7 +186,7 @@ func NewClient(ac AerospikeClient, opts ...ClientOpt) (*Client, error) {
 			return nil, fmt.Errorf("invalid info retry policy: %w", err)
 		}
 
-		infoClient, err := asinfo.NewClient(ac.Cluster(), client.infoPolicy, client.infoRetryPolicy)
+		infoClient, err := asinfo.NewClient(ac.Cluster(), client.infoPolicy, client.infoRetryPolicy, client.logger)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create info client: %w", err)
 		}

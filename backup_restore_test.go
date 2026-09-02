@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"sync"
@@ -87,7 +88,7 @@ func testAerospikeClient() (*a.Client, error) {
 }
 
 func testInfoClient(client *a.Client) (*asinfo.Client, error) {
-	return asinfo.NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	return asinfo.NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 }
 
 func runBackupRestoreLocal(
@@ -592,7 +593,7 @@ func TestBackupRestoreNodeList(t *testing.T) {
 	defer asClient.Close()
 
 	nodes := asClient.GetNodes()
-	ic, err := asinfo.NewClient(asClient.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic, err := asinfo.NewClient(asClient.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
 	nodeServiceAddress, err := ic.GetService(ctx, nodes[0].GetName())
 	require.NoError(t, err)
@@ -1211,7 +1212,7 @@ func TestRestoreExpiredRecords(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, w)
 
-	encoder := NewEncoder[*models.Token](EncoderTypeASB, testASNamespace, false, false)
+	encoder := NewEncoder[*models.Token](EncoderTypeASB, testASNamespace, false, models.SIndexInfo{})
 
 	header := encoder.GetHeader(true)
 

@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"slices"
 	"strconv"
@@ -37,6 +38,7 @@ const (
 	indexTypeList      = "list"
 	indexTypeMapKeys   = "mapkeys"
 	indexTypeMapValues = "mapvalues"
+	indexTypeSet       = "set"
 
 	indexBinTypeNumeric     = "numeric"
 	indexBinTypeIntSigned   = "int signed"
@@ -59,6 +61,7 @@ var (
 	ErrReplicationFactorZero = errors.New("replication factor is zero")
 	ErrNoNode                = errors.New("no node found")
 	ErrNotFound              = errors.New("not found")
+	ErrInvalidSIndexType     = errors.New("invalid sindex index type")
 
 	// Static internal errors. Kept as package-level sentinels so they can be
 	// matched with errors.Is and satisfy err113/perfsprint linters.
@@ -91,6 +94,7 @@ type Client struct {
 	policy      *a.InfoPolicy
 	retryPolicy *models.RetryPolicy
 	cmdDict     map[int]string
+	logger      *slog.Logger
 }
 
 // NewClient initializes and returns a new asinfo Client instance with the provided Aerospike client,
@@ -99,6 +103,7 @@ func NewClient(
 	cluster NodeGetter,
 	policy *a.InfoPolicy,
 	retryPolicy *models.RetryPolicy,
+	logger *slog.Logger,
 ) (*Client, error) {
 	if retryPolicy == nil {
 		retryPolicy = models.NewDefaultRetryPolicy()
@@ -108,6 +113,7 @@ func NewClient(
 		cluster:     cluster,
 		policy:      policy,
 		retryPolicy: retryPolicy,
+		logger:      logger,
 	}
 	// On init we can use context.Background(), as we don't need to do any async operations.
 	ctx := context.Background()
@@ -193,24 +199,37 @@ func (ic *Client) GetVersion(ctx context.Context) (iModels.AerospikeVersion, err
 	return result, nil
 }
 
-// HasExpressionSIndex checks whether the namespace contains expression based secondary indexes.
-func (ic *Client) HasExpressionSIndex(ctx context.Context, namespace string) (bool, error) {
-	list, err := ic.GetSIndexes(ctx, namespace)
+// GetSIndexInfo returns information about secondary indexes in the given namespace.
+func (ic *Client) GetSIndexInfo(ctx context.Context, namespace string) (models.SIndexInfo, error) {
+	list, err := ic.getSIndexes(ctx, namespace, true)
 	if err != nil {
-		return false, err
+		return models.SIndexInfo{}, err
 	}
+
+	var hasSetSIndex, hasExpressionSIndex bool
 
 	for _, idx := range list {
 		if idx.Expression != "" {
-			return true, nil
+			hasExpressionSIndex = true
+		}
+
+		if idx.IndexType == models.SetSIndex {
+			hasSetSIndex = true
 		}
 	}
 
-	return false, nil
+	return models.SIndexInfo{
+		HasSet:        hasSetSIndex,
+		HasExpression: hasExpressionSIndex,
+	}, nil
 }
 
 // GetSIndexes returns list of SIndexes for the given namespace.
 func (ic *Client) GetSIndexes(ctx context.Context, namespace string) ([]*models.SIndex, error) {
+	return ic.getSIndexes(ctx, namespace, false)
+}
+
+func (ic *Client) getSIndexes(ctx context.Context, namespace string, noWarn bool) ([]*models.SIndex, error) {
 	var indexes []*models.SIndex
 
 	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
@@ -219,10 +238,10 @@ func (ic *Client) GetSIndexes(ctx context.Context, namespace string) ([]*models.
 			return aErr.Unwrap()
 		}
 
-		var getErr error
-		indexes, getErr = ic.getSIndexes(node, namespace, ic.policy)
+		var indErr error
+		indexes, indErr = ic.requestSIndexes(node, namespace, ic.policy, noWarn)
 
-		return getErr
+		return indErr
 	})
 
 	return indexes, err

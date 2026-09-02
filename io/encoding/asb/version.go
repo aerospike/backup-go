@@ -26,9 +26,11 @@ var (
 	// version32 is the version of the ASB format with expression Sindex support.
 	// Should be used only for metadata files.
 	version32 = newVersion(3, 2)
+	// version33 is the version of the ASB format with set Sindex support.
+	version33 = newVersion(3, 3)
 
 	// Current supported version for decoding.
-	versionCurrent = version32
+	versionCurrent = version33
 )
 
 // version represents protocol version in format major.minor

@@ -18,7 +18,9 @@ import (
 	"cmp"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strconv"
 	"strings"
@@ -55,7 +57,8 @@ func parseResultResponse(cmd string, result map[string]string) (string, error) {
 	return v, nil
 }
 
-func (ic *Client) getSIndexes(node infoGetter, namespace string, policy *a.InfoPolicy) ([]*models.SIndex, error) {
+func (ic *Client) requestSIndexes(node infoGetter, namespace string, policy *a.InfoPolicy, noWarn bool,
+) ([]*models.SIndex, error) {
 	supportsSIndexCTX := m.AerospikeVersionSupportsSIndexContext
 
 	version, err := ic.getAerospikeVersion(node, policy)
@@ -76,7 +79,7 @@ func (ic *Client) getSIndexes(node infoGetter, namespace string, policy *a.InfoP
 		return nil, fmt.Errorf("failed to parse sindexes response: %w", err)
 	}
 
-	return parseSIndexes(cmdResp)
+	return ic.parseSIndexes(cmdResp, noWarn)
 }
 
 func (ic *Client) buildSindexCmd(namespace string, getCtx bool) string {
@@ -136,125 +139,180 @@ func parseAerospikeVersion(versionStr string) (m.AerospikeVersion, error) {
 	}, nil
 }
 
-func parseSIndexes(sindexListInfoResp string) ([]*models.SIndex, error) {
+func (ic *Client) parseSIndexes(sindexListInfoResp string, noWarn bool) ([]*models.SIndex, error) {
 	sindexInfo, err := parseSindexListResponse(sindexListInfoResp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse sindex response: %w", err)
 	}
 
-	// No sindexes
-	if sindexInfo == nil {
+	// No sindexes.
+	if len(sindexInfo) == 0 {
 		return nil, nil
 	}
 
-	sindexes := make([]*models.SIndex, len(sindexInfo))
+	sindexes := make([]*models.SIndex, 0, len(sindexInfo))
 
-	for i, sindexStr := range sindexInfo {
-		sindex, err := parseSIndex(sindexStr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse sindex: %w", err)
+	for _, sindexMap := range sindexInfo {
+		// Skip empty or nil maps.
+		if len(sindexMap) == 0 {
+			continue
 		}
 
-		sindexes[i] = sindex
+		sindex, err := parseSIndex(sindexMap)
+
+		switch {
+		case err == nil:
+			sindexes = append(sindexes, sindex)
+		case errors.Is(err, ErrInvalidSIndexType):
+			ic.warnInvalidSIndexType(noWarn, sindexMap)
+		default:
+			return nil, fmt.Errorf("failed to parse sindex: %w", err)
+		}
 	}
 
 	return sindexes, nil
 }
 
-// parseSIndex parses a single InfoMap containing a sindex into a SecondaryIndex model
+// warnInvalidSIndexType logs a warning if the sindex type is invalid.
+// We should warn only when we try to back up indexes, but we also call this function for index type check,
+// in that case we silence error with noWarn = true.
+func (ic *Client) warnInvalidSIndexType(noWarn bool, sindexMap map[string]string) {
+	if noWarn {
+		return
+	}
+
+	ic.logger.Warn("skipping sindex with invalid type",
+		slog.String("sindex", sindexMap["indexname"]),
+		slog.String("type", sindexMap["indextype"]),
+	)
+}
+
+// parseSIndex parses a single InfoMap containing a sindex into a SecondaryIndex model.
 func parseSIndex(sindexMap m.InfoMap) (*models.SIndex, error) {
 	si := &models.SIndex{}
 
-	if val, ok := sindexMap["ns"]; ok {
-		si.Namespace = val
+	var err error
+	if si.Namespace, err = requireField(sindexMap, "ns"); err != nil {
+		return nil, err
+	}
+
+	si.Set = optionalField(sindexMap, "set")
+
+	if si.Name, err = requireField(sindexMap, "indexname"); err != nil {
+		return nil, err
+	}
+
+	rawIndexType, err := requireField(sindexMap, "indextype")
+	if err != nil {
+		return nil, err
+	}
+
+	if si.IndexType, err = parseSIndexType(rawIndexType); err != nil {
+		return nil, err
+	}
+
+	if si.IndexType != models.SetSIndex {
+		path, hasBin, err := parseSIndexPath(sindexMap)
+		switch {
+		case err != nil:
+			return nil, err
+		case hasBin:
+			si.Path = path
+		case si.IndexType != models.SetSIndex:
+			// Set indexes are the only kind allowed to have no bin.
+			return nil, fmt.Errorf("sindex missing bin")
+		}
 	} else {
-		return nil, fmt.Errorf("sindex missing namespace")
+		si.Path = models.NewEmptySIndexPath()
 	}
 
-	if val, ok := sindexMap["set"]; ok {
-		// "NULL" is the server's representation of an empty set
-		// in the sindex list info response
-		if !strings.EqualFold(val, "null") {
-			si.Set = val
-		}
-	}
-
-	if val, ok := sindexMap["indexname"]; ok {
-		si.Name = val
-	} else {
-		return nil, fmt.Errorf("sindex missing indexname")
-	}
-
-	if val, ok := sindexMap["indextype"]; ok {
-		var sindexType models.SIndexType
-
-		switch strings.ToLower(val) {
-		case indexTypeDefault, indexTypeNone:
-			sindexType = models.BinSIndex
-		case indexTypeList:
-			sindexType = models.ListElementSIndex
-		case indexTypeMapKeys:
-			sindexType = models.MapKeySIndex
-		case indexTypeMapValues:
-			sindexType = models.MapValueSIndex
-		default:
-			return nil, fmt.Errorf("invalid sindex index type: %s", val)
-		}
-
-		si.IndexType = sindexType
-	} else {
-		return nil, fmt.Errorf("sindex missing indextype")
-	}
-
-	if val, ok := sindexMap["bin"]; ok { //nolint:nestif // parsing optional map fields: bin → type → context
-		path := models.SIndexPath{
-			BinName: val,
-		}
-
-		if val, ok := sindexMap["type"]; ok {
-			var binType models.SIPathBinType
-
-			switch strings.ToLower(val) {
-			case indexBinTypeNumeric, indexBinTypeIntSigned:
-				binType = models.NumericSIDataType
-			case indexBinTypeString, indexBinTypeText:
-				binType = models.StringSIDataType
-			case indexBinTypeBlob:
-				binType = models.BlobSIDataType
-			case indexBinTypeGeo2DSphere, indexBinTypeGeoJSON:
-				binType = models.GEO2DSphereSIDataType
-			default:
-				return nil, fmt.Errorf("invalid sindex type: %s", val)
-			}
-
-			path.BinType = binType
-		} else {
-			return nil, fmt.Errorf("sindex missing type")
-		}
-
-		if val, ok := sindexMap["context"]; ok {
-			// "NULL" is the server's representation of an empty context
-			// in the sindex list info response
-			if !strings.EqualFold(val, "null") {
-				path.B64Context = val
-			}
-		}
-
-		si.Path = path
-	} else {
-		return nil, fmt.Errorf("sindex missing bin")
-	}
-
-	// Set index expression value
-	if val, ok := sindexMap["exp"]; ok {
-		if strings.EqualFold(val, "null") {
-			val = ""
-		}
-
-		si.Expression = val
-	}
+	si.Expression = optionalField(sindexMap, "exp")
 
 	return si, nil
+}
+
+// requireField returns the value for key or an error mentioning name
+// if the key is absent.
+func requireField(sindexMap m.InfoMap, key string) (string, error) {
+	val, ok := sindexMap[key]
+	if !ok {
+		return "", fmt.Errorf("sindex missing %s", key)
+	}
+
+	return val, nil
+}
+
+// optionalField returns the value for key, treating a missing key and the
+// server's "NULL" placeholder (used for empty set/context/exp in the sindex
+// list info response) as an empty value.
+func optionalField(sindexMap m.InfoMap, key string) string {
+	val, ok := sindexMap[key]
+	if !ok || strings.EqualFold(val, "null") {
+		return ""
+	}
+
+	return val
+}
+
+func parseSIndexType(val string) (models.SIndexType, error) {
+	switch strings.ToLower(val) {
+	case indexTypeDefault, indexTypeNone:
+		return models.BinSIndex, nil
+	case indexTypeList:
+		return models.ListElementSIndex, nil
+	case indexTypeMapKeys:
+		return models.MapKeySIndex, nil
+	case indexTypeMapValues:
+		return models.MapValueSIndex, nil
+	case indexTypeSet:
+		return models.SetSIndex, nil
+	default:
+		var zero models.SIndexType
+		return zero, fmt.Errorf("%w: %s", ErrInvalidSIndexType, val)
+	}
+}
+
+// parseSIndexPath parses the optional bin/type/context fields.
+// hasBin reports whether the "bin" field was present at all.
+func parseSIndexPath(sindexMap m.InfoMap) (path models.SIndexPath, hasBin bool, err error) {
+	bin, ok := sindexMap["bin"]
+	if !ok {
+		return models.SIndexPath{}, false, nil
+	}
+
+	rawType, ok := sindexMap["type"]
+	if !ok {
+		return models.SIndexPath{}, true, fmt.Errorf("sindex missing type")
+	}
+
+	binType, err := parseSIndexBinType(rawType)
+	if err != nil {
+		return models.SIndexPath{}, true, err
+	}
+
+	return models.SIndexPath{
+		BinName:    bin,
+		BinType:    binType,
+		B64Context: optionalField(sindexMap, "context"),
+	}, true, nil
+}
+
+func parseSIndexBinType(val string) (models.SIPathBinType, error) {
+	switch strings.ToLower(val) {
+	case indexBinTypeNumeric, indexBinTypeIntSigned:
+		return models.NumericSIDataType, nil
+	case indexBinTypeString, indexBinTypeText:
+		return models.StringSIDataType, nil
+	case indexBinTypeBlob:
+		return models.BlobSIDataType, nil
+	case indexBinTypeGeo2DSphere, indexBinTypeGeoJSON:
+		return models.GEO2DSphereSIDataType, nil
+	case indexTypeSet: // Set indexes don't have any bins.
+		return models.EmptySIDataType, nil
+	default:
+		var zero models.SIPathBinType
+		return zero, fmt.Errorf("invalid sindex type: %s", val)
+	}
 }
 
 func parseUDF(udfMap m.InfoMap) (*models.UDF, error) {

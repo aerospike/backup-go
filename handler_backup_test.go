@@ -25,6 +25,7 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/mocks"
+	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -46,7 +47,7 @@ func TestBackupHandler_GoroutineLeak_OnSuccess(t *testing.T) {
 		IsDir: true,
 	}).Maybe()
 	mockWriter.EXPECT().Remove(mock.Anything, mock.Anything).Return(nil).Maybe()
-	mockInfoGetter.EXPECT().HasExpressionSIndex(mock.Anything, mock.Anything).Return(false, nil).Maybe()
+	mockInfoGetter.EXPECT().GetSIndexInfo(mock.Anything, mock.Anything).Return(models.SIndexInfo{}, nil).Maybe()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 

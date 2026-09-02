@@ -80,9 +80,6 @@ type ConfigBackup struct {
 	// (optional, given an empty list, all racks will be backed up)
 	// For proper work, an Aerospike client should be initialized with ClientPolicy.ReplicaPolicy = a.MASTER
 	RackList []int
-	// EncoderType describes an Encoder type that will be used on backing up.
-	// Default `EncoderTypeASB` = 0.
-	EncoderType EncoderType
 	// ParallelRead is the number of concurrent scans to run against the Aerospike cluster.
 	ParallelRead int
 	// ParallelWrite is the number of concurrent backup files writing.
@@ -141,7 +138,6 @@ func NewDefaultBackupConfig() *ConfigBackup {
 		ParallelRead:     1,
 		ParallelWrite:    1,
 		Namespace:        "test", //nolint:goconst // default value
-		EncoderType:      EncoderTypeASB,
 		ScanPolicy:       a.NewScanPolicy(),
 	}
 }
@@ -235,10 +231,6 @@ func (c *ConfigBackup) validate() error {
 
 	if slices.Contains(c.SetList, models.MonitorRecordsSetName) {
 		return fmt.Errorf("mrt monitor set is not allowed for backup")
-	}
-
-	if c.EncoderType != EncoderTypeASB {
-		return fmt.Errorf("unsupported encoder type: %d", c.EncoderType)
 	}
 
 	if c.ScanPolicy.ReplicaPolicy == a.PREFER_RACK && (len(c.RackList) != 0 || len(c.NodeList) != 0) {

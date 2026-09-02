@@ -28,37 +28,35 @@ import (
 )
 
 // statsSetterToken is an interface for setting the stats of a backup job.
-//
-//go:generate mockery --name statsSetterToken --inpackage --exported=false
 type statsSetterToken interface {
 	AddUDFs(uint32)
 	AddSIndexes(uint32)
 }
 
 // tokenStatsWriter is used to count UDFs and SIndexes.
-type tokenStatsWriter[T models.TokenConstraint] struct {
-	writer pipe.Writer[T]
+type tokenStatsWriter struct {
+	writer pipe.Writer
 	stats  statsSetterToken
 	logger *slog.Logger
 }
 
-func newWriterWithTokenStats[T models.TokenConstraint](
-	writer pipe.Writer[T],
+func newWriterWithTokenStats(
+	writer pipe.Writer,
 	stats statsSetterToken,
 	logger *slog.Logger,
-) *tokenStatsWriter[T] {
+) *tokenStatsWriter {
 	id := uuid.NewString()
 	logger = logging.WithWriter(logger, id, logging.WriterTypeTokenStats)
 	logger.Debug("created new token stats writer")
 
-	return &tokenStatsWriter[T]{
+	return &tokenStatsWriter{
 		writer: writer,
 		stats:  stats,
 		logger: logger,
 	}
 }
 
-func (tw *tokenStatsWriter[T]) Write(data T) (int, error) {
+func (tw *tokenStatsWriter) Write(data *models.Token) (int, error) {
 	n, err := tw.writer.Write(data)
 	if err != nil {
 		return 0, err
@@ -81,15 +79,15 @@ func (tw *tokenStatsWriter[T]) Write(data T) (int, error) {
 	return n, nil
 }
 
-func (tw *tokenStatsWriter[T]) Close() error {
+func (tw *tokenStatsWriter) Close() error {
 	return tw.writer.Close()
 }
 
 // tokenWriter satisfies the DataWriter interface.
 // It writes the types from the models package as encoded data
 // to an io.Writer. It uses an Encoder to encode the data.
-type tokenWriter[T models.TokenConstraint] struct {
-	encoder   Encoder[T]
+type tokenWriter struct {
+	encoder   Encoder
 	output    io.WriteCloser
 	logger    *slog.Logger
 	stateInfo *stateInfo
@@ -111,17 +109,17 @@ func newStateInfo(recordsStateChan chan<- models.PartitionFilterSerialized, n in
 }
 
 // newTokenWriter creates a new tokenWriter.
-func newTokenWriter[T models.TokenConstraint](
-	encoder Encoder[T],
+func newTokenWriter(
+	encoder Encoder,
 	output io.WriteCloser,
 	logger *slog.Logger,
 	stateInfo *stateInfo,
-) *tokenWriter[T] {
+) *tokenWriter {
 	id := uuid.NewString()
 	logger = logging.WithWriter(logger, id, logging.WriterTypeToken)
 	logger.Debug("created new token writer")
 
-	return &tokenWriter[T]{
+	return &tokenWriter{
 		encoder:   encoder,
 		output:    output,
 		logger:    logger,
@@ -130,7 +128,7 @@ func newTokenWriter[T models.TokenConstraint](
 }
 
 // Write encodes v and writes it to the output.
-func (w *tokenWriter[T]) Write(v T) (int, error) {
+func (w *tokenWriter) Write(v *models.Token) (int, error) {
 	w.buf.Reset()
 
 	if err := w.encoder.EncodeToken(v, &w.buf); err != nil {
@@ -151,7 +149,7 @@ func (w *tokenWriter[T]) Write(v T) (int, error) {
 }
 
 // Close releases resources associated with the tokenWriter and ensures the underlying writer is properly closed.
-func (w *tokenWriter[T]) Close() error {
+func (w *tokenWriter) Close() error {
 	w.logger.Debug("try to close token writer")
 
 	if err := w.output.Close(); err != nil {

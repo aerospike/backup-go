@@ -32,7 +32,7 @@ const testParallel = 10
 func TestPools_RunReaderBackupPool(t *testing.T) {
 	t.Parallel()
 
-	readMock := mocks.NewMockReader[*models.Token](t)
+	readMock := mocks.NewMockReader(t)
 	var (
 		mockCounter  int
 		counterMutex sync.Mutex
@@ -54,14 +54,14 @@ func TestPools_RunReaderBackupPool(t *testing.T) {
 
 	readMock.EXPECT().Close()
 
-	newProcessorMock := func() Processor[*models.Token] {
-		m := mocks.NewMockProcessor[*models.Token](t)
+	newProcessorMock := func() Processor {
+		m := mocks.NewMockProcessor(t)
 		m.EXPECT().Process(testToken()).Return(testToken(), nil)
 
 		return m
 	}
 
-	pool := NewReaderPool[*models.Token]([]Reader[*models.Token]{readMock, readMock, readMock}, newProcessorMock)
+	pool := NewReaderPool([]Reader{readMock, readMock, readMock}, newProcessorMock)
 	require.NotNil(t, pool)
 
 	err := pool.Run(t.Context())
@@ -80,7 +80,7 @@ func TestPools_RunReaderBackupPool(t *testing.T) {
 func TestPools_RunReaderBackupPoolError(t *testing.T) {
 	t.Parallel()
 
-	readMock := mocks.NewMockReader[*models.Token](t)
+	readMock := mocks.NewMockReader(t)
 	var (
 		mockCounter  int
 		counterMutex sync.Mutex
@@ -102,14 +102,14 @@ func TestPools_RunReaderBackupPoolError(t *testing.T) {
 
 	readMock.EXPECT().Close()
 
-	newProcessorMock := func() Processor[*models.Token] {
-		m := mocks.NewMockProcessor[*models.Token](t)
+	newProcessorMock := func() Processor {
+		m := mocks.NewMockProcessor(t)
 		m.EXPECT().Process(testToken()).Return(testToken(), nil)
 
 		return m
 	}
 
-	pool := NewReaderPool[*models.Token]([]Reader[*models.Token]{readMock, readMock, readMock}, newProcessorMock)
+	pool := NewReaderPool([]Reader{readMock, readMock, readMock}, newProcessorMock)
 	require.NotNil(t, pool)
 
 	err := pool.Run(t.Context())
@@ -119,7 +119,7 @@ func TestPools_RunReaderBackupPoolError(t *testing.T) {
 func TestPools_RunNewWriterBackupPool(t *testing.T) {
 	t.Parallel()
 
-	writeMock := mocks.NewMockWriter[*models.Token](t)
+	writeMock := mocks.NewMockWriter(t)
 	var (
 		mockCounterWrite int
 		writeMutex       sync.Mutex
@@ -134,12 +134,12 @@ func TestPools_RunNewWriterBackupPool(t *testing.T) {
 
 	writeMock.EXPECT().Close().Return(nil)
 
-	writers := make([]Writer[*models.Token], testParallel)
+	writers := make([]Writer, testParallel)
 	for i := range testParallel {
 		writers[i] = writeMock
 	}
 
-	pool := NewWriterPool[*models.Token](writers, nil)
+	pool := NewWriterPool(writers, nil)
 	require.NotNil(t, pool)
 
 	go func() {
@@ -164,7 +164,7 @@ func TestPools_RunNewWriterBackupPool(t *testing.T) {
 func TestPools_RunNewWriterBackupPoolError(t *testing.T) {
 	t.Parallel()
 
-	writeMock := mocks.NewMockWriter[*models.Token](t)
+	writeMock := mocks.NewMockWriter(t)
 	var (
 		mockCounter  int
 		counterMutex sync.Mutex
@@ -186,7 +186,7 @@ func TestPools_RunNewWriterBackupPoolError(t *testing.T) {
 
 	writeMock.EXPECT().Close().Return(nil)
 
-	pool := NewWriterPool[*models.Token]([]Writer[*models.Token]{writeMock, writeMock, writeMock}, nil)
+	pool := NewWriterPool([]Writer{writeMock, writeMock, writeMock}, nil)
 	require.NotNil(t, pool)
 
 	go func() {

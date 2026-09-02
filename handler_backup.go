@@ -69,9 +69,9 @@ type Writer interface {
 type backupHandler struct {
 	*handlerBase
 
-	readerProcessor *recordReaderProcessor[*models.Token]
-	writerProcessor *fileWriterProcessor[*models.Token]
-	encoder         Encoder[*models.Token]
+	readerProcessor *recordReaderProcessor
+	writerProcessor *fileWriterProcessor
+	encoder         Encoder
 	config          *ConfigBackup
 	aerospikeClient AerospikeClient
 	recordCounter   *recordCounter
@@ -87,7 +87,7 @@ type backupHandler struct {
 	// Backup state for continuation.
 	state *State
 
-	pl atomic.Pointer[pipe.Pipe[*models.Token]]
+	pl atomic.Pointer[pipe.Pipe]
 
 	// records per second collector.
 	rpsCollector *metrics.Collector
@@ -159,7 +159,7 @@ func newBackupHandler(
 		}
 	}
 
-	encoder := NewEncoder[*models.Token](config.EncoderType, config.Namespace, config.Compact, sIndexInfo)
+	encoder := NewEncoder(config.Namespace, config.Compact, sIndexInfo)
 
 	stats := models.NewBackupStats()
 
@@ -181,7 +181,7 @@ func newBackupHandler(
 
 	throttler := aerospike.NewThrottleLimiter(config.ParallelRead, config.ScanThrottlingTimeout)
 
-	readerProcessor := newRecordReaderProcessor[*models.Token](
+	readerProcessor := newRecordReaderProcessor(
 		config,
 		ac,
 		infoClient,
@@ -225,7 +225,7 @@ func newBackupHandler(
 		return nil, err
 	}
 
-	writerProcessor, err := newFileWriterProcessor[*models.Token](
+	writerProcessor, err := newFileWriterProcessor(
 		config.OutputFilePrefix,
 		bh.stateSuffixGenerator,
 		writer,
@@ -324,7 +324,7 @@ func (bh *backupHandler) getEstimateSamples(ctx context.Context, recordsNumber i
 		aerospike.NewRecordsetCloser())
 
 	// Timestamp processor.
-	tsProcessor := processors.NewVoidTimeSetter[*models.Token](bh.logger)
+	tsProcessor := processors.NewVoidTimeSetter(bh.logger)
 
 	var buf bytes.Buffer
 
@@ -390,12 +390,12 @@ func (bh *backupHandler) backup(ctx context.Context) error {
 	return bh.runBackupPipeline(ctx, dataWriters)
 }
 
-func (bh *backupHandler) runBackupPipeline(ctx context.Context, dataWriters []pipe.Writer[*models.Token]) error {
+func (bh *backupHandler) runBackupPipeline(ctx context.Context, dataWriters []pipe.Writer) error {
 	// Setup data processors
 	dataProcessors := newDataProcessor(
-		processors.NewRecordCounter[*models.Token](&bh.stats.ReadRecords),
-		processors.NewVoidTimeSetter[*models.Token](bh.logger),
-		processors.NewTPSLimiter[*models.Token](
+		processors.NewRecordCounter(&bh.stats.ReadRecords),
+		processors.NewVoidTimeSetter(bh.logger),
+		processors.NewTPSLimiter(
 			ctx, bh.config.RecordsPerSecond),
 	)
 
@@ -543,7 +543,7 @@ func (bh *backupHandler) backupSIndexes(
 		stInfo = newStateInfo(bh.state.RecordsStateChan, -1)
 	}
 
-	sindexWriter := pipe.Writer[*models.Token](
+	sindexWriter := pipe.Writer(
 		newTokenWriter(
 			bh.encoder,
 			writer,
@@ -554,12 +554,12 @@ func (bh *backupHandler) backupSIndexes(
 
 	sindexWriter = newWriterWithTokenStats(sindexWriter, bh.stats, bh.logger)
 
-	proc := newDataProcessor(processors.NewNoop[*models.Token]())
+	proc := newDataProcessor(processors.NewNoop())
 
 	sIndexPipeline, err := pipe.NewPipe(
 		proc,
-		[]pipe.Reader[*models.Token]{dataReader},
-		[]pipe.Writer[*models.Token]{sindexWriter},
+		[]pipe.Reader{dataReader},
+		[]pipe.Writer{sindexWriter},
 		bh.limiter,
 		pipe.Fixed,
 	)
@@ -581,7 +581,7 @@ func (bh *backupHandler) backupUDFs(
 		stInfo = newStateInfo(bh.state.RecordsStateChan, -1)
 	}
 
-	udfWriter := pipe.Writer[*models.Token](
+	udfWriter := pipe.Writer(
 		newTokenWriter(
 			bh.encoder,
 			writer,
@@ -592,12 +592,12 @@ func (bh *backupHandler) backupUDFs(
 
 	udfWriter = newWriterWithTokenStats(udfWriter, bh.stats, bh.logger)
 
-	proc := newDataProcessor(processors.NewNoop[*models.Token]())
+	proc := newDataProcessor(processors.NewNoop())
 
 	udfPipeline, err := pipe.NewPipe(
 		proc,
-		[]pipe.Reader[*models.Token]{dataReader},
-		[]pipe.Writer[*models.Token]{udfWriter},
+		[]pipe.Reader{dataReader},
+		[]pipe.Writer{udfWriter},
 		bh.limiter,
 		pipe.Fixed,
 	)

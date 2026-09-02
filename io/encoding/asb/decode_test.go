@@ -88,7 +88,7 @@ func TestASBReader_readHeader(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -202,7 +202,7 @@ func TestASBReader_readMetadata(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -458,7 +458,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 			if tt.name == "positive random 48" {
 				fmt.Println("test")
 			}
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -610,7 +610,7 @@ func TestASBReader_readUDF(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -1090,7 +1090,7 @@ func TestASBReader_readBin(t *testing.T) {
 			if tt.name == "positive random 10" {
 				fmt.Println("test")
 			}
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -1297,7 +1297,7 @@ func TestASBReader_readKey(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -1814,7 +1814,7 @@ func TestASBReader_readRecord(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:              tt.fields.reader,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
@@ -1889,7 +1889,7 @@ func TestASBReader_readBinCount(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -1955,7 +1955,7 @@ func TestASBReader_readExpiration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -2029,7 +2029,7 @@ func TestASBReader_readGeneration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -2087,7 +2087,7 @@ func TestASBReader_readSet(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -2148,7 +2148,7 @@ func TestASBReader_readDigest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -3076,7 +3076,7 @@ func TestASBReader_readBins(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -3354,7 +3354,7 @@ func TestASBReader_readGlobals(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:              tt.fields.reader,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
@@ -3466,7 +3466,7 @@ func TestASBReader_NextToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -3490,7 +3490,7 @@ func TestNewASBReader(t *testing.T) {
 	}
 	tests := []struct {
 		args    args
-		want    *Decoder[*models.Token]
+		want    *Decoder
 		name    string
 		wantErr bool
 	}{
@@ -3503,7 +3503,7 @@ func TestNewASBReader(t *testing.T) {
 						"# first-file\na", // "a" appended to avoid EOF error
 				),
 			},
-			want: &Decoder[*models.Token]{
+			want: &Decoder{
 				reader: newTestCountingReader(
 					"Version 3.1\n" +
 						"# namespace ns1\n" +
@@ -3545,7 +3545,7 @@ func TestNewASBReader(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := NewDecoder[*models.Token](tt.args.src, testFileName, false, slog.Default())
+			got, err := NewDecoder(tt.args.src, testFileName, false, slog.Default())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewASBReader() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -3597,7 +3597,7 @@ func TestEncodeDecodeRecordRoundTrip(t *testing.T) {
 		VoidTime: 100,
 	}, 0, nil)
 
-	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, models.SIndexInfo{}))
+	encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
 	var file bytes.Buffer
 	file.Write(encoder.GetHeader(true))
 
@@ -3605,7 +3605,7 @@ func TestEncodeDecodeRecordRoundTrip(t *testing.T) {
 		t.Fatalf("failed to encode token: %v", err)
 	}
 
-	decoder, err := NewDecoder[*models.Token](bytes.NewReader(file.Bytes()), testFileName, false, slog.Default())
+	decoder, err := NewDecoder(bytes.NewReader(file.Bytes()), testFileName, false, slog.Default())
 	if err != nil {
 		t.Fatalf("failed to create decoder: %v", err)
 	}
@@ -3661,7 +3661,7 @@ func BenchmarkDecodeRecordRoundTrip(b *testing.B) {
 		VoidTime: 100,
 	}, 0, nil)
 
-	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, models.SIndexInfo{}))
+	encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
 	var payload bytes.Buffer
 	payload.Write(encoder.GetHeader(true))
 	if err := encoder.EncodeToken(token, &payload); err != nil {
@@ -3673,7 +3673,7 @@ func BenchmarkDecodeRecordRoundTrip(b *testing.B) {
 	b.ResetTimer()
 
 	for b.Loop() {
-		decoder, err := NewDecoder[*models.Token](bytes.NewReader(data), testFileName, false, slog.Default())
+		decoder, err := NewDecoder(bytes.NewReader(data), testFileName, false, slog.Default())
 		if err != nil {
 			b.Fatal(err)
 		}

@@ -38,12 +38,12 @@ const (
 )
 
 // fileWriterProcessor configures and creates file writers pipelines.
-type fileWriterProcessor[T models.TokenConstraint] struct {
+type fileWriterProcessor struct {
 	prefix          string
 	suffixGenerator func() string
 
 	writer            Writer
-	encoder           Encoder[T]
+	encoder           Encoder
 	encryptionKey     []byte
 	compressionPolicy *CompressionPolicy
 	state             *State
@@ -58,11 +58,11 @@ type fileWriterProcessor[T models.TokenConstraint] struct {
 
 // newFileWriterProcessor returns a new file writer processor instance.
 // encryptionKey is the key for encryption; pass nil when encryption is disabled.
-func newFileWriterProcessor[T models.TokenConstraint](
+func newFileWriterProcessor(
 	prefix string,
 	suffixGenerator func() string,
 	writer Writer,
-	encoder Encoder[T],
+	encoder Encoder,
 	encryptionKey []byte,
 	compressionPolicy *CompressionPolicy,
 	state *State,
@@ -71,10 +71,10 @@ func newFileWriterProcessor[T models.TokenConstraint](
 	fileLimit uint64,
 	parallel int,
 	logger *slog.Logger,
-) (*fileWriterProcessor[T], error) {
+) (*fileWriterProcessor, error) {
 	logger.Debug("created new file writer processor")
 
-	p := &fileWriterProcessor[T]{
+	p := &fileWriterProcessor{
 		prefix:            prefix,
 		suffixGenerator:   suffixGenerator,
 		writer:            writer,
@@ -102,16 +102,16 @@ func newFileWriterProcessor[T models.TokenConstraint](
 //     That is used for metadata backup in case of backup to one file.
 //     As we need to use the same writer for metadata and records.
 //     In the case of backup to directory, it won't be used.
-//   - Initialized pipeline workers pipe.Writer[T] that should be passed directly to the pipeline,
+//   - Initialized pipeline workers pipe.Writer that should be passed directly to the pipeline,
 //     for records data backup.
 //   - Error if any.
-func (fw *fileWriterProcessor[T]) newDataWriters(ctx context.Context) ([]io.WriteCloser, []pipe.Writer[T], error) {
+func (fw *fileWriterProcessor) newDataWriters(ctx context.Context) ([]io.WriteCloser, []pipe.Writer, error) {
 	writers, err := fw.newWriters(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create storage writers: %w", err)
 	}
 
-	dataWriters := make([]pipe.Writer[T], len(writers))
+	dataWriters := make([]pipe.Writer, len(writers))
 
 	for i, writer := range writers {
 		dataWriters[i] = fw.createDataWriter(writer, i)
@@ -125,7 +125,7 @@ func (fw *fileWriterProcessor[T]) newDataWriters(ctx context.Context) ([]io.Writ
 // newMetaWriter creates a new writer for metadata based on the current configuration.
 // In the case of backup to one file, it returns the same writer that was passed.
 // Otherwise, it creates a separate writer for metadata.
-func (fw *fileWriterProcessor[T]) newMetaWriter(ctx context.Context, writer io.WriteCloser) (io.WriteCloser, error) {
+func (fw *fileWriterProcessor) newMetaWriter(ctx context.Context, writer io.WriteCloser) (io.WriteCloser, error) {
 	// If it is backup to file, we return the same writer.
 	if fw.isSingleFileBackup() {
 		return writer, nil
@@ -140,7 +140,7 @@ func (fw *fileWriterProcessor[T]) newMetaWriter(ctx context.Context, writer io.W
 }
 
 // createDataWriter creates a single data writer with state info if available.
-func (fw *fileWriterProcessor[T]) createDataWriter(writer io.WriteCloser, n int) pipe.Writer[T] {
+func (fw *fileWriterProcessor) createDataWriter(writer io.WriteCloser, n int) pipe.Writer {
 	sInfo := fw.getStateInfo(n)
 	tWriter := newTokenWriter(fw.encoder, writer, fw.logger.With(slog.Int("writer", n)), sInfo)
 
@@ -148,7 +148,7 @@ func (fw *fileWriterProcessor[T]) createDataWriter(writer io.WriteCloser, n int)
 }
 
 // getStateInfo returns state info for the given index if state is available.
-func (fw *fileWriterProcessor[T]) getStateInfo(n int) *stateInfo {
+func (fw *fileWriterProcessor) getStateInfo(n int) *stateInfo {
 	if fw.state == nil {
 		return nil
 	}
@@ -157,7 +157,7 @@ func (fw *fileWriterProcessor[T]) getStateInfo(n int) *stateInfo {
 }
 
 // newWriters returns a slice of configured writers.
-func (fw *fileWriterProcessor[T]) newWriters(ctx context.Context) ([]io.WriteCloser, error) {
+func (fw *fileWriterProcessor) newWriters(ctx context.Context) ([]io.WriteCloser, error) {
 	writers := make([]io.WriteCloser, fw.parallel)
 
 	for i := range fw.parallel {
@@ -178,7 +178,7 @@ func (fw *fileWriterProcessor[T]) newWriters(ctx context.Context) ([]io.WriteClo
 // If FileLimit is set, it returns a sized writer limited to FileLimit bytes.
 // The returned writer may be compressed or encrypted depending on the BackupHandler's
 // configuration.
-func (fw *fileWriterProcessor[T]) newWriter(ctx context.Context, n int,
+func (fw *fileWriterProcessor) newWriter(ctx context.Context, n int,
 ) (io.WriteCloser, error) {
 	var saveCommandChan chan int
 	if fw.state != nil {
@@ -193,7 +193,7 @@ func (fw *fileWriterProcessor[T]) newWriter(ctx context.Context, n int,
 }
 
 // configureWriter returns configured writer.
-func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, sizeCounter *atomic.Uint64,
+func (fw *fileWriterProcessor) configureWriter(ctx context.Context, n int, sizeCounter *atomic.Uint64,
 ) (io.WriteCloser, error) {
 	// Generate file name.
 	filename := fw.getFileName(n)
@@ -236,7 +236,7 @@ func (fw *fileWriterProcessor[T]) configureWriter(ctx context.Context, n int, si
 }
 
 // getFileName generates a file name based on the current configuration.
-func (fw *fileWriterProcessor[T]) getFileName(n int) string {
+func (fw *fileWriterProcessor) getFileName(n int) string {
 	// If it is a single file backup, we don't need to generate a file name.
 	if fw.isSingleFileBackup() && n >= 0 {
 		return ""
@@ -252,7 +252,7 @@ func (fw *fileWriterProcessor[T]) getFileName(n int) string {
 		// If prefix is set, we use it as a prefix.
 		prefix = fw.prefix
 	default:
-		// If the prefix is not set (for .asbx files prefix must be empty), we use the default one: <worker number>_
+		// If the prefix is not set, we use the default one: <worker number>_
 		prefix = fmt.Sprintf("%d_", n)
 	}
 
@@ -261,7 +261,7 @@ func (fw *fileWriterProcessor[T]) getFileName(n int) string {
 }
 
 // isSingleFileBackup returns true if the backup is single file backup.
-func (fw *fileWriterProcessor[T]) isSingleFileBackup() bool {
+func (fw *fileWriterProcessor) isSingleFileBackup() bool {
 	return fw.writer != nil && !fw.writer.GetOptions().IsDir
 }
 

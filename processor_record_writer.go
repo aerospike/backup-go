@@ -26,7 +26,7 @@ import (
 )
 
 // recordWriterProcessor configures and creates record writers pipelines for restoring data.
-type recordWriterProcessor[T models.TokenConstraint] struct {
+type recordWriterProcessor struct {
 	aerospikeClient  AerospikeClient
 	config           *ConfigRestore
 	stats            *models.RestoreStats
@@ -37,17 +37,17 @@ type recordWriterProcessor[T models.TokenConstraint] struct {
 }
 
 // newRecordWriterProcessor returns a new record writer processor.
-func newRecordWriterProcessor[T models.TokenConstraint](
+func newRecordWriterProcessor(
 	aerospikeClient AerospikeClient,
 	config *ConfigRestore,
 	stats *models.RestoreStats,
 	metricsCollector *metrics.Collector,
 	infoClient ClusterInfo,
 	logger *slog.Logger,
-) *recordWriterProcessor[T] {
+) *recordWriterProcessor {
 	logger.Debug("created new records writer processor")
 
-	return &recordWriterProcessor[T]{
+	return &recordWriterProcessor{
 		aerospikeClient:  aerospikeClient,
 		config:           config,
 		stats:            stats,
@@ -58,7 +58,7 @@ func newRecordWriterProcessor[T models.TokenConstraint](
 }
 
 // newDataWriters creates the data writers for restoring data.
-func (rw *recordWriterProcessor[T]) newDataWriters(ctx context.Context) ([]pipe.Writer[T], error) {
+func (rw *recordWriterProcessor) newDataWriters(ctx context.Context) ([]pipe.Writer, error) {
 	var parallelism int
 
 	// Determine the parallelism based on the encoder type and batch writes support.
@@ -71,7 +71,7 @@ func (rw *recordWriterProcessor[T]) newDataWriters(ctx context.Context) ([]pipe.
 
 	// If we need only validation, we create discard writers.
 	if rw.config.ValidateOnly {
-		return newDiscardWriters[T](parallelism, rw.stats, rw.logger), nil
+		return newDiscardWriters(parallelism, rw.stats, rw.logger), nil
 	}
 
 	// Check if batch writes are supported.
@@ -80,10 +80,10 @@ func (rw *recordWriterProcessor[T]) newDataWriters(ctx context.Context) ([]pipe.
 		return nil, fmt.Errorf("failed to check batch writes: %w", err)
 	}
 
-	dataWriters := make([]pipe.Writer[T], parallelism)
+	dataWriters := make([]pipe.Writer, parallelism)
 
 	for i := 0; i < parallelism; i++ {
-		writer := aerospike.NewRestoreWriter[T](
+		writer := aerospike.NewRestoreWriter(
 			ctx,
 			rw.aerospikeClient,
 			rw.config.WritePolicy,
@@ -96,14 +96,14 @@ func (rw *recordWriterProcessor[T]) newDataWriters(ctx context.Context) ([]pipe.
 			rw.config.IgnoreRecordError,
 		)
 
-		dataWriters[i] = newWriterWithTokenStats[T](writer, rw.stats, rw.logger)
+		dataWriters[i] = newWriterWithTokenStats(writer, rw.stats, rw.logger)
 	}
 
 	return dataWriters, nil
 }
 
 // useBatchWrites checks if batch writes are supported.
-func (rw *recordWriterProcessor[T]) useBatchWrites(ctx context.Context) (bool, error) {
+func (rw *recordWriterProcessor) useBatchWrites(ctx context.Context) (bool, error) {
 	if rw.config.DisableBatchWrites {
 		return false, nil
 	}
@@ -112,27 +112,27 @@ func (rw *recordWriterProcessor[T]) useBatchWrites(ctx context.Context) (bool, e
 }
 
 // discardWriter is a writer that does nothing. Used for backup files validation.
-type discardWriter[T models.TokenConstraint] struct{}
+type discardWriter struct{}
 
 // Write does nothing.
-func (w *discardWriter[T]) Write(_ T) (int, error) {
+func (w *discardWriter) Write(_ *models.Token) (int, error) {
 	return 0, nil
 }
 
 // Close does nothing.
-func (w *discardWriter[T]) Close() error {
+func (w *discardWriter) Close() error {
 	return nil
 }
 
 // newDiscardWriters creates a slice of empty writers.
-func newDiscardWriters[T models.TokenConstraint](
+func newDiscardWriters(
 	parallelism int,
 	stats statsSetterToken,
 	logger *slog.Logger,
-) []pipe.Writer[T] {
-	dataWriters := make([]pipe.Writer[T], parallelism)
+) []pipe.Writer {
+	dataWriters := make([]pipe.Writer, parallelism)
 	for i := range parallelism {
-		dataWriters[i] = newWriterWithTokenStats[T](&discardWriter[T]{}, stats, logger)
+		dataWriters[i] = newWriterWithTokenStats(&discardWriter{}, stats, logger)
 	}
 
 	return dataWriters

@@ -38,7 +38,7 @@ var testEncoderConfig = NewEncoderConfig("test", false, models.SIndexInfo{})
 func TestEncodeTokenRecord(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder[*models.Token](testEncoderConfig)
+	encoder := NewEncoder(testEncoderConfig)
 
 	key, aerr := a.NewKey("test", "demo", "1234")
 	require.NoError(t, aerr)
@@ -69,7 +69,7 @@ func TestEncodeTokenRecord(t *testing.T) {
 func TestEncodeTokenUDF(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder[*models.Token](testEncoderConfig)
+	encoder := NewEncoder(testEncoderConfig)
 
 	token := &models.Token{
 		Type: models.TokenTypeUDF,
@@ -93,7 +93,7 @@ func TestEncodeTokenUDF(t *testing.T) {
 func TestEncodeTokenSIndex(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder[*models.Token](testEncoderConfig)
+	encoder := NewEncoder(testEncoderConfig)
 
 	token := &models.Token{
 		Type: models.TokenTypeSIndex,
@@ -122,7 +122,7 @@ func TestEncodeTokenSIndex(t *testing.T) {
 func TestEncodeTokenInvalid(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder[*models.Token](testEncoderConfig)
+	encoder := NewEncoder(testEncoderConfig)
 
 	token := &models.Token{
 		Type: models.TokenTypeInvalid,
@@ -137,7 +137,7 @@ func TestEncodeTokenInvalid(t *testing.T) {
 func TestEncodeRecord(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder[*models.Token](testEncoderConfig)
+	encoder := NewEncoder(testEncoderConfig)
 
 	var recExpr int64 = 10
 
@@ -190,7 +190,7 @@ func TestGetHeaderFirst(t *testing.T) {
 
 	expected := "Version 3.1\n# namespace test\n# first-file\n"
 
-	encoder := NewEncoder[*models.Token](testEncoderConfig)
+	encoder := NewEncoder(testEncoderConfig)
 	firstHeader := encoder.GetHeader(true)
 	require.Equal(t, expected, string(firstHeader))
 
@@ -1688,7 +1688,7 @@ func Test_writeUserKeyBytes(t *testing.T) {
 }
 
 func BenchmarkEncodeRecord(b *testing.B) {
-	encoder := NewEncoder[*models.Token](testEncoderConfig)
+	encoder := NewEncoder(testEncoderConfig)
 
 	key := genKey()
 
@@ -1738,7 +1738,7 @@ func BenchmarkEncodeRecord(b *testing.B) {
 }
 
 func BenchmarkEncodeTokenRecordAllDataTypes(b *testing.B) {
-	encoder := NewEncoder[*models.Token](testEncoderConfig)
+	encoder := NewEncoder(testEncoderConfig)
 
 	key, err := a.NewKey("test", "all_types_set", "benchmark-user-key")
 	if err != nil {

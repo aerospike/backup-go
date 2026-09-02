@@ -18,11 +18,6 @@ type Sizer interface {
 	GetSize() uint64
 }
 
-type TokenConstraint interface {
-	Sizer
-	*Token
-}
-
 type TokenType uint8
 
 const (

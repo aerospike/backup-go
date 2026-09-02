@@ -43,9 +43,6 @@ type ConfigRestore struct {
 	SetList []string
 	// The bins to restore (optional, given an empty list, all bins will be restored).
 	BinList []string
-	// EncoderType describes an Encoder type that will be used on restoring.
-	// Default `EncoderTypeASB` = 0.
-	EncoderType EncoderType
 	// Parallel is the number of concurrent record readers from backup files.
 	Parallel int
 	// RecordsPerSecond limits restore records per second (rps) rate.
@@ -95,7 +92,6 @@ func NewDefaultRestoreConfig() *ConfigRestore {
 		Parallel:        4,
 		BatchSize:       128,
 		MaxAsyncBatches: 16,
-		EncoderType:     EncoderTypeASB,
 	}
 }
 
@@ -151,43 +147,6 @@ func (c *ConfigRestore) validate() error {
 		if err := collections.CheckDuplicates(c.BinList); err != nil {
 			return fmt.Errorf("bin list contains duplicates: %w", err)
 		}
-	}
-
-	return nil
-}
-
-// isValidForASBX checks if config is valid for restoring from asbx.
-func (c *ConfigRestore) isValidForASBX() error {
-	if c.Namespace != nil && *c.Namespace.Source != *c.Namespace.Destination {
-		return fmt.Errorf("changing namespace is not supported for ASBX")
-	}
-
-	if len(c.SetList) > 0 {
-		return fmt.Errorf("set list is not supported for ASBX")
-	}
-
-	if len(c.BinList) > 0 {
-		return fmt.Errorf("bin list is not supported for ASBX")
-	}
-
-	if c.NoRecords {
-		return fmt.Errorf("no records is not supported for ASBX")
-	}
-
-	if c.NoIndexes {
-		return fmt.Errorf("no indexes is not supported for ASBX")
-	}
-
-	if c.NoUDFs {
-		return fmt.Errorf("no udfs is not supported for ASBX")
-	}
-
-	if c.DisableBatchWrites {
-		return fmt.Errorf("disable batch writes is not supported for ASBX")
-	}
-
-	if c.ExtraTTL > 0 {
-		return fmt.Errorf("extra ttl value is not supported for ASBX")
 	}
 
 	return nil

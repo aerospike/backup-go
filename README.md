@@ -111,7 +111,7 @@ func main() {
 
 ### Restore
 
-The restore operation reads backup files in both `asb` and `asbx` formats and restores them using
+The restore operation reads backup files `asb` formats and restores them using
 the configured backup client.
 
 ```go
@@ -217,9 +217,6 @@ type ConfigBackup struct {
     // If set to true, we launch parallel workers for nodes; otherwise workers run in parallel for partitions.
     // Excludes PartitionFilters param.
     ParallelNodes bool
-    // EncoderType describes an Encoder type that will be used on backing up.
-    // Default `EncoderTypeASB` = 0.
-    EncoderType EncoderType
     // ParallelRead is the number of concurrent scans to run against the Aerospike cluster.
     ParallelRead int
     // ParallelWrite is the number of concurrent backup files writing.
@@ -299,9 +296,6 @@ type ConfigRestore struct {
     SetList []string
     // The bins to restore (optional, given an empty list, all bins will be restored).
     BinList []string
-    // EncoderType describes an Encoder type that will be used on restoring.
-    // Default `EncoderTypeASB` = 0.
-    EncoderType EncoderType
     // Parallel is the number of concurrent record readers from backup files.
     Parallel int
     // RecordsPerSecond limits restore records per second (rps) rate.

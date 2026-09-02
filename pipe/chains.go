@@ -30,40 +30,40 @@ const (
 )
 
 // Reader describes data readers. To exit worker, the Reader must return io.EOF.
-type Reader[T models.TokenConstraint] interface {
-	Read(ctx context.Context) (T, error)
+type Reader interface {
+	Read(ctx context.Context) (*models.Token, error)
 	// Close is required so the read loop can defer cleanup; most
 	// implementations are no-ops. A notable exception is
 	Close()
 }
 
 // Writer describes data writers.
-type Writer[T models.TokenConstraint] interface {
-	Write(T) (n int, err error)
+type Writer interface {
+	Write(*models.Token) (n int, err error)
 	Close() (err error)
 }
 
 // Processor describes data processors.
-type Processor[T models.TokenConstraint] interface {
-	Process(T) (T, error)
+type Processor interface {
+	Process(*models.Token) (*models.Token, error)
 }
 
 // The Chain contains a routine to process data. Chains will be running in parallel.
 // Each routine is built from a Reader and/or Processor and/or Writer.
-type Chain[T models.TokenConstraint] struct {
+type Chain struct {
 	routine func(context.Context) error
 }
 
 // Run execute the chain.
-func (c *Chain[T]) Run(ctx context.Context) error {
+func (c *Chain) Run(ctx context.Context) error {
 	return c.routine(ctx)
 }
 
 // NewReaderChain returns a new Chain with a Reader and a Processor,
 // and communication channel for backup operation.
-func NewReaderChain[T models.TokenConstraint](r Reader[T], p Processor[T]) (chain *Chain[T], output chan T) {
-	output = make(chan T, readerBufferSize)
-	chain = &Chain[T]{
+func NewReaderChain(r Reader, p Processor) (chain *Chain, output chan *models.Token) {
+	output = make(chan *models.Token, readerBufferSize)
+	chain = &Chain{
 		routine: newReaderRoutine(r, p, output),
 	}
 
@@ -71,7 +71,7 @@ func NewReaderChain[T models.TokenConstraint](r Reader[T], p Processor[T]) (chai
 }
 
 // newReaderRoutine returns a function that will be executed in goroutine to process a reader.
-func newReaderRoutine[T models.TokenConstraint](r Reader[T], p Processor[T], output chan<- T,
+func newReaderRoutine(r Reader, p Processor, output chan<- *models.Token,
 ) func(context.Context) error {
 	return func(ctx context.Context) error {
 		defer r.Close()
@@ -119,9 +119,9 @@ func newReaderRoutine[T models.TokenConstraint](r Reader[T], p Processor[T], out
 
 // NewWriterChain returns a new Chain with a Writer,
 // and communication channel for backup operation.
-func NewWriterChain[T models.TokenConstraint](w Writer[T], limiter *bandwidth.Limiter) (chain *Chain[T], input chan T) {
-	input = make(chan T, writerBufferSize)
-	chain = &Chain[T]{
+func NewWriterChain(w Writer, limiter *bandwidth.Limiter) (chain *Chain, input chan *models.Token) {
+	input = make(chan *models.Token, writerBufferSize)
+	chain = &Chain{
 		routine: newWriterRoutine(w, input, limiter),
 	}
 
@@ -129,7 +129,7 @@ func NewWriterChain[T models.TokenConstraint](w Writer[T], limiter *bandwidth.Li
 }
 
 // newWriterRoutine returns a function that will be executed in goroutine to process a writer.
-func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, limiter *bandwidth.Limiter,
+func newWriterRoutine(w Writer, input <-chan *models.Token, limiter *bandwidth.Limiter,
 ) func(context.Context) error {
 	// Notice!
 	// It is important to return func with `(err error)`,
@@ -150,7 +150,7 @@ func newWriterRoutine[T models.TokenConstraint](w Writer[T], input <-chan T, lim
 		}()
 
 		var (
-			data T
+			data *models.Token
 			ok   bool
 		)
 

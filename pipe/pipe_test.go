@@ -30,7 +30,7 @@ import (
 func TestPipe_RunBackupPipe(t *testing.T) {
 	t.Parallel()
 
-	readersMock := mocks.NewMockReader[*models.Token](t)
+	readersMock := mocks.NewMockReader(t)
 	var (
 		mockCounter  int
 		counterMutex sync.Mutex
@@ -51,14 +51,14 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 
 	readersMock.EXPECT().Close()
 
-	newProcessorMock := func() Processor[*models.Token] {
-		m := mocks.NewMockProcessor[*models.Token](t)
+	newProcessorMock := func() Processor {
+		m := mocks.NewMockProcessor(t)
 		m.EXPECT().Process(testToken()).Return(testToken(), nil)
 
 		return m
 	}
 
-	writersMocks := mocks.NewMockWriter[*models.Token](t)
+	writersMocks := mocks.NewMockWriter(t)
 	var (
 		mockCounterWrite int
 		writeMutex       sync.Mutex
@@ -73,7 +73,7 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 
 	writersMocks.EXPECT().Close().Return(nil)
 
-	readerSlice := make([]Reader[*models.Token], testParallel)
+	readerSlice := make([]Reader, testParallel)
 	for i := range testParallel {
 		readerSlice[i] = readersMock
 	}
@@ -81,7 +81,7 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 	p, err := NewPipe(
 		newProcessorMock,
 		readerSlice,
-		[]Writer[*models.Token]{writersMocks, writersMocks, writersMocks},
+		[]Writer{writersMocks, writersMocks, writersMocks},
 		nil,
 		RoundRobin,
 	)
@@ -100,7 +100,7 @@ func TestPipe_RunBackupPipe(t *testing.T) {
 func TestPipe_RunBackupPipeError(t *testing.T) {
 	t.Parallel()
 
-	readersMock := mocks.NewMockReader[*models.Token](t)
+	readersMock := mocks.NewMockReader(t)
 	var (
 		mockCounter  int
 		counterMutex sync.Mutex
@@ -120,14 +120,14 @@ func TestPipe_RunBackupPipeError(t *testing.T) {
 	})
 	readersMock.EXPECT().Close()
 
-	newProcessorMock := func() Processor[*models.Token] {
-		m := mocks.NewMockProcessor[*models.Token](t)
+	newProcessorMock := func() Processor {
+		m := mocks.NewMockProcessor(t)
 		m.EXPECT().Process(testToken()).Return(testToken(), nil)
 
 		return m
 	}
 
-	writersMocks := mocks.NewMockWriter[*models.Token](t)
+	writersMocks := mocks.NewMockWriter(t)
 	var mockCounterWrite int
 	var writeMutex sync.Mutex
 	writersMocks.EXPECT().Write(testToken()).RunAndReturn(func(*models.Token) (int, error) {
@@ -150,8 +150,8 @@ func TestPipe_RunBackupPipeError(t *testing.T) {
 
 	p, err := NewPipe(
 		newProcessorMock,
-		[]Reader[*models.Token]{readersMock, readersMock, readersMock},
-		[]Writer[*models.Token]{writersMocks, writersMocks, writersMocks},
+		[]Reader{readersMock, readersMock, readersMock},
+		[]Writer{writersMocks, writersMocks, writersMocks},
 		nil,
 		Fixed,
 	)
@@ -165,8 +165,8 @@ func TestPipe_RunBackupPipeError(t *testing.T) {
 func TestPipe_NewBackupPipeError(t *testing.T) {
 	t.Parallel()
 
-	newProcessorMock := func() Processor[*models.Token] {
-		m := mocks.NewMockProcessor[*models.Token](t)
+	newProcessorMock := func() Processor {
+		m := mocks.NewMockProcessor(t)
 		m.EXPECT().Process(testToken()).Return(testToken(), nil)
 
 		return m

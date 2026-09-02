@@ -35,8 +35,6 @@ const (
 )
 
 // AerospikeClient describes aerospike client interface for easy mocking.
-//
-//go:generate mockery --name AerospikeClient
 type AerospikeClient interface {
 	GetDefaultScanPolicy() *a.ScanPolicy
 	GetDefaultInfoPolicy() *a.InfoPolicy
@@ -331,26 +329,21 @@ func (c *Client) Restore(
 		return nil, fmt.Errorf("failed to validate restore config: %w", err)
 	}
 
-	switch config.EncoderType {
-	case EncoderTypeASB:
-		handler, err := newRestoreHandler[*models.Token](
-			ctx,
-			config,
-			c.aerospikeClient,
-			c.logger,
-			streamingReader,
-			c.infoClient,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create restore handler: %w", err)
-		}
-
-		handler.run()
-
-		return handler, nil
-	default:
-		return nil, fmt.Errorf("unknown encoder type: %d", config.EncoderType)
+	handler, err := newRestoreHandler(
+		ctx,
+		config,
+		c.aerospikeClient,
+		c.logger,
+		streamingReader,
+		c.infoClient,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create restore handler: %w", err)
 	}
+
+	handler.run()
+
+	return handler, nil
 }
 
 // AerospikeClient returns the underlying aerospike client.

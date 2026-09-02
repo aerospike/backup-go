@@ -37,35 +37,35 @@ func TestNewFilterByType(t *testing.T) {
 			noRecords:  false,
 			noIndexes:  false,
 			noUdf:      false,
-			expectType: &noopProcessor[*models.Token]{},
+			expectType: &noopProcessor{},
 		},
 		{
 			name:       "Only noRecords filter applied",
 			noRecords:  true,
 			noIndexes:  false,
 			noUdf:      false,
-			expectType: &filterByType[*models.Token]{},
+			expectType: &filterByType{},
 		},
 		{
 			name:       "Only noIndexes filter applied",
 			noRecords:  false,
 			noIndexes:  true,
 			noUdf:      false,
-			expectType: &filterByType[*models.Token]{},
+			expectType: &filterByType{},
 		},
 		{
 			name:       "Only noUdf filter applied",
 			noRecords:  false,
 			noIndexes:  false,
 			noUdf:      true,
-			expectType: &filterByType[*models.Token]{},
+			expectType: &filterByType{},
 		},
 		{
 			name:       "All filters applied",
 			noRecords:  true,
 			noIndexes:  true,
 			noUdf:      true,
-			expectType: &filterByType[*models.Token]{},
+			expectType: &filterByType{},
 		},
 	}
 
@@ -73,7 +73,7 @@ func TestNewFilterByType(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var skipped atomic.Uint64
-			processor := NewFilterByType[*models.Token](tt.noRecords, tt.noIndexes, tt.noUdf, &skipped)
+			processor := NewFilterByType(tt.noRecords, tt.noIndexes, tt.noUdf, &skipped)
 			assert.IsType(t, tt.expectType, processor)
 		})
 	}
@@ -84,14 +84,14 @@ func TestFilterByTypeProcess(t *testing.T) {
 	var skipped atomic.Uint64
 	tests := []struct {
 		name         string
-		filter       *filterByType[*models.Token]
+		filter       *filterByType
 		token        *models.Token
 		expectError  bool
 		errorMessage string
 	}{
 		{
 			name: "Filter out record token with noRecords flag",
-			filter: &filterByType[*models.Token]{
+			filter: &filterByType{
 				noRecords: true,
 				noIndexes: false,
 				noUdf:     false,
@@ -105,7 +105,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 		},
 		{
 			name: "Allow record token with noRecords flag off",
-			filter: &filterByType[*models.Token]{
+			filter: &filterByType{
 				noRecords: false,
 				noIndexes: false,
 				noUdf:     false,
@@ -116,7 +116,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 		},
 		{
 			name: "Filter out sIndex token with noIndexes flag",
-			filter: &filterByType[*models.Token]{
+			filter: &filterByType{
 				noRecords: false,
 				noIndexes: true,
 				noUdf:     false,
@@ -130,7 +130,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 		},
 		{
 			name: "Allow sIndex token with noIndexes flag off",
-			filter: &filterByType[*models.Token]{
+			filter: &filterByType{
 				noRecords: false,
 				noIndexes: false,
 				noUdf:     false,
@@ -141,7 +141,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 		},
 		{
 			name: "Filter out UDF token with noUdf flag",
-			filter: &filterByType[*models.Token]{
+			filter: &filterByType{
 				noRecords: false,
 				noIndexes: false,
 				noUdf:     true,
@@ -155,7 +155,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 		},
 		{
 			name: "Allow UDF token with noUdf flag off",
-			filter: &filterByType[*models.Token]{
+			filter: &filterByType{
 				noRecords: false,
 				noIndexes: false,
 				noUdf:     false,
@@ -166,7 +166,7 @@ func TestFilterByTypeProcess(t *testing.T) {
 		},
 		{
 			name: "No filtering applied",
-			filter: &filterByType[*models.Token]{
+			filter: &filterByType{
 				noRecords: false,
 				noIndexes: false,
 				noUdf:     false,

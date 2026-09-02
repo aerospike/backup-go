@@ -27,7 +27,7 @@ func TestSetFilter(t *testing.T) {
 	t.Parallel()
 	type test struct {
 		token            *models.Token
-		setFilter        *filterBySet[*models.Token]
+		setFilter        *filterBySet
 		name             string
 		shouldBeFiltered bool
 	}
@@ -45,7 +45,7 @@ func TestSetFilter(t *testing.T) {
 			token: &models.Token{
 				Type: models.TokenTypeSIndex,
 			},
-			setFilter: &filterBySet[*models.Token]{
+			setFilter: &filterBySet{
 				setsToRestore: map[string]bool{
 					"test": true,
 				},
@@ -58,7 +58,7 @@ func TestSetFilter(t *testing.T) {
 				Type:   models.TokenTypeRecord,
 				Record: record,
 			},
-			setFilter:        &filterBySet[*models.Token]{setsToRestore: map[string]bool{}},
+			setFilter:        &filterBySet{setsToRestore: map[string]bool{}},
 			shouldBeFiltered: false,
 		},
 		{
@@ -67,7 +67,7 @@ func TestSetFilter(t *testing.T) {
 				Type:   models.TokenTypeRecord,
 				Record: record,
 			},
-			setFilter: &filterBySet[*models.Token]{
+			setFilter: &filterBySet{
 				setsToRestore: map[string]bool{
 					"anotherSet": true,
 				},
@@ -81,7 +81,7 @@ func TestSetFilter(t *testing.T) {
 				Type:   models.TokenTypeRecord,
 				Record: record,
 			},
-			setFilter: &filterBySet[*models.Token]{
+			setFilter: &filterBySet{
 				setsToRestore: map[string]bool{
 					setName: true,
 				},

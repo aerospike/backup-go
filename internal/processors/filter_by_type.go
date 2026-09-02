@@ -22,7 +22,7 @@ import (
 )
 
 // tokenTypeFilterProcessor is used to support no-records, no-indexes and no-udf flags.
-type filterByType[T models.TokenConstraint] struct {
+type filterByType struct {
 	noRecords bool
 	noIndexes bool
 	noUdf     bool
@@ -31,12 +31,12 @@ type filterByType[T models.TokenConstraint] struct {
 }
 
 // NewFilterByType creates a new filterByType processor with the given flags.
-func NewFilterByType[T models.TokenConstraint](noRecords, noIndexes, noUdf bool, skipped *atomic.Uint64) Processor[T] {
+func NewFilterByType(noRecords, noIndexes, noUdf bool, skipped *atomic.Uint64) Processor {
 	if !noRecords && !noIndexes && !noUdf {
-		return &noopProcessor[T]{}
+		return &noopProcessor{}
 	}
 
-	return &filterByType[T]{
+	return &filterByType{
 		noRecords: noRecords,
 		noIndexes: noIndexes,
 		noUdf:     noUdf,
@@ -45,12 +45,7 @@ func NewFilterByType[T models.TokenConstraint](noRecords, noIndexes, noUdf bool,
 }
 
 // Process filters tokens by type.
-func (p filterByType[T]) Process(token T) (T, error) {
-	t, ok := any(token).(*models.Token)
-	if !ok {
-		return nil, fmt.Errorf("unsupported token type %T for record counter", token)
-	}
-
+func (p filterByType) Process(t *models.Token) (*models.Token, error) {
 	if p.noRecords && t.Type == models.TokenTypeRecord {
 		p.skipped.Add(1)
 
@@ -65,5 +60,5 @@ func (p filterByType[T]) Process(token T) (T, error) {
 		return nil, fmt.Errorf("%w: UDF is filtered with no-udf flag", models.ErrFilteredOut)
 	}
 
-	return token, nil
+	return t, nil
 }

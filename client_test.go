@@ -147,13 +147,10 @@ func TestRestoreNilStreamingReader(t *testing.T) {
 	client, err := NewClient(testAeroClient)
 	require.NoError(t, err)
 
-	config := &ConfigRestore{
-		EncoderType: EncoderTypeASB,
-	}
+	config := &ConfigRestore{}
 
 	_, err = client.Restore(t.Context(), config, nil)
 	require.Error(t, err)
-	// The validation happens before the check for nil streaming reader
 	assert.Contains(t, err.Error(), "failed to validate restore config")
 }
 
@@ -166,9 +163,8 @@ func TestRestoreInvalidConfig(t *testing.T) {
 	client, err := NewClient(testAeroClient)
 	require.NoError(t, err)
 
-	// Create an invalid config (invalid encoder type)
 	config := &ConfigRestore{
-		EncoderType: 999, // Invalid encoder type
+		Parallel: 0,
 	}
 
 	_, err = client.Restore(t.Context(), config, &mocks.MockStreamingReader{})
@@ -176,7 +172,7 @@ func TestRestoreInvalidConfig(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to validate restore config")
 }
 
-func TestRestoreInvalidEncoderType(t *testing.T) {
+func TestRestoreInvalidParallel(t *testing.T) {
 	t.Parallel()
 
 	testAeroClient, aerr := testAerospikeClient()
@@ -185,9 +181,8 @@ func TestRestoreInvalidEncoderType(t *testing.T) {
 	client, err := NewClient(testAeroClient)
 	require.NoError(t, err)
 
-	// Create a config with an invalid encoder type
 	config := &ConfigRestore{
-		EncoderType: 999, // Invalid encoder type
+		Parallel: -1,
 	}
 
 	_, err = client.Restore(t.Context(), config, &mocks.MockStreamingReader{})

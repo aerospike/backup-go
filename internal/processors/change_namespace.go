@@ -22,32 +22,28 @@ import (
 )
 
 // changeNamespace is used to restore to another namespace.
-type changeNamespace[T models.TokenConstraint] struct {
+type changeNamespace struct {
 	source      *string
 	destination *string
 }
 
 // NewChangeNamespace creates new changeNamespace
-func NewChangeNamespace[T models.TokenConstraint](source, destination *string) Processor[T] {
+func NewChangeNamespace(source, destination *string) Processor {
 	if source == nil || destination == nil {
-		return &noopProcessor[T]{}
+		return &noopProcessor{}
 	}
 
-	return &changeNamespace[T]{
+	return &changeNamespace{
 		source:      source,
 		destination: destination,
 	}
 }
 
 // Process filters tokens by type.
-func (p changeNamespace[T]) Process(token T) (T, error) {
-	t, ok := any(token).(*models.Token)
-	if !ok {
-		return nil, fmt.Errorf("unsupported token type %T for change namespace", token)
-	}
+func (p changeNamespace) Process(t *models.Token) (*models.Token, error) {
 	// if the token is not a record, we don't need to process it
 	if t.Type != models.TokenTypeRecord {
-		return token, nil
+		return t, nil
 	}
 
 	key := t.Record.Key
@@ -62,5 +58,5 @@ func (p changeNamespace[T]) Process(token T) (T, error) {
 
 	t.Record.Key = newKey
 
-	return any(t).(T), nil
+	return t, nil
 }

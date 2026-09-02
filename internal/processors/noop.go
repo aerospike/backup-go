@@ -14,23 +14,21 @@
 
 package processors
 
-import (
-	"github.com/aerospike/backup-go/models"
-)
+import "github.com/aerospike/backup-go/models"
 
-type Processor[T models.TokenConstraint] interface {
-	Process(token T) (T, error)
+type Processor interface {
+	Process(token *models.Token) (*models.Token, error)
 }
 
 // noopProcessor is a no-op implementation of a Processor.
-type noopProcessor[T models.TokenConstraint] struct{}
+type noopProcessor struct{}
 
 // NewNoop creates a new noop processor.
-func NewNoop[T models.TokenConstraint]() Processor[T] {
-	return &noopProcessor[T]{}
+func NewNoop() Processor {
+	return &noopProcessor{}
 }
 
 // Process just passes the token through for noopProcessor.
-func (n *noopProcessor[T]) Process(token T) (T, error) {
+func (n *noopProcessor) Process(token *models.Token) (*models.Token, error) {
 	return token, nil
 }

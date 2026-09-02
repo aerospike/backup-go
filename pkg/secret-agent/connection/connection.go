@@ -30,7 +30,6 @@ import (
 // by the service to validate TCP requests.
 const magic = 0x51dec1cc
 
-//go:generate mockery
 type connector interface {
 	Write(b []byte) (n int, err error)
 	Read(b []byte) (n int, err error)

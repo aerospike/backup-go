@@ -49,10 +49,10 @@ type StreamingReader interface {
 	// ListObjects return list of objects in the path.
 	ListObjects(ctx context.Context, path string) ([]string, error)
 
-	// GetSize returns the size of asb/asbx files in the path.
+	// GetSize returns the size of asb files in the path.
 	GetSize() int64
 
-	// GetNumber returns the number of asb/asbx files in the path.
+	// GetNumber returns the number of asb files in the path.
 	GetNumber() int64
 
 	// GetSkipped returns a list of file paths that were skipped during the `StreamFlies` with skipPrefix.
@@ -60,18 +60,18 @@ type StreamingReader interface {
 }
 
 // restoreHandler handles a restore job using the given reader.
-type restoreHandler[T models.TokenConstraint] struct {
+type restoreHandler struct {
 	*handlerBase
 
-	readProcessor  *fileReaderProcessor[T]
-	writeProcessor *recordWriterProcessor[T]
+	readProcessor  *fileReaderProcessor
+	writeProcessor *recordWriterProcessor
 	config         *ConfigRestore
 	stats          *models.RestoreStats
 
 	logger  *slog.Logger
 	limiter *bandwidth.Limiter
 
-	pl            atomic.Pointer[pipe.Pipe[T]]
+	pl            atomic.Pointer[pipe.Pipe]
 	rpsCollector  *metrics.Collector
 	kbpsCollector *metrics.Collector
 
@@ -79,14 +79,14 @@ type restoreHandler[T models.TokenConstraint] struct {
 }
 
 // newRestoreHandler creates a new restoreHandler.
-func newRestoreHandler[T models.TokenConstraint](
+func newRestoreHandler(
 	ctx context.Context,
 	config *ConfigRestore,
 	aerospikeClient AerospikeClient,
 	logger *slog.Logger,
 	reader StreamingReader,
 	infoClient ClusterInfo,
-) (*restoreHandler[T], error) {
+) (*restoreHandler, error) {
 	id := uuid.NewString()[:6]
 	logger = logging.WithHandler(logger, id, logging.HandlerTypeRestore, reader.GetType())
 	metricMessage := fmt.Sprintf("%s metrics %s", logging.HandlerTypeRestore, id)
@@ -121,7 +121,7 @@ func newRestoreHandler[T models.TokenConstraint](
 		return nil, err
 	}
 
-	readProcessor := newFileReaderProcessor[T](
+	readProcessor := newFileReaderProcessor(
 		reader,
 		config,
 		encryptionKey,
@@ -131,7 +131,7 @@ func newRestoreHandler[T models.TokenConstraint](
 		logger,
 	)
 
-	writeProcessor := newRecordWriterProcessor[T](
+	writeProcessor := newRecordWriterProcessor(
 		aerospikeClient,
 		config,
 		stats,
@@ -146,7 +146,7 @@ func newRestoreHandler[T models.TokenConstraint](
 		return nil, fmt.Errorf("failed to create bandwidth limiter: %w", err)
 	}
 
-	return &restoreHandler[T]{
+	return &restoreHandler{
 		handlerBase:    base,
 		readProcessor:  readProcessor,
 		writeProcessor: writeProcessor,
@@ -160,7 +160,7 @@ func newRestoreHandler[T models.TokenConstraint](
 	}, nil
 }
 
-func (rh *restoreHandler[T]) run() {
+func (rh *restoreHandler) run() {
 	rh.stats.Start()
 
 	go estimates.PrintFilesNumber(rh.ctx, rh.readProcessor.reader.GetNumber, rh.logger)
@@ -173,7 +173,7 @@ func (rh *restoreHandler[T]) run() {
 	})
 }
 
-func (rh *restoreHandler[T]) restore(ctx context.Context) error {
+func (rh *restoreHandler) restore(ctx context.Context) error {
 	dataReaders := rh.readProcessor.newDataReaders(ctx)
 
 	if err := rh.runPipeline(ctx, dataReaders); err != nil {
@@ -190,7 +190,7 @@ func (rh *restoreHandler[T]) restore(ctx context.Context) error {
 	return nil
 }
 
-func (rh *restoreHandler[T]) restoreMetadata(ctx context.Context) error {
+func (rh *restoreHandler) restoreMetadata(ctx context.Context) error {
 	metadataReaders := rh.readProcessor.newMetadataReaders(ctx)
 
 	if len(metadataReaders) == 0 {
@@ -208,16 +208,13 @@ func (rh *restoreHandler[T]) restoreMetadata(ctx context.Context) error {
 	return nil
 }
 
-func (rh *restoreHandler[T]) runPipeline(ctx context.Context, dataReaders []pipe.Reader[T]) error {
+func (rh *restoreHandler) runPipeline(ctx context.Context, dataReaders []pipe.Reader) error {
 	dataWriters, err := rh.writeProcessor.newDataWriters(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create writer workers: %w", err)
 	}
 
-	composeProcessor, err := rh.getComposeProcessor(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to create compose processor: %w", err)
-	}
+	composeProcessor := rh.getComposeProcessor(ctx)
 
 	pl, err := pipe.NewPipe(
 		composeProcessor,
@@ -236,44 +233,38 @@ func (rh *restoreHandler[T]) runPipeline(ctx context.Context, dataReaders []pipe
 	return pl.Run(ctx)
 }
 
-func (rh *restoreHandler[T]) getComposeProcessor(ctx context.Context) (pipe.ProcessorCreator[T], error) {
-	switch rh.config.EncoderType {
-	case EncoderTypeASB:
-		// Namespace Source and Destination
-		var nsSource, nsDest *string
-		if rh.config.Namespace != nil {
-			nsSource = rh.config.Namespace.Source
-			nsDest = rh.config.Namespace.Destination
-		}
-
-		return newDataProcessor[T](
-			processors.NewRecordCounter[T](&rh.stats.ReadRecords),
-			processors.NewSizeCounter[T](&rh.stats.TotalBytesRead),
-			processors.NewFilterByType[T](
-				rh.config.NoRecords,
-				rh.config.NoIndexes,
-				rh.config.NoUDFs,
-				&rh.stats.RecordsSkipped,
-			),
-			processors.NewFilterBySet[T](rh.config.SetList, &rh.stats.RecordsSkipped),
-			processors.NewFilterByBin[T](rh.config.BinList, &rh.stats.RecordsSkipped),
-			processors.NewChangeNamespace[T](nsSource, nsDest),
-			processors.NewExpirationSetter[T](&rh.stats.RecordsExpired, rh.config.ExtraTTL, rh.logger),
-			processors.NewTPSLimiter[T](ctx, rh.config.RecordsPerSecond),
-		), nil
-
-	default:
-		return nil, fmt.Errorf("unknown encoder type: %d", rh.config.EncoderType)
+func (rh *restoreHandler) getComposeProcessor(ctx context.Context) pipe.ProcessorCreator {
+	// Namespace Source and Destination
+	var nsSource, nsDest *string
+	if rh.config.Namespace != nil {
+		nsSource = rh.config.Namespace.Source
+		nsDest = rh.config.Namespace.Destination
 	}
+
+	return newDataProcessor(
+		processors.NewRecordCounter(&rh.stats.ReadRecords),
+		processors.NewSizeCounter(&rh.stats.TotalBytesRead),
+		processors.NewFilterByType(
+			rh.config.NoRecords,
+			rh.config.NoIndexes,
+			rh.config.NoUDFs,
+			&rh.stats.RecordsSkipped,
+		),
+		processors.NewFilterBySet(rh.config.SetList, &rh.stats.RecordsSkipped),
+		processors.NewFilterByBin(rh.config.BinList, &rh.stats.RecordsSkipped),
+		processors.NewChangeNamespace(nsSource, nsDest),
+		processors.NewExpirationSetter(&rh.stats.RecordsExpired, rh.config.ExtraTTL, rh.logger),
+		processors.NewTPSLimiter(ctx, rh.config.RecordsPerSecond),
+	)
 }
 
 // GetStats returns the stats of the restore job.
-func (rh *restoreHandler[T]) GetStats() *models.RestoreStats {
+func (rh *restoreHandler) GetStats() *models.RestoreStats {
 	return rh.stats
 }
 
 // Wait waits for the restore job to complete and returns an error if the job failed.
-func (rh *restoreHandler[T]) Wait(ctx context.Context) error {
+func (rh *restoreHandler) Wait(ctx context.Context) error {
 	err := rh.waitForCompletion(ctx)
 
 	rh.cleanup() // clean up resources.
@@ -282,7 +273,7 @@ func (rh *restoreHandler[T]) Wait(ctx context.Context) error {
 }
 
 // GetMetrics returns the metrics of the restore job.
-func (rh *restoreHandler[T]) GetMetrics() *models.Metrics {
+func (rh *restoreHandler) GetMetrics() *models.Metrics {
 	if rh == nil {
 		return nil
 	}
@@ -303,7 +294,7 @@ func (rh *restoreHandler[T]) GetMetrics() *models.Metrics {
 
 // cleanup stops the collection of stats and metrics for the restore job,
 // including RestoreStats, RPS, and KBPS tracking.
-func (rh *restoreHandler[T]) cleanup() {
+func (rh *restoreHandler) cleanup() {
 	rh.stats.Stop()
 	rh.rpsCollector.Stop()
 	rh.kbpsCollector.Stop()
@@ -316,4 +307,4 @@ func (rh *restoreHandler[T]) cleanup() {
 	rh.pl.Swap(nil)
 }
 
-var _ RestoreHandler = (*restoreHandler[*models.Token])(nil)
+var _ RestoreHandler = (*restoreHandler)(nil)

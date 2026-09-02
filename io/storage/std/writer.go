@@ -90,5 +90,8 @@ func (w *Writer) GetType() string {
 
 // GetOptions returns initialized options for the writer.
 func (w *Writer) GetOptions() options.Options {
-	return options.Options{}
+	return options.Options{
+		// Stdout doesn't split files into a limited number of chunks.
+		NoChunkLimit: true,
+	}
 }

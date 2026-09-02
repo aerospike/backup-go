@@ -54,6 +54,9 @@ func NewWriter(ctx context.Context, opts ...options.Opt) (*Writer, error) {
 		w.ChunkSize = defaultBufferSize
 	}
 
+	// The local file system doesn't split files into a limited number of chunks.
+	w.NoChunkLimit = true
+
 	// Special case for null target: writes are intentionally no-op.
 	if filepath.Clean(w.PathList[0]) == filepath.Clean(os.DevNull) {
 		return w, nil

@@ -379,3 +379,16 @@ func TestStdout_GetType(t *testing.T) {
 	res := w.GetType()
 	require.Equal(t, stdoutType, res)
 }
+
+func TestStdout_GetOptions_NoChunkLimit(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	w, err := NewWriter(ctx, defaultBufferSize)
+	require.NoError(t, err)
+
+	// Stdout has no chunk count restriction, so the file limit validation
+	// must be skipped for it.
+	require.True(t, w.GetOptions().NoChunkLimit)
+}

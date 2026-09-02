@@ -80,6 +80,18 @@ func TestDirectoryWriter_GetType(t *testing.T) {
 	require.Equal(t, TypeLocal, w.GetType())
 }
 
+func TestDirectoryWriter_GetOptions_NoChunkLimit(t *testing.T) {
+	t.Parallel()
+	tmpDir := path.Join(t.TempDir(), "TestDirectoryWriter_GetOptions_NoChunkLimit")
+	ctx := t.Context()
+	w, err := NewWriter(ctx, options.WithDir(tmpDir))
+	require.NoError(t, err)
+
+	// The local file system has no chunk count restriction, so the file limit
+	// validation must be skipped for it.
+	require.True(t, w.GetOptions().NoChunkLimit)
+}
+
 func TestNewWriter_NoPath(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()

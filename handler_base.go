@@ -63,6 +63,21 @@ func (h *handlerBase) waitForCompletion(waitCtx context.Context) error {
 	case <-h.done: // Success.
 	}
 
+	// A job failure and a cancellation can become ready at the same moment, and
+	// select picks a ready case at random, so the buffered job error may have
+	// lost the race. It explains the failure better than "context canceled".
+	// Drained before cancel() on purpose: afterwards the channel may hold an
+	// error that our own cancellation provoked.
+	if err != nil {
+		select {
+		case jobErr := <-h.errors:
+			if jobErr != nil {
+				err = jobErr
+			}
+		default:
+		}
+	}
+
 	// Always cancel to stop all goroutines and prevent leaks.
 	h.cancel()
 

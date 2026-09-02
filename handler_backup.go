@@ -522,8 +522,10 @@ func (bh *backupHandler) Wait(ctx context.Context) error {
 	// If the err is nil, we can remove the state file.
 	if err == nil && bh.state != nil {
 		// Clean only if err == nil and state is not nil.
-		if err = bh.state.cleanup(ctx); err != nil {
-			bh.logger.Error("failed to cleanup state", slog.Any("error", err))
+		// Failing to remove the state file doesn't make a finished backup
+		// unsuccessful, so log it and keep the job result.
+		if cleanupErr := bh.state.cleanup(ctx); cleanupErr != nil {
+			bh.logger.Error("failed to cleanup state", slog.Any("error", cleanupErr))
 		}
 	}
 

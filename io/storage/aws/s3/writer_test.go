@@ -377,6 +377,9 @@ func TestNewWriter_Success(t *testing.T) {
 	assert.NotNil(t, writer)
 	assert.Equal(t, testBucket, writer.bucketName)
 	assert.Equal(t, testDir, writer.prefix)
+	// S3 uploads files as a limited number of chunks, so the file limit
+	// validation must be applied to it.
+	assert.False(t, writer.GetOptions().NoChunkLimit)
 }
 
 // TestNewWriter_NoPath tests error when no path provided

@@ -18,7 +18,6 @@ import (
 	"math"
 	"testing"
 
-	"github.com/aerospike/backup-go/io/storage/local"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/mocks"
 	"github.com/stretchr/testify/require"
@@ -53,22 +52,33 @@ func TestValidateFileLimit(t *testing.T) {
 			},
 		},
 		{
-			name:      "local writer skips validation",
+			name:      "writer without chunk limit skips validation",
 			fileLimit: 100,
 			setupMock: func(t *testing.T) Writer {
 				t.Helper()
 				m := mocks.NewMockWriter(t)
-				m.EXPECT().GetType().Return(local.TypeLocal).Once()
+				m.EXPECT().GetOptions().Return(options.Options{NoChunkLimit: true}).Once()
 				return m
 			},
 		},
+		{
+			name:      "writer without chunk limit skips zero chunk size check",
+			fileLimit: math.MaxUint64,
+			setupMock: func(t *testing.T) Writer {
+				t.Helper()
+				m := mocks.NewMockWriter(t)
+				m.EXPECT().GetOptions().Return(options.Options{ChunkSize: 0, NoChunkLimit: true}).Once()
+				return m
+			},
+		},
+		// The cases below represent object storage (s3/gcp/azure), which uploads
+		// files as a limited number of chunks and therefore is validated.
 		{
 			name:      "zero chunk size returns error",
 			fileLimit: 1,
 			setupMock: func(t *testing.T) Writer {
 				t.Helper()
 				m := mocks.NewMockWriter(t)
-				m.EXPECT().GetType().Return("s3").Once()
 				m.EXPECT().GetOptions().Return(options.Options{ChunkSize: 0}).Once()
 				return m
 			},
@@ -80,7 +90,6 @@ func TestValidateFileLimit(t *testing.T) {
 			setupMock: func(t *testing.T) Writer {
 				t.Helper()
 				m := mocks.NewMockWriter(t)
-				m.EXPECT().GetType().Return("s3").Once()
 				m.EXPECT().GetOptions().Return(options.Options{ChunkSize: -1}).Once()
 				return m
 			},
@@ -92,7 +101,6 @@ func TestValidateFileLimit(t *testing.T) {
 			setupMock: func(t *testing.T) Writer {
 				t.Helper()
 				m := mocks.NewMockWriter(t)
-				m.EXPECT().GetType().Return("s3").Once()
 				m.EXPECT().GetOptions().Return(options.Options{ChunkSize: 1000}).Once()
 				return m
 			},
@@ -103,7 +111,6 @@ func TestValidateFileLimit(t *testing.T) {
 			setupMock: func(t *testing.T) Writer {
 				t.Helper()
 				m := mocks.NewMockWriter(t)
-				m.EXPECT().GetType().Return("s3").Once()
 				// 10 chunks
 				m.EXPECT().GetOptions().Return(options.Options{ChunkSize: 100}).Once()
 				return m
@@ -115,7 +122,6 @@ func TestValidateFileLimit(t *testing.T) {
 			setupMock: func(t *testing.T) Writer {
 				t.Helper()
 				m := mocks.NewMockWriter(t)
-				m.EXPECT().GetType().Return("s3").Once()
 				// it works as ceil(101/100) = 2
 				m.EXPECT().GetOptions().Return(options.Options{ChunkSize: 100}).Once()
 				return m
@@ -127,7 +133,6 @@ func TestValidateFileLimit(t *testing.T) {
 			setupMock: func(t *testing.T) Writer {
 				t.Helper()
 				m := mocks.NewMockWriter(t)
-				m.EXPECT().GetType().Return("s3").Once()
 				// 9999 chunks
 				m.EXPECT().GetOptions().Return(options.Options{ChunkSize: 100}).Once()
 				return m
@@ -139,7 +144,6 @@ func TestValidateFileLimit(t *testing.T) {
 			setupMock: func(t *testing.T) Writer {
 				t.Helper()
 				m := mocks.NewMockWriter(t)
-				m.EXPECT().GetType().Return("s3").Once()
 				m.EXPECT().GetOptions().Return(options.Options{ChunkSize: math.MaxInt64}).Once()
 				return m
 			},
@@ -150,7 +154,6 @@ func TestValidateFileLimit(t *testing.T) {
 			setupMock: func(t *testing.T) Writer {
 				t.Helper()
 				m := mocks.NewMockWriter(t)
-				m.EXPECT().GetType().Return("s3").Once()
 				// 10000 chunks
 				m.EXPECT().GetOptions().Return(options.Options{ChunkSize: 100}).Once()
 				return m
@@ -163,7 +166,6 @@ func TestValidateFileLimit(t *testing.T) {
 			setupMock: func(t *testing.T) Writer {
 				t.Helper()
 				m := mocks.NewMockWriter(t)
-				m.EXPECT().GetType().Return("s3").Once()
 				m.EXPECT().GetOptions().Return(options.Options{ChunkSize: 100}).Once()
 				return m
 			},
@@ -175,7 +177,6 @@ func TestValidateFileLimit(t *testing.T) {
 			setupMock: func(t *testing.T) Writer {
 				t.Helper()
 				m := mocks.NewMockWriter(t)
-				m.EXPECT().GetType().Return("s3").Once()
 				m.EXPECT().GetOptions().Return(options.Options{ChunkSize: 1}).Once()
 				return m
 			},

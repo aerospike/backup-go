@@ -55,7 +55,7 @@ type StreamingReader interface {
 	// GetNumber returns the number of asb files in the path.
 	GetNumber() int64
 
-	// GetSkipped returns a list of file paths that were skipped during the `StreamFlies` with skipPrefix.
+	// GetSkipped returns a list of file paths that were skipped during the `StreamFiles` with skipPrefix.
 	GetSkipped() []string
 }
 

@@ -141,7 +141,7 @@ func NewReader(
 	return r, nil
 }
 
-// StreamFiles read files form s3 and send io.Readers to `readersCh` communication chan for lazy loading.
+// StreamFiles read files from s3 and send io.Readers to `readersCh` communication chan for lazy loading.
 // In case of error, we send error to `errorsCh` channel.
 // If `skipPrefix` is set, it will skip files that start with this prefix and save a skipped list of files.
 func (r *Reader) StreamFiles(
@@ -174,7 +174,7 @@ func (r *Reader) StreamFiles(
 	}
 }
 
-// streamDirectory reads directory form s3 and send io.Readers to `readersCh` communication chan for lazy loading.
+// streamDirectory reads directory from s3 and send io.Readers to `readersCh` communication chan for lazy loading.
 // In case of error, we send error to `errorsCh` channel.
 func (r *Reader) streamDirectory(
 	ctx context.Context, path string, readersCh chan<- models.File, errorsCh chan<- error,
@@ -657,7 +657,7 @@ func (r *Reader) GetNumber() int64 {
 	return r.totalNumber.Load()
 }
 
-// GetSkipped returns a list of file paths that were skipped during the `StreamFlies` with skipPrefix.
+// GetSkipped returns a list of file paths that were skipped during the `StreamFiles` with skipPrefix.
 func (r *Reader) GetSkipped() []string {
 	return r.skipped.GetSkipped()
 }

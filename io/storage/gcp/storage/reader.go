@@ -93,7 +93,7 @@ func NewReader(
 	return r, nil
 }
 
-// StreamFiles streams file/directory form GCP cloud storage to `readersCh`.
+// StreamFiles streams file/directory from GCP cloud storage to `readersCh`.
 // If an error occurs, it will be sent to `errorsCh.`
 func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error, skipPrefixes []string,
@@ -399,7 +399,7 @@ func (r *Reader) GetNumber() int64 {
 	return r.totalNumber.Load()
 }
 
-// GetSkipped returns a list of file paths that were skipped during the `StreamFlies` with skipPrefix.
+// GetSkipped returns a list of file paths that were skipped during the `StreamFiles` with skipPrefix.
 func (r *Reader) GetSkipped() []string {
 	return r.skipped.GetSkipped()
 }

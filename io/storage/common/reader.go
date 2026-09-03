@@ -124,7 +124,7 @@ func (s *SkippedFiles) Skip(path string) bool {
 	return false
 }
 
-// GetSkipped returns a list of file paths that were skipped during the `StreamFlies` with skipPrefix.
+// GetSkipped returns a list of file paths that were skipped during the `StreamFiles` with skipPrefix.
 func (s *SkippedFiles) GetSkipped() []string {
 	if s == nil {
 		return nil

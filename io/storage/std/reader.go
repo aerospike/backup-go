@@ -100,7 +100,7 @@ func (r *Reader) StreamFiles(
 	r.StreamFile(ctx, stdinType, readersCh, errorsCh)
 }
 
-// GetSkipped returns a list of file paths that were skipped during the `StreamFlies` with skipPrefix.
+// GetSkipped returns a list of file paths that were skipped during the `StreamFiles` with skipPrefix.
 // no-op func to satisfy interface.
 func (r *Reader) GetSkipped() []string {
 	return nil

@@ -62,7 +62,7 @@ func (p *RetryPolicy) Validate() error {
 	}
 
 	if p.Multiplier < 1 {
-		return fmt.Errorf("multiplier must be greater than 0")
+		return fmt.Errorf("multiplier must be greater than or equal to 1")
 	}
 
 	// MaxRetries validation removed - 0 is valid (means no retries)

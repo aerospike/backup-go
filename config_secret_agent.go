@@ -42,6 +42,10 @@ type SecretAgentConfig struct {
 	KeyFile *string
 	// Flag that shows if secret agent responses are encrypted with base64.
 	IsBase64 *bool
+	// MinTLSVersion is the minimum accepted TLS version for an encrypted connection.
+	// Use the crypto/tls constants: tls.VersionTLS10 ... tls.VersionTLS13.
+	// If nil, TLS 1.2 is used.
+	MinTLSVersion *uint16
 }
 
 // validate validates the SecretAgentConfig.

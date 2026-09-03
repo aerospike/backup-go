@@ -537,12 +537,12 @@ func (ic *Client) GetService(ctx context.Context, node string) (string, error) {
 func (ic *Client) getByNode(node, cmd string) (string, error) {
 	resp, err := ic.requestByNode(node, cmd)
 	if err != nil {
-		return "", fmt.Errorf("failed to get %s info for node %s: %w", cmd, node, err)
+		return "", fmt.Errorf("failed to get %s info for node %s: %w", redactCmd(cmd), node, err)
 	}
 
 	result, err := parseResultResponse(cmd, resp)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse %s info response: %w", cmd, err)
+		return "", fmt.Errorf("failed to parse %s info response: %w", redactCmd(cmd), err)
 	}
 
 	return result, nil
@@ -605,7 +605,7 @@ func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
 
 	result, err := ic.getByNode(node, cmd)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get by node command: %s: %w", cmd, err)
+		return nil, fmt.Errorf("failed to get by node command: %s: %w", redactCmd(cmd), err)
 	}
 
 	var base64Res string

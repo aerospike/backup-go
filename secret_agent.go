@@ -80,9 +80,15 @@ func getTLSConfig(config *SecretAgentConfig) (*tls.Config, error) {
 		return nil, fmt.Errorf("nothing to append to ca cert pool")
 	}
 
-	// we must support any tls configuration for legacy.
+	// TLS 1.2 is the default floor. Older versions remain reachable only through
+	// an explicit SecretAgentConfig.MinTLSVersion opt-in for legacy deployments.
 	tlsConfig := &tls.Config{
-		RootCAs: caCertPool,
+		RootCAs:    caCertPool,
+		MinVersion: tls.VersionTLS12,
+	}
+
+	if config.MinTLSVersion != nil {
+		tlsConfig.MinVersion = *config.MinTLSVersion
 	}
 
 	if config.TLSName != nil && *config.TLSName != "" {

@@ -146,7 +146,7 @@ func TestRetryPolicy_Validate(t *testing.T) {
 		err := policy.Validate()
 
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "multiplier must be greater than 0")
+		require.Contains(t, err.Error(), "multiplier must be greater than or equal to 1")
 	})
 
 	t.Run("Negative multiplier fails validation", func(t *testing.T) {
@@ -157,7 +157,7 @@ func TestRetryPolicy_Validate(t *testing.T) {
 		err := policy.Validate()
 
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "multiplier must be greater than 0")
+		require.Contains(t, err.Error(), "multiplier must be greater than or equal to 1")
 	})
 
 	t.Run("Multiplier less than 1 fails validation", func(t *testing.T) {
@@ -168,7 +168,7 @@ func TestRetryPolicy_Validate(t *testing.T) {
 		err := policy.Validate()
 
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "multiplier must be greater than 0")
+		require.Contains(t, err.Error(), "multiplier must be greater than or equal to 1")
 	})
 
 	t.Run("Valid policy with minimum values", func(t *testing.T) {

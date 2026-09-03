@@ -47,11 +47,11 @@ func parseUDFResponse(udfGetInfoResp string) (*models.UDF, error) {
 func parseResultResponse(cmd string, result map[string]string) (string, error) {
 	v, ok := result[cmd]
 	if !ok {
-		return "", fmt.Errorf("no response for command %s", cmd)
+		return "", fmt.Errorf("no response for command %s", redactCmd(cmd))
 	}
 
 	if strings.Contains(v, errCmdRespPrefix) {
-		return "", fmt.Errorf("command %s failed: %s", cmd, v)
+		return "", fmt.Errorf("command %s failed: %s", redactCmd(cmd), redactCmd(v))
 	}
 
 	return v, nil

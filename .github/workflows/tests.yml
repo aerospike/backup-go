@@ -13,7 +13,29 @@ permissions:
   contents: read
 
 jobs:
-  tests:
+  # Hermetic: no Aerospike, no object storage, no Docker.
+  unit:
+    name: Unit tests (race)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run unit tests with the race detector
+        run: make test-race
+
+  integration:
+    name: Integration tests
     runs-on: ubuntu-latest
 
     services:
@@ -43,13 +65,9 @@ jobs:
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Get go version from go.mod
-        run: |
-          echo "GO_VERSION=$(grep '^go ' go.mod | cut -d " " -f 2)" >> $GITHUB_ENV
-
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
           cache: true
 
       - name: Set up Azurite
@@ -73,7 +91,7 @@ jobs:
           -e "MINIO_ACCESS_KEY=minioadmin" \
           -e "MINIO_SECRET_KEY=minioadminpassword" \
           -e "MINIO_BROWSER=off" \
-          minio/minio:latest server /data \
+          minio/minio:RELEASE.2025-09-07T16-13-09Z server /data \
           && until (curl -I http://127.0.0.1:9000/minio/health/live | grep "OK"); do echo "Waiting for MinIO server to be ready..."; sleep 3; done \
           && docker exec minio sh -c "mc alias set myminio http://127.0.0.1:9000 minioadmin minioadminpassword && mc mb myminio/backup && mc mb myminio/asbackup \
           && mc anonymous set upload myminio/backup && mc anonymous set download myminio/backup && mc anonymous set public myminio/backup \
@@ -89,3 +107,51 @@ jobs:
           token: ${{secrets.CODECOV_TOKEN}}
           files: coverage.cov
           verbose: false
+
+  # Gate: a PR that leaves go.mod / go.sum untidy fails.
+  tidy:
+    name: go mod tidy is clean
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run go mod tidy
+        run: make tidy
+
+      - name: Fail if go.mod or go.sum changed
+        run: |
+          if ! git diff --exit-code -- go.mod go.sum; then
+            echo "::error::go.mod / go.sum are not tidy. Run 'make tidy' and commit the result."
+            exit 1
+          fi
+
+  examples:
+    name: Examples compile
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build examples
+        run: make build-examples

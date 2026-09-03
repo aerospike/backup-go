@@ -1,12 +1,27 @@
+// Copyright 2024 Aerospike, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//go:build integration
+
 package integration
 
 import (
 	"context"
 	"crypto/rand"
-	"fmt"
 	"io"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/aerospike/backup-go/io/encoding/asb"
@@ -27,6 +42,12 @@ const (
 	profile  = "minio"
 	region   = "eu"
 	endpoint = "http://localhost:9000"
+
+	minioAccessKeyID     = "minioadmin"
+	minioSecretAccessKey = "minioadminpassword"
+
+	// awsCredentialsFileEnv points the AWS SDK at a specific credentials file.
+	awsCredentialsFileEnv = "AWS_SHARED_CREDENTIALS_FILE"
 )
 
 type writeReadTestSuite struct {
@@ -40,39 +61,26 @@ func TestReadWrite(t *testing.T) {
 }
 
 func (s *writeReadTestSuite) SetupSuite() {
-	if err := createMinioCredentialsFile(); err != nil {
-		s.FailNow("could not create credentials file", err)
-	}
+	s.T().Setenv(awsCredentialsFileEnv, writeMinioCredentialsFile(s.T()))
 }
 
-func createMinioCredentialsFile() error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("error getting home directory: %w", err)
+// writeMinioCredentialsFile writes the MinIO profile into a file under the
+// test's own temporary directory and returns its path. The developer's
+// ~/.aws/credentials is never read or written.
+func writeMinioCredentialsFile(t *testing.T) string {
+	t.Helper()
+
+	filePath := filepath.Join(t.TempDir(), "credentials")
+
+	credentials := []byte(`[` + profile + `]
+aws_access_key_id = ` + minioAccessKeyID + `
+aws_secret_access_key = ` + minioSecretAccessKey)
+
+	if err := os.WriteFile(filePath, credentials, 0o600); err != nil {
+		t.Fatalf("failed to write credentials file: %v", err)
 	}
 
-	awsDir := path.Join(home, ".aws")
-	err = os.MkdirAll(awsDir, 0o700)
-	if err != nil {
-		return fmt.Errorf("error creating .aws directory: %w", err)
-	}
-
-	filePath := path.Join(awsDir, "credentials")
-
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		credentialsFileBytes := []byte(`[minio]
-aws_access_key_id = minioadmin
-aws_secret_access_key = minioadminpassword`)
-
-		err = os.WriteFile(filePath, credentialsFileBytes, 0o600)
-		if err != nil {
-			return fmt.Errorf("error writing ~/.aws/credentials file: %w", err)
-		}
-
-		fmt.Println("Credentials file created successfully!")
-	}
-
-	return nil
+	return filePath
 }
 
 func (s *writeReadTestSuite) TearDownSuite() {}

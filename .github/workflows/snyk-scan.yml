@@ -26,13 +26,14 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Run Snyk to check for vulnerabilities
+        id: snyk
         uses: snyk/actions/golang@9adf32b1121593767fc3c057af55b55db032dc04
         continue-on-error: true # To make sure that SARIF upload gets called
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           snyk-version: v1.1297.3
-          args: --all-projects --sarif-file-output=snyk.sarif
+          args: --all-projects --severity-threshold=high --sarif-file-output=snyk.sarif
 
       - name: Handle undefined security-severity
         run: |
@@ -42,8 +43,8 @@ jobs:
         id: out-file
         run: |
           if test -f "snyk.sarif"; then
-            echo "::set-output name=exists::true"; else
-            echo "::set-output name=exists::false"
+            echo "exists=true" >> "$GITHUB_OUTPUT"; else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Upload result to GitHub Code Scanning
@@ -51,3 +52,30 @@ jobs:
         uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           sarif_file: snyk.sarif
+
+      # The scan step is continue-on-error so that the SARIF always gets uploaded.
+      # This turns a High/Critical finding back into a failed check.
+      - name: Fail on High/Critical vulnerabilities
+        if: steps.snyk.outcome == 'failure'
+        run: |
+          echo "::error::Snyk found High or Critical severity vulnerabilities."
+          exit 1
+
+  govulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run govulncheck
+        run: make vuln

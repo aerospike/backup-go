@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//nolint:revive,nolintlint // We want to use package name with underscore.
-package secret_agent
+package secretagent
 
 import (
 	"context"
@@ -21,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aerospike/backup-go/pkg/secret-agent/connection"
+	"github.com/aerospike/backup-go/pkg/secretagent/connection"
 	"github.com/segmentio/asm/base64"
 )
 

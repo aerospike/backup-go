@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aerospike/backup-go/pkg/secret-agent/connection/mocks"
-	"github.com/aerospike/backup-go/pkg/secret-agent/models"
+	"github.com/aerospike/backup-go/pkg/secretagent/connection/mocks"
+	"github.com/aerospike/backup-go/pkg/secretagent/models"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )

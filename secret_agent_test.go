@@ -32,9 +32,9 @@ import (
 	"testing"
 	"time"
 
-	saClient "github.com/aerospike/backup-go/pkg/secret-agent"
-	"github.com/aerospike/backup-go/pkg/secret-agent/connection"
-	"github.com/aerospike/backup-go/pkg/secret-agent/models"
+	saClient "github.com/aerospike/backup-go/pkg/secretagent"
+	"github.com/aerospike/backup-go/pkg/secretagent/connection"
+	"github.com/aerospike/backup-go/pkg/secretagent/models"
 	"github.com/stretchr/testify/require"
 )
 

@@ -17,7 +17,7 @@ package backup
 import (
 	"fmt"
 
-	saClient "github.com/aerospike/backup-go/pkg/secret-agent"
+	saClient "github.com/aerospike/backup-go/pkg/secretagent"
 )
 
 // SecretAgentConfig contains Secret Agent connection information.

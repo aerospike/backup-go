@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//nolint:revive,nolintlint // We want to use package name with underscore.
-package secret_agent
+package secretagent
 
 import (
 	"context"
@@ -26,8 +25,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aerospike/backup-go/pkg/secret-agent/connection"
-	"github.com/aerospike/backup-go/pkg/secret-agent/models"
+	"github.com/aerospike/backup-go/pkg/secretagent/connection"
+	"github.com/aerospike/backup-go/pkg/secretagent/models"
 	"github.com/stretchr/testify/require"
 )
 
@@ -178,7 +177,6 @@ func TestNewClient(t *testing.T) {
 	})
 
 	t.Run("Error with TLS and non-TCP", func(t *testing.T) {
-		//nolint:gosec // For test we can use default unsecured TLS version.
 		tlsConfig := &tls.Config{}
 		client, err := NewClient(ConnectionTypeUDS, testAddress, testTimeout, true, tlsConfig)
 		require.Error(t, err)

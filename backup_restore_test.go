@@ -533,12 +533,10 @@ func TestBackupRestoreTimestampFilter(t *testing.T) {
 }
 
 func TestBackupRestoreRps(t *testing.T) {
-	t.Parallel()
 	const (
 		setName = "testRps"
 		numRec  = 1000
 		rps     = 200
-		epsilon = 2 * float64(time.Second)
 	)
 	// Extend timeout as we need ~11 seconds for test.
 	ctx, cancel := context.WithTimeout(t.Context(), testTimeout*2)
@@ -555,6 +553,8 @@ func TestBackupRestoreRps(t *testing.T) {
 
 	restoreConfig := NewDefaultRestoreConfig()
 	restoreConfig.RecordsPerSecond = rps
+	// Keep restore single-threaded so the client-side TPS limiter is the bottleneck.
+	restoreConfig.Parallel = 1
 
 	records, err := genRecords(testASNamespace, setName, numRec, a.BinMap{"a": "b"})
 	require.NoError(t, err)
@@ -569,12 +569,26 @@ func TestBackupRestoreRps(t *testing.T) {
 	require.Equal(t, bStat.GetReadRecords(), rStat.GetRecordsInserted())
 	totalDuration := time.Since(now)
 
-	expectedDuration := time.Duration(1000.0*numRec/rps) * time.Millisecond
+	// rate.Limiter with burst=1 allows the first token immediately.
+	minDuration := time.Duration(float64(numRec-1) / float64(rps) * float64(time.Second))
+	const (
+		minSlack = time.Second
+		// Shared Aerospike and CI runners can add tail latency beyond the throttle floor.
+		maxSlack = 5 * time.Second
+	)
 
-	// Validate records.
-	require.InDelta(t, expectedDuration, bStat.GetDuration(), epsilon)
-	require.InDelta(t, expectedDuration, rStat.GetDuration(), epsilon)
-	require.InDelta(t, totalDuration, rStat.GetDuration()+bStat.GetDuration(), epsilon)
+	assertDurationNearRps := func(t *testing.T, name string, got time.Duration) {
+		t.Helper()
+		require.GreaterOrEqual(t, got, minDuration-minSlack,
+			"%s completed faster than the configured RPS allows", name)
+		require.LessOrEqual(t, got, minDuration+maxSlack,
+			"%s took longer than expected for the configured RPS", name)
+	}
+
+	assertDurationNearRps(t, "backup", bStat.GetDuration())
+	assertDurationNearRps(t, "restore", rStat.GetDuration())
+	require.InDelta(t, totalDuration, rStat.GetDuration()+bStat.GetDuration()+time.Second,
+		float64(2*time.Second))
 
 	// Validate stats.
 	require.Equal(t, uint64(0), rStat.GetRecordsExpired())

@@ -280,8 +280,8 @@ func (c *Client) Backup(
 		return nil, fmt.Errorf("aerospike client is nil")
 	}
 
-	if config.StateFile != "" && reader == nil {
-		return nil, fmt.Errorf("reader is required when a state file is configured")
+	if config.Continue && reader == nil {
+		return nil, fmt.Errorf("reader is required when continuing from a state file")
 	}
 
 	// Fill in the default policy on the caller's config. The default itself is

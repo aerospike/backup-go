@@ -30,12 +30,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testEncoderConfig = NewEncoderConfig("test", false, false)
+var testEncoderConfig = NewEncoderConfig("test", false, models.SIndexInfo{})
 
 func TestEncodeTokenUDF(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder[*models.Token](testEncoderConfig)
+	encoder := NewEncoder(testEncoderConfig)
 
 	token := &models.Token{
 		Type: models.TokenTypeUDF,
@@ -55,7 +55,7 @@ func TestEncodeTokenUDF(t *testing.T) {
 func TestEncodeTokenSIndex(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder[*models.Token](testEncoderConfig)
+	encoder := NewEncoder(testEncoderConfig)
 
 	token := &models.Token{
 		Type: models.TokenTypeSIndex,
@@ -80,7 +80,7 @@ func TestEncodeTokenSIndex(t *testing.T) {
 func TestEncodeTokenInvalid(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder[*models.Token](testEncoderConfig)
+	encoder := NewEncoder(testEncoderConfig)
 
 	token := &models.Token{
 		Type: models.TokenTypeInvalid,
@@ -94,7 +94,7 @@ func TestEncodeTokenInvalid(t *testing.T) {
 func TestEncodeRecord(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder[*models.Token](testEncoderConfig)
+	encoder := NewEncoder(testEncoderConfig)
 
 	var recExpr int64 = 10
 
@@ -143,7 +143,7 @@ func TestGetHeaderFirst(t *testing.T) {
 
 	expected := "Version 3.1\n# namespace test\n# first-file\n"
 
-	encoder := NewEncoder[*models.Token](testEncoderConfig)
+	encoder := NewEncoder(testEncoderConfig)
 	firstHeader := encoder.GetHeader(true)
 	require.Equal(t, expected, string(firstHeader))
 
@@ -432,7 +432,7 @@ func encoderTestRecordPrefix(key *a.Key, generation uint32, voidTime int64, binC
 func encodeTestRecord(t *testing.T, compact bool, record *models.Record) ([]byte, error) {
 	t.Helper()
 
-	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", compact, false))
+	encoder := NewEncoder(NewEncoderConfig("test", compact, models.SIndexInfo{}))
 
 	return encoder.appendRecord(nil, record)
 }
@@ -542,7 +542,7 @@ func TestAppendRecordKey(t *testing.T) {
 		},
 	}
 
-	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, false))
+	encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -837,7 +837,7 @@ func TestRecordWithUserKeyTypes(t *testing.T) {
 func TestGenerateFilename(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder[*models.Token](NewEncoderConfig("backup-ns", false, false))
+	encoder := NewEncoder(NewEncoderConfig("backup-ns", false, models.SIndexInfo{}))
 
 	first := encoder.GenerateFilename("pre_", ".part")
 	second := encoder.GenerateFilename("pre_", ".part")
@@ -852,7 +852,7 @@ func TestGetHeaderNonRecordFiles(t *testing.T) {
 	t.Run("default version", func(t *testing.T) {
 		t.Parallel()
 
-		encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, false))
+		encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
 		require.Equal(t, "Version 3.1\n# namespace test\n# first-file\n", string(encoder.GetHeader(false)))
 		require.Equal(t, "Version 3.1\n# namespace test\n", string(encoder.GetHeader(false)))
 	})
@@ -860,7 +860,7 @@ func TestGetHeaderNonRecordFiles(t *testing.T) {
 	t.Run("expression sindex version", func(t *testing.T) {
 		t.Parallel()
 
-		encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, true))
+		encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{HasExpression: true}))
 		require.Equal(t, "Version 3.2\n# namespace test\n# first-file\n", string(encoder.GetHeader(false)))
 	})
 }
@@ -868,7 +868,7 @@ func TestGetHeaderNonRecordFiles(t *testing.T) {
 func TestEncodeTokenUnknownType(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, false))
+	encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
 	token := &models.Token{Type: models.TokenType(99)}
 
 	_, err := encoder.EncodeToken(token, []byte("prefix"))
@@ -893,7 +893,7 @@ func TestEncodeTokenRecordWithPrefix(t *testing.T) {
 	expected := fmt.Sprintf("+ k S 4 1234\n+ n test\n+ d %s\n+ s demo\n+ g 1234\n+ t 10\n+ b 1\n- I bin1 0\n",
 		base64Encode(key.Digest()))
 
-	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, false))
+	encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
 	token := &models.Token{Type: models.TokenTypeRecord, Record: record}
 
 	dst := []byte("existing:")
@@ -919,7 +919,7 @@ func TestMetadataCacheHit(t *testing.T) {
 		}
 	}
 
-	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, false))
+	encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
 
 	first, firstErr := encoder.appendRecord(nil, record(1))
 	require.NoError(t, firstErr)
@@ -1138,8 +1138,8 @@ func BenchmarkPrecomputedBinCountLine(b *testing.B) {
 	}
 }
 
-func newEncoderWithCache(cacheLine, cacheGen bool) *Encoder[*models.Token] {
-	encoder := NewEncoder[*models.Token](testEncoderConfig)
+func newEncoderWithCache(cacheLine, cacheGen bool) *Encoder {
+	encoder := NewEncoder(testEncoderConfig)
 	encoder.cacheLine = cacheLine
 	encoder.cacheGen = cacheGen
 
@@ -1256,7 +1256,7 @@ func BenchmarkAppendVoidTimeLine(b *testing.B) {
 	}
 }
 
-func benchmarkEncoderCacheSameRecord(b *testing.B, encoder *Encoder[*models.Token], token *models.Token) {
+func benchmarkEncoderCacheSameRecord(b *testing.B, encoder *Encoder, token *models.Token) {
 	b.Helper()
 	b.ReportAllocs()
 
@@ -1272,7 +1272,7 @@ func benchmarkEncoderCacheSameRecord(b *testing.B, encoder *Encoder[*models.Toke
 	}
 }
 
-func benchmarkEncoderCacheAlternatingMetadata(b *testing.B, encoder *Encoder[*models.Token], tokens []*models.Token) {
+func benchmarkEncoderCacheAlternatingMetadata(b *testing.B, encoder *Encoder, tokens []*models.Token) {
 	b.Helper()
 	b.ReportAllocs()
 
@@ -1291,7 +1291,7 @@ func benchmarkEncoderCacheAlternatingMetadata(b *testing.B, encoder *Encoder[*mo
 	}
 }
 
-func benchmarkEncoderCacheVaryingGeneration(b *testing.B, encoder *Encoder[*models.Token], tokens []*models.Token) {
+func benchmarkEncoderCacheVaryingGeneration(b *testing.B, encoder *Encoder, tokens []*models.Token) {
 	b.Helper()
 	b.ReportAllocs()
 
@@ -1310,7 +1310,7 @@ func benchmarkEncoderCacheVaryingGeneration(b *testing.B, encoder *Encoder[*mode
 	}
 }
 
-func benchmarkEncoderCacheHighGeneration(b *testing.B, encoder *Encoder[*models.Token], token *models.Token) {
+func benchmarkEncoderCacheHighGeneration(b *testing.B, encoder *Encoder, token *models.Token) {
 	b.Helper()
 	b.ReportAllocs()
 

@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,12 +16,12 @@ package aerospike
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/models"
@@ -36,7 +36,7 @@ type recordWriter interface {
 // RestoreWriter satisfies the DataWriter interface.
 // It writes the types from the models package to an Aerospike client
 // It is used to restore data from a backup.
-type RestoreWriter[T models.TokenConstraint] struct {
+type RestoreWriter struct {
 	*sindexWriter
 	*udfWriter
 	recordWriter
@@ -44,7 +44,7 @@ type RestoreWriter[T models.TokenConstraint] struct {
 }
 
 // NewRestoreWriter creates a new RestoreWriter.
-func NewRestoreWriter[T models.TokenConstraint](
+func NewRestoreWriter(
 	ctx context.Context,
 	asc dbWriter,
 	writePolicy *a.WritePolicy,
@@ -55,7 +55,7 @@ func NewRestoreWriter[T models.TokenConstraint](
 	retryPolicy *models.RetryPolicy,
 	rpsCollector *metrics.Collector,
 	ignoreRecordError bool,
-) *RestoreWriter[T] {
+) *RestoreWriter {
 	logger = logging.WithWriter(logger, uuid.NewString(), logging.WriterTypeRestore)
 	logger.Debug("created new restore writer",
 		slog.Bool("useBatchWrites", useBatchWrites),
@@ -63,7 +63,7 @@ func NewRestoreWriter[T models.TokenConstraint](
 		slog.Bool("ignoreRecordError", ignoreRecordError),
 	)
 
-	return &RestoreWriter[T]{
+	return &RestoreWriter{
 		sindexWriter: newSindexWriter(ctx, asc, writePolicy, retryPolicy, logger),
 		udfWriter:    newUdfWriter(ctx, asc, writePolicy, retryPolicy, logger),
 		recordWriter: newRecordWriter(
@@ -121,16 +121,16 @@ func newRecordWriter(
 }
 
 // Write writes the types from the models package to an Aerospike DB.
-func (rw *RestoreWriter[T]) Write(data T) (int, error) {
+func (rw *RestoreWriter) Write(data *models.Token) (int, error) {
 	switch v := any(data).(type) {
 	case *models.Token:
 		return rw.writeToken(v)
 	default:
-		return 0, fmt.Errorf("unsupported type: %T", data)
+		return 0, fmt.Errorf("%w: unsupported type: %T", errclass.ErrUnsupported, data)
 	}
 }
 
-func (rw *RestoreWriter[T]) writeToken(token *models.Token) (int, error) {
+func (rw *RestoreWriter) writeToken(token *models.Token) (int, error) {
 	switch token.Type {
 	case models.TokenTypeRecord:
 		return int(token.Size), rw.writeRecord(token.Record)
@@ -139,14 +139,14 @@ func (rw *RestoreWriter[T]) writeToken(token *models.Token) (int, error) {
 	case models.TokenTypeSIndex:
 		return int(token.Size), rw.writeSecondaryIndex(token.SIndex)
 	case models.TokenTypeInvalid:
-		return 0, errors.New("invalid token")
+		return 0, fmt.Errorf("%w: invalid token", errclass.ErrCorruptData)
 	default:
-		return 0, errors.New("unsupported token type")
+		return 0, fmt.Errorf("%w: unsupported token type", errclass.ErrUnsupported)
 	}
 }
 
 // Close satisfies the pipe.Writer interface.
-func (rw *RestoreWriter[T]) Close() error {
+func (rw *RestoreWriter) Close() error {
 	rw.logger.Debug("close restore writer")
 	return rw.close()
 }

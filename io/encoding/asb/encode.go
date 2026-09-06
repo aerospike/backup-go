@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
 package asb
 
 import (
-	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -23,6 +22,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	particleType "github.com/aerospike/aerospike-client-go/v8/types/particle_type"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/models"
 	"github.com/segmentio/asm/base64"
 )
@@ -46,7 +46,7 @@ func init() {
 
 // Encoder contains logic for encoding backup data into the .asb format.
 // This is a stateful object that must be created for every backup operation.
-type Encoder[T models.TokenConstraint] struct {
+type Encoder struct {
 	config           *EncoderConfig
 	recordNamespace  recentLine
 	recordSet        recentLine
@@ -61,8 +61,8 @@ type Encoder[T models.TokenConstraint] struct {
 }
 
 // NewEncoder creates a new Encoder.
-func NewEncoder[T models.TokenConstraint](cfg *EncoderConfig) *Encoder[T] {
-	return &Encoder[T]{
+func NewEncoder(cfg *EncoderConfig) *Encoder {
+	return &Encoder{
 		config:    cfg,
 		cacheLine: true,
 		cacheGen:  true,
@@ -70,32 +70,27 @@ func NewEncoder[T models.TokenConstraint](cfg *EncoderConfig) *Encoder[T] {
 }
 
 // GenerateFilename generates a file name for the given namespace.
-func (e *Encoder[T]) GenerateFilename(prefix, suffix string) string {
+func (e *Encoder) GenerateFilename(prefix, suffix string) string {
 	return prefix + e.config.Namespace + "_" + strconv.FormatInt(e.id.Add(1), 10) + suffix + ".asb"
 }
 
 // EncodeToken appends the encoded token to dst and returns the extended slice.
-func (e *Encoder[T]) EncodeToken(token T, dst []byte) ([]byte, error) {
-	t, ok := any(token).(*models.Token)
-	if !ok {
-		return dst, fmt.Errorf("unsupported token type %T for ASB encoder", token)
-	}
-
+func (e *Encoder) EncodeToken(token *models.Token, dst []byte) ([]byte, error) {
 	start := len(dst)
 
 	var err error
 
-	switch t.Type {
+	switch token.Type {
 	case models.TokenTypeRecord:
-		dst, err = e.appendRecord(dst, t.Record)
+		dst, err = e.appendRecord(dst, token.Record)
 	case models.TokenTypeUDF:
-		dst = appendUDFToASB(dst, t.UDF)
+		dst = appendUDFToASB(dst, token.UDF)
 	case models.TokenTypeSIndex:
-		dst = appendSIndexToASB(dst, t.SIndex)
+		dst = appendSIndexToASB(dst, token.SIndex)
 	case models.TokenTypeInvalid:
-		err = errors.New("invalid token")
+		err = fmt.Errorf("%w: invalid token", errclass.ErrCorruptData)
 	default:
-		err = fmt.Errorf("invalid token type: %v", t.Type)
+		err = fmt.Errorf("%w: invalid token type: %v", errclass.ErrCorruptData, token.Type)
 	}
 
 	if err != nil {
@@ -107,7 +102,7 @@ func (e *Encoder[T]) EncodeToken(token T, dst []byte) ([]byte, error) {
 
 // GetHeader returns the header of the ASB file as a byte slice.
 // The header contains the version, namespace, and first file flag.
-func (e *Encoder[T]) GetHeader(isRecords bool) []byte {
+func (e *Encoder) GetHeader(isRecords bool) []byte {
 	dst := make([]byte, 0, 1024)
 	dst = appendVersionText(dst, e.headerVersion(isRecords))
 	dst = appendNamespaceMetaText(dst, e.config.Namespace)
@@ -119,7 +114,7 @@ func (e *Encoder[T]) GetHeader(isRecords bool) []byte {
 	return dst
 }
 
-func (e *Encoder[T]) headerVersion(isRecords bool) string {
+func (e *Encoder) headerVersion(isRecords bool) string {
 	if isRecords {
 		return version31.toString()
 	}
@@ -127,7 +122,7 @@ func (e *Encoder[T]) headerVersion(isRecords bool) string {
 	return e.config.getVersion().toString()
 }
 
-func (e *Encoder[T]) appendRecord(dst []byte, r *models.Record) ([]byte, error) {
+func (e *Encoder) appendRecord(dst []byte, r *models.Record) ([]byte, error) {
 	dst, err := e.appendRecordKey(dst, r.Key)
 	if err != nil {
 		return dst, err
@@ -148,7 +143,7 @@ func (e *Encoder[T]) appendRecord(dst []byte, r *models.Record) ([]byte, error) 
 	return dst, nil
 }
 
-func (e *Encoder[T]) appendRecordKey(dst []byte, key *a.Key) ([]byte, error) {
+func (e *Encoder) appendRecordKey(dst []byte, key *a.Key) ([]byte, error) {
 	if userKey := key.Value(); userKey != nil {
 		var err error
 
@@ -207,7 +202,7 @@ func appendUserKey(dst []byte, userKey a.Value) ([]byte, error) {
 	case nil:
 		return dst, nil
 	default:
-		return dst, fmt.Errorf("invalid user key type: %T", value)
+		return dst, fmt.Errorf("%w: invalid user key type: %T", errclass.ErrUnsupported, value)
 	}
 }
 
@@ -251,7 +246,7 @@ func appendUserKeyBytes(dst, value []byte) []byte {
 	return append(dst, '\n')
 }
 
-func (e *Encoder[T]) appendRecordBin(dst []byte, name string, value any, number *[32]byte) ([]byte, error) {
+func (e *Encoder) appendRecordBin(dst []byte, name string, value any, number *[32]byte) ([]byte, error) {
 	switch value := value.(type) {
 	case bool:
 		dst = appendBinName(dst, binBoolTypePrefix, name, ' ')
@@ -298,7 +293,7 @@ func (e *Encoder[T]) appendRecordBin(dst []byte, name string, value any, number 
 	case nil:
 		return appendBinName(dst, binNilTypePrefix, name, '\n'), nil
 	default:
-		return dst, fmt.Errorf("unknown bin type: %T, key: %s", value, name)
+		return dst, fmt.Errorf("%w: unknown bin type: %T, key: %s", errclass.ErrUnsupported, value, name)
 	}
 }
 
@@ -336,9 +331,13 @@ func appendBase64Bin(dst, prefix []byte, name string, value []byte, number *[32]
 	return append(dst, '\n')
 }
 
-func (e *Encoder[T]) appendRawBlobBin(
+func (e *Encoder) appendRawBlobBin(
 	dst []byte, name string, value *a.RawBlobValue, number *[32]byte,
 ) ([]byte, error) {
+	if value == nil {
+		return dst, fmt.Errorf("%w: raw blob bin %q is nil", errclass.ErrCorruptData, name)
+	}
+
 	switch value.ParticleType {
 	case particleType.MAP:
 		if e.config.Compact {
@@ -353,7 +352,7 @@ func (e *Encoder[T]) appendRawBlobBin(
 
 		return appendBase64Bin(dst, binListTypePrefix, name, value.Data, number), nil
 	default:
-		return dst, fmt.Errorf("invalid raw blob bin particle type: %v", value.ParticleType)
+		return dst, fmt.Errorf("%w: invalid raw blob bin particle type: %v", errclass.ErrUnsupported, value.ParticleType)
 	}
 }
 

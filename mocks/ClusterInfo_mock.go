@@ -73,7 +73,7 @@ type MockClusterInfo_GetClusterStable_Call struct {
 // GetClusterStable is a helper method to define mock.On call
 //   - ctx context.Context
 //   - namespace string
-func (_e *MockClusterInfo_Expecter) GetClusterStable(ctx interface{}, namespace interface{}) *MockClusterInfo_GetClusterStable_Call {
+func (_e *MockClusterInfo_Expecter) GetClusterStable(ctx any, namespace any) *MockClusterInfo_GetClusterStable_Call {
 	return &MockClusterInfo_GetClusterStable_Call{Call: _e.mock.On("GetClusterStable", ctx, namespace)}
 }
 
@@ -140,7 +140,7 @@ type MockClusterInfo_GetNamespacesList_Call struct {
 
 // GetNamespacesList is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockClusterInfo_Expecter) GetNamespacesList(ctx interface{}) *MockClusterInfo_GetNamespacesList_Call {
+func (_e *MockClusterInfo_Expecter) GetNamespacesList(ctx any) *MockClusterInfo_GetNamespacesList_Call {
 	return &MockClusterInfo_GetNamespacesList_Call{Call: _e.mock.On("GetNamespacesList", ctx)}
 }
 
@@ -201,7 +201,7 @@ type MockClusterInfo_GetPendingMigrations_Call struct {
 // GetPendingMigrations is a helper method to define mock.On call
 //   - ctx context.Context
 //   - namespace string
-func (_e *MockClusterInfo_Expecter) GetPendingMigrations(ctx interface{}, namespace interface{}) *MockClusterInfo_GetPendingMigrations_Call {
+func (_e *MockClusterInfo_Expecter) GetPendingMigrations(ctx any, namespace any) *MockClusterInfo_GetPendingMigrations_Call {
 	return &MockClusterInfo_GetPendingMigrations_Call{Call: _e.mock.On("GetPendingMigrations", ctx, namespace)}
 }
 
@@ -270,7 +270,7 @@ type MockClusterInfo_GetPrimaryPartitions_Call struct {
 //   - ctx context.Context
 //   - node string
 //   - namespace string
-func (_e *MockClusterInfo_Expecter) GetPrimaryPartitions(ctx interface{}, node interface{}, namespace interface{}) *MockClusterInfo_GetPrimaryPartitions_Call {
+func (_e *MockClusterInfo_Expecter) GetPrimaryPartitions(ctx any, node any, namespace any) *MockClusterInfo_GetPrimaryPartitions_Call {
 	return &MockClusterInfo_GetPrimaryPartitions_Call{Call: _e.mock.On("GetPrimaryPartitions", ctx, node, namespace)}
 }
 
@@ -343,7 +343,7 @@ type MockClusterInfo_GetRackNodes_Call struct {
 // GetRackNodes is a helper method to define mock.On call
 //   - ctx context.Context
 //   - rackID int
-func (_e *MockClusterInfo_Expecter) GetRackNodes(ctx interface{}, rackID interface{}) *MockClusterInfo_GetRackNodes_Call {
+func (_e *MockClusterInfo_Expecter) GetRackNodes(ctx any, rackID any) *MockClusterInfo_GetRackNodes_Call {
 	return &MockClusterInfo_GetRackNodes_Call{Call: _e.mock.On("GetRackNodes", ctx, rackID)}
 }
 
@@ -410,7 +410,7 @@ type MockClusterInfo_GetRecordCount_Call struct {
 //   - ctx context.Context
 //   - namespace string
 //   - sets []string
-func (_e *MockClusterInfo_Expecter) GetRecordCount(ctx interface{}, namespace interface{}, sets interface{}) *MockClusterInfo_GetRecordCount_Call {
+func (_e *MockClusterInfo_Expecter) GetRecordCount(ctx any, namespace any, sets any) *MockClusterInfo_GetRecordCount_Call {
 	return &MockClusterInfo_GetRecordCount_Call{Call: _e.mock.On("GetRecordCount", ctx, namespace, sets)}
 }
 
@@ -443,6 +443,72 @@ func (_c *MockClusterInfo_GetRecordCount_Call) Return(v uint64, err error) *Mock
 }
 
 func (_c *MockClusterInfo_GetRecordCount_Call) RunAndReturn(run func(ctx context.Context, namespace string, sets []string) (uint64, error)) *MockClusterInfo_GetRecordCount_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetSIndexInfo provides a mock function for the type MockClusterInfo
+func (_mock *MockClusterInfo) GetSIndexInfo(ctx context.Context, namespace string) (models.SIndexInfo, error) {
+	ret := _mock.Called(ctx, namespace)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSIndexInfo")
+	}
+
+	var r0 models.SIndexInfo
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (models.SIndexInfo, error)); ok {
+		return returnFunc(ctx, namespace)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) models.SIndexInfo); ok {
+		r0 = returnFunc(ctx, namespace)
+	} else {
+		r0 = ret.Get(0).(models.SIndexInfo)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, namespace)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClusterInfo_GetSIndexInfo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSIndexInfo'
+type MockClusterInfo_GetSIndexInfo_Call struct {
+	*mock.Call
+}
+
+// GetSIndexInfo is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+func (_e *MockClusterInfo_Expecter) GetSIndexInfo(ctx any, namespace any) *MockClusterInfo_GetSIndexInfo_Call {
+	return &MockClusterInfo_GetSIndexInfo_Call{Call: _e.mock.On("GetSIndexInfo", ctx, namespace)}
+}
+
+func (_c *MockClusterInfo_GetSIndexInfo_Call) Run(run func(ctx context.Context, namespace string)) *MockClusterInfo_GetSIndexInfo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClusterInfo_GetSIndexInfo_Call) Return(sIndexInfo models.SIndexInfo, err error) *MockClusterInfo_GetSIndexInfo_Call {
+	_c.Call.Return(sIndexInfo, err)
+	return _c
+}
+
+func (_c *MockClusterInfo_GetSIndexInfo_Call) RunAndReturn(run func(ctx context.Context, namespace string) (models.SIndexInfo, error)) *MockClusterInfo_GetSIndexInfo_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -483,7 +549,7 @@ type MockClusterInfo_GetSIndexes_Call struct {
 // GetSIndexes is a helper method to define mock.On call
 //   - ctx context.Context
 //   - namespace string
-func (_e *MockClusterInfo_Expecter) GetSIndexes(ctx interface{}, namespace interface{}) *MockClusterInfo_GetSIndexes_Call {
+func (_e *MockClusterInfo_Expecter) GetSIndexes(ctx any, namespace any) *MockClusterInfo_GetSIndexes_Call {
 	return &MockClusterInfo_GetSIndexes_Call{Call: _e.mock.On("GetSIndexes", ctx, namespace)}
 }
 
@@ -549,7 +615,7 @@ type MockClusterInfo_GetService_Call struct {
 // GetService is a helper method to define mock.On call
 //   - ctx context.Context
 //   - node string
-func (_e *MockClusterInfo_Expecter) GetService(ctx interface{}, node interface{}) *MockClusterInfo_GetService_Call {
+func (_e *MockClusterInfo_Expecter) GetService(ctx any, node any) *MockClusterInfo_GetService_Call {
 	return &MockClusterInfo_GetService_Call{Call: _e.mock.On("GetService", ctx, node)}
 }
 
@@ -617,7 +683,7 @@ type MockClusterInfo_GetSetsList_Call struct {
 // GetSetsList is a helper method to define mock.On call
 //   - ctx context.Context
 //   - namespace string
-func (_e *MockClusterInfo_Expecter) GetSetsList(ctx interface{}, namespace interface{}) *MockClusterInfo_GetSetsList_Call {
+func (_e *MockClusterInfo_Expecter) GetSetsList(ctx any, namespace any) *MockClusterInfo_GetSetsList_Call {
 	return &MockClusterInfo_GetSetsList_Call{Call: _e.mock.On("GetSetsList", ctx, namespace)}
 }
 
@@ -682,7 +748,7 @@ type MockClusterInfo_GetStatus_Call struct {
 
 // GetStatus is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockClusterInfo_Expecter) GetStatus(ctx interface{}) *MockClusterInfo_GetStatus_Call {
+func (_e *MockClusterInfo_Expecter) GetStatus(ctx any) *MockClusterInfo_GetStatus_Call {
 	return &MockClusterInfo_GetStatus_Call{Call: _e.mock.On("GetStatus", ctx)}
 }
 
@@ -744,7 +810,7 @@ type MockClusterInfo_GetUDFs_Call struct {
 
 // GetUDFs is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockClusterInfo_Expecter) GetUDFs(ctx interface{}) *MockClusterInfo_GetUDFs_Call {
+func (_e *MockClusterInfo_Expecter) GetUDFs(ctx any) *MockClusterInfo_GetUDFs_Call {
 	return &MockClusterInfo_GetUDFs_Call{Call: _e.mock.On("GetUDFs", ctx)}
 }
 
@@ -804,7 +870,7 @@ type MockClusterInfo_GetVersion_Call struct {
 
 // GetVersion is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockClusterInfo_Expecter) GetVersion(ctx interface{}) *MockClusterInfo_GetVersion_Call {
+func (_e *MockClusterInfo_Expecter) GetVersion(ctx any) *MockClusterInfo_GetVersion_Call {
 	return &MockClusterInfo_GetVersion_Call{Call: _e.mock.On("GetVersion", ctx)}
 }
 
@@ -827,72 +893,6 @@ func (_c *MockClusterInfo_GetVersion_Call) Return(aerospikeVersion models0.Aeros
 }
 
 func (_c *MockClusterInfo_GetVersion_Call) RunAndReturn(run func(ctx context.Context) (models0.AerospikeVersion, error)) *MockClusterInfo_GetVersion_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// HasExpressionSIndex provides a mock function for the type MockClusterInfo
-func (_mock *MockClusterInfo) HasExpressionSIndex(ctx context.Context, namespace string) (bool, error) {
-	ret := _mock.Called(ctx, namespace)
-
-	if len(ret) == 0 {
-		panic("no return value specified for HasExpressionSIndex")
-	}
-
-	var r0 bool
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
-		return returnFunc(ctx, namespace)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) bool); ok {
-		r0 = returnFunc(ctx, namespace)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = returnFunc(ctx, namespace)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockClusterInfo_HasExpressionSIndex_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasExpressionSIndex'
-type MockClusterInfo_HasExpressionSIndex_Call struct {
-	*mock.Call
-}
-
-// HasExpressionSIndex is a helper method to define mock.On call
-//   - ctx context.Context
-//   - namespace string
-func (_e *MockClusterInfo_Expecter) HasExpressionSIndex(ctx interface{}, namespace interface{}) *MockClusterInfo_HasExpressionSIndex_Call {
-	return &MockClusterInfo_HasExpressionSIndex_Call{Call: _e.mock.On("HasExpressionSIndex", ctx, namespace)}
-}
-
-func (_c *MockClusterInfo_HasExpressionSIndex_Call) Run(run func(ctx context.Context, namespace string)) *MockClusterInfo_HasExpressionSIndex_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		run(
-			arg0,
-			arg1,
-		)
-	})
-	return _c
-}
-
-func (_c *MockClusterInfo_HasExpressionSIndex_Call) Return(b bool, err error) *MockClusterInfo_HasExpressionSIndex_Call {
-	_c.Call.Return(b, err)
-	return _c
-}
-
-func (_c *MockClusterInfo_HasExpressionSIndex_Call) RunAndReturn(run func(ctx context.Context, namespace string) (bool, error)) *MockClusterInfo_HasExpressionSIndex_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -930,7 +930,7 @@ type MockClusterInfo_SupportsBatchWrite_Call struct {
 
 // SupportsBatchWrite is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockClusterInfo_Expecter) SupportsBatchWrite(ctx interface{}) *MockClusterInfo_SupportsBatchWrite_Call {
+func (_e *MockClusterInfo_Expecter) SupportsBatchWrite(ctx any) *MockClusterInfo_SupportsBatchWrite_Call {
 	return &MockClusterInfo_SupportsBatchWrite_Call{Call: _e.mock.On("SupportsBatchWrite", ctx)}
 }
 

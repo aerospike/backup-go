@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,19 +21,19 @@ import (
 )
 
 // sizeCounter counts the size of tokens.
-type sizeCounter[T models.TokenConstraint] struct {
+type sizeCounter struct {
 	counter *atomic.Uint64
 }
 
 // NewSizeCounter creates a new sizeCounter processor.
-func NewSizeCounter[T models.TokenConstraint](counter *atomic.Uint64) Processor[T] {
-	return &sizeCounter[T]{
+func NewSizeCounter(counter *atomic.Uint64) Processor {
+	return &sizeCounter{
 		counter: counter,
 	}
 }
 
 // Process aggregates the size of a token.
-func (c sizeCounter[T]) Process(token T) (T, error) {
+func (c sizeCounter) Process(token *models.Token) (*models.Token, error) {
 	c.counter.Add(token.GetSize())
 	return token, nil
 }

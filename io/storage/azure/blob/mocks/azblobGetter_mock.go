@@ -75,7 +75,7 @@ type MockazblobGetter_DownloadStream_Call struct {
 //   - container string
 //   - path string
 //   - options *blob.DownloadStreamOptions
-func (_e *MockazblobGetter_Expecter) DownloadStream(ctx interface{}, container interface{}, path interface{}, options interface{}) *MockazblobGetter_DownloadStream_Call {
+func (_e *MockazblobGetter_Expecter) DownloadStream(ctx any, container any, path any, options any) *MockazblobGetter_DownloadStream_Call {
 	return &MockazblobGetter_DownloadStream_Call{Call: _e.mock.On("DownloadStream", ctx, container, path, options)}
 }
 
@@ -107,8 +107,8 @@ func (_c *MockazblobGetter_DownloadStream_Call) Run(run func(ctx context.Context
 	return _c
 }
 
-func (_c *MockazblobGetter_DownloadStream_Call) Return(v azblob.DownloadStreamResponse, err error) *MockazblobGetter_DownloadStream_Call {
-	_c.Call.Return(v, err)
+func (_c *MockazblobGetter_DownloadStream_Call) Return(downloadStreamResponse azblob.DownloadStreamResponse, err error) *MockazblobGetter_DownloadStream_Call {
+	_c.Call.Return(downloadStreamResponse, err)
 	return _c
 }
 
@@ -151,7 +151,7 @@ type MockazblobGetter_GetBlobProperties_Call struct {
 // GetBlobProperties is a helper method to define mock.On call
 //   - ctx context.Context
 //   - path string
-func (_e *MockazblobGetter_Expecter) GetBlobProperties(ctx interface{}, path interface{}) *MockazblobGetter_GetBlobProperties_Call {
+func (_e *MockazblobGetter_Expecter) GetBlobProperties(ctx any, path any) *MockazblobGetter_GetBlobProperties_Call {
 	return &MockazblobGetter_GetBlobProperties_Call{Call: _e.mock.On("GetBlobProperties", ctx, path)}
 }
 
@@ -173,8 +173,8 @@ func (_c *MockazblobGetter_GetBlobProperties_Call) Run(run func(ctx context.Cont
 	return _c
 }
 
-func (_c *MockazblobGetter_GetBlobProperties_Call) Return(v blob.GetPropertiesResponse, err error) *MockazblobGetter_GetBlobProperties_Call {
-	_c.Call.Return(v, err)
+func (_c *MockazblobGetter_GetBlobProperties_Call) Return(getPropertiesResponse blob.GetPropertiesResponse, err error) *MockazblobGetter_GetBlobProperties_Call {
+	_c.Call.Return(getPropertiesResponse, err)
 	return _c
 }
 

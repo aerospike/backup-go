@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"io"
 
 	"cloud.google.com/go/storage"
+	"github.com/aerospike/backup-go/errclass"
 )
 
 // gcpGetter is an interface for *storage.BucketHandle. Used for mocking tests.
@@ -68,7 +69,11 @@ type rangeReader struct {
 func newRangeReader(ctx context.Context, client gcpGetter, bucket, path string) (*rangeReader, error) {
 	head, err := client.GetAttrs(ctx, path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get attr %s: %w", path, err)
+		return nil, fmt.Errorf("%w: failed to get attr %s: %w", errclass.ErrStorage, path, err)
+	}
+
+	if head == nil {
+		return nil, fmt.Errorf("%w: nil object attributes for %s", errclass.ErrStorage, path)
 	}
 
 	return &rangeReader{
@@ -84,7 +89,7 @@ func newRangeReader(ctx context.Context, client gcpGetter, bucket, path string) 
 func (r *rangeReader) OpenRange(ctx context.Context, offset, count int64) (io.ReadCloser, error) {
 	resp, err := r.client.GetReader(ctx, r.path, r.generation, offset, count)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get reader %s: %w", r.path, err)
+		return nil, fmt.Errorf("%w: failed to get reader %s: %w", errclass.ErrStorage, r.path, err)
 	}
 
 	return resp, nil

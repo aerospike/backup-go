@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -95,6 +95,7 @@ const (
 	sindexTypeList   byte = 'L'
 	sindexTypeMapKey byte = 'K'
 	sindexTypeMapVal byte = 'V'
+	sindexTypeSet    byte = 'S'
 )
 
 // sindex bin types
@@ -103,6 +104,7 @@ const (
 	sindexBinTypeNumeric byte = 'N'
 	sindexBinTypeGEO2D   byte = 'G'
 	sindexBinTypeBlob    byte = 'B'
+	sindexBinTypeEmpty   byte = 'E'
 )
 
 // literal asb tokens

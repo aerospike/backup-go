@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,34 +17,19 @@ package asinfo
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"reflect"
 	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/asinfo/mocks"
-	models2 "github.com/aerospike/backup-go/pkg/asinfo/models"
+	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
 	"github.com/segmentio/asm/base64"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-const (
-	testASLoginPassword = "admin"
-	testASNamespace     = "test"
-	testASDC            = "DC1"
-	testASHost          = "127.0.0.1"
-	testASPort          = 3000
-	testSetInfo         = "info_set"
-)
-
-func newAerospikeClient() (*a.Client, a.Error) {
-	asPolicy := a.NewClientPolicy()
-	asPolicy.User = testASLoginPassword
-	asPolicy.Password = testASLoginPassword
-
-	return a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
-}
 
 // newClient for testing purposes.
 // We can't mock version check for dict load,
@@ -61,9 +46,10 @@ func newClient(
 		cluster:     cluster,
 		policy:      policy,
 		retryPolicy: retryPolicy,
+		logger:      slog.Default(),
 	}
 
-	ic.cmdDict = newCmdDict(models2.AerospikeVersionRecentInfoCommands)
+	ic.cmdDict = newCmdDict(infomodels.AerospikeVersionRecentInfoCommands)
 
 	return ic
 }
@@ -76,7 +62,7 @@ func Test_parseAerospikeVersion(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    models2.AerospikeVersion
+		want    infomodels.AerospikeVersion
 		wantErr bool
 	}{
 		{
@@ -84,7 +70,7 @@ func Test_parseAerospikeVersion(t *testing.T) {
 			args: args{
 				versionStr: "5.6.0.0",
 			},
-			want: models2.AerospikeVersion{
+			want: infomodels.AerospikeVersion{
 				Major: 5,
 				Minor: 6,
 				Patch: 0,
@@ -95,7 +81,7 @@ func Test_parseAerospikeVersion(t *testing.T) {
 			args: args{
 				versionStr: "1829.123.0.33333",
 			},
-			want: models2.AerospikeVersion{
+			want: infomodels.AerospikeVersion{
 				Major: 1829,
 				Minor: 123,
 				Patch: 0,
@@ -106,7 +92,7 @@ func Test_parseAerospikeVersion(t *testing.T) {
 			args: args{
 				versionStr: "7.1.0.0-rc1-g1234",
 			},
-			want: models2.AerospikeVersion{
+			want: infomodels.AerospikeVersion{
 				Major: 7,
 				Minor: 1,
 				Patch: 0,
@@ -171,7 +157,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 		Patch int
 	}
 	type args struct {
-		other models2.AerospikeVersion
+		other infomodels.AerospikeVersion
 	}
 	tests := []struct {
 		name   string
@@ -187,7 +173,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: models2.AerospikeVersion{
+				other: infomodels.AerospikeVersion{
 					Major: 4,
 					Minor: 1,
 					Patch: 0,
@@ -203,7 +189,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: models2.AerospikeVersion{
+				other: infomodels.AerospikeVersion{
 					Major: 5,
 					Minor: 5,
 					Patch: 0,
@@ -219,7 +205,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Patch: 1,
 			},
 			args: args{
-				other: models2.AerospikeVersion{
+				other: infomodels.AerospikeVersion{
 					Major: 5,
 					Minor: 6,
 					Patch: 0,
@@ -235,7 +221,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: models2.AerospikeVersion{
+				other: infomodels.AerospikeVersion{
 					Major: 5,
 					Minor: 6,
 					Patch: 0,
@@ -251,7 +237,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: models2.AerospikeVersion{
+				other: infomodels.AerospikeVersion{
 					Major: 5,
 					Minor: 6,
 					Patch: 0,
@@ -267,7 +253,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: models2.AerospikeVersion{
+				other: infomodels.AerospikeVersion{
 					Major: 5,
 					Minor: 6,
 					Patch: 0,
@@ -283,7 +269,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: models2.AerospikeVersion{
+				other: infomodels.AerospikeVersion{
 					Major: 5,
 					Minor: 6,
 					Patch: 1,
@@ -295,7 +281,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			av := models2.AerospikeVersion{
+			av := infomodels.AerospikeVersion{
 				Major: tt.fields.Major,
 				Minor: tt.fields.Minor,
 				Patch: tt.fields.Patch,
@@ -359,7 +345,7 @@ func Test_parseSIndex(t *testing.T) {
 	}
 
 	type args struct {
-		sindexMap models2.InfoMap
+		sindexMap infomodels.InfoMap
 	}
 	tests := []struct {
 		args    args
@@ -370,7 +356,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive bin (default) sindex",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -395,7 +381,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive bin (none) sindex",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -420,7 +406,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive list elements sindex",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -445,7 +431,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive map keys sindex",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -470,7 +456,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive map values sindex",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -495,7 +481,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive ctx",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -521,7 +507,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive null set",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "null",
@@ -546,7 +532,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive numeric bin",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -571,7 +557,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive numeric (int signed) bin",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -596,7 +582,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive string bin",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -621,7 +607,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive string (text) bin",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -646,7 +632,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive blob bin",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -671,7 +657,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive geojson (geo2dsphere) bin",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -696,7 +682,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive geojson bin",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -721,7 +707,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "negative response missing namespace",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"indexname": "testindex",
 					"set":       "testset",
 					"bin":       "testbin",
@@ -736,7 +722,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "negative response missing indexname",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"set":       "testset",
 					"bin":       "testbin",
@@ -751,7 +737,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "negative response missing indextype",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -766,7 +752,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "negative response missing bin",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -781,7 +767,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "negative response missing type",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -796,7 +782,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "negative invalid indextype",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -812,7 +798,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "negative invalid type",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -825,6 +811,25 @@ func Test_parseSIndex(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "set index type",
+			args: args{
+				// map[indexname:set_idx indextype:set ns:source-ns1 set:testRacks]]
+				sindexMap: infomodels.InfoMap{
+					"ns":        "test",
+					"indexname": "testindex",
+					"set":       "testset",
+					"indextype": indexTypeSet,
+				},
+			},
+			want: &models.SIndex{
+				Namespace: "test",
+				Name:      "testindex",
+				Set:       "testset",
+				IndexType: models.SetSIndex,
+				Path:      models.NewEmptySIndexPath(),
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -833,6 +838,9 @@ func Test_parseSIndex(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseSIndex() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			if tt.name == "negative invalid indextype" {
+				require.ErrorIs(t, err, ErrInvalidSIndexType)
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("parseSIndex() = %v, want %v", got, tt.want)
@@ -852,7 +860,7 @@ func Test_parseInfoResponse(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    []models2.InfoMap
+		want    []infomodels.InfoMap
 		wantErr bool
 	}{
 		{
@@ -863,7 +871,7 @@ func Test_parseInfoResponse(t *testing.T) {
 				pairSep: ":",
 				kvSep:   "=",
 			},
-			want: []models2.InfoMap{
+			want: []infomodels.InfoMap{
 				{
 					"foo": "bar",
 				},
@@ -897,7 +905,7 @@ func Test_parseInfoResponse(t *testing.T) {
 				pairSep: ":",
 				kvSep:   "=",
 			},
-			want: []models2.InfoMap{
+			want: []infomodels.InfoMap{
 				{
 					"foo": "bar=as",
 				},
@@ -911,7 +919,7 @@ func Test_parseInfoResponse(t *testing.T) {
 				pairSep: ":",
 				kvSep:   "=",
 			},
-			want: []models2.InfoMap{
+			want: []infomodels.InfoMap{
 				{
 					"foo": "bar",
 					"baz": "qux",
@@ -926,7 +934,7 @@ func Test_parseInfoResponse(t *testing.T) {
 				pairSep: ":",
 				kvSep:   "=",
 			},
-			want: []models2.InfoMap{
+			want: []infomodels.InfoMap{
 				{
 					"foo": "bar",
 					"baz": "qux",
@@ -945,7 +953,7 @@ func Test_parseInfoResponse(t *testing.T) {
 				pairSep: ":",
 				kvSep:   "=",
 			},
-			want: []models2.InfoMap{
+			want: []infomodels.InfoMap{
 				{
 					"foo": "bar",
 					"baz": "qux",
@@ -964,7 +972,7 @@ func Test_parseInfoResponse(t *testing.T) {
 				pairSep: ",",
 				kvSep:   ".",
 			},
-			want: []models2.InfoMap{
+			want: []infomodels.InfoMap{
 				{
 					"foo": "bar",
 					"baz": "qux",
@@ -1028,7 +1036,7 @@ func Test_getAerospikeVersion(t *testing.T) {
 	tests := []struct {
 		args    args
 		name    string
-		want    models2.AerospikeVersion
+		want    infomodels.AerospikeVersion
 		wantErr bool
 	}{
 		{
@@ -1036,7 +1044,7 @@ func Test_getAerospikeVersion(t *testing.T) {
 			args: args{
 				node: newMockInfoGetter(t, "build", map[string]string{"build": "5.6.0.0"}, nil),
 			},
-			want: models2.AerospikeVersion{
+			want: infomodels.AerospikeVersion{
 				Major: 5,
 				Minor: 6,
 				Patch: 0,
@@ -1047,7 +1055,7 @@ func Test_getAerospikeVersion(t *testing.T) {
 			args: args{
 				node: newMockInfoGetter(t, "build", map[string]string{"build": "7.6.1.0-rc2-ghasd"}, nil),
 			},
-			want: models2.AerospikeVersion{
+			want: infomodels.AerospikeVersion{
 				Major: 7,
 				Minor: 6,
 				Patch: 1,
@@ -1183,7 +1191,7 @@ func Test_getSIndexes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := ic.getSIndexes(tt.args.conn, tt.args.namespace, tt.args.policy)
+			got, err := ic.requestSIndexes(tt.args.conn, tt.args.namespace, tt.args.policy, false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getSIndexes() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1285,17 +1293,38 @@ func Test_parseSIndexResponse(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "negative bad sindex",
+			name: "negative bad sindex bin type",
 			args: args{
 				sindexInfoResp: "ns=test:set=testset:indexname=testindex:bin=testbin:type=BADTYPE:indextype=default:context=null:state=RW",
 			},
 			wantErr: true,
 		},
+		{
+			name: "positive skips invalid indextype",
+			args: args{
+				sindexInfoResp: "ns=test:set=testset:indexname=validindex:bin=testbin:type=numeric:indextype=default:context=null:state=RW;ns=test:set=testset:indexname=badindex:bin=testbin:type=numeric:indextype=badtype:context=null:state=RW",
+			},
+			want: []*models.SIndex{
+				{
+					Namespace: "test",
+					Name:      "validindex",
+					Set:       "testset",
+					Path: models.SIndexPath{
+						BinName: "testbin",
+						BinType: models.NumericSIDataType,
+					},
+					IndexType: models.BinSIndex,
+				},
+			},
+		},
 	}
+	mockNodeGetter := mocks.NewMockNodeGetter(t)
+	ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := parseSIndexes(tt.args.sindexInfoResp)
+			got, err := ic.parseSIndexes(tt.args.sindexInfoResp, false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseSIndexResponse() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1315,7 +1344,7 @@ func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
 		Patch int
 	}
 	type args struct {
-		other models2.AerospikeVersion
+		other infomodels.AerospikeVersion
 	}
 	tests := []struct {
 		name   string
@@ -1331,7 +1360,7 @@ func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: models2.AerospikeVersion{
+				other: infomodels.AerospikeVersion{
 					Major: 4,
 					Minor: 1,
 					Patch: 0,
@@ -1347,7 +1376,7 @@ func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: models2.AerospikeVersion{
+				other: infomodels.AerospikeVersion{
 					Major: 5,
 					Minor: 6,
 					Patch: 0,
@@ -1363,7 +1392,7 @@ func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: models2.AerospikeVersion{
+				other: infomodels.AerospikeVersion{
 					Major: 4,
 					Minor: 1,
 					Patch: 0,
@@ -1375,7 +1404,7 @@ func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			av := models2.AerospikeVersion{
+			av := infomodels.AerospikeVersion{
 				Major: tt.fields.Major,
 				Minor: tt.fields.Minor,
 				Patch: tt.fields.Patch,
@@ -1390,7 +1419,7 @@ func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
 func Test_parseUDF(t *testing.T) {
 	t.Parallel()
 	type args struct {
-		udfMap models2.InfoMap
+		udfMap infomodels.InfoMap
 	}
 	tests := []struct {
 		args    args
@@ -1401,7 +1430,7 @@ func Test_parseUDF(t *testing.T) {
 		{
 			name: "positive simple",
 			args: args{
-				udfMap: models2.InfoMap{
+				udfMap: infomodels.InfoMap{
 					"type":    "LUA",
 					"content": base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
 				},
@@ -1414,7 +1443,7 @@ func Test_parseUDF(t *testing.T) {
 		{
 			name: "negative missing type",
 			args: args{
-				udfMap: models2.InfoMap{
+				udfMap: infomodels.InfoMap{
 					"content": base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
 				},
 			},
@@ -1423,7 +1452,7 @@ func Test_parseUDF(t *testing.T) {
 		{
 			name: "negative bad language type",
 			args: args{
-				udfMap: models2.InfoMap{
+				udfMap: infomodels.InfoMap{
 					"type":    "BADTYPE",
 					"content": base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
 				},
@@ -1433,7 +1462,7 @@ func Test_parseUDF(t *testing.T) {
 		{
 			name: "negative missing content",
 			args: args{
-				udfMap: models2.InfoMap{
+				udfMap: infomodels.InfoMap{
 					"type": "LUA",
 				},
 			},
@@ -1442,7 +1471,7 @@ func Test_parseUDF(t *testing.T) {
 		{
 			name: "negative content is not base64 encoded",
 			args: args{
-				udfMap: models2.InfoMap{
+				udfMap: infomodels.InfoMap{
 					"type":    "LUA",
 					"content": "function test()\n return 1\n end\n",
 				},
@@ -1452,7 +1481,7 @@ func Test_parseUDF(t *testing.T) {
 		{
 			name: "negative wrong number of info elements",
 			args: args{
-				udfMap: models2.InfoMap{
+				udfMap: infomodels.InfoMap{
 					"type":     "LUA",
 					"content":  "function test()\n return 1\n end\n",
 					"too many": "elements",
@@ -1781,7 +1810,7 @@ func Test_parseInfoObject(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		obj    string
-		result models2.InfoMap
+		result infomodels.InfoMap
 		err    error
 	}{
 		{
@@ -1851,184 +1880,20 @@ func TestClient_parseResultResponse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			result, err := parseResultResponse(tt.cmd, tt.input)
-			if result != tt.expected {
-				t.Errorf("expected result %v, got %v", tt.expected, result)
+
+			if tt.errMsg == "" {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+
+				return
 			}
-			if err != nil {
-				if err.Error() != tt.errMsg {
-					t.Errorf("expected error message %v, got %v", tt.errMsg, err)
-				}
-			} else if tt.errMsg != "" {
-				t.Errorf("expected error message %v, got nil", tt.errMsg)
-			}
+
+			// The class is the contract, the message text is not.
+			require.ErrorIs(t, err, errclass.ErrAerospike)
+			require.ErrorContains(t, err, tt.errMsg)
+			require.Equal(t, tt.expected, result)
 		})
 	}
-}
-
-func TestClient_GetSIndexes(t *testing.T) {
-	t.Parallel()
-
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	_, err = ic.GetSIndexes(ctx, testASNamespace)
-	require.NoError(t, err)
-}
-
-func TestClient_GetUDFs(t *testing.T) {
-	t.Parallel()
-
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	_, err = ic.GetUDFs(ctx)
-	require.NoError(t, err)
-}
-
-func TestClient_GetRecordCount(t *testing.T) {
-	t.Parallel()
-
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	_, err = ic.GetRecordCount(ctx, testASNamespace, nil)
-	require.NoError(t, err)
-}
-
-func TestClient_GetSets(t *testing.T) {
-	t.Parallel()
-
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	wp := a.NewWritePolicy(0, 0)
-	k, aerr := a.NewKey(testASNamespace, testSetInfo, "get-sets")
-	require.NoError(t, aerr)
-	b := a.NewBin("bin", "value")
-	aerr = client.PutBins(wp, k, b)
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	result, err := ic.GetSetsList(ctx, testASNamespace)
-	require.NoError(t, err)
-
-	require.Greater(t, len(result), 1)
-}
-
-func TestClient_getRackNodes(t *testing.T) {
-	t.Parallel()
-
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	res, err := ic.GetRackNodes(ctx, 0)
-	require.NoError(t, err)
-
-	fmt.Println(res)
-}
-
-func TestClient_getService(t *testing.T) {
-	t.Parallel()
-
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	nodes := ic.GetNodesNames()
-
-	_, err = ic.getByNode(nodes[0], cmdServiceTLSStd)
-	require.NoError(t, err)
-}
-
-func TestClient_GetNamespacesList(t *testing.T) {
-	t.Parallel()
-
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	result, err := ic.GetNamespacesList(ctx)
-	require.NoError(t, err)
-
-	require.Equal(t, []string{testASNamespace}, result)
-}
-
-func TestClient_GetStatus(t *testing.T) {
-	t.Parallel()
-
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	result, err := ic.GetStatus(ctx)
-	require.NoError(t, err)
-
-	require.Equal(t, "ok", result)
-}
-
-func TestClient_GetReplicas(t *testing.T) {
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	node, err := ic.cluster.GetRandomNode()
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	b, err := ic.GetPrimaryPartitions(ctx, node.GetName(), testASNamespace)
-	require.NoError(t, err)
-	require.NotNil(t, b)
-}
-
-func TestClient_GetPendingMigrations(t *testing.T) {
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	result, err := ic.GetPendingMigrations(ctx, testASNamespace)
-	require.NoError(t, err)
-	require.Equal(t, uint64(0), result)
 }
 
 func TestClient_GetBackupStatus(t *testing.T) {
@@ -2046,8 +1911,8 @@ func TestClient_GetBackupStatus(t *testing.T) {
 }
 
 // backupJob builds a minimal InfoMap representing a backup job.
-func backupJob(trid, timeSinceDone, progress, pids string) models2.InfoMap {
-	return models2.InfoMap{
+func backupJob(trid, timeSinceDone, progress, pids string) infomodels.InfoMap {
+	return infomodels.InfoMap{
 		"trid":             trid,
 		"ns":               "test-ns",
 		"job-type":         jobTypeBackup,
@@ -2062,7 +1927,7 @@ func TestFilterBackupsSortedByTimeSinceDone(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		input     []models2.InfoMap
+		input     []infomodels.InfoMap
 		wantTRIDs []string
 		wantErr   bool
 	}{
@@ -2073,7 +1938,7 @@ func TestFilterBackupsSortedByTimeSinceDone(t *testing.T) {
 		},
 		{
 			name: "filters out non-backup jobs",
-			input: []models2.InfoMap{
+			input: []infomodels.InfoMap{
 				{"trid": "1", "job-type": "scan", "time-since-done": "100"},
 				{"trid": "2", "job-type": "query", "time-since-done": "50"},
 				backupJob("3", "200", "100", "2048"),
@@ -2082,7 +1947,7 @@ func TestFilterBackupsSortedByTimeSinceDone(t *testing.T) {
 		},
 		{
 			name: "ascending by time-since-done",
-			input: []models2.InfoMap{
+			input: []infomodels.InfoMap{
 				backupJob("1", "300", "20", "1024"),
 				backupJob("2", "100", "40", "2048"),
 				backupJob("3", "200", "100", "4096"),
@@ -2091,7 +1956,7 @@ func TestFilterBackupsSortedByTimeSinceDone(t *testing.T) {
 		},
 		{
 			name: "missing time-since-done goes to the end",
-			input: []models2.InfoMap{
+			input: []infomodels.InfoMap{
 				backupJob("1", "300", "50", "2048"),
 				{"trid": "2", "job-type": jobTypeBackup},
 				backupJob("3", "100", "100", "4096"),
@@ -2100,14 +1965,14 @@ func TestFilterBackupsSortedByTimeSinceDone(t *testing.T) {
 		},
 		{
 			name: "all jobs filtered out",
-			input: []models2.InfoMap{
+			input: []infomodels.InfoMap{
 				{"trid": "1", "job-type": "scan", "time-since-done": "100"},
 			},
 			wantTRIDs: []string{},
 		},
 		{
 			name: "malformed time-since-done returns error",
-			input: []models2.InfoMap{
+			input: []infomodels.InfoMap{
 				backupJob("1", "not-a-number", "100", "4096"),
 			},
 			wantErr: true,
@@ -2162,17 +2027,17 @@ func TestClient_getBackupStatusByNode(t *testing.T) {
 		response string
 		reqErr   a.Error
 		wantErr  bool
-		check    func(t *testing.T, resp []models2.InfoMap)
+		check    func(t *testing.T, resp []infomodels.InfoMap)
 	}{
 		{
 			name:     "parses backup status response",
 			response: completeStatus,
-			check: func(t *testing.T, resp []models2.InfoMap) {
+			check: func(t *testing.T, resp []infomodels.InfoMap) {
 				t.Helper()
 
-				status := models2.NewResponseBackupState(resp)
+				status := infomodels.NewResponseBackupState(resp)
 				require.NotNil(t, status)
-				assert.Equal(t, models2.BackupStateComplete, status.State)
+				assert.Equal(t, infomodels.BackupStateComplete, status.State)
 				assert.Equal(t, testJobID, status.JobID)
 				assert.Equal(t, "source-ns1", status.Namespace)
 				assert.InEpsilon(t, 100.0, status.ProgressPct, 0.01)
@@ -2181,11 +2046,11 @@ func TestClient_getBackupStatusByNode(t *testing.T) {
 		{
 			name:     "empty response",
 			response: "",
-			check: func(t *testing.T, resp []models2.InfoMap) {
+			check: func(t *testing.T, resp []infomodels.InfoMap) {
 				t.Helper()
 
 				assert.Nil(t, resp)
-				assert.Nil(t, models2.NewResponseBackupState(resp))
+				assert.Nil(t, infomodels.NewResponseBackupState(resp))
 			},
 		},
 		{
@@ -2236,49 +2101,4 @@ func TestClient_getBackupStatusByNode_RequestInfoError(t *testing.T) {
 	require.Error(t, err)
 
 	assert.Contains(t, err.Error(), "failed to get backup status")
-}
-
-func TestClient_getClusterStable(t *testing.T) {
-	t.Parallel()
-
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	_, err = ic.getClusterStable(ctx, testASNamespace)
-	require.NoError(t, err)
-}
-
-func TestClient_getStatistics(t *testing.T) {
-	t.Parallel()
-
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	_, err = ic.getStatistics(ctx)
-	require.NoError(t, err)
-}
-
-func TestClient_getPrincipal(t *testing.T) {
-	t.Parallel()
-
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	_, err = ic.getPrincipal(ctx)
-	require.NoError(t, err)
 }

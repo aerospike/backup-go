@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -378,4 +378,17 @@ func TestStdout_GetType(t *testing.T) {
 
 	res := w.GetType()
 	require.Equal(t, stdoutType, res)
+}
+
+func TestStdout_GetOptions_NoChunkLimit(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	w, err := NewWriter(ctx, defaultBufferSize)
+	require.NoError(t, err)
+
+	// Stdout has no chunk count restriction, so the file limit validation
+	// must be skipped for it.
+	require.True(t, w.GetOptions().NoChunkLimit)
 }

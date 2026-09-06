@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ package asb
 import (
 	"fmt"
 	"path/filepath"
+
+	"github.com/aerospike/backup-go/errclass"
 )
 
 const Extension = ".asb"
@@ -33,8 +35,8 @@ func NewValidator() *Validator {
 // Run performs backup files validation.
 func (v *Validator) Run(fileName string) error {
 	if filepath.Ext(fileName) != Extension {
-		return fmt.Errorf("restore file %s is in an invalid format, expected extension: .asb, got: %s",
-			fileName, filepath.Ext(fileName))
+		return fmt.Errorf("%w: restore file %s is in an invalid format, expected extension: .asb, got: %s",
+			errclass.ErrUnsupported, fileName, filepath.Ext(fileName))
 	}
 
 	return nil

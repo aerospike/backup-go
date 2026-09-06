@@ -74,7 +74,7 @@ type MockServerBackupInfo_GetBackupStatus_Call struct {
 // GetBackupStatus is a helper method to define mock.On call
 //   - ctx context.Context
 //   - jobID string
-func (_e *MockServerBackupInfo_Expecter) GetBackupStatus(ctx interface{}, jobID interface{}) *MockServerBackupInfo_GetBackupStatus_Call {
+func (_e *MockServerBackupInfo_Expecter) GetBackupStatus(ctx any, jobID any) *MockServerBackupInfo_GetBackupStatus_Call {
 	return &MockServerBackupInfo_GetBackupStatus_Call{Call: _e.mock.On("GetBackupStatus", ctx, jobID)}
 }
 
@@ -140,7 +140,7 @@ type MockServerBackupInfo_GetRestoreStatus_Call struct {
 // GetRestoreStatus is a helper method to define mock.On call
 //   - ctx context.Context
 //   - namespace string
-func (_e *MockServerBackupInfo_Expecter) GetRestoreStatus(ctx interface{}, namespace interface{}) *MockServerBackupInfo_GetRestoreStatus_Call {
+func (_e *MockServerBackupInfo_Expecter) GetRestoreStatus(ctx any, namespace any) *MockServerBackupInfo_GetRestoreStatus_Call {
 	return &MockServerBackupInfo_GetRestoreStatus_Call{Call: _e.mock.On("GetRestoreStatus", ctx, namespace)}
 }
 
@@ -198,7 +198,7 @@ type MockServerBackupInfo_PrepareServerRestore_Call struct {
 //   - ctx context.Context
 //   - jobID string
 //   - namespace string
-func (_e *MockServerBackupInfo_Expecter) PrepareServerRestore(ctx interface{}, jobID interface{}, namespace interface{}) *MockServerBackupInfo_PrepareServerRestore_Call {
+func (_e *MockServerBackupInfo_Expecter) PrepareServerRestore(ctx any, jobID any, namespace any) *MockServerBackupInfo_PrepareServerRestore_Call {
 	return &MockServerBackupInfo_PrepareServerRestore_Call{Call: _e.mock.On("PrepareServerRestore", ctx, jobID, namespace)}
 }
 
@@ -269,7 +269,7 @@ type MockServerBackupInfo_StartServerBackup_Call struct {
 // StartServerBackup is a helper method to define mock.On call
 //   - ctx context.Context
 //   - request *models.RequestBackup
-func (_e *MockServerBackupInfo_Expecter) StartServerBackup(ctx interface{}, request interface{}) *MockServerBackupInfo_StartServerBackup_Call {
+func (_e *MockServerBackupInfo_Expecter) StartServerBackup(ctx any, request any) *MockServerBackupInfo_StartServerBackup_Call {
 	return &MockServerBackupInfo_StartServerBackup_Call{Call: _e.mock.On("StartServerBackup", ctx, request)}
 }
 
@@ -326,7 +326,7 @@ type MockServerBackupInfo_StartServerRestore_Call struct {
 // StartServerRestore is a helper method to define mock.On call
 //   - ctx context.Context
 //   - request *models.RequestRestore
-func (_e *MockServerBackupInfo_Expecter) StartServerRestore(ctx interface{}, request interface{}) *MockServerBackupInfo_StartServerRestore_Call {
+func (_e *MockServerBackupInfo_Expecter) StartServerRestore(ctx any, request any) *MockServerBackupInfo_StartServerRestore_Call {
 	return &MockServerBackupInfo_StartServerRestore_Call{Call: _e.mock.On("StartServerRestore", ctx, request)}
 }
 

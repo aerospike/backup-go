@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
@@ -96,13 +97,15 @@ func NewReader(
 	}
 
 	if len(r.PathList) == 0 {
-		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
+		return nil, fmt.Errorf("%w: path is required, use WithDir(path string) or WithFile(path string) to set",
+			errclass.ErrInvalidConfig)
 	}
 
 	if _, err := client.HeadBucket(ctx, &s3.HeadBucketInput{
 		Bucket: aws.String(bucketName),
 	}); err != nil {
-		return nil, fmt.Errorf("bucket %s does not exist or you don't have access: %w", bucketName, err)
+		return nil, fmt.Errorf("%w: bucket %s does not exist or you don't have access: %w",
+			errclass.ErrNotFound, bucketName, err)
 	}
 
 	r.client = client
@@ -110,7 +113,7 @@ func NewReader(
 
 	if r.IsDir && !r.SkipDirCheck {
 		if err := r.checkRestoreDirectory(ctx, r.PathList[0]); err != nil {
-			return nil, fmt.Errorf("%w: %w", common.ErrEmptyStorage, err)
+			return nil, err
 		}
 	}
 
@@ -121,13 +124,13 @@ func NewReader(
 
 		tier, err := parseAccessTier(r.AccessTier)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse restore tier: %w", err)
+			return nil, fmt.Errorf("%w: failed to parse restore tier: %w", errclass.ErrInvalidConfig, err)
 		}
 
 		r.Logger.Debug("parsed tier", slog.String("value", string(tier)))
 
 		if err := r.warmStorage(ctx, tier); err != nil {
-			return nil, fmt.Errorf("failed to warm storage: %w", err)
+			return nil, fmt.Errorf("%w: failed to warm storage: %w", errclass.ErrStorage, err)
 		}
 
 		r.Logger.Debug("finish warming storage")
@@ -141,7 +144,7 @@ func NewReader(
 	return r, nil
 }
 
-// StreamFiles read files form s3 and send io.Readers to `readersCh` communication chan for lazy loading.
+// StreamFiles read files from s3 and send io.Readers to `readersCh` communication chan for lazy loading.
 // In case of error, we send error to `errorsCh` channel.
 // If `skipPrefix` is set, it will skip files that start with this prefix and save a skipped list of files.
 func (r *Reader) StreamFiles(
@@ -174,7 +177,7 @@ func (r *Reader) StreamFiles(
 	}
 }
 
-// streamDirectory reads directory form s3 and send io.Readers to `readersCh` communication chan for lazy loading.
+// streamDirectory reads directory from s3 and send io.Readers to `readersCh` communication chan for lazy loading.
 // In case of error, we send error to `errorsCh` channel.
 func (r *Reader) streamDirectory(
 	ctx context.Context, path string, readersCh chan<- models.File, errorsCh chan<- error,
@@ -189,7 +192,7 @@ func (r *Reader) streamDirectory(
 			StartAfter:        &r.StartAfter,
 		})
 		if err != nil {
-			common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to list objects: %w", err))
+			common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to list objects: %w", errclass.ErrStorage, err))
 			return
 		}
 
@@ -233,7 +236,7 @@ func (r *Reader) openObject(
 ) {
 	state, err := r.checkObjectAvailability(ctx, path)
 	if err != nil {
-		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to check object availability: %w", err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to check object availability: %w", errclass.ErrStorage, err))
 		return
 	}
 
@@ -244,7 +247,9 @@ func (r *Reader) openObject(
 
 	rReader, err := newRangeReader(ctx, r.client, &r.bucketName, &path)
 	if err != nil {
-		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to prepare rangeReader %s: %w", path, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to prepare rangeReader %s: %w",
+			errclass.ErrStorage, path, err))
+
 		return
 	}
 
@@ -260,7 +265,7 @@ func (r *Reader) openObject(
 		}
 
 		// We check *p.Key == nil in the beginning.
-		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open file %s: %w", path, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to open file %s: %w", errclass.ErrStorage, path, err))
 
 		return
 	}
@@ -298,7 +303,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 			StartAfter:        &r.StartAfter,
 		})
 		if err != nil {
-			return fmt.Errorf("failed to list objects: %w", err)
+			return fmt.Errorf("%w: failed to list objects: %w", errclass.ErrStorage, err)
 		}
 
 		for _, p := range listResponse.Contents {
@@ -326,7 +331,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 		}
 	}
 
-	return fmt.Errorf("%s is empty", path)
+	return fmt.Errorf("%w: %s", common.ErrEmptyStorage, path)
 }
 
 // ListObjects list all object in the path.
@@ -343,7 +348,7 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 			StartAfter:        &r.StartAfter,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to list objects: %w", err)
+			return nil, fmt.Errorf("%w: failed to list objects: %w", errclass.ErrStorage, err)
 		}
 
 		for _, p := range listResponse.Contents {
@@ -393,7 +398,7 @@ func (r *Reader) restoreObject(ctx context.Context, path string, tier types.Tier
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("failed to restore object: %w", err)
+		return fmt.Errorf("%w: failed to restore object: %w", errclass.ErrStorage, err)
 	}
 
 	return nil
@@ -406,7 +411,8 @@ func (r *Reader) checkObjectAvailability(ctx context.Context, path string) (int,
 		Key:    aws.String(path),
 	})
 	if err != nil {
-		return objStatusArchived, fmt.Errorf("failed to get head object %s %s: %w", r.bucketName, path, err)
+		return objStatusArchived, fmt.Errorf("%w: failed to get head object %s %s: %w",
+			errclass.ErrStorage, r.bucketName, path, err)
 	}
 
 	r.Logger.Debug("check object availability",
@@ -448,7 +454,7 @@ func (r *Reader) checkObjectAvailability(ctx context.Context, path string) (int,
 func (r *Reader) warmStorage(ctx context.Context, tier types.Tier) error {
 	for _, path := range r.PathList {
 		if err := r.warmDirectory(ctx, path, tier); err != nil {
-			return fmt.Errorf("failed to warm directory %s: %w", path, err)
+			return fmt.Errorf("%w: failed to warm directory %s: %w", errclass.ErrStorage, path, err)
 		}
 	}
 
@@ -456,7 +462,7 @@ func (r *Reader) warmStorage(ctx context.Context, tier types.Tier) error {
 
 	// Start polling objects.
 	if err := r.checkWarm(ctx); err != nil {
-		return fmt.Errorf("failed to check directory warming status: %w", err)
+		return fmt.Errorf("%w: failed to check directory warming status: %w", errclass.ErrStorage, err)
 	}
 
 	r.Logger.Info("storage warm up finished")
@@ -480,7 +486,7 @@ func (r *Reader) warmDirectory(ctx context.Context, path string, tier types.Tier
 		switch state {
 		case objStatusArchived:
 			if err = r.restoreObject(ctx, object, tier); err != nil {
-				return fmt.Errorf("failed to restore object: %w", err)
+				return fmt.Errorf("%w: failed to restore object: %w", errclass.ErrStorage, err)
 			}
 			// Add to checking queue.
 			r.objectsToWarm = append(r.objectsToWarm, object)
@@ -502,7 +508,7 @@ func (r *Reader) checkWarm(ctx context.Context) error {
 
 	for i := range r.objectsToWarm {
 		if err := r.pollWarmDirStatus(ctx, r.objectsToWarm[i]); err != nil {
-			return fmt.Errorf("failed to poll dir status %s: %w", r.objectsToWarm[i], err)
+			return fmt.Errorf("%w: failed to poll dir status %s: %w", errclass.ErrStorage, r.objectsToWarm[i], err)
 		}
 	}
 
@@ -555,7 +561,7 @@ func parseAccessTier(tier string) (types.Tier, error) {
 	}
 
 	if result == "" {
-		return "", fmt.Errorf("invalid access tier %s", tier)
+		return "", fmt.Errorf("%w: invalid access tier %s", errclass.ErrInvalidConfig, tier)
 	}
 
 	return result, nil
@@ -602,7 +608,7 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 			Key:    aws.String(path),
 		})
 		if err != nil {
-			return 0, 0, fmt.Errorf("failed to get head object %s %s: %w", r.bucketName, path, err)
+			return 0, 0, fmt.Errorf("%w: failed to get head object %s %s: %w", errclass.ErrStorage, r.bucketName, path, err)
 		}
 
 		return *headOutput.ContentLength, 1, nil
@@ -622,7 +628,7 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 			StartAfter:        &r.StartAfter,
 		})
 		if err != nil {
-			return 0, 0, fmt.Errorf("failed to list objects: %w", err)
+			return 0, 0, fmt.Errorf("%w: failed to list objects: %w", errclass.ErrStorage, err)
 		}
 
 		for _, p := range listResponse.Contents {
@@ -647,17 +653,17 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 	return totalSize, totalNum, nil
 }
 
-// GetSize returns the size of asb/asbx file/dir that was initialized.
+// GetSize returns the size of asb file/dir that was initialized.
 func (r *Reader) GetSize() int64 {
 	return r.totalSize.Load()
 }
 
-// GetNumber returns the number of asb/asbx files/dirs that was initialized.
+// GetNumber returns the number of asb files/dirs that was initialized.
 func (r *Reader) GetNumber() int64 {
 	return r.totalNumber.Load()
 }
 
-// GetSkipped returns a list of file paths that were skipped during the `StreamFlies` with skipPrefix.
+// GetSkipped returns a list of file paths that were skipped during the `StreamFiles` with skipPrefix.
 func (r *Reader) GetSkipped() []string {
 	return r.skipped.GetSkipped()
 }

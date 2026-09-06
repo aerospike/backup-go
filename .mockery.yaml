@@ -36,9 +36,9 @@ packages:
     config:
       dir: ./pipe/mocks
       pkgname: mocks
-  github.com/aerospike/backup-go/pkg/secret-agent/connection:
+  github.com/aerospike/backup-go/pkg/secretagent/connection:
     config:
-      dir: ./pkg/secret-agent/connection/mocks
+      dir: ./pkg/secretagent/connection/mocks
       pkgname: mocks
   github.com/aerospike/backup-go/io/storage/aws/s3:
     config:
@@ -52,7 +52,7 @@ packages:
     config:
       dir: ./io/storage/gcp/storage/mocks
       pkgname: mocks
-  github.com/aerospike/backup-go/pkg/server:
+  github.com/aerospike/backup-go/pkg/server/lister:
     config:
-      dir: ./pkg/server/mocks
+      dir: ./pkg/server/lister/mocks
       pkgname: mocks

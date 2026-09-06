@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/io/storage/options"
 )
 
@@ -41,7 +42,7 @@ func NewWriter(ctx context.Context, bufferSize int) (*Writer, error) {
 	}
 
 	if bufferSize < 0 {
-		return nil, fmt.Errorf("buffer size must not be negative")
+		return nil, fmt.Errorf("%w: buffer size must not be negative", errclass.ErrInvalidConfig)
 	}
 
 	if bufferSize == 0 {
@@ -90,5 +91,8 @@ func (w *Writer) GetType() string {
 
 // GetOptions returns initialized options for the writer.
 func (w *Writer) GetOptions() options.Options {
-	return options.Options{}
+	return options.Options{
+		// Stdout doesn't split files into a limited number of chunks.
+		NoChunkLimit: true,
+	}
 }

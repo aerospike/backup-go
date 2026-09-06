@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -223,7 +223,7 @@ func TestProcessorTTL_Process(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			p := &expirationSetter[*models.Token]{
+			p := &expirationSetter{
 				getNow:  tt.fields.getNow,
 				expired: tt.fields.expired,
 				logger:  slog.Default(),

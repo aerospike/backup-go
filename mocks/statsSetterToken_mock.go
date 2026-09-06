@@ -48,7 +48,7 @@ type MockstatsSetterToken_AddSIndexes_Call struct {
 
 // AddSIndexes is a helper method to define mock.On call
 //   - v uint32
-func (_e *MockstatsSetterToken_Expecter) AddSIndexes(v interface{}) *MockstatsSetterToken_AddSIndexes_Call {
+func (_e *MockstatsSetterToken_Expecter) AddSIndexes(v any) *MockstatsSetterToken_AddSIndexes_Call {
 	return &MockstatsSetterToken_AddSIndexes_Call{Call: _e.mock.On("AddSIndexes", v)}
 }
 
@@ -88,7 +88,7 @@ type MockstatsSetterToken_AddUDFs_Call struct {
 
 // AddUDFs is a helper method to define mock.On call
 //   - v uint32
-func (_e *MockstatsSetterToken_Expecter) AddUDFs(v interface{}) *MockstatsSetterToken_AddUDFs_Call {
+func (_e *MockstatsSetterToken_Expecter) AddUDFs(v any) *MockstatsSetterToken_AddUDFs_Call {
 	return &MockstatsSetterToken_AddUDFs_Call{Call: _e.mock.On("AddUDFs", v)}
 }
 

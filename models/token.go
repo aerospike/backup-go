@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,11 +16,6 @@ package models
 
 type Sizer interface {
 	GetSize() uint64
-}
-
-type TokenConstraint interface {
-	Sizer
-	*Token
 }
 
 type TokenType uint8

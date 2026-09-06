@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/aerospike/backup-go/errclass"
 )
 
 const parentDirName = ".."
@@ -31,15 +33,15 @@ func ValidateObjectKey(key string) error {
 	}
 
 	if strings.ContainsRune(key, '\x00') {
-		return fmt.Errorf("object key must not contain NUL bytes")
+		return fmt.Errorf("%w: object key must not contain NUL bytes", errclass.ErrInvalidConfig)
 	}
 
 	if strings.HasPrefix(key, "/") {
-		return fmt.Errorf("object key must not start with '/'")
+		return fmt.Errorf("%w: object key must not start with '/'", errclass.ErrInvalidConfig)
 	}
 
 	if slices.Contains(strings.Split(key, "/"), parentDirName) {
-		return fmt.Errorf("object key must not contain '..' path segments")
+		return fmt.Errorf("%w: object key must not contain '..' path segments", errclass.ErrInvalidConfig)
 	}
 
 	return nil

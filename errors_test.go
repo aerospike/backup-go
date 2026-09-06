@@ -1,0 +1,391 @@
+// Copyright 2024-2026 Aerospike, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package backup
+
+import (
+	"crypto/tls"
+	"errors"
+	"fmt"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/aerospike/backup-go/errclass"
+	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/storage/local"
+	"github.com/aerospike/backup-go/io/storage/options"
+	"github.com/aerospike/backup-go/pkg/secretagent"
+	"github.com/aerospike/backup-go/pkg/server/segvalidator"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// TestErrorClasses_Aliases pins the root package aliases to the canonical
+// values in errclass, so errors.Is matches either spelling.
+func TestErrorClasses_Aliases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		alias     error
+		canonical error
+	}{
+		{name: "invalid config", alias: ErrInvalidConfig, canonical: errclass.ErrInvalidConfig},
+		{name: "not found", alias: ErrNotFound, canonical: errclass.ErrNotFound},
+		{name: "storage", alias: ErrStorage, canonical: errclass.ErrStorage},
+		{name: "corrupt data", alias: ErrCorruptData, canonical: errclass.ErrCorruptData},
+		{name: "unsupported", alias: ErrUnsupported, canonical: errclass.ErrUnsupported},
+		{name: "aerospike", alias: ErrAerospike, canonical: errclass.ErrAerospike},
+		{name: "secret agent", alias: ErrSecretAgent, canonical: errclass.ErrSecretAgent},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Sentinels have no Unwrap, so matching both ways proves identity.
+			require.ErrorIs(t, tt.alias, tt.canonical)
+			require.ErrorIs(t, tt.canonical, tt.alias)
+
+			wrapped := fmt.Errorf("some context: %w", fmt.Errorf("%w: details", tt.canonical))
+			assert.ErrorIs(t, wrapped, tt.alias)
+		})
+	}
+}
+
+// TestErrorClasses_Distinct guards against a class accidentally being defined
+// in terms of another one: matching must stay exact.
+func TestErrorClasses_Distinct(t *testing.T) {
+	t.Parallel()
+
+	classes := []error{
+		ErrInvalidConfig,
+		ErrNotFound,
+		ErrStorage,
+		ErrCorruptData,
+		ErrUnsupported,
+		ErrAerospike,
+		ErrSecretAgent,
+	}
+
+	for i, outer := range classes {
+		for j, inner := range classes {
+			if i == j {
+				continue
+			}
+
+			assert.NotErrorIs(t, outer, inner, "class %d must not match class %d", i, j)
+		}
+	}
+}
+
+// TestClientErrors_InvalidConfig covers the client entry points that reject a
+// caller mistake before any work is started.
+func TestClientErrors_InvalidConfig(t *testing.T) {
+	t.Parallel()
+
+	client := &Client{}
+
+	tests := []struct {
+		name    string
+		call    func() error
+		wantErr string
+	}{
+		{
+			name: "backup without config",
+			call: func() error {
+				_, err := client.Backup(t.Context(), nil, nil, nil)
+				return err
+			},
+			wantErr: "backup config required",
+		},
+		{
+			name: "restore without config",
+			call: func() error {
+				_, err := client.Restore(t.Context(), nil, nil)
+				return err
+			},
+			wantErr: "restore config required",
+		},
+		{
+			name: "estimate without config",
+			call: func() error {
+				_, err := client.Estimate(t.Context(), nil, 1)
+				return err
+			},
+			wantErr: "backup config required",
+		},
+		{
+			name: "estimate with a state file",
+			call: func() error {
+				config := NewDefaultBackupConfig()
+				config.StateFile = "state.json"
+				_, err := client.Estimate(t.Context(), config, 1)
+				return err
+			},
+			wantErr: "state file is not supported for estimate",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.call()
+			require.ErrorIs(t, err, ErrInvalidConfig)
+			require.ErrorContains(t, err, tt.wantErr)
+		})
+	}
+}
+
+// TestPartitionFilterParsing_InvalidConfig covers the exported partition
+// filter helpers, which validate arguments without going through a config.
+func TestPartitionFilterParsing_InvalidConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		call    func() error
+		wantErr string
+	}{
+		{
+			name: "empty filter list",
+			call: func() error {
+				_, err := ParsePartitionFilterListString("test", "")
+				return err
+			},
+			wantErr: "empty filters",
+		},
+		{
+			name: "invalid digest",
+			call: func() error {
+				_, err := NewPartitionFilterByDigest("test", "not-base64!")
+				return err
+			},
+			wantErr: "digest",
+		},
+		{
+			name: "unparsable filter string",
+			call: func() error {
+				_, err := ParsePartitionFilterListString("test", "not-a-filter")
+				return err
+			},
+			wantErr: "partition filter",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.call()
+			require.ErrorIs(t, err, ErrInvalidConfig)
+			require.ErrorContains(t, err, tt.wantErr)
+		})
+	}
+}
+
+// TestErrorClass_SurvivesWrapping documents the contract callers rely on: the
+// class stays reachable no matter how much context is added on the way out.
+func TestErrorClass_SurvivesWrapping(t *testing.T) {
+	t.Parallel()
+
+	leaf := fmt.Errorf("%w: bad thing", errclass.ErrStorage)
+	wrapped := fmt.Errorf("failed to write chunk: %w", fmt.Errorf("failed to open file: %w", leaf))
+
+	require.ErrorIs(t, wrapped, ErrStorage)
+	require.NotErrorIs(t, wrapped, ErrCorruptData)
+	require.Contains(t, wrapped.Error(), "failed to write chunk")
+	require.Contains(t, wrapped.Error(), "bad thing")
+}
+
+// classesOf reports every class err matches. The library contract is that an
+// error a caller can act on carries exactly one of them, so anything other than
+// a single entry points at a layer that re-classified an error instead of only
+// adding context to it.
+func classesOf(err error) []error {
+	classes := []error{
+		ErrInvalidConfig,
+		ErrNotFound,
+		ErrStorage,
+		ErrCorruptData,
+		ErrUnsupported,
+		ErrAerospike,
+		ErrSecretAgent,
+	}
+
+	matched := make([]error, 0, len(classes))
+
+	for _, class := range classes {
+		if errors.Is(err, class) {
+			matched = append(matched, class)
+		}
+	}
+
+	return matched
+}
+
+// TestErrorClass_ExactlyOne walks failures a caller reaches through the public
+// API of every layer and proves each of them carries exactly one class.
+func TestErrorClass_ExactlyOne(t *testing.T) {
+	t.Parallel()
+
+	const (
+		unreachableTCP = "127.0.0.1:1"
+		missingSocket  = "/tmp/backup-go-no-such.sock"
+		shortTimeout   = 100 * time.Millisecond
+		notAnASBFile   = "not an asb file\n"
+		testFileName   = "backup.asb"
+		testResource   = "resource"
+		testSecretKey  = "key"
+	)
+
+	ctx := t.Context()
+	client := &Client{}
+	missingDir := filepath.Join(t.TempDir(), "does-not-exist")
+	emptyDir := t.TempDir()
+
+	tests := []struct {
+		call func() error
+		name string
+		want error
+	}{
+		{
+			name: "backup without config",
+			call: func() error {
+				_, err := client.Backup(ctx, nil, nil, nil)
+				return err
+			},
+			want: ErrInvalidConfig,
+		},
+		{
+			name: "restore without config",
+			call: func() error {
+				_, err := client.Restore(ctx, nil, nil)
+				return err
+			},
+			want: ErrInvalidConfig,
+		},
+		{
+			name: "estimate with a state file",
+			call: func() error {
+				config := NewDefaultBackupConfig()
+				config.StateFile = "state.json"
+				_, err := client.Estimate(ctx, config, 1)
+				return err
+			},
+			want: ErrInvalidConfig,
+		},
+		{
+			name: "local reader on a missing directory",
+			call: func() error {
+				_, err := local.NewReader(ctx, options.WithDir(missingDir))
+				return err
+			},
+			want: ErrNotFound,
+		},
+		{
+			name: "local reader on an empty directory",
+			call: func() error {
+				_, err := local.NewReader(ctx, options.WithDir(emptyDir))
+				return err
+			},
+			want: ErrNotFound,
+		},
+		{
+			name: "local writer without a path",
+			call: func() error {
+				_, err := local.NewWriter(ctx)
+				return err
+			},
+			want: ErrInvalidConfig,
+		},
+		{
+			name: "asb decoder on a file that is not a backup",
+			call: func() error {
+				_, err := asb.NewDecoder(strings.NewReader(notAnASBFile), testFileName, false, slog.Default())
+				return err
+			},
+			want: ErrCorruptData,
+		},
+		{
+			name: "asb validator on an unknown extension",
+			call: func() error {
+				return asb.NewValidator().Run("backup.txt")
+			},
+			want: ErrUnsupported,
+		},
+		{
+			name: "secret agent with TLS over a unix socket",
+			call: func() error {
+				_, err := secretagent.NewClient(secretagent.ConnectionTypeUDS, missingSocket, shortTimeout, false,
+					&tls.Config{MinVersion: tls.VersionTLS12})
+
+				return err
+			},
+			want: ErrUnsupported,
+		},
+		{
+			name: "secret agent unreachable",
+			call: func() error {
+				// NewClient only rejects TLS over a non-TCP connection, so this
+				// combination cannot fail. Port 1 on the loopback interface is
+				// not listening in any sane environment, so the dial fails fast
+				// instead of hanging.
+				agent, _ := secretagent.NewClient(secretagent.ConnectionTypeTCP, unreachableTCP,
+					shortTimeout, false, nil)
+
+				_, err := agent.GetSecret(ctx, testResource, testSecretKey)
+
+				return err
+			},
+			want: ErrSecretAgent,
+		},
+		{
+			name: "segment validator without a streamer",
+			call: func() error {
+				_, err := segvalidator.NewSegValidator(nil)
+				return err
+			},
+			want: ErrInvalidConfig,
+		},
+		{
+			// Storage failures need infrastructure to provoke, so this case
+			// pins the property they rely on: added context never adds a class.
+			name: "context added above a storage failure",
+			call: func() error {
+				classified := fmt.Errorf("%w: failed to open object: %w", ErrStorage, os.ErrPermission)
+				return fmt.Errorf("failed to create reader: %w", classified)
+			},
+			want: ErrStorage,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.call()
+			require.Error(t, err)
+			require.ErrorIs(t, err, tt.want)
+
+			got := classesOf(err)
+			require.Len(t, got, 1, "error must carry exactly one class, got %v for %v", got, err)
+		})
+	}
+}

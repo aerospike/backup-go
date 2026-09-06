@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -78,6 +78,18 @@ func TestDirectoryWriter_GetType(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, TypeLocal, w.GetType())
+}
+
+func TestDirectoryWriter_GetOptions_NoChunkLimit(t *testing.T) {
+	t.Parallel()
+	tmpDir := path.Join(t.TempDir(), "TestDirectoryWriter_GetOptions_NoChunkLimit")
+	ctx := t.Context()
+	w, err := NewWriter(ctx, options.WithDir(tmpDir))
+	require.NoError(t, err)
+
+	// The local file system has no chunk count restriction, so the file limit
+	// validation must be skipped for it.
+	require.True(t, w.GetOptions().NoChunkLimit)
 }
 
 func TestNewWriter_NoPath(t *testing.T) {

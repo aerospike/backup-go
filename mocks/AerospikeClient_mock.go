@@ -63,7 +63,7 @@ type MockAerospikeClient_BatchOperate_Call struct {
 // BatchOperate is a helper method to define mock.On call
 //   - policy *aerospike.BatchPolicy
 //   - records []aerospike.BatchRecordIfc
-func (_e *MockAerospikeClient_Expecter) BatchOperate(policy interface{}, records interface{}) *MockAerospikeClient_BatchOperate_Call {
+func (_e *MockAerospikeClient_Expecter) BatchOperate(policy any, records any) *MockAerospikeClient_BatchOperate_Call {
 	return &MockAerospikeClient_BatchOperate_Call{Call: _e.mock.On("BatchOperate", policy, records)}
 }
 
@@ -224,9 +224,9 @@ type MockAerospikeClient_CreateComplexIndex_Call struct {
 //   - indexType aerospike.IndexType
 //   - indexCollectionType aerospike.IndexCollectionType
 //   - ctx ...*aerospike.CDTContext
-func (_e *MockAerospikeClient_Expecter) CreateComplexIndex(policy interface{}, namespace interface{}, set interface{}, indexName interface{}, binName interface{}, indexType interface{}, indexCollectionType interface{}, ctx ...interface{}) *MockAerospikeClient_CreateComplexIndex_Call {
+func (_e *MockAerospikeClient_Expecter) CreateComplexIndex(policy any, namespace any, set any, indexName any, binName any, indexType any, indexCollectionType any, ctx ...any) *MockAerospikeClient_CreateComplexIndex_Call {
 	return &MockAerospikeClient_CreateComplexIndex_Call{Call: _e.mock.On("CreateComplexIndex",
-		append([]interface{}{policy, namespace, set, indexName, binName, indexType, indexCollectionType}, ctx...)...)}
+		append([]any{policy, namespace, set, indexName, binName, indexType, indexCollectionType}, ctx...)...)}
 }
 
 func (_c *MockAerospikeClient_CreateComplexIndex_Call) Run(run func(policy *aerospike.WritePolicy, namespace string, set string, indexName string, binName string, indexType aerospike.IndexType, indexCollectionType aerospike.IndexCollectionType, ctx ...*aerospike.CDTContext)) *MockAerospikeClient_CreateComplexIndex_Call {
@@ -332,7 +332,7 @@ type MockAerospikeClient_CreateIndexWithExpression_Call struct {
 //   - indexType aerospike.IndexType
 //   - indexCollectionType aerospike.IndexCollectionType
 //   - expression *aerospike.Expression
-func (_e *MockAerospikeClient_Expecter) CreateIndexWithExpression(policy interface{}, namespace interface{}, set interface{}, indexName interface{}, indexType interface{}, indexCollectionType interface{}, expression interface{}) *MockAerospikeClient_CreateIndexWithExpression_Call {
+func (_e *MockAerospikeClient_Expecter) CreateIndexWithExpression(policy any, namespace any, set any, indexName any, indexType any, indexCollectionType any, expression any) *MockAerospikeClient_CreateIndexWithExpression_Call {
 	return &MockAerospikeClient_CreateIndexWithExpression_Call{Call: _e.mock.On("CreateIndexWithExpression", policy, namespace, set, indexName, indexType, indexCollectionType, expression)}
 }
 
@@ -418,7 +418,7 @@ type MockAerospikeClient_DropIndex_Call struct {
 //   - namespace string
 //   - set string
 //   - indexName string
-func (_e *MockAerospikeClient_Expecter) DropIndex(policy interface{}, namespace interface{}, set interface{}, indexName interface{}) *MockAerospikeClient_DropIndex_Call {
+func (_e *MockAerospikeClient_Expecter) DropIndex(policy any, namespace any, set any, indexName any) *MockAerospikeClient_DropIndex_Call {
 	return &MockAerospikeClient_DropIndex_Call{Call: _e.mock.On("DropIndex", policy, namespace, set, indexName)}
 }
 
@@ -672,7 +672,7 @@ type MockAerospikeClient_Put_Call struct {
 //   - policy *aerospike.WritePolicy
 //   - key *aerospike.Key
 //   - bins aerospike.BinMap
-func (_e *MockAerospikeClient_Expecter) Put(policy interface{}, key interface{}, bins interface{}) *MockAerospikeClient_Put_Call {
+func (_e *MockAerospikeClient_Expecter) Put(policy any, key any, bins any) *MockAerospikeClient_Put_Call {
 	return &MockAerospikeClient_Put_Call{Call: _e.mock.On("Put", policy, key, bins)}
 }
 
@@ -737,7 +737,7 @@ type MockAerospikeClient_PutPayload_Call struct {
 //   - policy *aerospike.WritePolicy
 //   - key *aerospike.Key
 //   - payload []byte
-func (_e *MockAerospikeClient_Expecter) PutPayload(policy interface{}, key interface{}, payload interface{}) *MockAerospikeClient_PutPayload_Call {
+func (_e *MockAerospikeClient_Expecter) PutPayload(policy any, key any, payload any) *MockAerospikeClient_PutPayload_Call {
 	return &MockAerospikeClient_PutPayload_Call{Call: _e.mock.On("PutPayload", policy, key, payload)}
 }
 
@@ -814,7 +814,7 @@ type MockAerospikeClient_RegisterUDF_Call struct {
 //   - udfBody []byte
 //   - serverPath string
 //   - language aerospike.Language
-func (_e *MockAerospikeClient_Expecter) RegisterUDF(policy interface{}, udfBody interface{}, serverPath interface{}, language interface{}) *MockAerospikeClient_RegisterUDF_Call {
+func (_e *MockAerospikeClient_Expecter) RegisterUDF(policy any, udfBody any, serverPath any, language any) *MockAerospikeClient_RegisterUDF_Call {
 	return &MockAerospikeClient_RegisterUDF_Call{Call: _e.mock.On("RegisterUDF", policy, udfBody, serverPath, language)}
 }
 
@@ -903,9 +903,9 @@ type MockAerospikeClient_ScanNode_Call struct {
 //   - namespace string
 //   - setName string
 //   - binNames ...string
-func (_e *MockAerospikeClient_Expecter) ScanNode(scanPolicy interface{}, node interface{}, namespace interface{}, setName interface{}, binNames ...interface{}) *MockAerospikeClient_ScanNode_Call {
+func (_e *MockAerospikeClient_Expecter) ScanNode(scanPolicy any, node any, namespace any, setName any, binNames ...any) *MockAerospikeClient_ScanNode_Call {
 	return &MockAerospikeClient_ScanNode_Call{Call: _e.mock.On("ScanNode",
-		append([]interface{}{scanPolicy, node, namespace, setName}, binNames...)...)}
+		append([]any{scanPolicy, node, namespace, setName}, binNames...)...)}
 }
 
 func (_c *MockAerospikeClient_ScanNode_Call) Run(run func(scanPolicy *aerospike.ScanPolicy, node *aerospike.Node, namespace string, setName string, binNames ...string)) *MockAerospikeClient_ScanNode_Call {
@@ -1000,9 +1000,9 @@ type MockAerospikeClient_ScanPartitions_Call struct {
 //   - namespace string
 //   - setName string
 //   - binNames ...string
-func (_e *MockAerospikeClient_Expecter) ScanPartitions(scanPolicy interface{}, partitionFilter interface{}, namespace interface{}, setName interface{}, binNames ...interface{}) *MockAerospikeClient_ScanPartitions_Call {
+func (_e *MockAerospikeClient_Expecter) ScanPartitions(scanPolicy any, partitionFilter any, namespace any, setName any, binNames ...any) *MockAerospikeClient_ScanPartitions_Call {
 	return &MockAerospikeClient_ScanPartitions_Call{Call: _e.mock.On("ScanPartitions",
-		append([]interface{}{scanPolicy, partitionFilter, namespace, setName}, binNames...)...)}
+		append([]any{scanPolicy, partitionFilter, namespace, setName}, binNames...)...)}
 }
 
 func (_c *MockAerospikeClient_ScanPartitions_Call) Run(run func(scanPolicy *aerospike.ScanPolicy, partitionFilter *aerospike.PartitionFilter, namespace string, setName string, binNames ...string)) *MockAerospikeClient_ScanPartitions_Call {

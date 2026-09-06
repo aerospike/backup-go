@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"math"
 	"sync/atomic"
 
+	"github.com/aerospike/backup-go/errclass"
 	cltime "github.com/aerospike/backup-go/internal/citrusleaf_time"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
@@ -28,7 +29,7 @@ import (
 
 // expirationSetter is a DataProcessor that sets the Expiration (TTL) of a record based on its VoidTime.
 // It is used during restore to set the TTL of records from their backed up VoidTime.
-type expirationSetter[T models.TokenConstraint] struct {
+type expirationSetter struct {
 	// getNow returns the current time since the citrusleaf epoch
 	// It is a field so that it can be mocked in tests
 	getNow   func() cltime.CLTime
@@ -38,13 +39,13 @@ type expirationSetter[T models.TokenConstraint] struct {
 }
 
 // NewExpirationSetter creates a new expirationSetter processor.
-func NewExpirationSetter[T models.TokenConstraint](expired *atomic.Uint64, extraTTL int64, logger *slog.Logger,
-) Processor[T] {
+func NewExpirationSetter(expired *atomic.Uint64, extraTTL int64, logger *slog.Logger,
+) Processor {
 	id := uuid.NewString()
 	logger = logging.WithProcessor(logger, id, logging.ProcessorTypeTTL)
 	logger.Debug("created new TTL processor")
 
-	return &expirationSetter[T]{
+	return &expirationSetter{
 		getNow:   cltime.Now,
 		expired:  expired,
 		extraTTL: extraTTL,
@@ -58,14 +59,10 @@ func NewExpirationSetter[T models.TokenConstraint](expired *atomic.Uint64, extra
 var errExpiredRecord = fmt.Errorf("%w: record is expired", models.ErrFilteredOut)
 
 // Process sets the TTL of a record based on its VoidTime
-func (p *expirationSetter[T]) Process(token T) (T, error) {
-	t, ok := any(token).(*models.Token)
-	if !ok {
-		return nil, fmt.Errorf("unsupported token type %T for ttl", token)
-	}
+func (p *expirationSetter) Process(t *models.Token) (*models.Token, error) {
 	// if the token is not a record, we don't need to process it
 	if t.Type != models.TokenTypeRecord {
-		return token, nil
+		return t, nil
 	}
 
 	record := t.Record
@@ -83,15 +80,15 @@ func (p *expirationSetter[T]) Process(token T) (T, error) {
 		}
 
 		if ttl > math.MaxUint32 {
-			return nil, fmt.Errorf("calculated TTL %d is too large", ttl)
+			return nil, fmt.Errorf("%w: calculated TTL %d is too large", errclass.ErrCorruptData, ttl)
 		}
 
 		record.Expiration = uint32(ttl)
 	case record.VoidTime == 0:
 		record.Expiration = models.ExpirationNever
 	default:
-		return nil, fmt.Errorf("invalid void time %d", record.VoidTime)
+		return nil, fmt.Errorf("%w: invalid void time %d", errclass.ErrCorruptData, record.VoidTime)
 	}
 
-	return any(t).(T), nil
+	return t, nil
 }

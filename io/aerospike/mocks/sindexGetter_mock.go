@@ -74,7 +74,7 @@ type MocksindexGetter_GetSIndexes_Call struct {
 // GetSIndexes is a helper method to define mock.On call
 //   - ctx context.Context
 //   - namespace string
-func (_e *MocksindexGetter_Expecter) GetSIndexes(ctx interface{}, namespace interface{}) *MocksindexGetter_GetSIndexes_Call {
+func (_e *MocksindexGetter_Expecter) GetSIndexes(ctx any, namespace any) *MocksindexGetter_GetSIndexes_Call {
 	return &MocksindexGetter_GetSIndexes_Call{Call: _e.mock.On("GetSIndexes", ctx, namespace)}
 }
 

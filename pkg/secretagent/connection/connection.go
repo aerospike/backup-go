@@ -1,0 +1,143 @@
+// Copyright 2024-2026 Aerospike, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package connection
+
+import (
+	"context"
+	"crypto/tls"
+	"encoding/binary"
+	"encoding/json"
+	"fmt"
+	"net"
+	"time"
+
+	"github.com/aerospike/backup-go/errclass"
+	"github.com/aerospike/backup-go/pkg/secretagent/models"
+)
+
+// magic const is taken from the Secret Agent service. It is used
+// by the service to validate TCP requests.
+const magic = 0x51dec1cc
+
+type connector interface {
+	Write(b []byte) (n int, err error)
+	Read(b []byte) (n int, err error)
+	SetReadDeadline(t time.Time) error
+	SetWriteDeadline(t time.Time) error
+}
+
+// Get returns a connector according to initialized params.
+func Get(
+	ctx context.Context,
+	connectionType, address string,
+	timeout time.Duration,
+	tlsConfig *tls.Config,
+) (net.Conn, error) {
+	dialer := &net.Dialer{Timeout: timeout}
+	if tlsConfig != nil {
+		tlsDialer := &tls.Dialer{Config: tlsConfig, NetDialer: dialer}
+		return tlsDialer.DialContext(ctx, connectionType, address)
+	}
+
+	return dialer.DialContext(ctx, connectionType, address)
+}
+
+// Write forms and executes a request to the secret agent.
+func Write(conn connector, timeout time.Duration, resource, secretKey string) error {
+	// Setting writing timeout.
+	deadline := time.Now().Add(timeout)
+	if err := conn.SetWriteDeadline(deadline); err != nil {
+		return fmt.Errorf("%w: failed to set write deadline: %w", errclass.ErrSecretAgent, err)
+	}
+
+	msg := models.Request{
+		Resource:  resource,
+		SecretKey: secretKey,
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("%w: failed to marshal request: %w", errclass.ErrSecretAgent, err)
+	}
+
+	// Adding headers.
+	length := len(data)
+	header := make([]byte, 8)
+	binary.BigEndian.PutUint32(header[:4], magic)
+	binary.BigEndian.PutUint32(header[4:], uint32(length))
+
+	// Sending message.
+	_, err = conn.Write(append(header, data...))
+	if err != nil {
+		return fmt.Errorf("%w: failed to send request: %w", errclass.ErrSecretAgent, err)
+	}
+
+	return nil
+}
+
+// Read reads and parse response from secret agent.
+func Read(conn connector, timeout time.Duration) (string, error) {
+	// Setting reading timeout.
+	deadline := time.Now().Add(timeout)
+	if err := conn.SetReadDeadline(deadline); err != nil {
+		return "", fmt.Errorf("%w: failed to set read deadline: %w", errclass.ErrSecretAgent, err)
+	}
+	// Reading headers.
+	header, err := ReadBytes(conn, 8)
+	if err != nil {
+		return "", fmt.Errorf("%w: failed to read header: %w", errclass.ErrSecretAgent, err)
+	}
+
+	// Checking headers.
+	receivedMagic := binary.BigEndian.Uint32(header[:4])
+	length := binary.BigEndian.Uint32(header[4:])
+
+	if receivedMagic != magic {
+		return "", fmt.Errorf("%w: invalid magic number: %x", errclass.ErrCorruptData, receivedMagic)
+	}
+
+	// Reading body.
+	body, err := ReadBytes(conn, int(length))
+	if err != nil {
+		return "", fmt.Errorf("%w: failed to read body: %w", errclass.ErrSecretAgent, err)
+	}
+
+	var res models.Response
+	if err = json.Unmarshal(body, &res); err != nil {
+		return "", fmt.Errorf("%w: failed to unmarshal response: %w", errclass.ErrSecretAgent, err)
+	}
+
+	if res.Error != "" {
+		return "", fmt.Errorf("%w: %s", errclass.ErrSecretAgent, res.Error)
+	}
+
+	return res.SecretValue, nil
+}
+
+func ReadBytes(conn connector, length int) ([]byte, error) {
+	buffer := make([]byte, length)
+	total := 0
+
+	for total < length {
+		n, err := conn.Read(buffer[total:])
+		if err != nil {
+			return nil, err
+		}
+
+		total += n
+	}
+
+	return buffer, nil
+}

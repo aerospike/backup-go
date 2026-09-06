@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -124,7 +124,7 @@ func (s *SkippedFiles) Skip(path string) bool {
 	return false
 }
 
-// GetSkipped returns a list of file paths that were skipped during the `StreamFlies` with skipPrefix.
+// GetSkipped returns a list of file paths that were skipped during the `StreamFiles` with skipPrefix.
 func (s *SkippedFiles) GetSkipped() []string {
 	if s == nil {
 		return nil

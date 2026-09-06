@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -43,20 +43,16 @@ type ConfigRestore struct {
 	SetList []string
 	// The bins to restore (optional, given an empty list, all bins will be restored).
 	BinList []string
-	// EncoderType describes an Encoder type that will be used on restoring.
-	// Default `EncoderTypeASB` = 0.
-	EncoderType EncoderType
 	// Parallel is the number of concurrent record readers from backup files.
 	Parallel int
 	// RecordsPerSecond limits restore records per second (rps) rate.
 	// Will not apply rps limit if RecordsPerSecond is zero (default).
 	RecordsPerSecond int
-	// Limits restore bandwidth (bytes per second).
-	// The lower bound is 8MiB (maximum size of the Aerospike record).
-	// Effective limit value is calculated using the formula:
-	// Bandwidth * base64ratio + metaOverhead
-	// Where: base64ratio = 1.34, metaOverhead = 16 * 1024
-	// Will not apply rps limit if Bandwidth is zero (default).
+	// Bandwidth limits the restore read rate, in bytes per second.
+	// The value is applied as given, with no adjustment.
+	// It is measured on the encoded size of the records read from the backup,
+	// not on the write traffic sent to the Aerospike cluster.
+	// Will not apply a bandwidth limit if Bandwidth is zero (default).
 	Bandwidth int64
 	// Don't restore any records.
 	NoRecords bool
@@ -77,7 +73,7 @@ type ConfigRestore struct {
 	// E.g.: AEROSPIKE_RECORD_TOO_BIG.
 	// By default, such errors are not ignored and restore terminates.
 	IgnoreRecordError bool
-	// MetricsEnabled indicates whether backup metrics collection and reporting are enabled.
+	// MetricsEnabled indicates whether restore metrics collection and reporting are enabled.
 	MetricsEnabled bool
 	// ValidateOnly indicates whether restore should only validate the backup files.
 	ValidateOnly bool
@@ -95,13 +91,27 @@ func NewDefaultRestoreConfig() *ConfigRestore {
 		Parallel:        4,
 		BatchSize:       128,
 		MaxAsyncBatches: 16,
-		EncoderType:     EncoderTypeASB,
 	}
 }
 
+// validate validates the ConfigRestore.
+// Every validation failure is wrapped with [ErrInvalidConfig], so callers can
+// detect configuration problems with errors.Is.
 func (c *ConfigRestore) validate() error {
+	if err := c.validateFields(); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidConfig, err)
+	}
+
+	return nil
+}
+
+// validateFields reports the first invalid field of the ConfigRestore.
+// It returns a bare error: wrapping with [ErrInvalidConfig] is done once, by
+// validate, to keep the message free of duplicated prefixes.
+func (c *ConfigRestore) validateFields() error {
 	if c.Parallel < MinParallel || c.Parallel > MaxParallel {
-		return fmt.Errorf("parallel must be between 1 and 1024, got %d", c.Parallel)
+		return fmt.Errorf("parallel must be between %d and %d, got %d",
+			MinParallel, MaxParallel, c.Parallel)
 	}
 
 	if err := c.Namespace.validate(); err != nil {
@@ -151,43 +161,6 @@ func (c *ConfigRestore) validate() error {
 		if err := collections.CheckDuplicates(c.BinList); err != nil {
 			return fmt.Errorf("bin list contains duplicates: %w", err)
 		}
-	}
-
-	return nil
-}
-
-// isValidForASBX checks if config is valid for restoring from asbx.
-func (c *ConfigRestore) isValidForASBX() error {
-	if c.Namespace != nil && *c.Namespace.Source != *c.Namespace.Destination {
-		return fmt.Errorf("changing namespace is not supported for ASBX")
-	}
-
-	if len(c.SetList) > 0 {
-		return fmt.Errorf("set list is not supported for ASBX")
-	}
-
-	if len(c.BinList) > 0 {
-		return fmt.Errorf("bin list is not supported for ASBX")
-	}
-
-	if c.NoRecords {
-		return fmt.Errorf("no records is not supported for ASBX")
-	}
-
-	if c.NoIndexes {
-		return fmt.Errorf("no indexes is not supported for ASBX")
-	}
-
-	if c.NoUDFs {
-		return fmt.Errorf("no udfs is not supported for ASBX")
-	}
-
-	if c.DisableBatchWrites {
-		return fmt.Errorf("disable batch writes is not supported for ASBX")
-	}
-
-	if c.ExtraTTL > 0 {
-		return fmt.Errorf("extra ttl value is not supported for ASBX")
 	}
 
 	return nil

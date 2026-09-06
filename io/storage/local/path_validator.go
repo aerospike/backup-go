@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ package local
 import (
 	"fmt"
 	"strings"
+
+	"github.com/aerospike/backup-go/errclass"
 )
 
 const parentDirName = ".."
@@ -30,19 +32,19 @@ func ValidateFilename(filename string) error {
 	}
 
 	if filename == "." {
-		return fmt.Errorf("filename must not be '.' (current directory)")
+		return fmt.Errorf("%w: filename must not be '.' (current directory)", errclass.ErrInvalidConfig)
 	}
 
 	if filename == parentDirName {
-		return fmt.Errorf("filename must not be '..' (parent directory)")
+		return fmt.Errorf("%w: filename must not be '..' (parent directory)", errclass.ErrInvalidConfig)
 	}
 
 	if strings.ContainsRune(filename, '/') {
-		return fmt.Errorf("filename must not contain path separators ('/')")
+		return fmt.Errorf("%w: filename must not contain path separators ('/')", errclass.ErrInvalidConfig)
 	}
 
 	if strings.ContainsRune(filename, '\x00') {
-		return fmt.Errorf("filename must not contain NUL bytes")
+		return fmt.Errorf("%w: filename must not contain NUL bytes", errclass.ErrInvalidConfig)
 	}
 
 	return nil

@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -54,11 +55,12 @@ type ConfigBackup struct {
 	// Used to resume backup with last record received from previous incomplete backup.
 	// This parameter will overwrite PartitionFilters.Begin value.
 	// Can't be used in full backup mode.
-	// This parameter is mutually exclusive with partition-list (not implemented).
 	// Format: base64 encoded string.
 	// Example: EjRWeJq83vEjRRI0VniavN7xI0U=
 	PartitionFilters []*a.PartitionFilter
 	// Namespace is the Aerospike namespace to back up.
+	// NewDefaultBackupConfig sets it to "test", so set it explicitly unless
+	// that is really the namespace you want.
 	Namespace string
 	// NodeList contains a list of nodes to back up.
 	// <addr 1>:<port 1>[,<addr 2>:<port 2>[,...]] or <node name 1>[,<node name 2>[,...]]
@@ -80,9 +82,6 @@ type ConfigBackup struct {
 	// (optional, given an empty list, all racks will be backed up)
 	// For proper work, an Aerospike client should be initialized with ClientPolicy.ReplicaPolicy = a.MASTER
 	RackList []int
-	// EncoderType describes an Encoder type that will be used on backing up.
-	// Default `EncoderTypeASB` = 0.
-	EncoderType EncoderType
 	// ParallelRead is the number of concurrent scans to run against the Aerospike cluster.
 	ParallelRead int
 	// ParallelWrite is the number of concurrent backup files writing.
@@ -96,11 +95,12 @@ type ConfigBackup struct {
 	// RecordsPerSecond limits backup records per second (rps) rate.
 	// Will not apply rps limit if RecordsPerSecond is zero (default).
 	RecordsPerSecond int
-	// Limits backup bandwidth (bytes per second).
-	// Effective limit value is calculated using the formula:
-	// Bandwidth * base64ratio + metaOverhead
-	// Where: base64ratio = 1.34, metaOverhead = 16 * 1024
-	// Will not apply rps limit if Bandwidth is zero (default).
+	// Bandwidth limits the backup write rate, in bytes per second.
+	// The value is applied as given, with no adjustment.
+	// It is measured on the encoded records handed to the writer, before
+	// compression is applied, so with CompressionPolicy set the number of
+	// bytes actually reaching the storage is lower than this limit.
+	// Will not apply a bandwidth limit if Bandwidth is zero (default).
 	Bandwidth int64
 	// File size limit (in bytes) for the backup. If a backup file exceeds this
 	// size threshold, a new file will be created. 0 for no file size limit.
@@ -135,13 +135,13 @@ type ConfigBackup struct {
 }
 
 // NewDefaultBackupConfig returns a new ConfigBackup with default values.
+// Note that Namespace defaults to "test" rather than to an empty string.
 func NewDefaultBackupConfig() *ConfigBackup {
 	return &ConfigBackup{
 		PartitionFilters: []*a.PartitionFilter{NewPartitionFilterAll()},
 		ParallelRead:     1,
 		ParallelWrite:    1,
 		Namespace:        "test", //nolint:goconst // default value
-		EncoderType:      EncoderTypeASB,
 		ScanPolicy:       a.NewScanPolicy(),
 	}
 }
@@ -178,15 +178,30 @@ func (c *ConfigBackup) withoutFilter() bool {
 }
 
 // validate validates the ConfigBackup.
+// Every validation failure is wrapped with [ErrInvalidConfig], so callers can
+// detect configuration problems with errors.Is.
+func (c *ConfigBackup) validate() error {
+	if err := c.validateFields(); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidConfig, err)
+	}
+
+	return nil
+}
+
+// validateFields reports the first invalid field of the ConfigBackup.
+// It returns a bare error: wrapping with [ErrInvalidConfig] is done once, by
+// validate, to keep the message free of duplicated prefixes.
 //
 //nolint:gocyclo // contains a long list of validations
-func (c *ConfigBackup) validate() error {
+func (c *ConfigBackup) validateFields() error {
 	if c.ParallelRead < MinParallel || c.ParallelRead > MaxParallel {
-		return fmt.Errorf("parallel read must be between 1 and 1024, got %d", c.ParallelRead)
+		return fmt.Errorf("parallel read must be between %d and %d, got %d",
+			MinParallel, MaxParallel, c.ParallelRead)
 	}
 
 	if c.ParallelWrite < MinParallel || c.ParallelWrite > MaxParallel {
-		return fmt.Errorf("parallel write must be between 1 and 1024, got %d", c.ParallelWrite)
+		return fmt.Errorf("parallel write must be between %d and %d, got %d",
+			MinParallel, MaxParallel, c.ParallelWrite)
 	}
 
 	if c.ModBefore != nil && c.ModAfter != nil && !c.ModBefore.After(*c.ModAfter) {
@@ -194,7 +209,7 @@ func (c *ConfigBackup) validate() error {
 	}
 
 	if c.isProcessedByNodes() && !c.isDefaultPartitionFilter() {
-		return fmt.Errorf("process by nodes, racks and/or and after digest/partition and the same time not allowed")
+		return errors.New("node list or rack list cannot be combined with partition filters or after digest")
 	}
 
 	if c.PageSize > 0 && len(c.PartitionFilters) == 0 {
@@ -235,10 +250,6 @@ func (c *ConfigBackup) validate() error {
 
 	if slices.Contains(c.SetList, models.MonitorRecordsSetName) {
 		return fmt.Errorf("mrt monitor set is not allowed for backup")
-	}
-
-	if c.EncoderType != EncoderTypeASB {
-		return fmt.Errorf("unsupported encoder type: %d", c.EncoderType)
 	}
 
 	if c.ScanPolicy.ReplicaPolicy == a.PREFER_RACK && (len(c.RackList) != 0 || len(c.NodeList) != 0) {

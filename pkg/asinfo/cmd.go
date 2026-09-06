@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 package asinfo
 
-import "github.com/aerospike/backup-go/pkg/asinfo/models"
+import infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
 
 const (
 	cmdIDBuild = iota
@@ -81,7 +81,7 @@ const (
 	cmdSindexList = "sindex-list:namespace=%s"
 )
 
-func newCmdDict(version models.AerospikeVersion) map[int]string {
+func newCmdDict(version infomodels.AerospikeVersion) map[int]string {
 	cmds := make(map[int]string, commandsNumber)
 
 	cmds[cmdIDBuild] = cmdBuild
@@ -100,11 +100,11 @@ func newCmdDict(version models.AerospikeVersion) map[int]string {
 	cmds[cmdIDClusterStable] = cmdClusterStable
 	cmds[cmdIDStatistics] = cmdStatistics
 
-	if version.IsGreaterOrEqual(models.AerospikeVersionRecentInfoCommands) {
+	if version.IsGreaterOrEqual(infomodels.AerospikeVersionRecentInfoCommands) {
 		cmds[cmdIDSindexList] = cmdSindexList
 	}
 
-	if version.IsGreaterOrEqual(models.AerospikeVersionSupportsIntegratedBackup) {
+	if version.IsGreaterOrEqual(infomodels.AerospikeVersionSupportsIntegratedBackup) {
 		cmds[cmdIDServerBackup] = cmdServerBackup
 		cmds[cmdIDServerRestore] = cmdServerRestore
 		cmds[cmdIDServerPrepareRestore] = cmdServerPrepareRestore

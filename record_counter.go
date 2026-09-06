@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/io/aerospike"
-	"github.com/aerospike/backup-go/models"
 )
 
 // recordCounter contains logic to calculate approximate records count.
@@ -33,7 +32,7 @@ type recordCounter struct {
 	aerospikeClient AerospikeClient
 	infoClient      ClusterInfo
 	config          *ConfigBackup
-	readerProcessor *recordReaderProcessor[*models.Token]
+	readerProcessor *recordReaderProcessor
 
 	logger *slog.Logger
 }
@@ -43,7 +42,7 @@ func newRecordCounter(
 	aerospikeClient AerospikeClient,
 	infoClient ClusterInfo,
 	config *ConfigBackup,
-	readerProcessor *recordReaderProcessor[*models.Token],
+	readerProcessor *recordReaderProcessor,
 	logger *slog.Logger,
 ) *recordCounter {
 	return &recordCounter{

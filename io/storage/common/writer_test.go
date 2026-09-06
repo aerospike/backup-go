@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package common
 import (
 	"testing"
 
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -229,8 +230,10 @@ func TestGetFullPath(t *testing.T) {
 
 			if tt.wantErr {
 				require.Error(t, err, "expected error but got none")
-				assert.Equal(t, tt.errMsg, err.Error(), "error message mismatch")
-				assert.Equal(t, tt.want, got, "expected empty string on error")
+				// The class is the contract, the message text is not.
+				require.ErrorIs(t, err, errclass.ErrInvalidConfig, "error class mismatch")
+				require.ErrorContains(t, err, tt.errMsg, "error message mismatch")
+				require.Equal(t, tt.want, got, "expected empty string on error")
 				return
 			}
 

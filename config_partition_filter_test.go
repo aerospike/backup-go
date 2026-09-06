@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -129,8 +129,8 @@ func TestSplitPartitions_NumWorkersLessThanFilters(t *testing.T) {
 
 	_, err := splitPartitions(partitionFilters, numWorkers)
 
-	require.Error(t, err)
-	assert.Equal(t, "number of workers is less than partition filters, cannot split partition filters", err.Error())
+	require.ErrorIs(t, err, ErrInvalidConfig)
+	assert.ErrorContains(t, err, "number of workers is less than partition filters, cannot split partition filters")
 }
 
 func TestSplitPartitionRange(t *testing.T) {

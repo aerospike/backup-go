@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,13 +17,13 @@ package backup
 import (
 	"fmt"
 
-	saClient "github.com/aerospike/backup-go/pkg/secret-agent"
+	saClient "github.com/aerospike/backup-go/pkg/secretagent"
 )
 
 // SecretAgentConfig contains Secret Agent connection information.
 type SecretAgentConfig struct {
 	// Connection type: tcp, unix.
-	// Use constants form `secret-agent`: `ConnectionTypeTCP` or `ConnectionTypeUDS`
+	// Use constants form the `secretagent`: `ConnectionTypeTCP` or `ConnectionTypeUDS`
 	ConnectionType *string
 	// Secret agent host for TCP connection or socket file path for UDS connection.
 	Address *string
@@ -42,6 +42,10 @@ type SecretAgentConfig struct {
 	KeyFile *string
 	// Flag that shows if secret agent responses are encrypted with base64.
 	IsBase64 *bool
+	// MinTLSVersion is the minimum accepted TLS version for an encrypted connection.
+	// Use the crypto/tls constants: tls.VersionTLS10 ... tls.VersionTLS13.
+	// If nil, TLS 1.2 is used.
+	MinTLSVersion *uint16
 }
 
 // validate validates the SecretAgentConfig.

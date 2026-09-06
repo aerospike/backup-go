@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/binary"
@@ -31,9 +32,9 @@ import (
 	"testing"
 	"time"
 
-	saClient "github.com/aerospike/backup-go/pkg/secret-agent"
-	"github.com/aerospike/backup-go/pkg/secret-agent/connection"
-	"github.com/aerospike/backup-go/pkg/secret-agent/models"
+	saClient "github.com/aerospike/backup-go/pkg/secretagent"
+	"github.com/aerospike/backup-go/pkg/secretagent/connection"
+	"github.com/aerospike/backup-go/pkg/secretagent/models"
 	"github.com/stretchr/testify/require"
 )
 
@@ -290,6 +291,54 @@ func TestSecretAgent_getTlSConfig_WithTLSNameAndClientCert(t *testing.T) {
 	require.NotNil(t, tlsConfig)
 	require.Equal(t, serverName, tlsConfig.ServerName)
 	require.NotEmpty(t, tlsConfig.Certificates, "client certificate should be loaded")
+}
+
+func TestSecretAgent_getTlSConfig_MinVersion(t *testing.T) {
+	t.Parallel()
+
+	filePem := testCaFile
+
+	minTLS13 := uint16(tls.VersionTLS13)
+	minTLS10 := uint16(tls.VersionTLS10)
+
+	testCases := []struct {
+		name          string
+		minTLSVersion *uint16
+		want          uint16
+	}{
+		{
+			name:          "default is TLS 1.2",
+			minTLSVersion: nil,
+			want:          tls.VersionTLS12,
+		},
+		{
+			name:          "explicit TLS 1.3",
+			minTLSVersion: &minTLS13,
+			want:          tls.VersionTLS13,
+		},
+		{
+			name:          "legacy opt-in TLS 1.0",
+			minTLSVersion: &minTLS10,
+			want:          tls.VersionTLS10,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			cfg := &SecretAgentConfig{
+				CaFile:        &filePem,
+				MinTLSVersion: tt.minTLSVersion,
+			}
+
+			tlsConfig, err := getTLSConfig(cfg)
+
+			require.NoError(t, err)
+			require.NotNil(t, tlsConfig)
+			require.Equal(t, tt.want, tlsConfig.MinVersion)
+		})
+	}
 }
 
 func TestSecretAgent_getTlSConfig_InvalidClientCert(t *testing.T) {

@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -78,6 +78,13 @@ type Options struct {
 
 	// WithChecksum enables checksum validation on upload.
 	WithChecksum bool
+
+	// NoChunkLimit indicates that the storage doesn't upload files as a limited number
+	// of chunks (e.g. a local file system or stdout), so the maximum chunk count
+	// restriction doesn't apply to it.
+	// It describes a capability of the storage backend and is set by the Writer
+	// implementation itself, not by the user.
+	NoChunkLimit bool
 }
 
 type Opt func(*Options)

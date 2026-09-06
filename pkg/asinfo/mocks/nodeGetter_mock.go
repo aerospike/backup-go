@@ -73,7 +73,7 @@ type MockNodeGetter_GetNodeByName_Call struct {
 
 // GetNodeByName is a helper method to define mock.On call
 //   - name string
-func (_e *MockNodeGetter_Expecter) GetNodeByName(name interface{}) *MockNodeGetter_GetNodeByName_Call {
+func (_e *MockNodeGetter_Expecter) GetNodeByName(name any) *MockNodeGetter_GetNodeByName_Call {
 	return &MockNodeGetter_GetNodeByName_Call{Call: _e.mock.On("GetNodeByName", name)}
 }
 

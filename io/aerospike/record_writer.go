@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/models"
 )
@@ -77,7 +78,7 @@ func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
 
 	err := rw.executeWrite(&writePolicy, record)
 	if err != nil {
-		return fmt.Errorf("failed to write record %s: %w", record.Key.Digest(), err)
+		return fmt.Errorf("%w: failed to write record %s: %w", errclass.ErrAerospike, record.Key.Digest(), err)
 	}
 
 	return nil

@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,41 +18,39 @@ import (
 	"fmt"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/models"
 )
 
 // changeNamespace is used to restore to another namespace.
-type changeNamespace[T models.TokenConstraint] struct {
+type changeNamespace struct {
 	source      *string
 	destination *string
 }
 
 // NewChangeNamespace creates new changeNamespace
-func NewChangeNamespace[T models.TokenConstraint](source, destination *string) Processor[T] {
+func NewChangeNamespace(source, destination *string) Processor {
 	if source == nil || destination == nil {
-		return &noopProcessor[T]{}
+		return &noopProcessor{}
 	}
 
-	return &changeNamespace[T]{
+	return &changeNamespace{
 		source:      source,
 		destination: destination,
 	}
 }
 
 // Process filters tokens by type.
-func (p changeNamespace[T]) Process(token T) (T, error) {
-	t, ok := any(token).(*models.Token)
-	if !ok {
-		return nil, fmt.Errorf("unsupported token type %T for change namespace", token)
-	}
+func (p changeNamespace) Process(t *models.Token) (*models.Token, error) {
 	// if the token is not a record, we don't need to process it
 	if t.Type != models.TokenTypeRecord {
-		return token, nil
+		return t, nil
 	}
 
 	key := t.Record.Key
 	if key.Namespace() != *p.source {
-		return nil, fmt.Errorf("invalid namespace %s (expected: %s)", key.Namespace(), *p.source)
+		return nil, fmt.Errorf("%w: invalid namespace %s (expected: %s)",
+			errclass.ErrInvalidConfig, key.Namespace(), *p.source)
 	}
 
 	newKey, err := a.NewKeyWithDigest(*p.destination, key.SetName(), key.Value(), key.Digest())
@@ -62,5 +60,5 @@ func (p changeNamespace[T]) Process(token T) (T, error) {
 
 	t.Record.Key = newKey
 
-	return any(t).(T), nil
+	return t, nil
 }

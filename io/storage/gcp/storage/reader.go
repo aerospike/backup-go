@@ -359,6 +359,10 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 			return 0, 0, fmt.Errorf("%w: failed to get object attributes for %s: %w", errclass.ErrStorage, path, err)
 		}
 
+		if objAttrs == nil {
+			return 0, 0, fmt.Errorf("%w: nil object attributes for %s", errclass.ErrStorage, path)
+		}
+
 		return objAttrs.Size, 1, nil
 	}
 

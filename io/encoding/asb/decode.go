@@ -105,24 +105,31 @@ func (c *countingReader) ReadByte() (byte, error) {
 		return 0, err
 	}
 
-	c.tracker.offset++
-
-	// If it is a new line byte.
-	if b == asbNewLine {
-		// Increase line counter.
-		c.tracker.line++
-		// Save the previous column counter, so we can return in case of Unread.
-		c.tracker.prevCol = c.tracker.column
-		// Reset column counter.
-		c.tracker.column = 0
-	} else {
-		// If no new line, just move the column counter.
-		c.tracker.column++
-	}
-	// Save the previous value, so we can track changes on Unread.
-	c.tracker.prevByte = b
+	c.tracker.note(b)
 
 	return b, nil
+}
+
+// note records one consumed byte in the position tracker.
+func (t *positionTracker) note(b byte) {
+	t.offset++
+
+	if b == asbNewLine {
+		t.line++
+		t.prevCol = t.column
+		t.column = 0
+	} else {
+		t.column++
+	}
+
+	t.prevByte = b
+}
+
+// noteBytes records a sequence of consumed bytes.
+func (t *positionTracker) noteBytes(p []byte) {
+	for _, b := range p {
+		t.note(b)
+	}
 }
 
 // UnreadByte unreads a single byte from the underlying reader.
@@ -303,7 +310,7 @@ func (r *Decoder) readMetadata() (*metaData, error) {
 			return nil, err
 		}
 
-		metaToken, err := readUntilAny(r.reader, delimsSpaceOrNewline)
+		metaToken, err := readUntilWhitespace(r.reader)
 		if err != nil {
 			return nil, err
 		}
@@ -1291,31 +1298,39 @@ func readUntil(src *countingReader, delim byte) (string, error) {
 	return string(result), nil
 }
 
+// readUntilByte returns the bytes before delim, leaving delim unread so the
+// caller can consume it (and so ReadByte updates line/column for a newline).
+// Tokens larger than the reader's buffer are assembled across ReadSlice calls.
 func readUntilByte(src *countingReader, delim byte) ([]byte, error) {
-	slice, err := src.ReadSlice(delim)
-	if err != nil && !errors.Is(err, bufio.ErrBufferFull) {
-		return nil, err
+	var buf []byte
+
+	for {
+		slice, err := src.ReadSlice(delim)
+		if err != nil && !errors.Is(err, bufio.ErrBufferFull) {
+			return nil, err
+		}
+
+		// ReadSlice's buffer is invalidated by the next read; copy it out.
+		// append of a nil slice is a no-op, which keeps NilAway happy.
+		buf = append(buf, slice...)
+
+		if errors.Is(err, bufio.ErrBufferFull) {
+			continue
+		}
+
+		// err == nil: ReadSlice consumed delim as the last byte of this chunk.
+		if len(buf) > 0 {
+			buf = buf[:len(buf)-1]
+		}
+
+		if err := src.Reader.UnreadByte(); err != nil {
+			return nil, err
+		}
+
+		src.tracker.noteBytes(buf)
+
+		return buf, nil
 	}
-
-	n := len(slice)
-	// ReadSlice includes the delimiter, we need to exclude it
-	if n > 0 && slice[n-1] == delim {
-		n--
-	}
-
-	// Update tracker offset only
-	src.tracker.offset += uint64(n)
-
-	// Unread the delimiter
-	if err := src.Reader.UnreadByte(); err != nil {
-		return nil, err
-	}
-
-	// Copy slice data - ReadSlice returns internal buffer that becomes invalid on next read
-	buf := make([]byte, n)
-	copy(buf, slice[:n])
-
-	return buf, nil
 }
 
 func readUntilByteEscaped(src *countingReader, delim byte) ([]byte, error) {
@@ -1347,64 +1362,23 @@ func readUntilByteEscaped(src *countingReader, delim byte) ([]byte, error) {
 	return nil, fmt.Errorf("%w: token larger than max size", errclass.ErrCorruptData)
 }
 
-func readUntilAny(src *countingReader, delims []byte) ([]byte, error) {
+func readUntilWhitespace(src *countingReader) ([]byte, error) {
 	var buf []byte
-	totalRead := 0
 
-	for {
-		if totalRead >= maxTokenSize {
-			return nil, fmt.Errorf("%w: token larger than max size", errclass.ErrCorruptData)
-		}
-
-		buffered := src.Buffered()
-		if buffered == 0 {
-			// Need to fill buffer
-			if _, err := src.Peek(1); err != nil {
-				return nil, err
-			}
-
-			buffered = src.Buffered()
-		}
-
-		data, err := src.Peek(buffered)
-		if err != nil && !errors.Is(err, io.EOF) {
+	for range maxTokenSize {
+		b, err := src.ReadByte()
+		if err != nil {
 			return nil, err
 		}
 
-		// Limit search to maxTokenSize
-		searchLen := len(data)
-		if totalRead+searchLen > maxTokenSize {
-			searchLen = maxTokenSize - totalRead
+		if b == ' ' || b == asbNewLine {
+			return buf, src.UnreadByte()
 		}
 
-		// Find first delimiter in buffered data
-		idx := bytes.IndexAny(data[:searchLen], string(delims))
-		if idx >= 0 {
-			// Found delimiter, read up to it
-			buf = append(buf, data[:idx]...)
-			if _, err := src.Discard(idx); err != nil {
-				return nil, err
-			}
-
-			src.tracker.offset += uint64(idx)
-
-			return buf, nil
-		}
-
-		// No delimiter found in search range
-		if totalRead+searchLen >= maxTokenSize {
-			return nil, fmt.Errorf("%w: token larger than max size", errclass.ErrCorruptData)
-		}
-
-		// No delimiter in buffer, consume all and continue
-		buf = append(buf, data[:searchLen]...)
-		if _, err := src.Discard(searchLen); err != nil {
-			return nil, err
-		}
-
-		src.tracker.offset += uint64(searchLen)
-		totalRead += searchLen
+		buf = append(buf, b)
 	}
+
+	return nil, fmt.Errorf("%w: token larger than max size", errclass.ErrCorruptData)
 }
 
 func readUntilAnyEscaped(src *countingReader, delims []byte) ([]byte, error) {

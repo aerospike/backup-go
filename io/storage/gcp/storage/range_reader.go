@@ -72,6 +72,10 @@ func newRangeReader(ctx context.Context, client gcpGetter, bucket, path string) 
 		return nil, fmt.Errorf("%w: failed to get attr %s: %w", errclass.ErrStorage, path, err)
 	}
 
+	if head == nil {
+		return nil, fmt.Errorf("%w: nil object attributes for %s", errclass.ErrStorage, path)
+	}
+
 	return &rangeReader{
 		client:     client,
 		bucket:     bucket,

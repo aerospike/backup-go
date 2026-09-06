@@ -21,6 +21,7 @@
 | `make coverage` | Unit + integration tests with a coverage profile; this is what CI uploads |
 | `make fmt` | Applies the formatters from `.golangci.yaml` |
 | `make lint` | Runs golangci-lint |
+| `make nilaway` | Runs [NilAway](https://github.com/uber-go/nilaway) on production packages (no tests, no mocks) |
 | `make vet` | Runs `go vet ./...` |
 | `make tidy` | Runs `go mod tidy`; CI fails a PR that leaves `go.mod`/`go.sum` untidy |
 | `make vuln` | Runs govulncheck; CI requires it to pass |
@@ -109,6 +110,6 @@ Every `.go` file starts with the Apache 2.0 header, test files and `tests/` incl
 ## Pull requests
 
 Target the `dev` branch. `main` holds releases. Every CI gate must be green: unit tests under
-the race detector, integration tests, lint, license headers, up-to-date mocks, a tidy
+the race detector, integration tests, lint, NilAway, license headers, up-to-date mocks, a tidy
 `go.mod`/`go.sum`, compiling examples, and the vulnerability scans (Snyk fails on High and
 Critical; govulncheck must report nothing).

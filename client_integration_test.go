@@ -278,11 +278,7 @@ func TestEstimateGetEstimateError(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a valid config
-	config := &ConfigBackup{
-		Namespace:     "test",
-		ParallelRead:  1, // Set a valid value to pass validation
-		ParallelWrite: 1, // Set a valid value to pass validation
-	}
+	config := NewDefaultBackupConfig()
 
 	// Call Estimate
 	_, err = client.Estimate(t.Context(), config, -1) // Negative sample size

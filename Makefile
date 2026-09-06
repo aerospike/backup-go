@@ -10,6 +10,8 @@ GO_TEST_FLAGS = -parallel $(NPROC) -timeout=5m -count=1
 
 GOVULNCHECK_VERSION = v1.7.0
 
+INTEGRATION_SERVICES = scripts/integration-services.sh
+
 .PHONY: fmt
 fmt:
 	golangci-lint fmt --build-tags=$(INTEGRATION_TAG)
@@ -36,10 +38,23 @@ test-unit:
 test-race:
 	$(GO) test -race $(GO_TEST_FLAGS) ./...
 
-# Unit + integration tests. Needs the services listed in CONTRIBUTING.md.
+# Unit + integration tests. Run `make integration-up` first (see CONTRIBUTING.md).
 .PHONY: test-integration
 test-integration:
 	$(GO) test -tags=$(INTEGRATION_TAG) $(GO_TEST_FLAGS) ./...
+
+.PHONY: integration-up integration-down integration-status integration-restart
+integration-up:
+	$(INTEGRATION_SERVICES) up
+
+integration-down:
+	$(INTEGRATION_SERVICES) down
+
+integration-status:
+	$(INTEGRATION_SERVICES) status
+
+integration-restart:
+	$(INTEGRATION_SERVICES) restart
 
 # Kept as the default entry point: hermetic, same as test-unit.
 .PHONY: test

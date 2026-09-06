@@ -153,7 +153,7 @@ func TestRestoreNilStreamingReader(t *testing.T) {
 
 	_, err = client.Restore(t.Context(), config, nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to validate restore config")
+	assert.Contains(t, err.Error(), "streaming reader is nil")
 }
 
 func TestRestoreInvalidConfig(t *testing.T) {
@@ -234,11 +234,7 @@ func TestEstimateGetEstimateError(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a valid config
-	config := &ConfigBackup{
-		Namespace:     "test",
-		ParallelRead:  1, // Set a valid value to pass validation
-		ParallelWrite: 1, // Set a valid value to pass validation
-	}
+	config := NewDefaultBackupConfig()
 
 	// Call Estimate
 	_, err = client.Estimate(t.Context(), config, -1) // Negative sample size

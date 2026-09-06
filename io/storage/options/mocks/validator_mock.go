@@ -59,7 +59,7 @@ type Mockvalidator_Run_Call struct {
 
 // Run is a helper method to define mock.On call
 //   - fileName string
-func (_e *Mockvalidator_Expecter) Run(fileName interface{}) *Mockvalidator_Run_Call {
+func (_e *Mockvalidator_Expecter) Run(fileName any) *Mockvalidator_Run_Call {
 	return &Mockvalidator_Run_Call{Call: _e.mock.On("Run", fileName)}
 }
 

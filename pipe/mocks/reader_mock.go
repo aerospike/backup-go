@@ -106,7 +106,7 @@ type MockReader_Read_Call struct {
 
 // Read is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockReader_Expecter) Read(ctx interface{}) *MockReader_Read_Call {
+func (_e *MockReader_Expecter) Read(ctx any) *MockReader_Read_Call {
 	return &MockReader_Read_Call{Call: _e.mock.On("Read", ctx)}
 }
 

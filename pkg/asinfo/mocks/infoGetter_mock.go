@@ -80,9 +80,9 @@ type MockinfoGetter_RequestInfo_Call struct {
 // RequestInfo is a helper method to define mock.On call
 //   - infoPolicy *aerospike.InfoPolicy
 //   - commands ...string
-func (_e *MockinfoGetter_Expecter) RequestInfo(infoPolicy interface{}, commands ...interface{}) *MockinfoGetter_RequestInfo_Call {
+func (_e *MockinfoGetter_Expecter) RequestInfo(infoPolicy any, commands ...any) *MockinfoGetter_RequestInfo_Call {
 	return &MockinfoGetter_RequestInfo_Call{Call: _e.mock.On("RequestInfo",
-		append([]interface{}{infoPolicy}, commands...)...)}
+		append([]any{infoPolicy}, commands...)...)}
 }
 
 func (_c *MockinfoGetter_RequestInfo_Call) Run(run func(infoPolicy *aerospike.InfoPolicy, commands ...string)) *MockinfoGetter_RequestInfo_Call {

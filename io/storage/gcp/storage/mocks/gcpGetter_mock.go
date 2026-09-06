@@ -75,7 +75,7 @@ type MockgcpGetter_GetAttrs_Call struct {
 // GetAttrs is a helper method to define mock.On call
 //   - ctx context.Context
 //   - path string
-func (_e *MockgcpGetter_Expecter) GetAttrs(ctx interface{}, path interface{}) *MockgcpGetter_GetAttrs_Call {
+func (_e *MockgcpGetter_Expecter) GetAttrs(ctx any, path any) *MockgcpGetter_GetAttrs_Call {
 	return &MockgcpGetter_GetAttrs_Call{Call: _e.mock.On("GetAttrs", ctx, path)}
 }
 
@@ -146,7 +146,7 @@ type MockgcpGetter_GetReader_Call struct {
 //   - generation int64
 //   - offset int64
 //   - length int64
-func (_e *MockgcpGetter_Expecter) GetReader(ctx interface{}, path interface{}, generation interface{}, offset interface{}, length interface{}) *MockgcpGetter_GetReader_Call {
+func (_e *MockgcpGetter_Expecter) GetReader(ctx any, path any, generation any, offset any, length any) *MockgcpGetter_GetReader_Call {
 	return &MockgcpGetter_GetReader_Call{Call: _e.mock.On("GetReader", ctx, path, generation, offset, length)}
 }
 

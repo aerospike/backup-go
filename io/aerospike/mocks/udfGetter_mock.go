@@ -73,7 +73,7 @@ type MockudfGetter_GetUDFs_Call struct {
 
 // GetUDFs is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockudfGetter_Expecter) GetUDFs(ctx interface{}) *MockudfGetter_GetUDFs_Call {
+func (_e *MockudfGetter_Expecter) GetUDFs(ctx any) *MockudfGetter_GetUDFs_Call {
 	return &MockudfGetter_GetUDFs_Call{Call: _e.mock.On("GetUDFs", ctx)}
 }
 

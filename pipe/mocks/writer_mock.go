@@ -113,7 +113,7 @@ type MockWriter_Write_Call struct {
 
 // Write is a helper method to define mock.On call
 //   - token *models.Token
-func (_e *MockWriter_Expecter) Write(token interface{}) *MockWriter_Write_Call {
+func (_e *MockWriter_Expecter) Write(token any) *MockWriter_Write_Call {
 	return &MockWriter_Write_Call{Call: _e.mock.On("Write", token)}
 }
 

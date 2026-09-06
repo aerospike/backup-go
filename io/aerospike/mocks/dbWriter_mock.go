@@ -63,7 +63,7 @@ type MockdbWriter_BatchOperate_Call struct {
 // BatchOperate is a helper method to define mock.On call
 //   - policy *aerospike.BatchPolicy
 //   - records []aerospike.BatchRecordIfc
-func (_e *MockdbWriter_Expecter) BatchOperate(policy interface{}, records interface{}) *MockdbWriter_BatchOperate_Call {
+func (_e *MockdbWriter_Expecter) BatchOperate(policy any, records any) *MockdbWriter_BatchOperate_Call {
 	return &MockdbWriter_BatchOperate_Call{Call: _e.mock.On("BatchOperate", policy, records)}
 }
 
@@ -145,9 +145,9 @@ type MockdbWriter_CreateComplexIndex_Call struct {
 //   - indexType aerospike.IndexType
 //   - indexCollectionType aerospike.IndexCollectionType
 //   - ctx ...*aerospike.CDTContext
-func (_e *MockdbWriter_Expecter) CreateComplexIndex(policy interface{}, namespace interface{}, set interface{}, indexName interface{}, binName interface{}, indexType interface{}, indexCollectionType interface{}, ctx ...interface{}) *MockdbWriter_CreateComplexIndex_Call {
+func (_e *MockdbWriter_Expecter) CreateComplexIndex(policy any, namespace any, set any, indexName any, binName any, indexType any, indexCollectionType any, ctx ...any) *MockdbWriter_CreateComplexIndex_Call {
 	return &MockdbWriter_CreateComplexIndex_Call{Call: _e.mock.On("CreateComplexIndex",
-		append([]interface{}{policy, namespace, set, indexName, binName, indexType, indexCollectionType}, ctx...)...)}
+		append([]any{policy, namespace, set, indexName, binName, indexType, indexCollectionType}, ctx...)...)}
 }
 
 func (_c *MockdbWriter_CreateComplexIndex_Call) Run(run func(policy *aerospike.WritePolicy, namespace string, set string, indexName string, binName string, indexType aerospike.IndexType, indexCollectionType aerospike.IndexCollectionType, ctx ...*aerospike.CDTContext)) *MockdbWriter_CreateComplexIndex_Call {
@@ -253,7 +253,7 @@ type MockdbWriter_CreateIndexWithExpression_Call struct {
 //   - indexType aerospike.IndexType
 //   - indexCollectionType aerospike.IndexCollectionType
 //   - expression *aerospike.Expression
-func (_e *MockdbWriter_Expecter) CreateIndexWithExpression(policy interface{}, namespace interface{}, set interface{}, indexName interface{}, indexType interface{}, indexCollectionType interface{}, expression interface{}) *MockdbWriter_CreateIndexWithExpression_Call {
+func (_e *MockdbWriter_Expecter) CreateIndexWithExpression(policy any, namespace any, set any, indexName any, indexType any, indexCollectionType any, expression any) *MockdbWriter_CreateIndexWithExpression_Call {
 	return &MockdbWriter_CreateIndexWithExpression_Call{Call: _e.mock.On("CreateIndexWithExpression", policy, namespace, set, indexName, indexType, indexCollectionType, expression)}
 }
 
@@ -339,7 +339,7 @@ type MockdbWriter_DropIndex_Call struct {
 //   - namespace string
 //   - set string
 //   - indexName string
-func (_e *MockdbWriter_Expecter) DropIndex(policy interface{}, namespace interface{}, set interface{}, indexName interface{}) *MockdbWriter_DropIndex_Call {
+func (_e *MockdbWriter_Expecter) DropIndex(policy any, namespace any, set any, indexName any) *MockdbWriter_DropIndex_Call {
 	return &MockdbWriter_DropIndex_Call{Call: _e.mock.On("DropIndex", policy, namespace, set, indexName)}
 }
 
@@ -409,7 +409,7 @@ type MockdbWriter_Put_Call struct {
 //   - policy *aerospike.WritePolicy
 //   - key *aerospike.Key
 //   - bins aerospike.BinMap
-func (_e *MockdbWriter_Expecter) Put(policy interface{}, key interface{}, bins interface{}) *MockdbWriter_Put_Call {
+func (_e *MockdbWriter_Expecter) Put(policy any, key any, bins any) *MockdbWriter_Put_Call {
 	return &MockdbWriter_Put_Call{Call: _e.mock.On("Put", policy, key, bins)}
 }
 
@@ -474,7 +474,7 @@ type MockdbWriter_PutPayload_Call struct {
 //   - policy *aerospike.WritePolicy
 //   - key *aerospike.Key
 //   - payload []byte
-func (_e *MockdbWriter_Expecter) PutPayload(policy interface{}, key interface{}, payload interface{}) *MockdbWriter_PutPayload_Call {
+func (_e *MockdbWriter_Expecter) PutPayload(policy any, key any, payload any) *MockdbWriter_PutPayload_Call {
 	return &MockdbWriter_PutPayload_Call{Call: _e.mock.On("PutPayload", policy, key, payload)}
 }
 
@@ -551,7 +551,7 @@ type MockdbWriter_RegisterUDF_Call struct {
 //   - udfBody []byte
 //   - serverPath string
 //   - language aerospike.Language
-func (_e *MockdbWriter_Expecter) RegisterUDF(policy interface{}, udfBody interface{}, serverPath interface{}, language interface{}) *MockdbWriter_RegisterUDF_Call {
+func (_e *MockdbWriter_Expecter) RegisterUDF(policy any, udfBody any, serverPath any, language any) *MockdbWriter_RegisterUDF_Call {
 	return &MockdbWriter_RegisterUDF_Call{Call: _e.mock.On("RegisterUDF", policy, udfBody, serverPath, language)}
 }
 

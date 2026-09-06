@@ -81,9 +81,9 @@ type MockS3API_GetObject_Call struct {
 //   - ctx context.Context
 //   - in *s3.GetObjectInput
 //   - opts ...func(*s3.Options)
-func (_e *MockS3API_Expecter) GetObject(ctx interface{}, in interface{}, opts ...interface{}) *MockS3API_GetObject_Call {
+func (_e *MockS3API_Expecter) GetObject(ctx any, in any, opts ...any) *MockS3API_GetObject_Call {
 	return &MockS3API_GetObject_Call{Call: _e.mock.On("GetObject",
-		append([]interface{}{ctx, in}, opts...)...)}
+		append([]any{ctx, in}, opts...)...)}
 }
 
 func (_c *MockS3API_GetObject_Call) Run(run func(ctx context.Context, in *s3.GetObjectInput, opts ...func(*s3.Options))) *MockS3API_GetObject_Call {
@@ -164,9 +164,9 @@ type MockS3API_ListObjectsV2_Call struct {
 //   - ctx context.Context
 //   - in *s3.ListObjectsV2Input
 //   - opts ...func(*s3.Options)
-func (_e *MockS3API_Expecter) ListObjectsV2(ctx interface{}, in interface{}, opts ...interface{}) *MockS3API_ListObjectsV2_Call {
+func (_e *MockS3API_Expecter) ListObjectsV2(ctx any, in any, opts ...any) *MockS3API_ListObjectsV2_Call {
 	return &MockS3API_ListObjectsV2_Call{Call: _e.mock.On("ListObjectsV2",
-		append([]interface{}{ctx, in}, opts...)...)}
+		append([]any{ctx, in}, opts...)...)}
 }
 
 func (_c *MockS3API_ListObjectsV2_Call) Run(run func(ctx context.Context, in *s3.ListObjectsV2Input, opts ...func(*s3.Options))) *MockS3API_ListObjectsV2_Call {

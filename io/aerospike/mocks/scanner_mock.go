@@ -83,9 +83,9 @@ type Mockscanner_ScanPartitions_Call struct {
 //   - namespace string
 //   - setName string
 //   - binNames ...string
-func (_e *Mockscanner_Expecter) ScanPartitions(scanPolicy interface{}, partitionFilter interface{}, namespace interface{}, setName interface{}, binNames ...interface{}) *Mockscanner_ScanPartitions_Call {
+func (_e *Mockscanner_Expecter) ScanPartitions(scanPolicy any, partitionFilter any, namespace any, setName any, binNames ...any) *Mockscanner_ScanPartitions_Call {
 	return &Mockscanner_ScanPartitions_Call{Call: _e.mock.On("ScanPartitions",
-		append([]interface{}{scanPolicy, partitionFilter, namespace, setName}, binNames...)...)}
+		append([]any{scanPolicy, partitionFilter, namespace, setName}, binNames...)...)}
 }
 
 func (_c *Mockscanner_ScanPartitions_Call) Run(run func(scanPolicy *aerospike.ScanPolicy, partitionFilter *aerospike.PartitionFilter, namespace string, setName string, binNames ...string)) *Mockscanner_ScanPartitions_Call {

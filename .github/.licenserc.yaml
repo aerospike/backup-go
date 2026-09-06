@@ -8,5 +8,4 @@ header:
     - '**/*.go'
 
   paths-ignore:
-    - '**/tests/**'
     - '**/mocks/**'

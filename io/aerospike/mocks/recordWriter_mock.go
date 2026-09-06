@@ -104,7 +104,7 @@ type MockrecordWriter_writeRecord_Call struct {
 
 // writeRecord is a helper method to define mock.On call
 //   - record *models.Record
-func (_e *MockrecordWriter_Expecter) writeRecord(record interface{}) *MockrecordWriter_writeRecord_Call {
+func (_e *MockrecordWriter_Expecter) writeRecord(record any) *MockrecordWriter_writeRecord_Call {
 	return &MockrecordWriter_writeRecord_Call{Call: _e.mock.On("writeRecord", record)}
 }
 

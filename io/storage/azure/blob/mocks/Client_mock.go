@@ -76,7 +76,7 @@ type MockClient_DeleteBlob_Call struct {
 //   - containerName string
 //   - blobName string
 //   - o *azblob.DeleteBlobOptions
-func (_e *MockClient_Expecter) DeleteBlob(ctx interface{}, containerName interface{}, blobName interface{}, o interface{}) *MockClient_DeleteBlob_Call {
+func (_e *MockClient_Expecter) DeleteBlob(ctx any, containerName any, blobName any, o any) *MockClient_DeleteBlob_Call {
 	return &MockClient_DeleteBlob_Call{Call: _e.mock.On("DeleteBlob", ctx, containerName, blobName, o)}
 }
 
@@ -108,8 +108,8 @@ func (_c *MockClient_DeleteBlob_Call) Run(run func(ctx context.Context, containe
 	return _c
 }
 
-func (_c *MockClient_DeleteBlob_Call) Return(v azblob.DeleteBlobResponse, err error) *MockClient_DeleteBlob_Call {
-	_c.Call.Return(v, err)
+func (_c *MockClient_DeleteBlob_Call) Return(deleteBlobResponse azblob.DeleteBlobResponse, err error) *MockClient_DeleteBlob_Call {
+	_c.Call.Return(deleteBlobResponse, err)
 	return _c
 }
 
@@ -154,7 +154,7 @@ type MockClient_DownloadStream_Call struct {
 //   - containerName string
 //   - blobName string
 //   - o *azblob.DownloadStreamOptions
-func (_e *MockClient_Expecter) DownloadStream(ctx interface{}, containerName interface{}, blobName interface{}, o interface{}) *MockClient_DownloadStream_Call {
+func (_e *MockClient_Expecter) DownloadStream(ctx any, containerName any, blobName any, o any) *MockClient_DownloadStream_Call {
 	return &MockClient_DownloadStream_Call{Call: _e.mock.On("DownloadStream", ctx, containerName, blobName, o)}
 }
 
@@ -186,8 +186,8 @@ func (_c *MockClient_DownloadStream_Call) Run(run func(ctx context.Context, cont
 	return _c
 }
 
-func (_c *MockClient_DownloadStream_Call) Return(v azblob.DownloadStreamResponse, err error) *MockClient_DownloadStream_Call {
-	_c.Call.Return(v, err)
+func (_c *MockClient_DownloadStream_Call) Return(downloadStreamResponse azblob.DownloadStreamResponse, err error) *MockClient_DownloadStream_Call {
+	_c.Call.Return(downloadStreamResponse, err)
 	return _c
 }
 
@@ -223,7 +223,7 @@ type MockClient_NewListBlobsFlatPager_Call struct {
 // NewListBlobsFlatPager is a helper method to define mock.On call
 //   - containerName string
 //   - o *azblob.ListBlobsFlatOptions
-func (_e *MockClient_Expecter) NewListBlobsFlatPager(containerName interface{}, o interface{}) *MockClient_NewListBlobsFlatPager_Call {
+func (_e *MockClient_Expecter) NewListBlobsFlatPager(containerName any, o any) *MockClient_NewListBlobsFlatPager_Call {
 	return &MockClient_NewListBlobsFlatPager_Call{Call: _e.mock.On("NewListBlobsFlatPager", containerName, o)}
 }
 

@@ -70,7 +70,7 @@ type Mockconnector_Read_Call struct {
 
 // Read is a helper method to define mock.On call
 //   - b []byte
-func (_e *Mockconnector_Expecter) Read(b interface{}) *Mockconnector_Read_Call {
+func (_e *Mockconnector_Expecter) Read(b any) *Mockconnector_Read_Call {
 	return &Mockconnector_Read_Call{Call: _e.mock.On("Read", b)}
 }
 
@@ -121,7 +121,7 @@ type Mockconnector_SetReadDeadline_Call struct {
 
 // SetReadDeadline is a helper method to define mock.On call
 //   - t time.Time
-func (_e *Mockconnector_Expecter) SetReadDeadline(t interface{}) *Mockconnector_SetReadDeadline_Call {
+func (_e *Mockconnector_Expecter) SetReadDeadline(t any) *Mockconnector_SetReadDeadline_Call {
 	return &Mockconnector_SetReadDeadline_Call{Call: _e.mock.On("SetReadDeadline", t)}
 }
 
@@ -172,7 +172,7 @@ type Mockconnector_SetWriteDeadline_Call struct {
 
 // SetWriteDeadline is a helper method to define mock.On call
 //   - t time.Time
-func (_e *Mockconnector_Expecter) SetWriteDeadline(t interface{}) *Mockconnector_SetWriteDeadline_Call {
+func (_e *Mockconnector_Expecter) SetWriteDeadline(t any) *Mockconnector_SetWriteDeadline_Call {
 	return &Mockconnector_SetWriteDeadline_Call{Call: _e.mock.On("SetWriteDeadline", t)}
 }
 
@@ -232,7 +232,7 @@ type Mockconnector_Write_Call struct {
 
 // Write is a helper method to define mock.On call
 //   - b []byte
-func (_e *Mockconnector_Expecter) Write(b interface{}) *Mockconnector_Write_Call {
+func (_e *Mockconnector_Expecter) Write(b any) *Mockconnector_Write_Call {
 	return &Mockconnector_Write_Call{Call: _e.mock.On("Write", b)}
 }
 

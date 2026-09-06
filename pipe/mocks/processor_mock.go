@@ -71,7 +71,7 @@ type MockProcessor_Process_Call struct {
 
 // Process is a helper method to define mock.On call
 //   - token *models.Token
-func (_e *MockProcessor_Expecter) Process(token interface{}) *MockProcessor_Process_Call {
+func (_e *MockProcessor_Expecter) Process(token any) *MockProcessor_Process_Call {
 	return &MockProcessor_Process_Call{Call: _e.mock.On("Process", token)}
 }
 

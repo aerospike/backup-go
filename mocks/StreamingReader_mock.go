@@ -252,7 +252,7 @@ type MockStreamingReader_ListObjects_Call struct {
 // ListObjects is a helper method to define mock.On call
 //   - ctx context.Context
 //   - path string
-func (_e *MockStreamingReader_Expecter) ListObjects(ctx interface{}, path interface{}) *MockStreamingReader_ListObjects_Call {
+func (_e *MockStreamingReader_Expecter) ListObjects(ctx any, path any) *MockStreamingReader_ListObjects_Call {
 	return &MockStreamingReader_ListObjects_Call{Call: _e.mock.On("ListObjects", ctx, path)}
 }
 
@@ -300,7 +300,7 @@ type MockStreamingReader_StreamFile_Call struct {
 //   - filename string
 //   - readersCh chan<- models.File
 //   - errorsCh chan<- error
-func (_e *MockStreamingReader_Expecter) StreamFile(ctx interface{}, filename interface{}, readersCh interface{}, errorsCh interface{}) *MockStreamingReader_StreamFile_Call {
+func (_e *MockStreamingReader_Expecter) StreamFile(ctx any, filename any, readersCh any, errorsCh any) *MockStreamingReader_StreamFile_Call {
 	return &MockStreamingReader_StreamFile_Call{Call: _e.mock.On("StreamFile", ctx, filename, readersCh, errorsCh)}
 }
 
@@ -358,7 +358,7 @@ type MockStreamingReader_StreamFiles_Call struct {
 //   - fileCh chan<- models.File
 //   - errCh chan<- error
 //   - strings []string
-func (_e *MockStreamingReader_Expecter) StreamFiles(context1 interface{}, fileCh interface{}, errCh interface{}, strings interface{}) *MockStreamingReader_StreamFiles_Call {
+func (_e *MockStreamingReader_Expecter) StreamFiles(context1 any, fileCh any, errCh any, strings any) *MockStreamingReader_StreamFiles_Call {
 	return &MockStreamingReader_StreamFiles_Call{Call: _e.mock.On("StreamFiles", context1, fileCh, errCh, strings)}
 }
 

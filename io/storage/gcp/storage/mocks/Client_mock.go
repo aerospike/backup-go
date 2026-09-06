@@ -62,7 +62,7 @@ type MockClient_Bucket_Call struct {
 
 // Bucket is a helper method to define mock.On call
 //   - name string
-func (_e *MockClient_Expecter) Bucket(name interface{}) *MockClient_Bucket_Call {
+func (_e *MockClient_Expecter) Bucket(name any) *MockClient_Bucket_Call {
 	return &MockClient_Bucket_Call{Call: _e.mock.On("Bucket", name)}
 }
 

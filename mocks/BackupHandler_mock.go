@@ -154,7 +154,7 @@ type MockBackupHandler_Wait_Call struct {
 
 // Wait is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockBackupHandler_Expecter) Wait(ctx interface{}) *MockBackupHandler_Wait_Call {
+func (_e *MockBackupHandler_Expecter) Wait(ctx any) *MockBackupHandler_Wait_Call {
 	return &MockBackupHandler_Wait_Call{Call: _e.mock.On("Wait", ctx)}
 }
 

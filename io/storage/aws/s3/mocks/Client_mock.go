@@ -81,9 +81,9 @@ type MockClient_AbortMultipartUpload_Call struct {
 //   - ctx context.Context
 //   - params *s3.AbortMultipartUploadInput
 //   - optFns ...func(*s3.Options)
-func (_e *MockClient_Expecter) AbortMultipartUpload(ctx interface{}, params interface{}, optFns ...interface{}) *MockClient_AbortMultipartUpload_Call {
+func (_e *MockClient_Expecter) AbortMultipartUpload(ctx any, params any, optFns ...any) *MockClient_AbortMultipartUpload_Call {
 	return &MockClient_AbortMultipartUpload_Call{Call: _e.mock.On("AbortMultipartUpload",
-		append([]interface{}{ctx, params}, optFns...)...)}
+		append([]any{ctx, params}, optFns...)...)}
 }
 
 func (_c *MockClient_AbortMultipartUpload_Call) Run(run func(ctx context.Context, params *s3.AbortMultipartUploadInput, optFns ...func(*s3.Options))) *MockClient_AbortMultipartUpload_Call {
@@ -164,9 +164,9 @@ type MockClient_CompleteMultipartUpload_Call struct {
 //   - ctx context.Context
 //   - params *s3.CompleteMultipartUploadInput
 //   - optFns ...func(*s3.Options)
-func (_e *MockClient_Expecter) CompleteMultipartUpload(ctx interface{}, params interface{}, optFns ...interface{}) *MockClient_CompleteMultipartUpload_Call {
+func (_e *MockClient_Expecter) CompleteMultipartUpload(ctx any, params any, optFns ...any) *MockClient_CompleteMultipartUpload_Call {
 	return &MockClient_CompleteMultipartUpload_Call{Call: _e.mock.On("CompleteMultipartUpload",
-		append([]interface{}{ctx, params}, optFns...)...)}
+		append([]any{ctx, params}, optFns...)...)}
 }
 
 func (_c *MockClient_CompleteMultipartUpload_Call) Run(run func(ctx context.Context, params *s3.CompleteMultipartUploadInput, optFns ...func(*s3.Options))) *MockClient_CompleteMultipartUpload_Call {
@@ -247,9 +247,9 @@ type MockClient_CreateMultipartUpload_Call struct {
 //   - ctx context.Context
 //   - params *s3.CreateMultipartUploadInput
 //   - optFns ...func(*s3.Options)
-func (_e *MockClient_Expecter) CreateMultipartUpload(ctx interface{}, params interface{}, optFns ...interface{}) *MockClient_CreateMultipartUpload_Call {
+func (_e *MockClient_Expecter) CreateMultipartUpload(ctx any, params any, optFns ...any) *MockClient_CreateMultipartUpload_Call {
 	return &MockClient_CreateMultipartUpload_Call{Call: _e.mock.On("CreateMultipartUpload",
-		append([]interface{}{ctx, params}, optFns...)...)}
+		append([]any{ctx, params}, optFns...)...)}
 }
 
 func (_c *MockClient_CreateMultipartUpload_Call) Run(run func(ctx context.Context, params *s3.CreateMultipartUploadInput, optFns ...func(*s3.Options))) *MockClient_CreateMultipartUpload_Call {
@@ -330,9 +330,9 @@ type MockClient_DeleteObject_Call struct {
 //   - ctx context.Context
 //   - params *s3.DeleteObjectInput
 //   - optFns ...func(*s3.Options)
-func (_e *MockClient_Expecter) DeleteObject(ctx interface{}, params interface{}, optFns ...interface{}) *MockClient_DeleteObject_Call {
+func (_e *MockClient_Expecter) DeleteObject(ctx any, params any, optFns ...any) *MockClient_DeleteObject_Call {
 	return &MockClient_DeleteObject_Call{Call: _e.mock.On("DeleteObject",
-		append([]interface{}{ctx, params}, optFns...)...)}
+		append([]any{ctx, params}, optFns...)...)}
 }
 
 func (_c *MockClient_DeleteObject_Call) Run(run func(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options))) *MockClient_DeleteObject_Call {
@@ -413,9 +413,9 @@ type MockClient_DeleteObjects_Call struct {
 //   - ctx context.Context
 //   - params *s3.DeleteObjectsInput
 //   - optFns ...func(*s3.Options)
-func (_e *MockClient_Expecter) DeleteObjects(ctx interface{}, params interface{}, optFns ...interface{}) *MockClient_DeleteObjects_Call {
+func (_e *MockClient_Expecter) DeleteObjects(ctx any, params any, optFns ...any) *MockClient_DeleteObjects_Call {
 	return &MockClient_DeleteObjects_Call{Call: _e.mock.On("DeleteObjects",
-		append([]interface{}{ctx, params}, optFns...)...)}
+		append([]any{ctx, params}, optFns...)...)}
 }
 
 func (_c *MockClient_DeleteObjects_Call) Run(run func(ctx context.Context, params *s3.DeleteObjectsInput, optFns ...func(*s3.Options))) *MockClient_DeleteObjects_Call {
@@ -496,9 +496,9 @@ type MockClient_GetObject_Call struct {
 //   - ctx context.Context
 //   - params *s3.GetObjectInput
 //   - optFns ...func(*s3.Options)
-func (_e *MockClient_Expecter) GetObject(ctx interface{}, params interface{}, optFns ...interface{}) *MockClient_GetObject_Call {
+func (_e *MockClient_Expecter) GetObject(ctx any, params any, optFns ...any) *MockClient_GetObject_Call {
 	return &MockClient_GetObject_Call{Call: _e.mock.On("GetObject",
-		append([]interface{}{ctx, params}, optFns...)...)}
+		append([]any{ctx, params}, optFns...)...)}
 }
 
 func (_c *MockClient_GetObject_Call) Run(run func(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options))) *MockClient_GetObject_Call {
@@ -579,9 +579,9 @@ type MockClient_HeadBucket_Call struct {
 //   - ctx context.Context
 //   - params *s3.HeadBucketInput
 //   - optFns ...func(*s3.Options)
-func (_e *MockClient_Expecter) HeadBucket(ctx interface{}, params interface{}, optFns ...interface{}) *MockClient_HeadBucket_Call {
+func (_e *MockClient_Expecter) HeadBucket(ctx any, params any, optFns ...any) *MockClient_HeadBucket_Call {
 	return &MockClient_HeadBucket_Call{Call: _e.mock.On("HeadBucket",
-		append([]interface{}{ctx, params}, optFns...)...)}
+		append([]any{ctx, params}, optFns...)...)}
 }
 
 func (_c *MockClient_HeadBucket_Call) Run(run func(ctx context.Context, params *s3.HeadBucketInput, optFns ...func(*s3.Options))) *MockClient_HeadBucket_Call {
@@ -662,9 +662,9 @@ type MockClient_HeadObject_Call struct {
 //   - ctx context.Context
 //   - params *s3.HeadObjectInput
 //   - optFns ...func(*s3.Options)
-func (_e *MockClient_Expecter) HeadObject(ctx interface{}, params interface{}, optFns ...interface{}) *MockClient_HeadObject_Call {
+func (_e *MockClient_Expecter) HeadObject(ctx any, params any, optFns ...any) *MockClient_HeadObject_Call {
 	return &MockClient_HeadObject_Call{Call: _e.mock.On("HeadObject",
-		append([]interface{}{ctx, params}, optFns...)...)}
+		append([]any{ctx, params}, optFns...)...)}
 }
 
 func (_c *MockClient_HeadObject_Call) Run(run func(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options))) *MockClient_HeadObject_Call {
@@ -745,9 +745,9 @@ type MockClient_ListObjectsV2_Call struct {
 //   - ctx context.Context
 //   - params *s3.ListObjectsV2Input
 //   - optFns ...func(*s3.Options)
-func (_e *MockClient_Expecter) ListObjectsV2(ctx interface{}, params interface{}, optFns ...interface{}) *MockClient_ListObjectsV2_Call {
+func (_e *MockClient_Expecter) ListObjectsV2(ctx any, params any, optFns ...any) *MockClient_ListObjectsV2_Call {
 	return &MockClient_ListObjectsV2_Call{Call: _e.mock.On("ListObjectsV2",
-		append([]interface{}{ctx, params}, optFns...)...)}
+		append([]any{ctx, params}, optFns...)...)}
 }
 
 func (_c *MockClient_ListObjectsV2_Call) Run(run func(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options))) *MockClient_ListObjectsV2_Call {
@@ -828,9 +828,9 @@ type MockClient_RestoreObject_Call struct {
 //   - ctx context.Context
 //   - params *s3.RestoreObjectInput
 //   - optFns ...func(*s3.Options)
-func (_e *MockClient_Expecter) RestoreObject(ctx interface{}, params interface{}, optFns ...interface{}) *MockClient_RestoreObject_Call {
+func (_e *MockClient_Expecter) RestoreObject(ctx any, params any, optFns ...any) *MockClient_RestoreObject_Call {
 	return &MockClient_RestoreObject_Call{Call: _e.mock.On("RestoreObject",
-		append([]interface{}{ctx, params}, optFns...)...)}
+		append([]any{ctx, params}, optFns...)...)}
 }
 
 func (_c *MockClient_RestoreObject_Call) Run(run func(ctx context.Context, params *s3.RestoreObjectInput, optFns ...func(*s3.Options))) *MockClient_RestoreObject_Call {
@@ -911,9 +911,9 @@ type MockClient_UploadPart_Call struct {
 //   - ctx context.Context
 //   - params *s3.UploadPartInput
 //   - optFns ...func(*s3.Options)
-func (_e *MockClient_Expecter) UploadPart(ctx interface{}, params interface{}, optFns ...interface{}) *MockClient_UploadPart_Call {
+func (_e *MockClient_Expecter) UploadPart(ctx any, params any, optFns ...any) *MockClient_UploadPart_Call {
 	return &MockClient_UploadPart_Call{Call: _e.mock.On("UploadPart",
-		append([]interface{}{ctx, params}, optFns...)...)}
+		append([]any{ctx, params}, optFns...)...)}
 }
 
 func (_c *MockClient_UploadPart_Call) Run(run func(ctx context.Context, params *s3.UploadPartInput, optFns ...func(*s3.Options))) *MockClient_UploadPart_Call {

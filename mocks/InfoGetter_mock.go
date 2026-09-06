@@ -75,7 +75,7 @@ type MockInfoGetter_GetBackupStatus_Call struct {
 // GetBackupStatus is a helper method to define mock.On call
 //   - ctx context.Context
 //   - jobID string
-func (_e *MockInfoGetter_Expecter) GetBackupStatus(ctx interface{}, jobID interface{}) *MockInfoGetter_GetBackupStatus_Call {
+func (_e *MockInfoGetter_Expecter) GetBackupStatus(ctx any, jobID any) *MockInfoGetter_GetBackupStatus_Call {
 	return &MockInfoGetter_GetBackupStatus_Call{Call: _e.mock.On("GetBackupStatus", ctx, jobID)}
 }
 
@@ -141,7 +141,7 @@ type MockInfoGetter_GetClusterStable_Call struct {
 // GetClusterStable is a helper method to define mock.On call
 //   - ctx context.Context
 //   - namespace string
-func (_e *MockInfoGetter_Expecter) GetClusterStable(ctx interface{}, namespace interface{}) *MockInfoGetter_GetClusterStable_Call {
+func (_e *MockInfoGetter_Expecter) GetClusterStable(ctx any, namespace any) *MockInfoGetter_GetClusterStable_Call {
 	return &MockInfoGetter_GetClusterStable_Call{Call: _e.mock.On("GetClusterStable", ctx, namespace)}
 }
 
@@ -208,7 +208,7 @@ type MockInfoGetter_GetNamespacesList_Call struct {
 
 // GetNamespacesList is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockInfoGetter_Expecter) GetNamespacesList(ctx interface{}) *MockInfoGetter_GetNamespacesList_Call {
+func (_e *MockInfoGetter_Expecter) GetNamespacesList(ctx any) *MockInfoGetter_GetNamespacesList_Call {
 	return &MockInfoGetter_GetNamespacesList_Call{Call: _e.mock.On("GetNamespacesList", ctx)}
 }
 
@@ -269,7 +269,7 @@ type MockInfoGetter_GetPendingMigrations_Call struct {
 // GetPendingMigrations is a helper method to define mock.On call
 //   - ctx context.Context
 //   - namespace string
-func (_e *MockInfoGetter_Expecter) GetPendingMigrations(ctx interface{}, namespace interface{}) *MockInfoGetter_GetPendingMigrations_Call {
+func (_e *MockInfoGetter_Expecter) GetPendingMigrations(ctx any, namespace any) *MockInfoGetter_GetPendingMigrations_Call {
 	return &MockInfoGetter_GetPendingMigrations_Call{Call: _e.mock.On("GetPendingMigrations", ctx, namespace)}
 }
 
@@ -338,7 +338,7 @@ type MockInfoGetter_GetPrimaryPartitions_Call struct {
 //   - ctx context.Context
 //   - node string
 //   - namespace string
-func (_e *MockInfoGetter_Expecter) GetPrimaryPartitions(ctx interface{}, node interface{}, namespace interface{}) *MockInfoGetter_GetPrimaryPartitions_Call {
+func (_e *MockInfoGetter_Expecter) GetPrimaryPartitions(ctx any, node any, namespace any) *MockInfoGetter_GetPrimaryPartitions_Call {
 	return &MockInfoGetter_GetPrimaryPartitions_Call{Call: _e.mock.On("GetPrimaryPartitions", ctx, node, namespace)}
 }
 
@@ -411,7 +411,7 @@ type MockInfoGetter_GetRackNodes_Call struct {
 // GetRackNodes is a helper method to define mock.On call
 //   - ctx context.Context
 //   - rackID int
-func (_e *MockInfoGetter_Expecter) GetRackNodes(ctx interface{}, rackID interface{}) *MockInfoGetter_GetRackNodes_Call {
+func (_e *MockInfoGetter_Expecter) GetRackNodes(ctx any, rackID any) *MockInfoGetter_GetRackNodes_Call {
 	return &MockInfoGetter_GetRackNodes_Call{Call: _e.mock.On("GetRackNodes", ctx, rackID)}
 }
 
@@ -478,7 +478,7 @@ type MockInfoGetter_GetRecordCount_Call struct {
 //   - ctx context.Context
 //   - namespace string
 //   - sets []string
-func (_e *MockInfoGetter_Expecter) GetRecordCount(ctx interface{}, namespace interface{}, sets interface{}) *MockInfoGetter_GetRecordCount_Call {
+func (_e *MockInfoGetter_Expecter) GetRecordCount(ctx any, namespace any, sets any) *MockInfoGetter_GetRecordCount_Call {
 	return &MockInfoGetter_GetRecordCount_Call{Call: _e.mock.On("GetRecordCount", ctx, namespace, sets)}
 }
 
@@ -549,7 +549,7 @@ type MockInfoGetter_GetRestoreStatus_Call struct {
 // GetRestoreStatus is a helper method to define mock.On call
 //   - ctx context.Context
 //   - namespace string
-func (_e *MockInfoGetter_Expecter) GetRestoreStatus(ctx interface{}, namespace interface{}) *MockInfoGetter_GetRestoreStatus_Call {
+func (_e *MockInfoGetter_Expecter) GetRestoreStatus(ctx any, namespace any) *MockInfoGetter_GetRestoreStatus_Call {
 	return &MockInfoGetter_GetRestoreStatus_Call{Call: _e.mock.On("GetRestoreStatus", ctx, namespace)}
 }
 
@@ -615,7 +615,7 @@ type MockInfoGetter_GetSIndexInfo_Call struct {
 // GetSIndexInfo is a helper method to define mock.On call
 //   - ctx context.Context
 //   - namespace string
-func (_e *MockInfoGetter_Expecter) GetSIndexInfo(ctx interface{}, namespace interface{}) *MockInfoGetter_GetSIndexInfo_Call {
+func (_e *MockInfoGetter_Expecter) GetSIndexInfo(ctx any, namespace any) *MockInfoGetter_GetSIndexInfo_Call {
 	return &MockInfoGetter_GetSIndexInfo_Call{Call: _e.mock.On("GetSIndexInfo", ctx, namespace)}
 }
 
@@ -683,7 +683,7 @@ type MockInfoGetter_GetSIndexes_Call struct {
 // GetSIndexes is a helper method to define mock.On call
 //   - ctx context.Context
 //   - namespace string
-func (_e *MockInfoGetter_Expecter) GetSIndexes(ctx interface{}, namespace interface{}) *MockInfoGetter_GetSIndexes_Call {
+func (_e *MockInfoGetter_Expecter) GetSIndexes(ctx any, namespace any) *MockInfoGetter_GetSIndexes_Call {
 	return &MockInfoGetter_GetSIndexes_Call{Call: _e.mock.On("GetSIndexes", ctx, namespace)}
 }
 
@@ -749,7 +749,7 @@ type MockInfoGetter_GetService_Call struct {
 // GetService is a helper method to define mock.On call
 //   - ctx context.Context
 //   - node string
-func (_e *MockInfoGetter_Expecter) GetService(ctx interface{}, node interface{}) *MockInfoGetter_GetService_Call {
+func (_e *MockInfoGetter_Expecter) GetService(ctx any, node any) *MockInfoGetter_GetService_Call {
 	return &MockInfoGetter_GetService_Call{Call: _e.mock.On("GetService", ctx, node)}
 }
 
@@ -817,7 +817,7 @@ type MockInfoGetter_GetSetsList_Call struct {
 // GetSetsList is a helper method to define mock.On call
 //   - ctx context.Context
 //   - namespace string
-func (_e *MockInfoGetter_Expecter) GetSetsList(ctx interface{}, namespace interface{}) *MockInfoGetter_GetSetsList_Call {
+func (_e *MockInfoGetter_Expecter) GetSetsList(ctx any, namespace any) *MockInfoGetter_GetSetsList_Call {
 	return &MockInfoGetter_GetSetsList_Call{Call: _e.mock.On("GetSetsList", ctx, namespace)}
 }
 
@@ -882,7 +882,7 @@ type MockInfoGetter_GetStatus_Call struct {
 
 // GetStatus is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockInfoGetter_Expecter) GetStatus(ctx interface{}) *MockInfoGetter_GetStatus_Call {
+func (_e *MockInfoGetter_Expecter) GetStatus(ctx any) *MockInfoGetter_GetStatus_Call {
 	return &MockInfoGetter_GetStatus_Call{Call: _e.mock.On("GetStatus", ctx)}
 }
 
@@ -944,7 +944,7 @@ type MockInfoGetter_GetUDFs_Call struct {
 
 // GetUDFs is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockInfoGetter_Expecter) GetUDFs(ctx interface{}) *MockInfoGetter_GetUDFs_Call {
+func (_e *MockInfoGetter_Expecter) GetUDFs(ctx any) *MockInfoGetter_GetUDFs_Call {
 	return &MockInfoGetter_GetUDFs_Call{Call: _e.mock.On("GetUDFs", ctx)}
 }
 
@@ -1004,7 +1004,7 @@ type MockInfoGetter_GetVersion_Call struct {
 
 // GetVersion is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockInfoGetter_Expecter) GetVersion(ctx interface{}) *MockInfoGetter_GetVersion_Call {
+func (_e *MockInfoGetter_Expecter) GetVersion(ctx any) *MockInfoGetter_GetVersion_Call {
 	return &MockInfoGetter_GetVersion_Call{Call: _e.mock.On("GetVersion", ctx)}
 }
 
@@ -1057,7 +1057,7 @@ type MockInfoGetter_PrepareServerRestore_Call struct {
 //   - ctx context.Context
 //   - jobID string
 //   - namespace string
-func (_e *MockInfoGetter_Expecter) PrepareServerRestore(ctx interface{}, jobID interface{}, namespace interface{}) *MockInfoGetter_PrepareServerRestore_Call {
+func (_e *MockInfoGetter_Expecter) PrepareServerRestore(ctx any, jobID any, namespace any) *MockInfoGetter_PrepareServerRestore_Call {
 	return &MockInfoGetter_PrepareServerRestore_Call{Call: _e.mock.On("PrepareServerRestore", ctx, jobID, namespace)}
 }
 
@@ -1128,7 +1128,7 @@ type MockInfoGetter_StartServerBackup_Call struct {
 // StartServerBackup is a helper method to define mock.On call
 //   - ctx context.Context
 //   - request *models.RequestBackup
-func (_e *MockInfoGetter_Expecter) StartServerBackup(ctx interface{}, request interface{}) *MockInfoGetter_StartServerBackup_Call {
+func (_e *MockInfoGetter_Expecter) StartServerBackup(ctx any, request any) *MockInfoGetter_StartServerBackup_Call {
 	return &MockInfoGetter_StartServerBackup_Call{Call: _e.mock.On("StartServerBackup", ctx, request)}
 }
 
@@ -1185,7 +1185,7 @@ type MockInfoGetter_StartServerRestore_Call struct {
 // StartServerRestore is a helper method to define mock.On call
 //   - ctx context.Context
 //   - request *models.RequestRestore
-func (_e *MockInfoGetter_Expecter) StartServerRestore(ctx interface{}, request interface{}) *MockInfoGetter_StartServerRestore_Call {
+func (_e *MockInfoGetter_Expecter) StartServerRestore(ctx any, request any) *MockInfoGetter_StartServerRestore_Call {
 	return &MockInfoGetter_StartServerRestore_Call{Call: _e.mock.On("StartServerRestore", ctx, request)}
 }
 
@@ -1250,7 +1250,7 @@ type MockInfoGetter_SupportsBatchWrite_Call struct {
 
 // SupportsBatchWrite is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockInfoGetter_Expecter) SupportsBatchWrite(ctx interface{}) *MockInfoGetter_SupportsBatchWrite_Call {
+func (_e *MockInfoGetter_Expecter) SupportsBatchWrite(ctx any) *MockInfoGetter_SupportsBatchWrite_Call {
 	return &MockInfoGetter_SupportsBatchWrite_Call{Call: _e.mock.On("SupportsBatchWrite", ctx)}
 }
 

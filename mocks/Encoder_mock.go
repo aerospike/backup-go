@@ -63,7 +63,7 @@ type MockEncoder_EncodeToken_Call struct {
 // EncodeToken is a helper method to define mock.On call
 //   - token *models.Token
 //   - buffer *bytes.Buffer
-func (_e *MockEncoder_Expecter) EncodeToken(token interface{}, buffer interface{}) *MockEncoder_EncodeToken_Call {
+func (_e *MockEncoder_Expecter) EncodeToken(token any, buffer any) *MockEncoder_EncodeToken_Call {
 	return &MockEncoder_EncodeToken_Call{Call: _e.mock.On("EncodeToken", token, buffer)}
 }
 
@@ -120,7 +120,7 @@ type MockEncoder_GenerateFilename_Call struct {
 // GenerateFilename is a helper method to define mock.On call
 //   - prefix string
 //   - suffix string
-func (_e *MockEncoder_Expecter) GenerateFilename(prefix interface{}, suffix interface{}) *MockEncoder_GenerateFilename_Call {
+func (_e *MockEncoder_Expecter) GenerateFilename(prefix any, suffix any) *MockEncoder_GenerateFilename_Call {
 	return &MockEncoder_GenerateFilename_Call{Call: _e.mock.On("GenerateFilename", prefix, suffix)}
 }
 
@@ -178,7 +178,7 @@ type MockEncoder_GetHeader_Call struct {
 
 // GetHeader is a helper method to define mock.On call
 //   - b bool
-func (_e *MockEncoder_Expecter) GetHeader(b interface{}) *MockEncoder_GetHeader_Call {
+func (_e *MockEncoder_Expecter) GetHeader(b any) *MockEncoder_GetHeader_Call {
 	return &MockEncoder_GetHeader_Call{Call: _e.mock.On("GetHeader", b)}
 }
 

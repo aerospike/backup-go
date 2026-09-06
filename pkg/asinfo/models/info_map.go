@@ -17,6 +17,8 @@ package models
 import (
 	"fmt"
 	"strconv"
+
+	"github.com/aerospike/backup-go/errclass"
 )
 
 // InfoMap represents a map of string keys to string values,
@@ -33,7 +35,7 @@ func (m InfoMap) ParseUint64(key string) (result uint64, ok bool, err error) {
 
 	v, err := strconv.ParseUint(val, 10, 64)
 	if err != nil {
-		return 0, true, fmt.Errorf("failed to parse %s=%q: %w", key, val, err)
+		return 0, true, fmt.Errorf("%w: failed to parse %s=%q: %w", errclass.ErrAerospike, key, val, err)
 	}
 
 	return v, true, nil
@@ -49,7 +51,7 @@ func (m InfoMap) ParseInt64(key string) (result int64, ok bool, err error) {
 
 	v, err := strconv.ParseInt(val, 10, 64)
 	if err != nil {
-		return 0, true, fmt.Errorf("failed to parse %s=%q: %w", key, val, err)
+		return 0, true, fmt.Errorf("%w: failed to parse %s=%q: %w", errclass.ErrAerospike, key, val, err)
 	}
 
 	return v, true, nil
@@ -65,7 +67,7 @@ func (m InfoMap) ParseBool(key string) (result, ok bool, err error) {
 
 	v, err := strconv.ParseBool(val)
 	if err != nil {
-		return false, true, fmt.Errorf("failed to parse %s=%q: %w", key, val, err)
+		return false, true, fmt.Errorf("%w: failed to parse %s=%q: %w", errclass.ErrAerospike, key, val, err)
 	}
 
 	return v, true, nil
@@ -81,7 +83,7 @@ func (m InfoMap) ParseFloat64(key string) (result float64, ok bool, err error) {
 
 	v, err := strconv.ParseFloat(val, 64)
 	if err != nil {
-		return 0, true, fmt.Errorf("failed to parse %s=%q: %w", key, val, err)
+		return 0, true, fmt.Errorf("%w: failed to parse %s=%q: %w", errclass.ErrAerospike, key, val, err)
 	}
 
 	return v, true, nil

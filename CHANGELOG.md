@@ -11,6 +11,111 @@ request links for the full detail of any change.
 
 ## [Unreleased]
 
+### Added
+
+- Set indexes are backed up and restored. The ASB format is bumped to 3.3 to carry them, so a
+  backup that contains a set index cannot be read by an older release.
+  ([#501](https://github.com/aerospike/backup-go/pull/501), BKRS-334)
+- Error classes. Every error a caller can act on now carries exactly one of `ErrInvalidConfig`,
+  `ErrNotFound`, `ErrStorage`, `ErrCorruptData`, `ErrUnsupported`, `ErrAerospike` and
+  `ErrSecretAgent`, so a failure can be handled with `errors.Is` instead of matching message text.
+  The classes live in the new leaf package `github.com/aerospike/backup-go/errclass` and are
+  re-exported from the root package as `backup.ErrInvalidConfig` and so on. The values are
+  identical, so `errors.Is` matches either spelling. Which class an error carries is part of the
+  library contract; the message text is not. (BKRS-364)
+- Segment validation for server-integrated backups, in the new package `pkg/server/segvalidator`:
+  it walks the segments of a backup in local or S3 storage and reports missing, truncated,
+  mis-sized and checksum-mismatched ones.
+  ([#505](https://github.com/aerospike/backup-go/pull/505), BKRS-344)
+- `ClusterInfo.GetClusterStable`, which reports whether the cluster key is the same on every
+  node, and a lister for server-integrated backups in `pkg/server/lister` that reads and sorts
+  their metadata from S3. ([#470](https://github.com/aerospike/backup-go/pull/470), SERVER-898)
+- Fuzzy restore for server-integrated backups: `RequestRestore` accepts `FuzzyRestore` and `Path`.
+  ([#483](https://github.com/aerospike/backup-go/pull/483), BKRS-255)
+- `SecretAgentConfig.MinTLSVersion`, for deployments that still need a TLS version below the new
+  1.2 floor. ([#516](https://github.com/aerospike/backup-go/pull/516), BKRS-361)
+- Repository documentation and process files: a security policy, a code of conduct, issue and
+  pull request templates, a release script and this changelog.
+  ([#518](https://github.com/aerospike/backup-go/pull/518), BKRS-363)
+
+### Changed
+
+- **Breaking.** The Secret Agent client moved from `pkg/secret-agent` to `pkg/secretagent`.
+  ([#519](https://github.com/aerospike/backup-go/pull/519), BKRS-365)
+- **Breaking.** Generic type parameters were removed from the encoding and pipeline types.
+  `EncoderType`, `EncoderTypeASB` and `models.TokenConstraint` are gone, and `Encoder`, `Decoder`
+  and the pipeline types are no longer generic. `ConfigRestore.EncoderType` no longer selects an
+  encoder: ASB is the only format.
+  ([#512](https://github.com/aerospike/backup-go/pull/512), BKRS-360)
+- **Breaking.** `Client.Backup` returns the `BackupHandler` interface instead of `*BackupHandler`,
+  and the restore handler interface was renamed from `Restorer` to `RestoreHandler`. Both make the
+  handlers straightforward to fake in a caller's tests.
+  ([#503](https://github.com/aerospike/backup-go/pull/503))
+- **Breaking.** `InfoGetter` was split into `ClusterInfo` and `ServerBackupInfo`, which it now
+  composes, so a caller can depend on the half it uses.
+  ([#484](https://github.com/aerospike/backup-go/pull/484))
+- **Breaking.** `asb.NewEncoderConfig` takes a `models.SIndexInfo` instead of a single
+  `hasExpressionSIndex` flag. ([#501](https://github.com/aerospike/backup-go/pull/501), BKRS-334)
+- Error messages are now prefixed with the class they belong to, for example
+  `storage error: failed to open root /backups: permission denied`. Code that matches on message
+  text should move to `errors.Is`. (BKRS-364)
+- `Client.Backup` now rejects a nil writer, and a nil reader when it is asked to continue from a
+  state file; `Client.Restore` now rejects a nil streaming reader. All three fail immediately with
+  `ErrInvalidConfig` instead of failing later and less clearly. (BKRS-364)
+- Server-integrated backup and restore commands are sent only to principal nodes.
+  ([#485](https://github.com/aerospike/backup-go/pull/485), BKRS-258)
+- Server-integrated backup state processing was reworked and its response models moved to
+  `pkg/asinfo/models`; the metadata struct of the backup lister was trimmed to what the server
+  actually reports. ([#490](https://github.com/aerospike/backup-go/pull/490),
+  [#492](https://github.com/aerospike/backup-go/pull/492), BKRS-323, BKRS-325)
+- The backup file limit is validated through a `NoChunkLimit` capability on the storage options
+  rather than a check for the local backend, so the root package no longer imports a concrete
+  storage implementation. Behaviour is unchanged except for stdout, which no longer reports a
+  misleading chunk size error for a non-zero file limit.
+  ([#513](https://github.com/aerospike/backup-go/pull/513), BKRS-359)
+- The test suite is split into hermetic unit tests and Docker-backed integration tests behind the
+  `integration` build tag, with CI, linting and `make test-unit` aligned with that split. Go is
+  now 1.25.13 and the Aerospike client v8.8.0.
+  ([#517](https://github.com/aerospike/backup-go/pull/517),
+  [#482](https://github.com/aerospike/backup-go/pull/482), BKRS-362)
+- CI workflows also run for the `dev` branch, and the pinned GitHub actions were updated.
+  ([#486](https://github.com/aerospike/backup-go/pull/486),
+  [#474](https://github.com/aerospike/backup-go/pull/474),
+  [#478](https://github.com/aerospike/backup-go/pull/478),
+  [#480](https://github.com/aerospike/backup-go/pull/480),
+  [#481](https://github.com/aerospike/backup-go/pull/481))
+- Package documentation and the README were rewritten, including the supported import paths.
+  ([#515](https://github.com/aerospike/backup-go/pull/515),
+  [#518](https://github.com/aerospike/backup-go/pull/518), BKRS-357, BKRS-363)
+
+### Fixed
+
+- A failed job that was cancelled at the same moment reported `context canceled` instead of the
+  error that actually caused it, because both were ready and the wait picked one at random. The
+  job error now wins. Failing to remove the state file no longer turns a finished backup into a
+  failed one either. ([#514](https://github.com/aerospike/backup-go/pull/514), BKRS-358)
+- Backup state is flushed and its files closed before the handler shuts down, so a continuation
+  can no longer read a half-written state file and fail with `EOF`.
+  ([#489](https://github.com/aerospike/backup-go/pull/489), BKRS-324)
+
+### Removed
+
+- **Breaking.** XDR backup support. `Client.BackupXDR`, `ConfigBackupXDR`, `HandlerBackupXDR`,
+  the `XDRInfo` interface and the `io/aerospike/xdr` and `io/encoding/asbx` packages are gone,
+  along with the ASBX format. ([#495](https://github.com/aerospike/backup-go/pull/495), BKRS-326)
+
+### Security
+
+- Local and cloud storage path handling was hardened: directory operations go through
+  `os.Root`-scoped access, stat-then-act patterns were replaced to close TOCTOU windows,
+  directories and files are created with `0700` and `0600`, and file names and object keys are
+  validated against `..` segments, leading slashes and NUL bytes before anything touches storage.
+  ([#488](https://github.com/aerospike/backup-go/pull/488), BKRS-271)
+- Values of sensitive info command parameters (`access-key`, `secret-key`) are redacted from
+  errors raised by the asinfo client, and the Secret Agent TLS configuration now defaults to a
+  TLS 1.2 floor instead of accepting any version.
+  ([#516](https://github.com/aerospike/backup-go/pull/516), BKRS-361)
+
 ## [0.11.1] - 2026-08-19
 
 ### Fixed

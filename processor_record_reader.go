@@ -253,8 +253,8 @@ func (rr *recordReaderProcessor) filterNodes(ctx context.Context, nodesList []st
 
 	// Check that we found all nodes.
 	if len(filteredNodes) != len(nodesList) {
-		return nil, fmt.Errorf("failed to find all nodes %d/%d in list: %v",
-			len(filteredNodes), len(nodesList), nodesList)
+		return nil, fmt.Errorf("%w: failed to find all nodes %d/%d in list: %v",
+			ErrNotFound, len(filteredNodes), len(nodesList), nodesList)
 	}
 
 	return filteredNodes, nil

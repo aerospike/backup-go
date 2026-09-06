@@ -31,7 +31,7 @@ const secretPrefix = "secrets:"
 // getSecret gets the secret from the secret agent using the given client.
 func getSecret(ctx context.Context, client *saClient.Client, key string) (string, error) {
 	if client == nil {
-		return "", fmt.Errorf("secret config not initialized")
+		return "", fmt.Errorf("%w: secret config not initialized", ErrInvalidConfig)
 	}
 
 	resource, secretKey, err := getResourceKey(key)
@@ -51,12 +51,12 @@ func getSecret(ctx context.Context, client *saClient.Client, key string) (string
 func getResourceKey(key string) (resource, secretKey string, err error) {
 	if !isSecret(key) {
 		return "", "",
-			fmt.Errorf("invalid secret key format, must be secrets:<resource>:<secret>")
+			fmt.Errorf("%w: invalid secret key format, must be secrets:<resource>:<secret>", ErrInvalidConfig)
 	}
 
 	keyArr := strings.Split(key, ":")
 	if len(keyArr) != 3 {
-		return "", "", fmt.Errorf("invalid secret key format")
+		return "", "", fmt.Errorf("%w: invalid secret key format", ErrInvalidConfig)
 	}
 	// We believe that keyArr[0] == secretPrefix
 	return keyArr[1], keyArr[2], nil
@@ -70,14 +70,14 @@ func getTLSConfig(config *SecretAgentConfig) (*tls.Config, error) {
 
 	caCert, err := os.ReadFile(*config.CaFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read ca file: %w", err)
+		return nil, fmt.Errorf("%w: failed to read ca file: %w", ErrInvalidConfig, err)
 	}
 
 	caCertPool := x509.NewCertPool()
 
 	ok := caCertPool.AppendCertsFromPEM(caCert)
 	if !ok {
-		return nil, fmt.Errorf("nothing to append to ca cert pool")
+		return nil, fmt.Errorf("%w: nothing to append to ca cert pool", ErrInvalidConfig)
 	}
 
 	// TLS 1.2 is the default floor. Older versions remain reachable only through
@@ -99,7 +99,7 @@ func getTLSConfig(config *SecretAgentConfig) (*tls.Config, error) {
 	if config.CertFile != nil && config.KeyFile != nil {
 		cert, err := tls.LoadX509KeyPair(*config.CertFile, *config.KeyFile)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load client certificate: %w", err)
+			return nil, fmt.Errorf("%w: failed to load client certificate: %w", ErrInvalidConfig, err)
 		}
 
 		tlsConfig.Certificates = []tls.Certificate{cert}
@@ -135,7 +135,7 @@ func ParseSecret(ctx context.Context, config *SecretAgentConfig, secret string) 
 // NewSecretAgentClient initializes a new secret agent client from config.
 func NewSecretAgentClient(config *SecretAgentConfig) (*saClient.Client, error) {
 	if config == nil {
-		return nil, fmt.Errorf("secret config not initialized")
+		return nil, fmt.Errorf("%w: secret config not initialized", ErrInvalidConfig)
 	}
 	// Getting tls config.
 	tlsConfig, err := getTLSConfig(config)

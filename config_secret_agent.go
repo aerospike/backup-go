@@ -23,7 +23,7 @@ import (
 // SecretAgentConfig contains Secret Agent connection information.
 type SecretAgentConfig struct {
 	// Connection type: tcp, unix.
-	// Use constants form `secret-agent`: `ConnectionTypeTCP` or `ConnectionTypeUDS`
+	// Use constants form the `secretagent`: `ConnectionTypeTCP` or `ConnectionTypeUDS`
 	ConnectionType *string
 	// Secret agent host for TCP connection or socket file path for UDS connection.
 	Address *string

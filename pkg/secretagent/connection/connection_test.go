@@ -204,7 +204,7 @@ func TestConnection_ReadBodyError(t *testing.T) {
 
 	_, err := Read(mockConn, testTimeout)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "failed to read header")
+	require.Contains(t, err.Error(), "failed to read body")
 }
 
 func TestConnection_ReadInvalidJSON(t *testing.T) {

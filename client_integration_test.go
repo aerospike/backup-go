@@ -29,6 +29,12 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
+const (
+	// A state file continuation is only valid when both are set.
+	testContinuePageSize  = 100
+	testContinueFileLimit = 100_000
+)
+
 func TestClientOptions(t *testing.T) {
 	t.Parallel()
 
@@ -68,7 +74,11 @@ func TestBackupNilConfig(t *testing.T) {
 	assert.Contains(t, err.Error(), "backup config required")
 }
 
-func TestBackupNilWriter(t *testing.T) {
+// TestBackupIODependencies covers the IO arguments Client.Backup requires.
+// Which of them are required depends on the config, so every case starts from a
+// config that passes validation: an invalid one would fail earlier and mask the
+// check under test.
+func TestBackupIODependencies(t *testing.T) {
 	t.Parallel()
 
 	testAeroClient, aerr := testAerospikeClient()
@@ -77,14 +87,47 @@ func TestBackupNilWriter(t *testing.T) {
 	client, err := NewClient(testAeroClient)
 	require.NoError(t, err)
 
-	config := &ConfigBackup{
-		Namespace: "test",
+	tests := []struct {
+		name    string
+		setup   func(c *ConfigBackup)
+		writer  Writer
+		reader  StreamingReader
+		wantErr string
+	}{
+		{
+			name:    "nil writer is rejected",
+			writer:  nil,
+			reader:  &mocks.MockStreamingReader{},
+			wantErr: "backup writer required",
+		},
+		{
+			name: "nil reader is rejected when continuing from a state file",
+			setup: func(c *ConfigBackup) {
+				c.StateFile = testStateFile
+				c.Continue = true
+				c.PageSize = testContinuePageSize
+				c.FileLimit = testContinueFileLimit
+			},
+			writer:  &mocks.MockWriter{},
+			reader:  nil,
+			wantErr: "streaming reader required to continue backup",
+		},
 	}
 
-	_, err = client.Backup(t.Context(), config, nil, &mocks.MockStreamingReader{})
-	require.Error(t, err)
-	// The validation happens before the check for nil writer
-	assert.Contains(t, err.Error(), "failed to validate backup config")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			config := NewDefaultBackupConfig()
+			if tt.setup != nil {
+				tt.setup(config)
+			}
+
+			_, err := client.Backup(t.Context(), config, tt.writer, tt.reader)
+			require.ErrorIs(t, err, ErrInvalidConfig)
+			assert.ErrorContains(t, err, tt.wantErr)
+		})
+	}
 }
 
 func TestBackupInvalidConfig(t *testing.T) {
@@ -149,11 +192,12 @@ func TestRestoreNilStreamingReader(t *testing.T) {
 	client, err := NewClient(testAeroClient)
 	require.NoError(t, err)
 
-	config := &ConfigRestore{}
+	// The config must be valid, otherwise its own error masks the nil reader.
+	config := NewDefaultRestoreConfig()
 
 	_, err = client.Restore(t.Context(), config, nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to validate restore config")
+	require.ErrorIs(t, err, ErrInvalidConfig)
+	assert.ErrorContains(t, err, "restore streaming reader required")
 }
 
 func TestRestoreInvalidConfig(t *testing.T) {

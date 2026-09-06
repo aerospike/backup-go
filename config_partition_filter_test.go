@@ -129,8 +129,8 @@ func TestSplitPartitions_NumWorkersLessThanFilters(t *testing.T) {
 
 	_, err := splitPartitions(partitionFilters, numWorkers)
 
-	require.Error(t, err)
-	assert.Equal(t, "number of workers is less than partition filters, cannot split partition filters", err.Error())
+	require.ErrorIs(t, err, ErrInvalidConfig)
+	assert.ErrorContains(t, err, "number of workers is less than partition filters, cannot split partition filters")
 }
 
 func TestSplitPartitionRange(t *testing.T) {

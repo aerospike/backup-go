@@ -21,6 +21,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/models"
 )
@@ -77,7 +78,7 @@ func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
 
 	err := rw.executeWrite(&writePolicy, record)
 	if err != nil {
-		return fmt.Errorf("failed to write record %s: %w", record.Key.Digest(), err)
+		return fmt.Errorf("%w: failed to write record %s: %w", errclass.ErrAerospike, record.Key.Digest(), err)
 	}
 
 	return nil

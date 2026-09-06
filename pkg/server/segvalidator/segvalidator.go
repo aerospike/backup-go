@@ -40,6 +40,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/pkg/server/segvalidator/models"
 	"github.com/aerospike/backup-go/pkg/server/segvalidator/segment"
 	"github.com/aerospike/backup-go/pkg/server/segvalidator/streamers"
@@ -62,17 +63,17 @@ const defaultMaxIssues = 1000
 var (
 	// ErrNoSegments is returned when a run checked no segment at all, which
 	// also covers a backup id that does not exist.
-	ErrNoSegments = errors.New("no segments found for backup")
+	ErrNoSegments = fmt.Errorf("%w: no segments found for backup", errclass.ErrNotFound)
 	// ErrSegmentTooLarge is returned for a segment bigger than any record a
 	// flat header can describe.
-	ErrSegmentTooLarge = errors.New("segment is too large")
+	ErrSegmentTooLarge = fmt.Errorf("%w: segment is too large", errclass.ErrCorruptData)
 	// ErrSizeMismatch is returned for a segment whose stored size is not the
 	// one its manifest records.
-	ErrSizeMismatch = errors.New("segment size does not match the manifest")
+	ErrSizeMismatch = fmt.Errorf("%w: segment size does not match the manifest", errclass.ErrCorruptData)
 	// ErrChecksumMismatch is returned for a segment whose bytes do not
 	// checksum to what its manifest records. It is the only check that catches
 	// a segment whose contents rotted without its structure breaking.
-	ErrChecksumMismatch = errors.New("segment checksum does not match the manifest")
+	ErrChecksumMismatch = fmt.Errorf("%w: segment checksum does not match the manifest", errclass.ErrCorruptData)
 )
 
 // Streamer names the segments of one backup and opens them. It is what a
@@ -142,7 +143,7 @@ func WithMaxIssues(n int) Option {
 // segments at once as the machine has CPUs and logs nothing.
 func NewSegValidator(streamer Streamer, opts ...Option) (*SegValidator, error) {
 	if streamer == nil {
-		return nil, errors.New("streamer must not be nil")
+		return nil, fmt.Errorf("%w: streamer must not be nil", errclass.ErrInvalidConfig)
 	}
 
 	v := &SegValidator{

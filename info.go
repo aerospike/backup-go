@@ -18,7 +18,7 @@ import (
 	"context"
 
 	"github.com/aerospike/backup-go/models"
-	infoModels "github.com/aerospike/backup-go/pkg/asinfo/models"
+	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
 )
 
 // ClusterInfo provides cluster metadata and introspection for client-side backup and restore.
@@ -26,7 +26,7 @@ type ClusterInfo interface {
 	GetRecordCount(ctx context.Context, namespace string, sets []string) (uint64, error)
 	GetRackNodes(ctx context.Context, rackID int) ([]string, error)
 	GetService(ctx context.Context, node string) (string, error)
-	GetVersion(ctx context.Context) (infoModels.AerospikeVersion, error)
+	GetVersion(ctx context.Context) (infomodels.AerospikeVersion, error)
 	GetSIndexes(ctx context.Context, namespace string) ([]*models.SIndex, error)
 	GetUDFs(ctx context.Context) ([]*models.UDF, error)
 	SupportsBatchWrite(ctx context.Context) (bool, error)
@@ -41,9 +41,9 @@ type ClusterInfo interface {
 
 // ServerBackupInfo provides server-side backup and restore job control.
 type ServerBackupInfo interface {
-	StartServerBackup(ctx context.Context, request *infoModels.RequestBackup) (string, error)
-	StartServerRestore(ctx context.Context, request *infoModels.RequestRestore) error
+	StartServerBackup(ctx context.Context, request *infomodels.RequestBackup) (string, error)
+	StartServerRestore(ctx context.Context, request *infomodels.RequestRestore) error
 	PrepareServerRestore(ctx context.Context, jobID, namespace string) error
-	GetBackupStatus(ctx context.Context, jobID string) (*infoModels.ResponseBackupState, error)
+	GetBackupStatus(ctx context.Context, jobID string) (*infomodels.ResponseBackupState, error)
 	GetRestoreStatus(ctx context.Context, namespace string) (string, error)
 }

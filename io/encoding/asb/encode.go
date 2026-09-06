@@ -16,13 +16,13 @@ package asb
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"strconv"
 	"sync/atomic"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	particleType "github.com/aerospike/aerospike-client-go/v8/types/particle_type"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/models"
 	"github.com/segmentio/asm/base64"
 )
@@ -52,7 +52,7 @@ func (e *Encoder) GenerateFilename(prefix, suffix string) string {
 func (e *Encoder) EncodeToken(token *models.Token, w *bytes.Buffer) error {
 	t, ok := any(token).(*models.Token)
 	if !ok {
-		return fmt.Errorf("unsupported token type %T for ASB encoder", token)
+		return fmt.Errorf("%w: unsupported token type %T for ASB encoder", errclass.ErrUnsupported, token)
 	}
 
 	var (
@@ -68,9 +68,9 @@ func (e *Encoder) EncodeToken(token *models.Token, w *bytes.Buffer) error {
 	case models.TokenTypeSIndex:
 		n, err = sindexToASB(t.SIndex, w)
 	case models.TokenTypeInvalid:
-		n, err = 0, errors.New("invalid token")
+		n, err = 0, fmt.Errorf("%w: invalid token", errclass.ErrCorruptData)
 	default:
-		n, err = 0, fmt.Errorf("invalid token type: %v", t.Type)
+		n, err = 0, fmt.Errorf("%w: invalid token type: %v", errclass.ErrCorruptData, t.Type)
 	}
 
 	if err != nil {
@@ -232,7 +232,7 @@ func binToASB(k string, compact bool, v any, w *bytes.Buffer) (int, error) {
 		return writeBinNil(k, w)
 	}
 
-	return 0, fmt.Errorf("unknown bin type: %T, key: %s", v, k)
+	return 0, fmt.Errorf("%w: unknown bin type: %T, key: %s", errclass.ErrUnsupported, v, k)
 }
 
 func writeBinBool(name string, v bool, w *bytes.Buffer) (int, error) {
@@ -308,7 +308,7 @@ func writeRawBlobBin(cdt *a.RawBlobValue, name string, compact bool, w *bytes.Bu
 	case particleType.LIST:
 		return writeRawListBin(cdt, name, compact, w)
 	default:
-		return 0, fmt.Errorf("invalid raw blob bin particle type: %v", cdt.ParticleType)
+		return 0, fmt.Errorf("%w: invalid raw blob bin particle type: %v", errclass.ErrUnsupported, cdt.ParticleType)
 	}
 }
 
@@ -501,7 +501,7 @@ func userKeyToASB(userKey a.Value, w *bytes.Buffer) (int, error) {
 	case nil:
 		return 0, nil
 	default:
-		return 0, fmt.Errorf("invalid user key type: %T", v)
+		return 0, fmt.Errorf("%w: invalid user key type: %T", errclass.ErrUnsupported, v)
 	}
 }
 

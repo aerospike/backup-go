@@ -91,7 +91,7 @@ func newFileWriterProcessor(
 
 	// Check writer and parallelism.
 	if p.isSingleFileBackup() && parallel > 1 {
-		return nil, fmt.Errorf("parallel running for single file is not allowed")
+		return nil, fmt.Errorf("%w: parallel running for single file is not allowed", ErrInvalidConfig)
 	}
 
 	return p, nil
@@ -277,7 +277,7 @@ func newCompressionWriter(
 		return compression.NewWriter(writer, policy.Level)
 	}
 
-	return nil, fmt.Errorf("unknown compression mode %s", policy.Mode)
+	return nil, fmt.Errorf("%w: unknown compression mode %s", ErrUnsupported, policy.Mode)
 }
 
 // newEncryptionWriter returns an encryption writer for encrypting backup.

@@ -15,72 +15,73 @@
 package segment
 
 import (
-	"errors"
 	"fmt"
+
+	"github.com/aerospike/backup-go/errclass"
 )
 
 // Segment level errors.
 var (
 	// ErrEmptySegment is returned for a zero length payload.
-	ErrEmptySegment = errors.New("segment is empty")
+	ErrEmptySegment = fmt.Errorf("%w: segment is empty", errclass.ErrCorruptData)
 	// ErrNoRecords is returned when a payload carries no record at all.
-	ErrNoRecords = errors.New("segment contains no records")
+	ErrNoRecords = fmt.Errorf("%w: segment contains no records", errclass.ErrCorruptData)
 	// ErrBadTailSlack is returned when the bytes after the last record are not zero.
-	ErrBadTailSlack = errors.New("non-zero tail slack")
+	ErrBadTailSlack = fmt.Errorf("%w: non-zero tail slack", errclass.ErrCorruptData)
 )
 
 // Record level errors.
 var (
-	ErrHeaderTooShort    = errors.New("record header too short")
-	ErrBadMagic          = errors.New("bad record magic")
-	ErrRecordTooSmall    = errors.New("record size below minimum")
-	ErrRecordOutOfBounds = errors.New("record extends past segment buffer")
-	ErrContentOverflow   = errors.New("record content overflows record boundary")
-	ErrBadEndMark        = errors.New("bad end marker")
-	ErrNonZeroPadding    = errors.New("non-zero padding inside record")
+	ErrHeaderTooShort    = fmt.Errorf("%w: record header too short", errclass.ErrCorruptData)
+	ErrBadMagic          = fmt.Errorf("%w: bad record magic", errclass.ErrCorruptData)
+	ErrRecordTooSmall    = fmt.Errorf("%w: record size below minimum", errclass.ErrCorruptData)
+	ErrRecordOutOfBounds = fmt.Errorf("%w: record extends past segment buffer", errclass.ErrCorruptData)
+	ErrContentOverflow   = fmt.Errorf("%w: record content overflows record boundary", errclass.ErrCorruptData)
+	ErrBadEndMark        = fmt.Errorf("%w: bad end marker", errclass.ErrCorruptData)
+	ErrNonZeroPadding    = fmt.Errorf("%w: non-zero padding inside record", errclass.ErrCorruptData)
 )
 
 // Metadata level errors.
 var (
-	ErrZeroGeneration         = errors.New("generation is zero")
-	ErrIncompleteExtraFlags   = errors.New("incomplete extra flags")
-	ErrUnsupportedExtraFields = errors.New("unsupported extra storage fields")
-	ErrIncompleteMRTID        = errors.New("incomplete MRT id")
-	ErrIncompleteMRTOrigV     = errors.New("incomplete MRT original version")
-	ErrIncompleteVoidTime     = errors.New("incomplete void-time")
-	ErrIncompleteSetName      = errors.New("incomplete set name")
-	ErrBadSetNameLength       = errors.New("bad set name length")
-	ErrZeroKeySize            = errors.New("key size is zero")
-	ErrIncompleteKey          = errors.New("incomplete user key")
-	ErrBadBinCount            = errors.New("bad n-bins")
-	ErrIncompleteMeta         = errors.New("incomplete record metadata")
+	ErrZeroGeneration         = fmt.Errorf("%w: generation is zero", errclass.ErrCorruptData)
+	ErrIncompleteExtraFlags   = fmt.Errorf("%w: incomplete extra flags", errclass.ErrCorruptData)
+	ErrUnsupportedExtraFields = fmt.Errorf("%w: unsupported extra storage fields", errclass.ErrUnsupported)
+	ErrIncompleteMRTID        = fmt.Errorf("%w: incomplete MRT id", errclass.ErrCorruptData)
+	ErrIncompleteMRTOrigV     = fmt.Errorf("%w: incomplete MRT original version", errclass.ErrCorruptData)
+	ErrIncompleteVoidTime     = fmt.Errorf("%w: incomplete void-time", errclass.ErrCorruptData)
+	ErrIncompleteSetName      = fmt.Errorf("%w: incomplete set name", errclass.ErrCorruptData)
+	ErrBadSetNameLength       = fmt.Errorf("%w: bad set name length", errclass.ErrCorruptData)
+	ErrZeroKeySize            = fmt.Errorf("%w: key size is zero", errclass.ErrCorruptData)
+	ErrIncompleteKey          = fmt.Errorf("%w: incomplete user key", errclass.ErrCorruptData)
+	ErrBadBinCount            = fmt.Errorf("%w: bad n-bins", errclass.ErrCorruptData)
+	ErrIncompleteMeta         = fmt.Errorf("%w: incomplete record metadata", errclass.ErrCorruptData)
 )
 
 // Uintvar errors.
 var (
-	ErrTruncatedUintvar = errors.New("truncated uintvar")
-	ErrLeadingZeroUvar  = errors.New("illegal leading zero in uintvar")
-	ErrUintvarTooLong   = errors.New("uintvar too long")
+	ErrTruncatedUintvar = fmt.Errorf("%w: truncated uintvar", errclass.ErrCorruptData)
+	ErrLeadingZeroUvar  = fmt.Errorf("%w: illegal leading zero in uintvar", errclass.ErrCorruptData)
+	ErrUintvarTooLong   = fmt.Errorf("%w: uintvar too long", errclass.ErrCorruptData)
 )
 
 // Bin and particle level errors.
 var (
-	ErrIncompleteBin       = errors.New("incomplete flat bin")
-	ErrIncompleteBinMeta   = errors.New("incomplete flat bin metadata")
-	ErrBadBinNameLength    = errors.New("bad flat bin name length")
-	ErrIncompleteBinName   = errors.New("incomplete flat bin name")
-	ErrUnknownBinFlags     = errors.New("unknown bin flags")
-	ErrIncompleteBinLUT    = errors.New("incomplete flat bin LUT")
-	ErrIncompleteBinSrcID  = errors.New("incomplete flat bin src-id")
-	ErrExtraRBlocks        = errors.New("extra rblocks follow flat bins")
-	ErrIncompleteParticle  = errors.New("incomplete flat particle")
-	ErrUnknownParticleType = errors.New("unknown particle type")
-	ErrIncompleteInteger   = errors.New("incomplete flat integer")
-	ErrBadIntegerSize      = errors.New("bad flat integer size")
-	ErrIncompleteFloat     = errors.New("incomplete flat float")
-	ErrIncompleteBool      = errors.New("incomplete flat bool")
-	ErrBadBoolValue        = errors.New("bad flat bool value")
-	ErrIncompleteBlob      = errors.New("incomplete flat blob")
+	ErrIncompleteBin       = fmt.Errorf("%w: incomplete flat bin", errclass.ErrCorruptData)
+	ErrIncompleteBinMeta   = fmt.Errorf("%w: incomplete flat bin metadata", errclass.ErrCorruptData)
+	ErrBadBinNameLength    = fmt.Errorf("%w: bad flat bin name length", errclass.ErrCorruptData)
+	ErrIncompleteBinName   = fmt.Errorf("%w: incomplete flat bin name", errclass.ErrCorruptData)
+	ErrUnknownBinFlags     = fmt.Errorf("%w: unknown bin flags", errclass.ErrCorruptData)
+	ErrIncompleteBinLUT    = fmt.Errorf("%w: incomplete flat bin LUT", errclass.ErrCorruptData)
+	ErrIncompleteBinSrcID  = fmt.Errorf("%w: incomplete flat bin src-id", errclass.ErrCorruptData)
+	ErrExtraRBlocks        = fmt.Errorf("%w: extra rblocks follow flat bins", errclass.ErrCorruptData)
+	ErrIncompleteParticle  = fmt.Errorf("%w: incomplete flat particle", errclass.ErrCorruptData)
+	ErrUnknownParticleType = fmt.Errorf("%w: unknown particle type", errclass.ErrUnsupported)
+	ErrIncompleteInteger   = fmt.Errorf("%w: incomplete flat integer", errclass.ErrCorruptData)
+	ErrBadIntegerSize      = fmt.Errorf("%w: bad flat integer size", errclass.ErrCorruptData)
+	ErrIncompleteFloat     = fmt.Errorf("%w: incomplete flat float", errclass.ErrCorruptData)
+	ErrIncompleteBool      = fmt.Errorf("%w: incomplete flat bool", errclass.ErrCorruptData)
+	ErrBadBoolValue        = fmt.Errorf("%w: bad flat bool value", errclass.ErrCorruptData)
+	ErrIncompleteBlob      = fmt.Errorf("%w: incomplete flat blob", errclass.ErrCorruptData)
 )
 
 // RecordError locates the record inside a segment that failed validation.

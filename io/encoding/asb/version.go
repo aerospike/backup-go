@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/aerospike/backup-go/errclass"
 )
 
 var (
@@ -48,17 +50,17 @@ func newVersion(major, minor int) *version {
 func parseVersion(v string) (*version, error) {
 	parts := strings.Split(v, ".")
 	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid version format: %s", v)
+		return nil, fmt.Errorf("%w: invalid version format: %s", errclass.ErrCorruptData, v)
 	}
 
 	major, err := strconv.Atoi(parts[0])
 	if err != nil {
-		return nil, fmt.Errorf("invalid major version: %s", parts[0])
+		return nil, fmt.Errorf("%w: invalid major version: %s", errclass.ErrCorruptData, parts[0])
 	}
 
 	minor, err := strconv.Atoi(parts[1])
 	if err != nil {
-		return nil, fmt.Errorf("invalid minor version: %s", parts[1])
+		return nil, fmt.Errorf("%w: invalid minor version: %s", errclass.ErrCorruptData, parts[1])
 	}
 
 	return &version{Major: major, Minor: minor}, nil

@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 	optMocks "github.com/aerospike/backup-go/io/storage/options/mocks"
 	"github.com/aerospike/backup-go/models"
@@ -53,7 +54,7 @@ func TestCheckRestoreDirectory_Negative_EmptyDir(t *testing.T) {
 	)
 	require.NoError(t, err)
 	err = reader.checkRestoreDirectory(dir)
-	require.ErrorContains(t, err, "is empty")
+	require.ErrorIs(t, err, common.ErrEmptyStorage)
 }
 
 func TestDirectoryReader_StreamFiles_OK(t *testing.T) {
@@ -159,7 +160,7 @@ func TestDirectoryReader_StreamFiles_ErrEmptyDir(t *testing.T) {
 	})
 	ctx := t.Context()
 	_, err = NewReader(ctx, options.WithValidator(mockValidator), options.WithDir(dir))
-	require.ErrorContains(t, err, "is empty")
+	require.ErrorIs(t, err, common.ErrEmptyStorage)
 }
 
 func TestDirectoryReader_StreamFiles_ErrNoSuchFile(t *testing.T) {

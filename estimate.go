@@ -127,7 +127,7 @@ func getCompressRatio(policy *CompressionPolicy, samplesData []byte) (float64, e
 	// Check buf.len for safety reasons.
 	if buf.Len() == 0 {
 		if len(samplesData) > 0 {
-			return 0, fmt.Errorf("output length is zero, but samples data is not empty")
+			return 0, fmt.Errorf("%w: output length is zero, but samples data is not empty", ErrCorruptData)
 		}
 
 		return 1, nil

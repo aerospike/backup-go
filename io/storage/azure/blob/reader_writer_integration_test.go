@@ -26,7 +26,9 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
@@ -285,7 +287,7 @@ func (s *AzureSuite) TestReader_StreamFilesEmpty() {
 		options.WithDir(testReadFolderEmpty),
 		options.WithValidator(validatorMock{}),
 	)
-	s.Require().ErrorContains(err, "is empty")
+	s.Require().ErrorIs(err, common.ErrEmptyStorage)
 }
 
 func (s *AzureSuite) TestReader_StreamFilesMixed() {
@@ -780,7 +782,8 @@ func TestParseAccessTier(t *testing.T) {
 			tier, err := parseAccessTier(tt.tier)
 
 			if tt.expectedError != nil {
-				assert.EqualError(t, err, tt.expectedError.Error())
+				require.ErrorIs(t, err, errclass.ErrInvalidConfig)
+				assert.ErrorContains(t, err, tt.expectedError.Error())
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, tt.expectedTier, tier)

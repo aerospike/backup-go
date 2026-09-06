@@ -273,11 +273,11 @@ func (c *Client) Backup(
 	reader StreamingReader,
 ) (BackupHandler, error) {
 	if config == nil {
-		return nil, fmt.Errorf("backup config required")
+		return nil, fmt.Errorf("%w: backup config required", ErrInvalidConfig)
 	}
 
 	if c.aerospikeClient == nil {
-		return nil, fmt.Errorf("aerospike client is nil")
+		return nil, fmt.Errorf("%w: aerospike client is nil", ErrInvalidConfig)
 	}
 
 	// Fill in the default policy on the caller's config. The default itself is
@@ -286,6 +286,10 @@ func (c *Client) Backup(
 
 	if err := config.validate(); err != nil {
 		return nil, fmt.Errorf("failed to validate backup config: %w", err)
+	}
+
+	if err := validateBackupIO(config, writer, reader); err != nil {
+		return nil, err
 	}
 
 	handler, err := newBackupHandler(
@@ -305,6 +309,25 @@ func (c *Client) Backup(
 	handler.run()
 
 	return handler, nil
+}
+
+// validateBackupIO reports whether the IO dependencies required by this
+// particular backup call are present. What is required depends on the config,
+// so this cannot live in ConfigBackup.validate; it cannot live in
+// newBackupHandler either, because [Client.Estimate] reuses that handler with
+// no writer and no reader at all.
+func validateBackupIO(config *ConfigBackup, writer Writer, reader StreamingReader) error {
+	if writer == nil {
+		return fmt.Errorf("%w: backup writer required", ErrInvalidConfig)
+	}
+
+	// The reader is only used to load the state file when resuming a backup.
+	if config.isStateContinue() && reader == nil {
+		return fmt.Errorf("%w: streaming reader required to continue backup from state file %q",
+			ErrInvalidConfig, config.StateFile)
+	}
+
+	return nil
 }
 
 // RestoreHandler represents a restore operation started by [Client.Restore].
@@ -333,11 +356,11 @@ func (c *Client) Restore(
 	streamingReader StreamingReader,
 ) (RestoreHandler, error) {
 	if config == nil {
-		return nil, fmt.Errorf("restore config required")
+		return nil, fmt.Errorf("%w: restore config required", ErrInvalidConfig)
 	}
 
 	if c.aerospikeClient == nil && !config.ValidateOnly {
-		return nil, fmt.Errorf("aerospike client is nil")
+		return nil, fmt.Errorf("%w: aerospike client is nil", ErrInvalidConfig)
 	}
 
 	// Fill in the default policy on the caller.s config. The default itself is
@@ -346,6 +369,12 @@ func (c *Client) Restore(
 
 	if err := config.validate(); err != nil {
 		return nil, fmt.Errorf("failed to validate restore config: %w", err)
+	}
+
+	// The streaming reader is the source of the restored data, so it is required
+	// for every restore, a ValidateOnly run included.
+	if streamingReader == nil {
+		return nil, fmt.Errorf("%w: restore streaming reader required", ErrInvalidConfig)
 	}
 
 	handler, err := newRestoreHandler(
@@ -390,11 +419,11 @@ func (c *Client) Estimate(
 	config *ConfigBackup,
 	estimateSamples int64) (uint64, error) {
 	if config == nil {
-		return 0, fmt.Errorf("backup config required")
+		return 0, fmt.Errorf("%w: backup config required", ErrInvalidConfig)
 	}
 
 	if c.aerospikeClient == nil {
-		return 0, fmt.Errorf("aerospike client is nil")
+		return 0, fmt.Errorf("%w: aerospike client is nil", ErrInvalidConfig)
 	}
 
 	// Fill in the default policy on the caller's config. The default itself is

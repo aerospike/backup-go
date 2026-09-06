@@ -17,6 +17,8 @@ package common
 import (
 	"fmt"
 	"path"
+
+	"github.com/aerospike/backup-go/errclass"
 )
 
 // GetFullPath returns full path for file or directory, according to params.
@@ -31,7 +33,7 @@ func GetFullPath(prefix, filename string, pathList []string, isDir bool) (string
 
 	// Validation: Files require at least one entry in the path list.
 	if len(pathList) == 0 {
-		return "", fmt.Errorf("path list can't be empty")
+		return "", fmt.Errorf("%w: path list can't be empty", errclass.ErrInvalidConfig)
 	}
 
 	if err := ValidateObjectKey(pathList[0]); err != nil {

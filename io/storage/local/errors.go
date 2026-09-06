@@ -12,32 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package asb
+package local
 
 import (
-	"fmt"
-	"path/filepath"
+	"errors"
+	"os"
 
 	"github.com/aerospike/backup-go/errclass"
 )
 
-const Extension = ".asb"
-
-// Validator represents backup files validator.
-type Validator struct {
-}
-
-// NewValidator returns new validator instance for files validation.
-func NewValidator() *Validator {
-	return &Validator{}
-}
-
-// Run performs backup files validation.
-func (v *Validator) Run(fileName string) error {
-	if filepath.Ext(fileName) != Extension {
-		return fmt.Errorf("%w: restore file %s is in an invalid format, expected extension: .asb, got: %s",
-			errclass.ErrUnsupported, fileName, filepath.Ext(fileName))
+// classifyFS returns the error class of a file system failure. A path that does
+// not exist is [errclass.ErrNotFound]; everything else is a storage failure.
+// Every place where an os error enters this package goes through it, so the
+// same syscall error is never reported under two different classes.
+func classifyFS(err error) error {
+	if errors.Is(err, os.ErrNotExist) {
+		return errclass.ErrNotFound
 	}
 
-	return nil
+	return errclass.ErrStorage
 }

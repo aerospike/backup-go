@@ -25,6 +25,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/io/storage/options"
 )
 
@@ -47,7 +48,8 @@ func NewWriter(ctx context.Context, opts ...options.Opt) (*Writer, error) {
 	}
 
 	if len(w.PathList) != 1 {
-		return nil, fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
+		return nil, fmt.Errorf("%w: one path is required, use WithDir(path string) or WithFile(path string) to set",
+			errclass.ErrInvalidConfig)
 	}
 
 	if w.ChunkSize == 0 {
@@ -72,11 +74,11 @@ func NewWriter(ctx context.Context, opts ...options.Opt) (*Writer, error) {
 		}
 
 		if err != nil {
-			return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
+			return nil, fmt.Errorf("%w: failed to check if directory is empty: %w", errclass.ErrStorage, err)
 		}
 
 		if !isEmpty && !w.IsRemovingFiles {
-			return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
+			return nil, fmt.Errorf("%w: backup folder must be empty or set RemoveFiles = true", errclass.ErrInvalidConfig)
 		}
 	}
 
@@ -84,7 +86,7 @@ func NewWriter(ctx context.Context, opts ...options.Opt) (*Writer, error) {
 	if w.IsRemovingFiles {
 		err := w.RemoveFiles(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to remove files: %w", err)
+			return nil, fmt.Errorf("%w: failed to remove files: %w", errclass.ErrStorage, err)
 		}
 	}
 
@@ -101,7 +103,7 @@ func createDirIfNotExist(path string, isDir bool) error {
 	// Create directly instead of checking with Stat first. A separate check
 	// can become stale before MkdirAll runs if another process changes path.
 	if err := os.MkdirAll(path, 0o700); err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
+		return fmt.Errorf("%w: failed to create directory: %w", errclass.ErrStorage, err)
 	}
 
 	return nil
@@ -110,7 +112,7 @@ func createDirIfNotExist(path string, isDir bool) error {
 func isEmptyDirectory(path string) (bool, error) {
 	fileInfo, err := os.ReadDir(path)
 	if err != nil {
-		return false, fmt.Errorf("failed to read path %s: %w", path, err)
+		return false, fmt.Errorf("%w: failed to read path %s: %w", errclass.ErrStorage, path, err)
 	}
 
 	if len(fileInfo) > 0 {
@@ -135,7 +137,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		// RemoveAll is intentionally used directly. Stat-then-remove would
 		// make the deletion decision on a stale path if it changes meanwhile.
 		if err := os.RemoveAll(targetPath); err != nil {
-			return fmt.Errorf("failed to remove targetPath %s: %w", targetPath, err)
+			return fmt.Errorf("%w: failed to remove targetPath %s: %w", errclass.ErrStorage, targetPath, err)
 		}
 
 		return nil
@@ -149,26 +151,26 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 
 		if isNotDir(err) { // it's a file, remove a single file
 			if err = os.Remove(targetPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-				return fmt.Errorf("failed to remove file %s: %w", targetPath, err)
+				return fmt.Errorf("%w: failed to remove file %s: %w", errclass.ErrStorage, targetPath, err)
 			}
 
 			return nil
 		}
 
-		return fmt.Errorf("failed to open %s: %w", targetPath, err)
+		return fmt.Errorf("%w: failed to open %s: %w", errclass.ErrStorage, targetPath, err)
 	}
 
 	defer root.Close()
 
 	f, err := root.Open(".")
 	if err != nil {
-		return fmt.Errorf("failed to open root directory %s: %w", targetPath, err)
+		return fmt.Errorf("%w: failed to open root directory %s: %w", errclass.ErrStorage, targetPath, err)
 	}
 	defer f.Close()
 
 	files, err := f.ReadDir(-1)
 	if err != nil {
-		return fmt.Errorf("failed to read root directory %s: %w", targetPath, err)
+		return fmt.Errorf("%w: failed to read root directory %s: %w", errclass.ErrStorage, targetPath, err)
 	}
 
 	for _, file := range files {
@@ -189,7 +191,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 				continue
 			}
 
-			return fmt.Errorf("failed to remove file %s: %w", file.Name(), err)
+			return fmt.Errorf("%w: failed to remove file %s: %w", errclass.ErrStorage, file.Name(), err)
 		}
 	}
 
@@ -218,7 +220,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 	// Create directory only if we have something to back up to this directory.
 	err := createDirIfNotExist(w.PathList[0], w.IsDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to prepare backup directory: %w", err)
+		return nil, fmt.Errorf("%w: failed to prepare backup directory: %w", errclass.ErrStorage, err)
 	}
 
 	switch {
@@ -226,13 +228,14 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 		// Directory backup writes files under PathList[0] by generated filename.
 		root, err := os.OpenRoot(w.PathList[0])
 		if err != nil {
-			return nil, fmt.Errorf("failed to open root %s: %w", w.PathList[0], err)
+			return nil, fmt.Errorf("%w: failed to open root %s: %w", errclass.ErrStorage, w.PathList[0], err)
 		}
 		defer root.Close()
 
 		file, err := root.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 		if err != nil {
-			return nil, fmt.Errorf("failed to open file %s in root %s: %w", filename, w.PathList[0], err)
+			return nil, fmt.Errorf("%w: failed to open file %s in root %s: %w",
+				errclass.ErrStorage, filename, w.PathList[0], err)
 		}
 
 		return &bufferedFile{bufio.NewWriterSize(file, w.ChunkSize), file}, nil
@@ -243,13 +246,13 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 
 		root, err := os.OpenRoot(dir)
 		if err != nil {
-			return nil, fmt.Errorf("failed to open root %s: %w", dir, err)
+			return nil, fmt.Errorf("%w: failed to open root %s: %w", errclass.ErrStorage, dir, err)
 		}
 		defer root.Close()
 
 		file, err := root.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 		if err != nil {
-			return nil, fmt.Errorf("failed to open file %s in root %s: %w", filename, dir, err)
+			return nil, fmt.Errorf("%w: failed to open file %s in root %s: %w", errclass.ErrStorage, filename, dir, err)
 		}
 
 		return &bufferedFile{bufio.NewWriterSize(file, w.ChunkSize), file}, nil
@@ -260,7 +263,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open file %s: %w", filePath, err)
+		return nil, fmt.Errorf("%w: failed to open file %s: %w", errclass.ErrStorage, filePath, err)
 	}
 
 	return &bufferedFile{bufio.NewWriterSize(file, w.ChunkSize), file}, nil

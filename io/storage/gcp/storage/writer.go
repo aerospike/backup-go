@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"google.golang.org/api/iterator"
@@ -81,18 +82,18 @@ func NewWriter(
 		// Check if backup dir is empty.
 		isEmpty, err := isEmptyDirectory(ctx, w.bucketHandle, w.prefix)
 		if err != nil {
-			return nil, fmt.Errorf("failed to check if directory is empty: %w", err)
+			return nil, fmt.Errorf("%w: failed to check if directory is empty: %w", errclass.ErrStorage, err)
 		}
 
 		if !isEmpty && !w.IsRemovingFiles {
-			return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
+			return nil, fmt.Errorf("%w: backup folder must be empty or set RemoveFiles = true", errclass.ErrInvalidConfig)
 		}
 	}
 
 	if w.IsRemovingFiles {
 		// As we accept only empty dir or dir with files for removing. We can remove them even in an empty bucketHandler.
 		if err := w.RemoveFiles(ctx); err != nil {
-			return nil, fmt.Errorf("failed to remove files from folder: %w", err)
+			return nil, fmt.Errorf("%w: failed to remove files from folder: %w", errclass.ErrStorage, err)
 		}
 	}
 
@@ -101,16 +102,17 @@ func NewWriter(
 
 func (w *Writer) validate(ctx context.Context) error {
 	if w.ChunkSize < 0 {
-		return fmt.Errorf("chunk size must be positive")
+		return fmt.Errorf("%w: chunk size must be positive", errclass.ErrInvalidConfig)
 	}
 
 	if len(w.PathList) != 1 {
-		return fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
+		return fmt.Errorf("%w: one path is required, use WithDir(path string) or WithFile(path string) to set",
+			errclass.ErrInvalidConfig)
 	}
 
 	// Check if bucketHandler exists, to avoid errors.
 	if _, err := w.bucketHandle.Attrs(ctx); err != nil {
-		return fmt.Errorf("failed to get bucketHandler %s attributes: %w", w.bucketName, err)
+		return fmt.Errorf("%w: failed to get bucketHandler %s attributes: %w", errclass.ErrNotFound, w.bucketName, err)
 	}
 
 	return nil
@@ -152,7 +154,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 	// Remove file.
 	if !w.IsDir {
 		if err := w.bucketHandle.Object(targetPath).Delete(ctx); err != nil {
-			return fmt.Errorf("failed to delete object %s: %w", targetPath, err)
+			return fmt.Errorf("%w: failed to delete object %s: %w", errclass.ErrStorage, targetPath, err)
 		}
 
 		return nil
@@ -172,7 +174,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		}
 
 		if err != nil {
-			return fmt.Errorf("failed to read object attributes from bucket %s: %w", w.bucketName, err)
+			return fmt.Errorf("%w: failed to read object attributes from bucket %s: %w", errclass.ErrStorage, w.bucketName, err)
 		}
 
 		// Skip files in folders.
@@ -188,7 +190,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 		}
 
 		if err = w.bucketHandle.Object(objAttrs.Name).Delete(ctx); err != nil {
-			return fmt.Errorf("failed to delete object %s: %w", objAttrs.Name, err)
+			return fmt.Errorf("%w: failed to delete object %s: %w", errclass.ErrStorage, objAttrs.Name, err)
 		}
 	}
 
@@ -218,7 +220,7 @@ func isEmptyDirectory(ctx context.Context, bucketHandle *storage.BucketHandle, p
 		}
 
 		if err != nil {
-			return false, fmt.Errorf("failed to list bucket objects: %w", err)
+			return false, fmt.Errorf("%w: failed to list bucket objects: %w", errclass.ErrStorage, err)
 		}
 
 		// Skip files in folders.
@@ -275,11 +277,11 @@ func (c *crcWriter) Close() error {
 	if local != remote {
 		// Clean up if checksum mismatches.
 		if err := c.objectHandle.Delete(c.ctx); err != nil {
-			return fmt.Errorf("checksum mismatch: %d != %d and failed to delete object: %w",
+			return fmt.Errorf("%w: checksum mismatch: %d != %d and failed to delete object: %w", errclass.ErrCorruptData,
 				local, remote, err)
 		}
 
-		return fmt.Errorf("checksum mismatch: %d != %d", local, remote)
+		return fmt.Errorf("%w: checksum mismatch: %d != %d", errclass.ErrCorruptData, local, remote)
 	}
 
 	return nil

@@ -27,7 +27,7 @@ import (
 	"regexp"
 	"strings"
 
-	saClient "github.com/aerospike/backup-go/pkg/secret-agent"
+	saClient "github.com/aerospike/backup-go/pkg/secretagent"
 )
 
 var (

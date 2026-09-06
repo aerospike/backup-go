@@ -24,7 +24,7 @@ import (
 	"time"
 
 	bModels "github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pkg/secret-agent/models"
+	"github.com/aerospike/backup-go/pkg/secretagent/models"
 )
 
 // magic const is taken from the Secret Agent service. It is used

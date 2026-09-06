@@ -29,7 +29,7 @@ import (
 	"time"
 
 	"github.com/aerospike/backup-go/errclass"
-	lismodels "github.com/aerospike/backup-go/pkg/server/lister/models"
+	"github.com/aerospike/backup-go/pkg/server/lister/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -55,9 +55,8 @@ const (
 	s3ErrNoSuchKey = "NoSuchKey"
 )
 
-// ErrMetadataNotFound is returned when metadata.json is not found.
 // ErrMetadataNotFound is returned when a backup has no metadata.json.
-// It belongs to the [bModels.ErrNotFound] class.
+// It belongs to the [errclass.ErrNotFound] class.
 var ErrMetadataNotFound = fmt.Errorf("%w: metadata.json not found", errclass.ErrNotFound)
 
 // S3API is an interface for the S3 client.
@@ -125,7 +124,7 @@ func NewLister(client S3API, bucket, prefix string, opts ...Option) *Lister {
 
 // FetchAllMetadata lists and parses all metadata files under the prefix,
 // sorted by backup id (Citrusleaf timestamp) ascending.
-func (l *Lister) FetchAllMetadata(ctx context.Context) ([]lismodels.Metadata, error) {
+func (l *Lister) FetchAllMetadata(ctx context.Context) ([]models.Metadata, error) {
 	snapshots, err := l.listSnapshotPrefixes(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list snapshots: %w", err)
@@ -135,7 +134,7 @@ func (l *Lister) FetchAllMetadata(ctx context.Context) ([]lismodels.Metadata, er
 		return nil, nil
 	}
 
-	results := make([]lismodels.Metadata, 0)
+	results := make([]models.Metadata, 0)
 
 	var resultsMu sync.Mutex
 
@@ -175,7 +174,7 @@ func (l *Lister) FetchAllMetadata(ctx context.Context) ([]lismodels.Metadata, er
 		return nil, err
 	}
 
-	slices.SortFunc(results, func(a, b lismodels.Metadata) int {
+	slices.SortFunc(results, func(a, b models.Metadata) int {
 		return cmp.Compare(a.BackupID, b.BackupID)
 	})
 
@@ -183,15 +182,15 @@ func (l *Lister) FetchAllMetadata(ctx context.Context) ([]lismodels.Metadata, er
 }
 
 // GetMetadata fetches and parses the metadata for a single backup.
-func (l *Lister) GetMetadata(ctx context.Context, backupID string) (lismodels.Metadata, error) {
+func (l *Lister) GetMetadata(ctx context.Context, backupID string) (models.Metadata, error) {
 	data, err := l.fetchOne(ctx, backupID)
 	if err != nil {
-		return lismodels.Metadata{}, fmt.Errorf("failed to get manifest %s: %w", backupID, err)
+		return models.Metadata{}, fmt.Errorf("failed to get manifest %s: %w", backupID, err)
 	}
 
-	var md lismodels.Metadata
+	var md models.Metadata
 	if err := json.Unmarshal(data, &md); err != nil {
-		return lismodels.Metadata{}, fmt.Errorf("failed to parse metadata: %w", err)
+		return models.Metadata{}, fmt.Errorf("failed to parse metadata: %w", err)
 	}
 
 	return md, nil

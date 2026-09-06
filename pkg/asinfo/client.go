@@ -60,8 +60,12 @@ const (
 var (
 	ErrReplicationFactorZero = fmt.Errorf("%w: replication factor is zero", errclass.ErrAerospike)
 	ErrNoNode                = fmt.Errorf("%w: no node found", errclass.ErrNotFound)
-	ErrNotFound              = errclass.ErrNotFound
 	ErrInvalidSIndexType     = fmt.Errorf("%w: invalid sindex index type", errclass.ErrCorruptData)
+
+	// ErrNotFound is returned when the cluster holds no state for the requested
+	// job or namespace. It is a distinct sentinel in the [errclass.ErrNotFound]
+	// class, not the class itself, so matching it stays specific to this package.
+	ErrNotFound = fmt.Errorf("%w: info not found", errclass.ErrNotFound)
 
 	// Static internal errors. Kept as package-level sentinels so they can be
 	// matched with errors.Is and satisfy err113/perfsprint linters.
@@ -138,18 +142,24 @@ func (ic *Client) GetInfo(ctx context.Context, names ...string) (map[string]stri
 
 	var result map[string]string
 
+	// The class is attached here, inside the retried command, so that a context
+	// error returned by the retry policy itself is not reported as a cluster
+	// failure.
 	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
 		node, err := ic.cluster.GetRandomNode()
 		if err != nil {
-			return err
+			return fmt.Errorf("%w: %w", errclass.ErrAerospike, err)
 		}
 
 		result, err = node.RequestInfo(ic.policy, names...)
+		if err != nil {
+			return fmt.Errorf("%w: %w", errclass.ErrAerospike, err)
+		}
 
-		return err
+		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", errclass.ErrAerospike, err)
+		return nil, err
 	}
 
 	return result, nil

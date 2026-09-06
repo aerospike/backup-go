@@ -28,6 +28,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
@@ -286,7 +287,7 @@ func (s *AzureSuite) TestReader_StreamFilesEmpty() {
 		options.WithDir(testReadFolderEmpty),
 		options.WithValidator(validatorMock{}),
 	)
-	s.Require().ErrorContains(err, "is empty")
+	s.Require().ErrorIs(err, common.ErrEmptyStorage)
 }
 
 func (s *AzureSuite) TestReader_StreamFilesMixed() {

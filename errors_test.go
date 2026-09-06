@@ -15,16 +15,28 @@
 package backup
 
 import (
+	"crypto/tls"
+	"errors"
 	"fmt"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/aerospike/backup-go/errclass"
+	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/storage/local"
+	"github.com/aerospike/backup-go/io/storage/options"
+	"github.com/aerospike/backup-go/pkg/secretagent"
+	"github.com/aerospike/backup-go/pkg/server/segvalidator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // TestErrorClasses_Aliases pins the root package aliases to the canonical
-// values in models, so errors.Is matches either spelling.
+// values in errclass, so errors.Is matches either spelling.
 func TestErrorClasses_Aliases(t *testing.T) {
 	t.Parallel()
 
@@ -190,4 +202,170 @@ func TestErrorClass_SurvivesWrapping(t *testing.T) {
 	require.NotErrorIs(t, wrapped, ErrCorruptData)
 	require.Contains(t, wrapped.Error(), "failed to write chunk")
 	require.Contains(t, wrapped.Error(), "bad thing")
+}
+
+// classesOf reports every class err matches. The library contract is that an
+// error a caller can act on carries exactly one of them, so anything other than
+// a single entry points at a layer that re-classified an error instead of only
+// adding context to it.
+func classesOf(err error) []error {
+	classes := []error{
+		ErrInvalidConfig,
+		ErrNotFound,
+		ErrStorage,
+		ErrCorruptData,
+		ErrUnsupported,
+		ErrAerospike,
+		ErrSecretAgent,
+	}
+
+	matched := make([]error, 0, len(classes))
+
+	for _, class := range classes {
+		if errors.Is(err, class) {
+			matched = append(matched, class)
+		}
+	}
+
+	return matched
+}
+
+// TestErrorClass_ExactlyOne walks failures a caller reaches through the public
+// API of every layer and proves each of them carries exactly one class.
+func TestErrorClass_ExactlyOne(t *testing.T) {
+	t.Parallel()
+
+	const (
+		unreachableTCP = "127.0.0.1:1"
+		missingSocket  = "/tmp/backup-go-no-such.sock"
+		shortTimeout   = 100 * time.Millisecond
+		notAnASBFile   = "not an asb file\n"
+		testFileName   = "backup.asb"
+		testResource   = "resource"
+		testSecretKey  = "key"
+	)
+
+	ctx := t.Context()
+	client := &Client{}
+	missingDir := filepath.Join(t.TempDir(), "does-not-exist")
+	emptyDir := t.TempDir()
+
+	tests := []struct {
+		call func() error
+		name string
+		want error
+	}{
+		{
+			name: "backup without config",
+			call: func() error {
+				_, err := client.Backup(ctx, nil, nil, nil)
+				return err
+			},
+			want: ErrInvalidConfig,
+		},
+		{
+			name: "restore without config",
+			call: func() error {
+				_, err := client.Restore(ctx, nil, nil)
+				return err
+			},
+			want: ErrInvalidConfig,
+		},
+		{
+			name: "local reader on a missing directory",
+			call: func() error {
+				_, err := local.NewReader(ctx, options.WithDir(missingDir))
+				return err
+			},
+			want: ErrNotFound,
+		},
+		{
+			name: "local reader on an empty directory",
+			call: func() error {
+				_, err := local.NewReader(ctx, options.WithDir(emptyDir))
+				return err
+			},
+			want: ErrNotFound,
+		},
+		{
+			name: "local writer without a path",
+			call: func() error {
+				_, err := local.NewWriter(ctx)
+				return err
+			},
+			want: ErrInvalidConfig,
+		},
+		{
+			name: "asb decoder on a file that is not a backup",
+			call: func() error {
+				_, err := asb.NewDecoder(strings.NewReader(notAnASBFile), testFileName, false, slog.Default())
+				return err
+			},
+			want: ErrCorruptData,
+		},
+		{
+			name: "asb validator on an unknown extension",
+			call: func() error {
+				return asb.NewValidator().Run("backup.txt")
+			},
+			want: ErrUnsupported,
+		},
+		{
+			name: "secret agent with TLS over a unix socket",
+			call: func() error {
+				_, err := secretagent.NewClient(secretagent.ConnectionTypeUDS, missingSocket, shortTimeout, false,
+					&tls.Config{MinVersion: tls.VersionTLS12})
+
+				return err
+			},
+			want: ErrUnsupported,
+		},
+		{
+			name: "secret agent unreachable",
+			call: func() error {
+				// NewClient only rejects TLS over a non-TCP connection, so this
+				// combination cannot fail. Port 1 on the loopback interface is
+				// not listening in any sane environment, so the dial fails fast
+				// instead of hanging.
+				agent, _ := secretagent.NewClient(secretagent.ConnectionTypeTCP, unreachableTCP,
+					shortTimeout, false, nil)
+
+				_, err := agent.GetSecret(ctx, testResource, testSecretKey)
+
+				return err
+			},
+			want: ErrSecretAgent,
+		},
+		{
+			name: "segment validator without a streamer",
+			call: func() error {
+				_, err := segvalidator.NewSegValidator(nil)
+				return err
+			},
+			want: ErrInvalidConfig,
+		},
+		{
+			// Storage failures need infrastructure to provoke, so this case
+			// pins the property they rely on: added context never adds a class.
+			name: "context added above a storage failure",
+			call: func() error {
+				classified := fmt.Errorf("%w: failed to open object: %w", ErrStorage, os.ErrPermission)
+				return fmt.Errorf("failed to create reader: %w", classified)
+			},
+			want: ErrStorage,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.call()
+			require.Error(t, err)
+			require.ErrorIs(t, err, tt.want)
+
+			got := classesOf(err)
+			require.Len(t, got, 1, "error must carry exactly one class, got %v for %v", got, err)
+		})
+	}
 }

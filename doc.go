@@ -99,7 +99,7 @@ A class is attached once, where the error is created or where an error from
 another library first enters this one; every layer above only adds context, so
 the class reaches the caller intact along with the original error, which stays
 reachable through errors.Is and errors.As. The same values are exported from
-[github.com/aerospike/backup-go/models], which the internal packages use.
+[github.com/aerospike/backup-go/errclass], which the internal packages use.
 
 # Cancellation
 

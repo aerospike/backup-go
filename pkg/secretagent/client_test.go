@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/aerospike/backup-go/pkg/secretagent/connection"
-	samodels "github.com/aerospike/backup-go/pkg/secretagent/models"
+	"github.com/aerospike/backup-go/pkg/secretagent/models"
 	"github.com/stretchr/testify/require"
 )
 
@@ -88,7 +88,7 @@ func mockHandler(conn net.Conn) {
 	defer sneakyClose(conn)
 	_, _ = connection.ReadBytes(conn, 10)
 
-	resp := samodels.Response{
+	resp := models.Response{
 		SecretValue: testPKey,
 		Error:       "",
 	}
@@ -108,7 +108,7 @@ func mockBase64Handler(conn net.Conn) {
 	defer sneakyClose(conn)
 	_, _ = connection.ReadBytes(conn, 10)
 
-	resp := samodels.Response{
+	resp := models.Response{
 		SecretValue: testBase64Value,
 		Error:       "",
 	}
@@ -128,7 +128,7 @@ func mockErrorHandler(conn net.Conn) {
 	defer sneakyClose(conn)
 	_, _ = connection.ReadBytes(conn, 10)
 
-	resp := samodels.Response{
+	resp := models.Response{
 		SecretValue: "",
 		Error:       "test error",
 	}
@@ -148,7 +148,7 @@ func mockInvalidBase64Handler(conn net.Conn) {
 	defer sneakyClose(conn)
 	_, _ = connection.ReadBytes(conn, 10)
 
-	resp := samodels.Response{
+	resp := models.Response{
 		SecretValue: "invalid-base64",
 		Error:       "",
 	}

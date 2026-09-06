@@ -103,7 +103,7 @@ func readUnsignedInt(src *countingReader, delim byte) (uint32, error) {
 		if result > math.MaxUint32 {
 			// Consume remaining digits
 			if err := consumeUntil(src, delim); err != nil {
-				return math.MaxUint32, fmt.Errorf("%w: value exceeds uint32 max", errclass.ErrCorruptData)
+				return math.MaxUint32, fmt.Errorf("%w: value exceeds uint32 max: %w", errclass.ErrCorruptData, err)
 			}
 
 			return math.MaxUint32, fmt.Errorf("%w: value exceeds uint32 max", errclass.ErrCorruptData)

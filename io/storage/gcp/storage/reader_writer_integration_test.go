@@ -31,6 +31,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
 	"github.com/googleapis/gax-go/v2"
@@ -317,7 +318,7 @@ func (s *GCPSuite) TestReader_StreamFilesEmpty() {
 		options.WithValidator(validatorMock{}),
 		options.WithNestedDir(),
 	)
-	s.Require().ErrorContains(err, "is empty")
+	s.Require().ErrorIs(err, common.ErrEmptyStorage)
 }
 
 func (s *GCPSuite) TestReader_StreamFilesMixed() {

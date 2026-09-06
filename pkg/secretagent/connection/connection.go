@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/aerospike/backup-go/errclass"
-	samodels "github.com/aerospike/backup-go/pkg/secretagent/models"
+	"github.com/aerospike/backup-go/pkg/secretagent/models"
 )
 
 // magic const is taken from the Secret Agent service. It is used
@@ -62,7 +62,7 @@ func Write(conn connector, timeout time.Duration, resource, secretKey string) er
 		return fmt.Errorf("%w: failed to set write deadline: %w", errclass.ErrSecretAgent, err)
 	}
 
-	msg := samodels.Request{
+	msg := models.Request{
 		Resource:  resource,
 		SecretKey: secretKey,
 	}
@@ -114,7 +114,7 @@ func Read(conn connector, timeout time.Duration) (string, error) {
 		return "", fmt.Errorf("%w: failed to read body: %w", errclass.ErrSecretAgent, err)
 	}
 
-	var res samodels.Response
+	var res models.Response
 	if err = json.Unmarshal(body, &res); err != nil {
 		return "", fmt.Errorf("%w: failed to unmarshal response: %w", errclass.ErrSecretAgent, err)
 	}

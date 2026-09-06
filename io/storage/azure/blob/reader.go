@@ -103,7 +103,7 @@ func NewReader(
 
 	if r.IsDir && !r.SkipDirCheck {
 		if err := r.checkRestoreDirectory(ctx, r.PathList[0]); err != nil {
-			return nil, fmt.Errorf("%w: %w", common.ErrEmptyStorage, err)
+			return nil, err
 		}
 	}
 
@@ -321,7 +321,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 		}
 	}
 
-	return fmt.Errorf("%w: %s is empty", errclass.ErrNotFound, path)
+	return fmt.Errorf("%w: %s", common.ErrEmptyStorage, path)
 }
 
 // ListObjects list all object in the path.

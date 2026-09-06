@@ -150,6 +150,7 @@ These import paths are what consumers are expected to use:
 - `github.com/aerospike/backup-go/io/encoding/asb` — ASB format and its file validator
 - `github.com/aerospike/backup-go/pkg/asinfo` — Aerospike info command client
 - `github.com/aerospike/backup-go/pkg/secretagent` — Secret Agent client
+- `github.com/aerospike/backup-go/errclass` — error classes, for packages used without the root one
 
 Packages under `pkg/server` are **under active development** and change without notice.
 
@@ -159,6 +160,33 @@ surface, and may change in any release — in particular `pipe`, `io/aerospike`,
 everything under `internal/`. Compression and encryption are configured through
 `CompressionPolicy` and `EncryptionPolicy` on the config, not by importing those packages
 directly.
+
+## Errors
+
+Every error a caller can act on carries exactly one error class, so failures can be handled
+without matching on message text:
+
+```go
+if _, err := client.Backup(ctx, cfg, writer, nil); err != nil {
+	switch {
+	case errors.Is(err, backup.ErrInvalidConfig):
+		// bad input, retrying will not help
+	case errors.Is(err, backup.ErrStorage):
+		// infrastructure failure, worth retrying
+	}
+}
+```
+
+The classes are `ErrInvalidConfig`, `ErrNotFound`, `ErrStorage`, `ErrCorruptData`,
+`ErrUnsupported`, `ErrAerospike` and `ErrSecretAgent`. The class is attached once, where the
+error is created or where an error from another library first enters this one; the layers
+above only add context, so the class reaches the caller together with the original error,
+which stays reachable through `errors.Is` and `errors.As`.
+
+The same values are exported from `github.com/aerospike/backup-go/errclass` for code that
+uses a package such as `io/storage/local` or `pkg/asinfo` without the root one. They are the
+same variables, so `errors.Is` matches either spelling. Which class an error carries is part
+of the library contract; the message text is not, and may change between releases.
 
 ## Configuration
 

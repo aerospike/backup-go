@@ -14,9 +14,7 @@
 
 package backup
 
-import (
-	"github.com/aerospike/backup-go/errclass"
-)
+import "github.com/aerospike/backup-go/errclass"
 
 // Error classes reported by this library.
 //
@@ -34,38 +32,38 @@ import (
 // The class is only a marker: the wrapped message keeps all the details, and
 // the underlying error stays reachable through errors.Is and errors.As.
 //
-// These are aliases of the values declared in the models package, which the
-// internal packages use directly. The values are identical, so errors.Is
-// matches either spelling.
+// These are aliases of the values declared in
+// [github.com/aerospike/backup-go/errclass], which the internal packages use
+// directly. The values are identical, so errors.Is matches either spelling.
 //
 // Which class is attached is part of the library contract; the message text
 // is not, and may change between releases.
 var (
 	// ErrInvalidConfig marks a configuration or an argument rejected by
-	// validation. See [models.ErrInvalidConfig].
+	// validation. See [errclass.ErrInvalidConfig].
 	ErrInvalidConfig = errclass.ErrInvalidConfig
 
 	// ErrNotFound marks a backup, a directory, a file or an object that does
-	// not exist. See [models.ErrNotFound].
+	// not exist. See [errclass.ErrNotFound].
 	ErrNotFound = errclass.ErrNotFound
 
 	// ErrStorage marks a failure reported by a storage backend.
-	// See [models.ErrStorage].
+	// See [errclass.ErrStorage].
 	ErrStorage = errclass.ErrStorage
 
 	// ErrCorruptData marks backup content that cannot be trusted.
-	// See [models.ErrCorruptData].
+	// See [errclass.ErrCorruptData].
 	ErrCorruptData = errclass.ErrCorruptData
 
 	// ErrUnsupported marks a mode, a format or a feature this version of the
-	// library cannot handle. See [models.ErrUnsupported].
+	// library cannot handle. See [errclass.ErrUnsupported].
 	ErrUnsupported = errclass.ErrUnsupported
 
 	// ErrAerospike marks a failure reported by the Aerospike cluster or by the
-	// Aerospike client. See [models.ErrAerospike].
+	// Aerospike client. See [errclass.ErrAerospike].
 	ErrAerospike = errclass.ErrAerospike
 
 	// ErrSecretAgent marks a failure while talking to the Aerospike Secret
-	// Agent. See [models.ErrSecretAgent].
+	// Agent. See [errclass.ErrSecretAgent].
 	ErrSecretAgent = errclass.ErrSecretAgent
 )

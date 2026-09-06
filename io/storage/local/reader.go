@@ -64,7 +64,7 @@ func NewReader(_ context.Context, opts ...options.Opt) (*Reader, error) {
 	if r.IsDir && !r.SkipDirCheck {
 		for _, path := range r.PathList {
 			if err := r.checkRestoreDirectory(path); err != nil {
-				return nil, fmt.Errorf("%w: %w", common.ErrEmptyStorage, err)
+				return nil, err
 			}
 		}
 	}
@@ -118,7 +118,7 @@ func (r *Reader) streamDirectory(
 	// protecting against directory traversal vulnerability exploits.
 	root, err := os.OpenRoot(path)
 	if err != nil {
-		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to open root %s: %w", errclass.ErrStorage, path, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to open root %s: %w", classifyFS(err), path, err))
 		return
 	}
 
@@ -126,14 +126,14 @@ func (r *Reader) streamDirectory(
 
 	dirFile, err := root.Open(".")
 	if err != nil {
-		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to open root directory: %w", errclass.ErrStorage, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to open root directory: %w", classifyFS(err), err))
 		return
 	}
 	defer dirFile.Close()
 
 	fileInfo, err := dirFile.ReadDir(-1)
 	if err != nil {
-		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to read root %s: %w", errclass.ErrStorage, path, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to read root %s: %w", classifyFS(err), path, err))
 		return
 	}
 
@@ -157,7 +157,7 @@ func (r *Reader) streamDirectory(
 		info, err := file.Info()
 		if err != nil {
 			common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to get file info %s in root %s: %w",
-				errclass.ErrStorage, file.Name(), path, err))
+				classifyFS(err), file.Name(), path, err))
 
 			return
 		}
@@ -186,7 +186,7 @@ func (r *Reader) streamDirectory(
 		reader, err = root.Open(file.Name())
 		if err != nil {
 			common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to open file %s in root %s: %w",
-				errclass.ErrStorage, file.Name(), path, err))
+				classifyFS(err), file.Name(), path, err))
 
 			return
 		}
@@ -207,7 +207,7 @@ func (r *Reader) StreamFile(
 
 	reader, err := os.Open(filename)
 	if err != nil {
-		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to open %s: %w", errclass.ErrStorage, filename, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to open %s: %w", classifyFS(err), filename, err))
 		return
 	}
 
@@ -219,28 +219,24 @@ func (r *Reader) StreamFile(
 func (r *Reader) checkRestoreDirectory(dir string) error {
 	root, err := os.OpenRoot(dir)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("%w: failed to get path info %s: %w", errclass.ErrNotFound, dir, err)
-		}
-
 		if isNotDir(err) { // it's a file, not a directory
 			return fmt.Errorf("%w: %s is not a directory", errclass.ErrInvalidConfig, dir)
 		}
 
-		return fmt.Errorf("%w: failed to open root %s: %w", errclass.ErrStorage, dir, err)
+		return fmt.Errorf("%w: failed to open root %s: %w", classifyFS(err), dir, err)
 	}
 
 	defer root.Close()
 
 	dirFile, err := root.Open(".")
 	if err != nil {
-		return fmt.Errorf("%w: failed to open root directory: %w", errclass.ErrStorage, err)
+		return fmt.Errorf("%w: failed to open root directory: %w", classifyFS(err), err)
 	}
 	defer dirFile.Close()
 
 	fileInfo, err := dirFile.ReadDir(-1)
 	if err != nil {
-		return fmt.Errorf("%w: failed to read root %s: %w", errclass.ErrStorage, dir, err)
+		return fmt.Errorf("%w: failed to read root %s: %w", classifyFS(err), dir, err)
 	}
 
 	switch {
@@ -266,11 +262,11 @@ func (r *Reader) checkRestoreDirectory(dir string) error {
 			}
 		}
 
-		return fmt.Errorf("%w: %s is empty", errclass.ErrNotFound, dir)
+		return fmt.Errorf("%w: %s", common.ErrEmptyStorage, dir)
 	default:
 		// Check if the directory is empty
 		if len(fileInfo) == 0 {
-			return fmt.Errorf("%w: %s is empty", errclass.ErrNotFound, dir)
+			return fmt.Errorf("%w: %s", common.ErrEmptyStorage, dir)
 		}
 	}
 
@@ -287,20 +283,20 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 			return nil, nil // Path doesn't exist, no error returned
 		}
 
-		return nil, fmt.Errorf("%w: failed to open root %s: %w", errclass.ErrStorage, path, err)
+		return nil, fmt.Errorf("%w: failed to open root %s: %w", classifyFS(err), path, err)
 	}
 
 	defer root.Close()
 
 	dirFile, err := root.Open(".")
 	if err != nil {
-		return nil, fmt.Errorf("%w: failed to open root directory: %w", errclass.ErrStorage, err)
+		return nil, fmt.Errorf("%w: failed to open root directory: %w", classifyFS(err), err)
 	}
 	defer dirFile.Close()
 
 	fileInfo, err := dirFile.ReadDir(-1)
 	if err != nil {
-		return nil, fmt.Errorf("%w: failed to read root %s: %w", errclass.ErrStorage, path, err)
+		return nil, fmt.Errorf("%w: failed to read root %s: %w", classifyFS(err), path, err)
 	}
 
 	for i := range fileInfo {
@@ -373,7 +369,7 @@ func (r *Reader) calculateTotalSize() {
 func (r *Reader) calculateTotalSizeForPath(path string) (totalSize, totalNum int64, err error) {
 	dirInfo, err := os.Stat(path)
 	if err != nil {
-		return 0, 0, fmt.Errorf("%w: failed to get path info %s: %w", errclass.ErrStorage, path, err)
+		return 0, 0, fmt.Errorf("%w: failed to get path info %s: %w", classifyFS(err), path, err)
 	}
 
 	if dirInfo.IsDir() {
@@ -386,20 +382,20 @@ func (r *Reader) calculateTotalSizeForPath(path string) (totalSize, totalNum int
 func (r *Reader) calculateTotalSizeForDir(path string) (totalSize, totalNum int64, err error) {
 	root, err := os.OpenRoot(path)
 	if err != nil {
-		return 0, 0, fmt.Errorf("%w: failed to open root %s: %w", errclass.ErrStorage, path, err)
+		return 0, 0, fmt.Errorf("%w: failed to open root %s: %w", classifyFS(err), path, err)
 	}
 
 	defer root.Close()
 
 	dirFile, err := root.Open(".")
 	if err != nil {
-		return 0, 0, fmt.Errorf("%w: failed to open root directory: %w", errclass.ErrStorage, err)
+		return 0, 0, fmt.Errorf("%w: failed to open root directory: %w", classifyFS(err), err)
 	}
 	defer dirFile.Close()
 
 	fileInfo, err := dirFile.ReadDir(-1)
 	if err != nil {
-		return 0, 0, fmt.Errorf("%w: failed to read root %s: %w", errclass.ErrStorage, path, err)
+		return 0, 0, fmt.Errorf("%w: failed to read root %s: %w", classifyFS(err), path, err)
 	}
 
 	for _, file := range fileInfo {
@@ -435,7 +431,7 @@ func (r *Reader) processEntry(path string, file os.DirEntry) (size, num int64, e
 
 	info, err := file.Info()
 	if err != nil {
-		return 0, 0, fmt.Errorf("%w: failed to get file info %s: %w", errclass.ErrStorage, path, err)
+		return 0, 0, fmt.Errorf("%w: failed to get file info %s: %w", classifyFS(err), path, err)
 	}
 
 	return info.Size(), 1, nil

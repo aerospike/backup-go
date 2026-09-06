@@ -73,18 +73,21 @@ func NewClient(connectionType, address string, timeout time.Duration, isBase64 b
 func (c *Client) GetSecret(ctx context.Context, resource, secretKey string) (string, error) {
 	conn, err := connection.Get(ctx, c.connectionType, c.address, c.timeout, c.tlsConfig)
 	if err != nil {
-		return "", fmt.Errorf("%w: failed to connect to secret agent: %w", errclass.ErrSecretAgent, err)
+		return "", fmt.Errorf("%w: failed to connect to secret agent over %s at %s: %w",
+			errclass.ErrSecretAgent, c.connectionType, c.address, err)
 	}
 
 	defer func() { _ = conn.Close() }()
 
+	// The transport already attaches the class, so these only name the resource
+	// the request was made for.
 	if err := connection.Write(conn, c.timeout, resource, secretKey); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to request resource %s: %w", resource, err)
 	}
 
 	response, err := connection.Read(conn, c.timeout)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read response for resource %s: %w", resource, err)
 	}
 
 	// If the secret agent is configured to encode all responses to base64,
@@ -94,7 +97,8 @@ func (c *Client) GetSecret(ctx context.Context, resource, secretKey string) (str
 
 		decoded, err = base64.StdEncoding.DecodeString(response)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("%w: failed to decode base64 response for resource %s: %w",
+				errclass.ErrCorruptData, resource, err)
 		}
 
 		return string(decoded), nil

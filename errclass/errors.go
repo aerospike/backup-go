@@ -21,7 +21,7 @@ import "errors"
 // Errors a caller can act on are wrapped with exactly one of them, so a
 // failure can be classified without matching on error strings:
 //
-//	if errors.Is(err, models.ErrInvalidConfig) {
+//	if errors.Is(err, errclass.ErrInvalidConfig) {
 //		// bad input, retrying will not help
 //	}
 //

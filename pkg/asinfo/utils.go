@@ -101,7 +101,8 @@ func (ic *Client) getAerospikeVersion(conn infoGetter, policy *a.InfoPolicy) (in
 
 	versionResp, aErr := conn.RequestInfo(policy, cmd)
 	if aErr != nil {
-		return infomodels.AerospikeVersion{}, aErr
+		return infomodels.AerospikeVersion{}, fmt.Errorf("%w: failed to get build version: %w",
+			errclass.ErrAerospike, aErr)
 	}
 
 	versionStr, err := parseResultResponse(cmd, versionResp)

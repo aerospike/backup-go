@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/aerospike/backup-go/pkg/secretagent/connection/mocks"
-	samodels "github.com/aerospike/backup-go/pkg/secretagent/models"
+	"github.com/aerospike/backup-go/pkg/secretagent/models"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -105,7 +105,7 @@ func TestConnection_WriteTimeout(t *testing.T) {
 func TestConnection_ReadOK(t *testing.T) {
 	mockConn := new(mocks.Mockconnector)
 	header := make([]byte, 8)
-	body := samodels.Response{
+	body := models.Response{
 		SecretValue: testSecretValue,
 		Error:       "",
 	}
@@ -204,7 +204,7 @@ func TestConnection_ReadBodyError(t *testing.T) {
 
 	_, err := Read(mockConn, testTimeout)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "failed to read header")
+	require.Contains(t, err.Error(), "failed to read body")
 }
 
 func TestConnection_ReadInvalidJSON(t *testing.T) {
@@ -238,7 +238,7 @@ func TestConnection_ReadInvalidJSON(t *testing.T) {
 func TestConnection_ReadErrorInResponse(t *testing.T) {
 	mockConn := new(mocks.Mockconnector)
 	header := make([]byte, 8)
-	body := samodels.Response{
+	body := models.Response{
 		SecretValue: "",
 		Error:       "error from server",
 	}

@@ -47,6 +47,7 @@ const (
 	minioSecretAccessKey = "minioadminpassword"
 
 	// awsCredentialsFileEnv points the AWS SDK at a specific credentials file.
+	//nolint:gosec // There is no credentials in this file.
 	awsCredentialsFileEnv = "AWS_SHARED_CREDENTIALS_FILE"
 )
 

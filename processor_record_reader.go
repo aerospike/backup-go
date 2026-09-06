@@ -171,6 +171,10 @@ func (rr *recordReaderProcessor) getPrimaryPartitions(ctx context.Context) ([]in
 		partIDs = append(partIDs, parts...)
 	}
 
+	if len(partIDs) == 0 {
+		return nil, fmt.Errorf("no primary partitions found")
+	}
+
 	return partIDs, nil
 }
 

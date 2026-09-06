@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Go 1.25+ (the language version and toolchain are in [go.mod](go.mod); CI reads them from there)
+- Go 1.25.13+ (the language version and toolchain are in [go.mod](go.mod); CI reads them from there)
 - Docker, only for the integration tests
 - [Mockery](https://github.com/vektra/mockery), pinned in [tools.go](tools.go) / [go.mod](go.mod)
   and installed by `make mockery-install`

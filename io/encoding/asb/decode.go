@@ -104,24 +104,31 @@ func (c *countingReader) ReadByte() (byte, error) {
 		return 0, err
 	}
 
-	c.tracker.offset++
-
-	// If it is a new line byte.
-	if b == asbNewLine {
-		// Increase line counter.
-		c.tracker.line++
-		// Save the previous column counter, so we can return in case of Unread.
-		c.tracker.prevCol = c.tracker.column
-		// Reset column counter.
-		c.tracker.column = 0
-	} else {
-		// If no new line, just move the column counter.
-		c.tracker.column++
-	}
-	// Save the previous value, so we can track changes on Unread.
-	c.tracker.prevByte = b
+	c.tracker.note(b)
 
 	return b, nil
+}
+
+// note records one consumed byte in the position tracker.
+func (t *positionTracker) note(b byte) {
+	t.offset++
+
+	if b == asbNewLine {
+		t.line++
+		t.prevCol = t.column
+		t.column = 0
+	} else {
+		t.column++
+	}
+
+	t.prevByte = b
+}
+
+// noteBytes records a sequence of consumed bytes.
+func (t *positionTracker) noteBytes(p []byte) {
+	for _, b := range p {
+		t.note(b)
+	}
 }
 
 // UnreadByte unreads a single byte from the underlying reader.
@@ -1288,27 +1295,39 @@ func readUntil(src *countingReader, delim byte) (string, error) {
 	return string(result), nil
 }
 
+// readUntilByte returns the bytes before delim, leaving delim unread so the
+// caller can consume it (and so ReadByte updates line/column for a newline).
+// Tokens larger than the reader's buffer are assembled across ReadSlice calls.
 func readUntilByte(src *countingReader, delim byte) ([]byte, error) {
-	slice, err := src.ReadSlice(delim)
-	if err != nil && !errors.Is(err, bufio.ErrBufferFull) {
-		return nil, err
+	var buf []byte
+
+	for {
+		slice, err := src.ReadSlice(delim)
+		if err != nil && !errors.Is(err, bufio.ErrBufferFull) {
+			return nil, err
+		}
+
+		// ReadSlice's buffer is invalidated by the next read; copy it out.
+		// append of a nil slice is a no-op, which keeps NilAway happy.
+		buf = append(buf, slice...)
+
+		if errors.Is(err, bufio.ErrBufferFull) {
+			continue
+		}
+
+		// err == nil: ReadSlice consumed delim as the last byte of this chunk.
+		if len(buf) > 0 {
+			buf = buf[:len(buf)-1]
+		}
+
+		if err := src.Reader.UnreadByte(); err != nil {
+			return nil, err
+		}
+
+		src.tracker.noteBytes(buf)
+
+		return buf, nil
 	}
-
-	// Copy slice data - ReadSlice returns internal buffer that becomes invalid on next read
-	buf := make([]byte, 0, len(slice))
-	buf = append(buf, slice...)
-	// ReadSlice includes the delimiter, we need to exclude it
-	buf = bytes.TrimSuffix(buf, []byte{delim})
-
-	// Update tracker offset only
-	src.tracker.offset += uint64(len(buf))
-
-	// Unread the delimiter
-	if err := src.Reader.UnreadByte(); err != nil {
-		return nil, err
-	}
-
-	return buf, nil
 }
 
 func readUntilByteEscaped(src *countingReader, delim byte) ([]byte, error) {

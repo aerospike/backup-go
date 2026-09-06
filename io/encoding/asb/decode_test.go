@@ -15,6 +15,7 @@
 package asb
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -29,6 +30,7 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/segmentio/asm/base64"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const testFileName = "test_backup.asb"
@@ -2663,6 +2665,64 @@ func TestReadUntil(t *testing.T) {
 		if err == nil {
 			t.Errorf("readUntil() expected error, got nil")
 		}
+	})
+}
+
+func TestReadUntilByte(t *testing.T) {
+	t.Parallel()
+
+	t.Run("leaves delimiter unread and tracks column", func(t *testing.T) {
+		t.Parallel()
+
+		src := newTestCountingReader("hello\nworld")
+
+		got, err := readUntilByte(src, asbNewLine)
+		require.NoError(t, err)
+		assert.Equal(t, []byte("hello"), got)
+		assert.Equal(t, uint64(5), src.tracker.offset)
+		assert.Equal(t, int64(1), src.tracker.line)
+		assert.Equal(t, int64(5), src.tracker.column)
+
+		b, err := src.ReadByte()
+		require.NoError(t, err)
+		assert.Equal(t, byte(asbNewLine), b)
+		assert.Equal(t, uint64(6), src.tracker.offset)
+		assert.Equal(t, int64(2), src.tracker.line)
+		assert.Equal(t, int64(0), src.tracker.column)
+	})
+
+	t.Run("assembles token across buffer fills", func(t *testing.T) {
+		t.Parallel()
+
+		const token = "abcdefghijklmnop"
+		src := &countingReader{
+			Reader:  bufio.NewReaderSize(strings.NewReader(token+"\n"), 8),
+			tracker: &positionTracker{line: 1},
+		}
+
+		got, err := readUntilByte(src, asbNewLine)
+		require.NoError(t, err)
+		assert.Equal(t, []byte(token), got)
+		assert.Equal(t, uint64(len(token)), src.tracker.offset)
+		assert.Equal(t, int64(len(token)), src.tracker.column)
+
+		b, err := src.ReadByte()
+		require.NoError(t, err)
+		assert.Equal(t, byte(asbNewLine), b)
+		assert.Equal(t, int64(2), src.tracker.line)
+	})
+
+	t.Run("skipToNextLine consumes newline via ReadByte", func(t *testing.T) {
+		t.Parallel()
+
+		dec := &Decoder{reader: newTestCountingReader("junk\nnext")}
+		require.NoError(t, dec.skipToNextLine())
+		assert.Equal(t, int64(2), dec.reader.tracker.line)
+		assert.Equal(t, int64(0), dec.reader.tracker.column)
+
+		b, err := dec.reader.ReadByte()
+		require.NoError(t, err)
+		assert.Equal(t, byte('n'), b)
 	})
 }
 

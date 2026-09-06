@@ -280,6 +280,10 @@ func (c *Client) Backup(
 		return nil, fmt.Errorf("aerospike client is nil")
 	}
 
+	if config.StateFile != "" && reader == nil {
+		return nil, fmt.Errorf("streaming reader is required when a state file is configured")
+	}
+
 	// Fill in the default policy on the caller's config. The default itself is
 	// copied, so the Aerospike client's own policy is not modified.
 	config.ScanPolicy = c.getUsableScanPolicy(config.ScanPolicy)
@@ -340,6 +344,10 @@ func (c *Client) Restore(
 		return nil, fmt.Errorf("aerospike client is nil")
 	}
 
+	if streamingReader == nil {
+		return nil, fmt.Errorf("streaming reader is nil")
+	}
+
 	// Fill in the default policy on the caller.s config. The default itself is
 	// copied, so the Aerospike client.s own policy is not modified.
 	config.WritePolicy = c.getUsableWritePolicy(config.WritePolicy)
@@ -395,6 +403,10 @@ func (c *Client) Estimate(
 
 	if c.aerospikeClient == nil {
 		return 0, fmt.Errorf("aerospike client is nil")
+	}
+
+	if config.StateFile != "" {
+		return 0, fmt.Errorf("state file is not supported for estimate")
 	}
 
 	// Fill in the default policy on the caller's config. The default itself is

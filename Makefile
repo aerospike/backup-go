@@ -9,6 +9,8 @@ INTEGRATION_TAG = integration
 GO_TEST_FLAGS = -parallel $(NPROC) -timeout=5m -count=1
 
 GOVULNCHECK_VERSION = v1.7.0
+# go.uber.org/nilaway has no tagged releases; pin the module pseudo-version.
+NILAWAY_VERSION = v0.0.0-20260808063849-8649a03c818a
 
 INTEGRATION_SERVICES = scripts/integration-services.sh
 
@@ -19,6 +21,14 @@ fmt:
 .PHONY: lint
 lint:
 	golangci-lint run --build-tags=$(INTEGRATION_TAG)
+
+# Production packages only: skip tests and generated mocks.
+.PHONY: nilaway
+nilaway:
+	$(GO) run go.uber.org/nilaway/cmd/nilaway@$(NILAWAY_VERSION) \
+		-test=false \
+		-exclude-test-files \
+		$$($(GO) list ./... | grep -v '/mocks')
 
 .PHONY: vet
 vet:

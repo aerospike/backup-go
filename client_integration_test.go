@@ -153,7 +153,7 @@ func TestRestoreNilStreamingReader(t *testing.T) {
 
 	_, err = client.Restore(t.Context(), config, nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "streaming reader is nil")
+	assert.Contains(t, err.Error(), "reader is nil")
 }
 
 func TestRestoreInvalidConfig(t *testing.T) {

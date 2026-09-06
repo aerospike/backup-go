@@ -82,7 +82,7 @@ func NewState(
 
 	if config.Continue {
 		if reader == nil {
-			return nil, fmt.Errorf("streaming reader is required when continuing from a state file")
+			return nil, fmt.Errorf("reader is required when continuing from a state file")
 		}
 
 		logger.Debug("initializing state from file", slog.String("file", config.StateFile))

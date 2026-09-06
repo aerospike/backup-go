@@ -281,7 +281,7 @@ func (c *Client) Backup(
 	}
 
 	if config.StateFile != "" && reader == nil {
-		return nil, fmt.Errorf("streaming reader is required when a state file is configured")
+		return nil, fmt.Errorf("reader is required when a state file is configured")
 	}
 
 	// Fill in the default policy on the caller's config. The default itself is
@@ -345,7 +345,7 @@ func (c *Client) Restore(
 	}
 
 	if streamingReader == nil {
-		return nil, fmt.Errorf("streaming reader is nil")
+		return nil, fmt.Errorf("reader is nil")
 	}
 
 	// Fill in the default policy on the caller.s config. The default itself is

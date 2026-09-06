@@ -2666,19 +2666,32 @@ func TestReadUntil(t *testing.T) {
 	})
 }
 
-func TestReadUntilAny(t *testing.T) {
+func TestReadUntilWhitespace(t *testing.T) {
 	t.Parallel()
 
 	t.Run("positive simple", func(t *testing.T) {
 		t.Parallel()
 		src := newTestCountingReader("string\n")
-		got, err := readUntilAny(src, []byte{'\n'})
+		got, err := readUntilWhitespace(src)
 		if err != nil {
-			t.Errorf("readUntilAny() error = %v", err)
+			t.Errorf("readUntilWhitespace() error = %v", err)
 			return
 		}
 		if !reflect.DeepEqual(got, []byte("string")) {
-			t.Errorf("readUntilAny() = %v, want %v", got, []byte("string"))
+			t.Errorf("readUntilWhitespace() = %v, want %v", got, []byte("string"))
+		}
+	})
+
+	t.Run("positive stop at space", func(t *testing.T) {
+		t.Parallel()
+		src := newTestCountingReader("namespace test\n")
+		got, err := readUntilWhitespace(src)
+		if err != nil {
+			t.Errorf("readUntilWhitespace() error = %v", err)
+			return
+		}
+		if !reflect.DeepEqual(got, []byte("namespace")) {
+			t.Errorf("readUntilWhitespace() = %v, want %v", got, []byte("namespace"))
 		}
 	})
 
@@ -2708,19 +2721,6 @@ func TestReadUntilAny(t *testing.T) {
 		}
 	})
 
-	t.Run("positive multiple delimiters", func(t *testing.T) {
-		t.Parallel()
-		src := newTestCountingReader("strHing\n")
-		got, err := readUntilAny(src, []byte{'\n', 'H'})
-		if err != nil {
-			t.Errorf("readUntilAny() error = %v", err)
-			return
-		}
-		if !reflect.DeepEqual(got, []byte("str")) {
-			t.Errorf("readUntilAny() = %v, want %v", got, []byte("str"))
-		}
-	})
-
 	t.Run("positive multiple escaped delimiters", func(t *testing.T) {
 		t.Parallel()
 		src := newTestCountingReader("str\\Hing\n")
@@ -2734,34 +2734,12 @@ func TestReadUntilAny(t *testing.T) {
 		}
 	})
 
-	t.Run("positive unescaped delimiter mid input", func(t *testing.T) {
-		t.Parallel()
-		src := newTestCountingReader("strHing\n")
-		got, err := readUntilAny(src, []byte{'H'})
-		if err != nil {
-			t.Errorf("readUntilAny() error = %v", err)
-			return
-		}
-		if !reflect.DeepEqual(got, []byte("str")) {
-			t.Errorf("readUntilAny() = %v, want %v", got, []byte("str"))
-		}
-	})
-
-	t.Run("negative empty delimiter list", func(t *testing.T) {
-		t.Parallel()
-		src := newTestCountingReader("string\n")
-		_, err := readUntilAny(src, []byte{})
-		if err == nil {
-			t.Errorf("readUntilAny() expected error, got nil")
-		}
-	})
-
 	t.Run("negative no delimiter", func(t *testing.T) {
 		t.Parallel()
 		src := newTestCountingReader("string")
-		_, err := readUntilAny(src, []byte{'\n'})
+		_, err := readUntilWhitespace(src)
 		if err == nil {
-			t.Errorf("readUntilAny() expected error, got nil")
+			t.Errorf("readUntilWhitespace() expected error, got nil")
 		}
 	})
 
@@ -2777,18 +2755,18 @@ func TestReadUntilAny(t *testing.T) {
 	t.Run("negative token too long", func(t *testing.T) {
 		t.Parallel()
 		src := newTestCountingReader(strings.Repeat("a", maxTokenSize+1) + "\n")
-		_, err := readUntilAny(src, []byte{'\n'})
+		_, err := readUntilWhitespace(src)
 		if err == nil {
-			t.Errorf("readUntilAny() expected error, got nil")
+			t.Errorf("readUntilWhitespace() expected error, got nil")
 		}
 	})
 
 	t.Run("negative input empty", func(t *testing.T) {
 		t.Parallel()
 		src := newTestCountingReader("")
-		_, err := readUntilAny(src, []byte{'\n'})
+		_, err := readUntilWhitespace(src)
 		if err == nil {
-			t.Errorf("readUntilAny() expected error, got nil")
+			t.Errorf("readUntilWhitespace() expected error, got nil")
 		}
 	})
 }

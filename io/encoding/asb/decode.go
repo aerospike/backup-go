@@ -302,7 +302,7 @@ func (r *Decoder) readMetadata() (*metaData, error) {
 			return nil, err
 		}
 
-		metaToken, err := readUntilAny(r.reader, delimsSpaceOrNewline)
+		metaToken, err := readUntilWhitespace(r.reader)
 		if err != nil {
 			return nil, err
 		}
@@ -1294,23 +1294,19 @@ func readUntilByte(src *countingReader, delim byte) ([]byte, error) {
 		return nil, err
 	}
 
-	n := len(slice)
+	// Copy slice data - ReadSlice returns internal buffer that becomes invalid on next read
+	buf := make([]byte, 0, len(slice))
+	buf = append(buf, slice...)
 	// ReadSlice includes the delimiter, we need to exclude it
-	if n > 0 && slice[n-1] == delim {
-		n--
-	}
+	buf = bytes.TrimSuffix(buf, []byte{delim})
 
 	// Update tracker offset only
-	src.tracker.offset += uint64(n)
+	src.tracker.offset += uint64(len(buf))
 
 	// Unread the delimiter
 	if err := src.Reader.UnreadByte(); err != nil {
 		return nil, err
 	}
-
-	// Copy slice data - ReadSlice returns internal buffer that becomes invalid on next read
-	buf := make([]byte, n)
-	copy(buf, slice[:n])
 
 	return buf, nil
 }
@@ -1344,64 +1340,23 @@ func readUntilByteEscaped(src *countingReader, delim byte) ([]byte, error) {
 	return nil, errors.New("token larger than max size")
 }
 
-func readUntilAny(src *countingReader, delims []byte) ([]byte, error) {
+func readUntilWhitespace(src *countingReader) ([]byte, error) {
 	var buf []byte
-	totalRead := 0
 
-	for {
-		if totalRead >= maxTokenSize {
-			return nil, errors.New("token larger than max size")
-		}
-
-		buffered := src.Buffered()
-		if buffered == 0 {
-			// Need to fill buffer
-			if _, err := src.Peek(1); err != nil {
-				return nil, err
-			}
-
-			buffered = src.Buffered()
-		}
-
-		data, err := src.Peek(buffered)
-		if err != nil && !errors.Is(err, io.EOF) {
+	for range maxTokenSize {
+		b, err := src.ReadByte()
+		if err != nil {
 			return nil, err
 		}
 
-		// Limit search to maxTokenSize
-		searchLen := len(data)
-		if totalRead+searchLen > maxTokenSize {
-			searchLen = maxTokenSize - totalRead
+		if b == ' ' || b == asbNewLine {
+			return buf, src.UnreadByte()
 		}
 
-		// Find first delimiter in buffered data
-		idx := bytes.IndexAny(data[:searchLen], string(delims))
-		if idx >= 0 {
-			// Found delimiter, read up to it
-			buf = append(buf, data[:idx]...)
-			if _, err := src.Discard(idx); err != nil {
-				return nil, err
-			}
-
-			src.tracker.offset += uint64(idx)
-
-			return buf, nil
-		}
-
-		// No delimiter found in search range
-		if totalRead+searchLen >= maxTokenSize {
-			return nil, errors.New("token larger than max size")
-		}
-
-		// No delimiter in buffer, consume all and continue
-		buf = append(buf, data[:searchLen]...)
-		if _, err := src.Discard(searchLen); err != nil {
-			return nil, err
-		}
-
-		src.tracker.offset += uint64(searchLen)
-		totalRead += searchLen
+		buf = append(buf, b)
 	}
+
+	return nil, errors.New("token larger than max size")
 }
 
 func readUntilAnyEscaped(src *countingReader, delims []byte) ([]byte, error) {

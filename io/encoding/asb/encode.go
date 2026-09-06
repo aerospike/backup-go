@@ -302,6 +302,10 @@ func writeBinNil(name string, w *bytes.Buffer) (int, error) {
 }
 
 func writeRawBlobBin(cdt *a.RawBlobValue, name string, compact bool, w *bytes.Buffer) (int, error) {
+	if cdt == nil {
+		return 0, fmt.Errorf("raw blob bin %q is nil", name)
+	}
+
 	switch cdt.ParticleType {
 	case particleType.MAP:
 		return writeRawMapBin(cdt, name, compact, w)

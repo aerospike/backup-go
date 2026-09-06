@@ -76,16 +76,23 @@ func NewState(
 ) (*State, error) {
 	logger.Debug("initializing state", slog.String("path", config.StateFile))
 
-	switch {
-	case config.isStateFirstRun():
-		logger.Debug("initializing new state")
-		return newState(ctx, config, writer, logger), nil
-	case config.isStateContinue():
+	if config.StateFile == "" {
+		return nil, fmt.Errorf("state file is required")
+	}
+
+	if config.Continue {
+		if reader == nil {
+			return nil, fmt.Errorf("streaming reader is required when continuing from a state file")
+		}
+
 		logger.Debug("initializing state from file", slog.String("file", config.StateFile))
+
 		return newStateFromFile(ctx, config, reader, writer, logger)
 	}
 
-	return nil, nil
+	logger.Debug("initializing new state")
+
+	return newState(ctx, config, writer, logger), nil
 }
 
 // newState creates a new State instance for backup operations.

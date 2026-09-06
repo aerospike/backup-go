@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 	optMocks "github.com/aerospike/backup-go/io/storage/options/mocks"
 	"github.com/aerospike/backup-go/models"
@@ -483,7 +484,7 @@ func (s *AwsSuite) TestReader_StreamFilesEmpty() {
 		options.WithDir(testFolderEmpty),
 		options.WithValidator(mockValidator),
 	)
-	s.Require().ErrorContains(err, "is empty")
+	s.Require().ErrorIs(err, common.ErrEmptyStorage)
 }
 
 func (s *AwsSuite) TestReader_StreamFilesMixed() {

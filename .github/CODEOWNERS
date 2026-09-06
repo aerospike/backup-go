@@ -1,0 +1,10 @@
+# Code owners for aerospike/backup-go.
+#
+# Every pull request against this repository requests a review from the owners
+# listed here. Rules are matched like .gitignore patterns and the last matching
+# rule wins, so a single global rule owns everything.
+#
+# An owner must have at least write access to this repository, otherwise GitHub
+# silently ignores the rule.
+
+*       @filkeith

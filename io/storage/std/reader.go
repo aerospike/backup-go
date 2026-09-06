@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/models"
 )
@@ -40,7 +41,7 @@ func NewReader(ctx context.Context, bufferSize int) (*Reader, error) {
 	}
 
 	if bufferSize < 0 {
-		return nil, fmt.Errorf("buffer size must not be negative")
+		return nil, fmt.Errorf("%w: buffer size must not be negative", errclass.ErrInvalidConfig)
 	}
 
 	if bufferSize == 0 {

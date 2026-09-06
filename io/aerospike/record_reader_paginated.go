@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/aerospike-client-go/v8/types"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -174,7 +175,7 @@ func (r *paginatedRecordReader) startNextScan() error {
 	)
 	if aErr != nil {
 		r.config.scanLimiter.Release(1)
-		return fmt.Errorf("failed to start scan: %w", aErr.Unwrap())
+		return fmt.Errorf("%w: failed to start scan: %w", errclass.ErrAerospike, aErr.Unwrap())
 	}
 
 	r.logger.Debug("partition scan started",
@@ -204,7 +205,7 @@ func (r *paginatedRecordReader) startNextScan() error {
 func (r *paginatedRecordReader) readResult(ctx context.Context) (*a.Result, bool, error) {
 	active := r.active
 	if active == nil {
-		return nil, false, fmt.Errorf("active scan has no results channel")
+		return nil, false, fmt.Errorf("%w: active scan has no results channel", errclass.ErrAerospike)
 	}
 
 	// Fast path
@@ -235,11 +236,11 @@ func (r *paginatedRecordReader) handleResult(res *a.Result) (*models.Token, erro
 			return nil, err
 		}
 
-		return nil, fmt.Errorf("no active scan while handling record result")
+		return nil, fmt.Errorf("%w: no active scan while handling record result", errclass.ErrAerospike)
 	}
 
 	if res == nil {
-		return nil, fmt.Errorf("nil scan result")
+		return nil, fmt.Errorf("%w: nil scan result", errclass.ErrAerospike)
 	}
 
 	if active.needsThrottleCheck {
@@ -265,7 +266,7 @@ func (r *paginatedRecordReader) handleResult(res *a.Result) (*models.Token, erro
 		r.cancel()
 		_ = r.closeActiveScan()
 
-		return nil, fmt.Errorf("failed to read record: %w", res.Err)
+		return nil, fmt.Errorf("%w: failed to read record: %w", errclass.ErrAerospike, res.Err)
 	}
 
 	r.active.count++

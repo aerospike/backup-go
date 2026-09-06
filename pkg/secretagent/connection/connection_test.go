@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aerospike/backup-go/pkg/secret-agent/connection/mocks"
-	"github.com/aerospike/backup-go/pkg/secret-agent/models"
+	"github.com/aerospike/backup-go/pkg/secretagent/connection/mocks"
+	"github.com/aerospike/backup-go/pkg/secretagent/models"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -204,7 +204,7 @@ func TestConnection_ReadBodyError(t *testing.T) {
 
 	_, err := Read(mockConn, testTimeout)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "failed to read header")
+	require.Contains(t, err.Error(), "failed to read body")
 }
 
 func TestConnection_ReadInvalidJSON(t *testing.T) {

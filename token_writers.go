@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@ package backup
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -72,7 +71,7 @@ func (tw *tokenStatsWriter) Write(data *models.Token) (int, error) {
 		case models.TokenTypeSIndex:
 			tw.stats.AddSIndexes(1)
 		case models.TokenTypeInvalid:
-			return 0, errors.New("invalid token")
+			return 0, fmt.Errorf("%w: invalid token", ErrCorruptData)
 		}
 	}
 

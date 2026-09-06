@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,11 +16,12 @@ package streamers
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"path"
 	"strings"
+
+	"github.com/aerospike/backup-go/errclass"
 )
 
 // A server side backup has a fixed layout, and everything in this package is
@@ -77,7 +78,7 @@ var streams = []Stream{QueryStream, ChangeStream}
 // ErrManifestUnusable is returned for a manifest that cannot be turned into a
 // list of segments, whether because it did not parse or because it names
 // something that cannot be located in the storage.
-var ErrManifestUnusable = errors.New("manifest cannot be read")
+var ErrManifestUnusable = fmt.Errorf("%w: manifest cannot be read", errclass.ErrCorruptData)
 
 // namespacesRoot locates the directory naming the namespaces of the backup.
 func namespacesRoot(backupID string) string {

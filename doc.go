@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -78,6 +78,28 @@ functional options from [github.com/aerospike/backup-go/io/storage/options]:
   - io/storage/gcp/storage for Google Cloud Storage
   - io/storage/azure/blob for Azure Blob Storage
   - io/storage/std for stdin and stdout
+
+# Errors
+
+Errors a caller can act on carry an error class: [ErrInvalidConfig],
+[ErrNotFound], [ErrStorage], [ErrCorruptData], [ErrUnsupported],
+[ErrAerospike] and [ErrSecretAgent]. Match them with errors.Is, never by
+comparing message text:
+
+	if _, err := client.Backup(ctx, config, writer, nil); err != nil {
+		switch {
+		case errors.Is(err, backup.ErrInvalidConfig):
+			// bad input, retrying will not help
+		case errors.Is(err, backup.ErrStorage):
+			// infrastructure failure, worth retrying
+		}
+	}
+
+A class is attached once, where the error is created or where an error from
+another library first enters this one; every layer above only adds context, so
+the class reaches the caller intact along with the original error, which stays
+reachable through errors.Is and errors.As. The same values are exported from
+[github.com/aerospike/backup-go/errclass], which the internal packages use.
 
 # Cancellation
 

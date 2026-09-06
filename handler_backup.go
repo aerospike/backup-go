@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -266,7 +266,7 @@ func (bh *backupHandler) run() {
 // getEstimate calculates backup size estimate.
 func (bh *backupHandler) getEstimate(ctx context.Context, recordsNumber int64) (uint64, error) {
 	if recordsNumber < 0 {
-		return 0, fmt.Errorf("samples records number is negative")
+		return 0, fmt.Errorf("%w: samples records number is negative", ErrInvalidConfig)
 	}
 
 	totalCount, err := bh.infoClient.GetRecordCount(ctx, bh.config.Namespace, bh.config.SetList)

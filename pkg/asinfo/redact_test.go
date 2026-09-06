@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import (
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/asinfo/mocks"
-	iModels "github.com/aerospike/backup-go/pkg/asinfo/models"
+	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
 	"github.com/stretchr/testify/require"
 )
 
@@ -77,8 +77,8 @@ func testRestoreCmd() string {
 }
 
 // testRequestCommon returns request fields carrying cloud credentials.
-func testRequestCommon() iModels.RequestCommon {
-	return iModels.RequestCommon{
+func testRequestCommon() infomodels.RequestCommon {
+	return infomodels.RequestCommon{
 		Namespace: testRedactNamespace,
 		Storage:   testRedactStorage,
 		Bucket:    testRedactBucket,
@@ -258,7 +258,7 @@ func Test_StartServer_DoesNotLeakSecretKey(t *testing.T) {
 			logger: slog.Default(),
 			buf:    &defaultBuf,
 			run: func(ic *Client) error {
-				_, err := ic.StartServerBackup(t.Context(), &iModels.RequestBackup{RequestCommon: common})
+				_, err := ic.StartServerBackup(t.Context(), &infomodels.RequestBackup{RequestCommon: common})
 				return err
 			},
 		},
@@ -267,7 +267,7 @@ func Test_StartServer_DoesNotLeakSecretKey(t *testing.T) {
 			logger: slog.New(slog.NewTextHandler(&infoBuf, &slog.HandlerOptions{Level: slog.LevelInfo})),
 			buf:    &infoBuf,
 			run: func(ic *Client) error {
-				_, err := ic.StartServerBackup(t.Context(), &iModels.RequestBackup{RequestCommon: common})
+				_, err := ic.StartServerBackup(t.Context(), &infomodels.RequestBackup{RequestCommon: common})
 				return err
 			},
 		},
@@ -276,7 +276,7 @@ func Test_StartServer_DoesNotLeakSecretKey(t *testing.T) {
 			logger: slog.New(slog.NewTextHandler(&debugBuf, &slog.HandlerOptions{Level: slog.LevelDebug})),
 			buf:    &debugBuf,
 			run: func(ic *Client) error {
-				return ic.StartServerRestore(t.Context(), &iModels.RequestRestore{
+				return ic.StartServerRestore(t.Context(), &infomodels.RequestRestore{
 					RequestCommon: common,
 					JobID:         testRedactJobID,
 				})

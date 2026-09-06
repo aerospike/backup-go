@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -42,6 +42,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/aerospike/backup-go/errclass"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -185,7 +186,7 @@ func WithSeed(seed uint64) Option {
 // newStreamer creates a streamer over one backup of a storage.
 func newStreamer(st store, backupID string, opts ...Option) (*Streamer, error) {
 	if backupID == "" {
-		return nil, errors.New("backup id must not be empty")
+		return nil, fmt.Errorf("%w: backup id must not be empty", errclass.ErrInvalidConfig)
 	}
 
 	s := &Streamer{

@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ func TestRecordError(t *testing.T) {
 
 	err := newRecordError(3, 192, ErrBadEndMark)
 
-	const want = "record 3 at offset 192: bad end marker"
+	want := "record 3 at offset 192: " + ErrBadEndMark.Error()
 	if got := err.Error(); got != want {
 		t.Errorf("Error() = %q, want %q", got, want)
 	}

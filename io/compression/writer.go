@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/klauspost/compress/zstd"
 )
 
@@ -32,7 +33,7 @@ type writer struct {
 func NewWriter(w io.WriteCloser, level int) (io.WriteCloser, error) {
 	zstWriter, err := zstd.NewWriter(w, zstd.WithEncoderLevel(zstd.EncoderLevelFromZstd(level)))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create zstd writer: %w", err)
+		return nil, fmt.Errorf("%w: failed to create zstd writer: %w", errclass.ErrInvalidConfig, err)
 	}
 
 	return &writer{

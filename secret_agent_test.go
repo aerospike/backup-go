@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,9 +32,9 @@ import (
 	"testing"
 	"time"
 
-	saClient "github.com/aerospike/backup-go/pkg/secret-agent"
-	"github.com/aerospike/backup-go/pkg/secret-agent/connection"
-	"github.com/aerospike/backup-go/pkg/secret-agent/models"
+	saClient "github.com/aerospike/backup-go/pkg/secretagent"
+	"github.com/aerospike/backup-go/pkg/secretagent/connection"
+	"github.com/aerospike/backup-go/pkg/secretagent/models"
 	"github.com/stretchr/testify/require"
 )
 

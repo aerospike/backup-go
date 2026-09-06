@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -67,12 +67,12 @@ func doWork(errors chan<- error, done chan<- struct{}, logger *slog.Logger, work
 func newKeyByDigest(namespace, digest string) (*a.Key, error) {
 	digestBytes, err := base64.StdEncoding.DecodeString(digest)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode after-digest: %w", err)
+		return nil, fmt.Errorf("%w: failed to decode after-digest: %w", ErrInvalidConfig, err)
 	}
 
 	key, err := a.NewKeyWithDigest(namespace, "", "", digestBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to init key from digest: %w", err)
+		return nil, fmt.Errorf("%w: failed to init key from digest: %w", ErrInvalidConfig, err)
 	}
 
 	return key, nil
@@ -98,7 +98,7 @@ func validateFileLimit(fileLimit uint64, w Writer) error {
 
 	// Double check chunk size. Not to divide by zero.
 	if chunkSize <= 0 {
-		return fmt.Errorf("chunk size must be positive, got %d", chunkSize)
+		return fmt.Errorf("%w: chunk size must be positive, got %d", ErrInvalidConfig, chunkSize)
 	}
 
 	const maxChunks = 10_000
@@ -107,9 +107,9 @@ func validateFileLimit(fileLimit uint64, w Writer) error {
 
 	if chunks >= maxChunks {
 		return fmt.Errorf(
-			"file limit %d with chunk size %d requires %d chunks, exceeds maximum of %d: "+
+			"%w: file limit %d with chunk size %d requires %d chunks, exceeds maximum of %d: "+
 				"increase chunk size or decrease file limit",
-			fileLimit, chunkSize, chunks, maxChunks,
+			ErrInvalidConfig, fileLimit, chunkSize, chunks, maxChunks,
 		)
 	}
 

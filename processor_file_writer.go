@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -91,7 +91,7 @@ func newFileWriterProcessor(
 
 	// Check writer and parallelism.
 	if p.isSingleFileBackup() && parallel > 1 {
-		return nil, fmt.Errorf("parallel running for single file is not allowed")
+		return nil, fmt.Errorf("%w: parallel running for single file is not allowed", ErrInvalidConfig)
 	}
 
 	return p, nil
@@ -277,7 +277,7 @@ func newCompressionWriter(
 		return compression.NewWriter(writer, policy.Level)
 	}
 
-	return nil, fmt.Errorf("unknown compression mode %s", policy.Mode)
+	return nil, fmt.Errorf("%w: unknown compression mode %s", ErrUnsupported, policy.Mode)
 }
 
 // newEncryptionWriter returns an encryption writer for encrypting backup.

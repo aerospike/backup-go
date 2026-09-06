@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -48,7 +49,8 @@ func (p changeNamespace) Process(t *models.Token) (*models.Token, error) {
 
 	key := t.Record.Key
 	if key.Namespace() != *p.source {
-		return nil, fmt.Errorf("invalid namespace %s (expected: %s)", key.Namespace(), *p.source)
+		return nil, fmt.Errorf("%w: invalid namespace %s (expected: %s)",
+			errclass.ErrInvalidConfig, key.Namespace(), *p.source)
 	}
 
 	newKey, err := a.NewKeyWithDigest(*p.destination, key.SetName(), key.Value(), key.Digest())

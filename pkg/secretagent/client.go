@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//nolint:revive,nolintlint // We want to use package name with underscore.
-package secret_agent
+package secretagent
 
 import (
 	"context"
@@ -21,7 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aerospike/backup-go/pkg/secret-agent/connection"
+	"github.com/aerospike/backup-go/errclass"
+	"github.com/aerospike/backup-go/pkg/secretagent/connection"
 	"github.com/segmentio/asm/base64"
 )
 
@@ -55,7 +55,7 @@ func NewClient(connectionType, address string, timeout time.Duration, isBase64 b
 	tlsConfig *tls.Config,
 ) (*Client, error) {
 	if tlsConfig != nil && connectionType != ConnectionTypeTCP {
-		return nil, fmt.Errorf("tls connection type %s is not supported", connectionType)
+		return nil, fmt.Errorf("%w: tls connection type %s is not supported", errclass.ErrUnsupported, connectionType)
 	}
 
 	return &Client{
@@ -73,18 +73,21 @@ func NewClient(connectionType, address string, timeout time.Duration, isBase64 b
 func (c *Client) GetSecret(ctx context.Context, resource, secretKey string) (string, error) {
 	conn, err := connection.Get(ctx, c.connectionType, c.address, c.timeout, c.tlsConfig)
 	if err != nil {
-		return "", fmt.Errorf("failed to connect to secret agent: %w", err)
+		return "", fmt.Errorf("%w: failed to connect to secret agent over %s at %s: %w",
+			errclass.ErrSecretAgent, c.connectionType, c.address, err)
 	}
 
 	defer func() { _ = conn.Close() }()
 
+	// The transport already attaches the class, so these only name the resource
+	// the request was made for.
 	if err := connection.Write(conn, c.timeout, resource, secretKey); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to request resource %s: %w", resource, err)
 	}
 
 	response, err := connection.Read(conn, c.timeout)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read response for resource %s: %w", resource, err)
 	}
 
 	// If the secret agent is configured to encode all responses to base64,
@@ -94,7 +97,8 @@ func (c *Client) GetSecret(ctx context.Context, resource, secretKey string) (str
 
 		decoded, err = base64.StdEncoding.DecodeString(response)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("%w: failed to decode base64 response for resource %s: %w",
+				errclass.ErrCorruptData, resource, err)
 		}
 
 		return string(decoded), nil

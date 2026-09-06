@@ -3,7 +3,7 @@
 # Image versions and setup match .github/workflows/tests.yml.
 set -euo pipefail
 
-readonly AEROSPIKE_IMAGE="aerospike/aerospike-server-enterprise:8.0.0.7"
+readonly AEROSPIKE_IMAGE="aerospike/aerospike-server-enterprise:8.1.2.4"
 readonly AZURITE_IMAGE="mcr.microsoft.com/azure-storage/azurite:3.35.0"
 readonly FAKE_GCS_IMAGE="fsouza/fake-gcs-server:1.52.2"
 readonly MINIO_IMAGE="minio/minio:RELEASE.2025-09-07T16-13-09Z"

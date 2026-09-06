@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,8 +26,9 @@ import (
 	"strings"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/models"
-	m "github.com/aerospike/backup-go/pkg/asinfo/models"
+	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
 )
 
 func parseUDFResponse(udfGetInfoResp string) (*models.UDF, error) {
@@ -47,11 +48,11 @@ func parseUDFResponse(udfGetInfoResp string) (*models.UDF, error) {
 func parseResultResponse(cmd string, result map[string]string) (string, error) {
 	v, ok := result[cmd]
 	if !ok {
-		return "", fmt.Errorf("no response for command %s", redactCmd(cmd))
+		return "", fmt.Errorf("%w: no response for command %s", errclass.ErrAerospike, redactCmd(cmd))
 	}
 
 	if strings.Contains(v, errCmdRespPrefix) {
-		return "", fmt.Errorf("command %s failed: %s", redactCmd(cmd), redactCmd(v))
+		return "", fmt.Errorf("%w: command %s failed: %s", errclass.ErrAerospike, redactCmd(cmd), redactCmd(v))
 	}
 
 	return v, nil
@@ -59,7 +60,7 @@ func parseResultResponse(cmd string, result map[string]string) (string, error) {
 
 func (ic *Client) requestSIndexes(node infoGetter, namespace string, policy *a.InfoPolicy, noWarn bool,
 ) ([]*models.SIndex, error) {
-	supportsSIndexCTX := m.AerospikeVersionSupportsSIndexContext
+	supportsSIndexCTX := infomodels.AerospikeVersionSupportsSIndexContext
 
 	version, err := ic.getAerospikeVersion(node, policy)
 	if err != nil {
@@ -94,45 +95,50 @@ func (ic *Client) buildSindexCmd(namespace string, getCtx bool) string {
 	return cmd
 }
 
-func (ic *Client) getAerospikeVersion(conn infoGetter, policy *a.InfoPolicy) (m.AerospikeVersion, error) {
+func (ic *Client) getAerospikeVersion(conn infoGetter, policy *a.InfoPolicy) (infomodels.AerospikeVersion, error) {
 	// As we need to check version before we form dict, this command will be loaded directly.
 	cmd := cmdBuild
 
 	versionResp, aErr := conn.RequestInfo(policy, cmd)
 	if aErr != nil {
-		return m.AerospikeVersion{}, aErr
+		return infomodels.AerospikeVersion{}, fmt.Errorf("%w: failed to get build version: %w",
+			errclass.ErrAerospike, aErr)
 	}
 
 	versionStr, err := parseResultResponse(cmd, versionResp)
 	if err != nil {
-		return m.AerospikeVersion{}, fmt.Errorf("failed to parse get version response: %s: %w", versionResp, err)
+		return infomodels.AerospikeVersion{}, fmt.Errorf("failed to parse get version response: %s: %w", versionResp, err)
 	}
 
 	return parseAerospikeVersion(versionStr)
 }
 
-func parseAerospikeVersion(versionStr string) (m.AerospikeVersion, error) {
-	matches := m.AerospikeVersionRegex.FindStringSubmatch(versionStr)
+func parseAerospikeVersion(versionStr string) (infomodels.AerospikeVersion, error) {
+	matches := infomodels.AerospikeVersionRegex.FindStringSubmatch(versionStr)
 	if len(matches) != 4 {
-		return m.AerospikeVersion{}, fmt.Errorf("failed to parse Aerospike version from '%s'", versionStr)
+		return infomodels.AerospikeVersion{}, fmt.Errorf("%w: failed to parse Aerospike version from '%s'",
+			errclass.ErrAerospike, versionStr)
 	}
 
 	major, err := strconv.Atoi(matches[1])
 	if err != nil {
-		return m.AerospikeVersion{}, fmt.Errorf("failed to parse Aerospike major version %w", err)
+		return infomodels.AerospikeVersion{}, fmt.Errorf("%w: failed to parse Aerospike major version: %w",
+			errclass.ErrAerospike, err)
 	}
 
 	minor, err := strconv.Atoi(matches[2])
 	if err != nil {
-		return m.AerospikeVersion{}, fmt.Errorf("failed to parse Aerospike minor version %w", err)
+		return infomodels.AerospikeVersion{}, fmt.Errorf("%w: failed to parse Aerospike minor version: %w",
+			errclass.ErrAerospike, err)
 	}
 
 	patch, err := strconv.Atoi(matches[3])
 	if err != nil {
-		return m.AerospikeVersion{}, fmt.Errorf("failed to parse Aerospike patch version %w", err)
+		return infomodels.AerospikeVersion{}, fmt.Errorf("%w: failed to parse Aerospike patch version: %w",
+			errclass.ErrAerospike, err)
 	}
 
-	return m.AerospikeVersion{
+	return infomodels.AerospikeVersion{
 		Major: major,
 		Minor: minor,
 		Patch: patch,
@@ -188,7 +194,7 @@ func (ic *Client) warnInvalidSIndexType(noWarn bool, sindexMap map[string]string
 }
 
 // parseSIndex parses a single InfoMap containing a sindex into a SecondaryIndex model.
-func parseSIndex(sindexMap m.InfoMap) (*models.SIndex, error) {
+func parseSIndex(sindexMap infomodels.InfoMap) (*models.SIndex, error) {
 	si := &models.SIndex{}
 
 	var err error
@@ -220,7 +226,7 @@ func parseSIndex(sindexMap m.InfoMap) (*models.SIndex, error) {
 			si.Path = path
 		case si.IndexType != models.SetSIndex:
 			// Set indexes are the only kind allowed to have no bin.
-			return nil, fmt.Errorf("sindex missing bin")
+			return nil, fmt.Errorf("%w: sindex missing bin", errclass.ErrAerospike)
 		}
 	} else {
 		si.Path = models.NewEmptySIndexPath()
@@ -233,10 +239,10 @@ func parseSIndex(sindexMap m.InfoMap) (*models.SIndex, error) {
 
 // requireField returns the value for key or an error mentioning name
 // if the key is absent.
-func requireField(sindexMap m.InfoMap, key string) (string, error) {
+func requireField(sindexMap infomodels.InfoMap, key string) (string, error) {
 	val, ok := sindexMap[key]
 	if !ok {
-		return "", fmt.Errorf("sindex missing %s", key)
+		return "", fmt.Errorf("%w: sindex missing %s", errclass.ErrAerospike, key)
 	}
 
 	return val, nil
@@ -245,7 +251,7 @@ func requireField(sindexMap m.InfoMap, key string) (string, error) {
 // optionalField returns the value for key, treating a missing key and the
 // server's "NULL" placeholder (used for empty set/context/exp in the sindex
 // list info response) as an empty value.
-func optionalField(sindexMap m.InfoMap, key string) string {
+func optionalField(sindexMap infomodels.InfoMap, key string) string {
 	val, ok := sindexMap[key]
 	if !ok || strings.EqualFold(val, "null") {
 		return ""
@@ -274,7 +280,7 @@ func parseSIndexType(val string) (models.SIndexType, error) {
 
 // parseSIndexPath parses the optional bin/type/context fields.
 // hasBin reports whether the "bin" field was present at all.
-func parseSIndexPath(sindexMap m.InfoMap) (path models.SIndexPath, hasBin bool, err error) {
+func parseSIndexPath(sindexMap infomodels.InfoMap) (path models.SIndexPath, hasBin bool, err error) {
 	bin, ok := sindexMap["bin"]
 	if !ok {
 		return models.SIndexPath{}, false, nil
@@ -282,7 +288,7 @@ func parseSIndexPath(sindexMap m.InfoMap) (path models.SIndexPath, hasBin bool, 
 
 	rawType, ok := sindexMap["type"]
 	if !ok {
-		return models.SIndexPath{}, true, fmt.Errorf("sindex missing type")
+		return models.SIndexPath{}, true, fmt.Errorf("%w: sindex missing type", errclass.ErrAerospike)
 	}
 
 	binType, err := parseSIndexBinType(rawType)
@@ -311,11 +317,11 @@ func parseSIndexBinType(val string) (models.SIPathBinType, error) {
 		return models.EmptySIDataType, nil
 	default:
 		var zero models.SIPathBinType
-		return zero, fmt.Errorf("invalid sindex type: %s", val)
+		return zero, fmt.Errorf("%w: invalid sindex type: %s", errclass.ErrAerospike, val)
 	}
 }
 
-func parseUDF(udfMap m.InfoMap) (*models.UDF, error) {
+func parseUDF(udfMap infomodels.InfoMap) (*models.UDF, error) {
 	var (
 		udf     models.UDF
 		udfLang string
@@ -324,13 +330,13 @@ func parseUDF(udfMap m.InfoMap) (*models.UDF, error) {
 	if val, ok := udfMap["type"]; ok {
 		udfLang = val
 	} else {
-		return nil, fmt.Errorf("UDF info response missing language type")
+		return nil, fmt.Errorf("%w: UDF info response missing language type", errclass.ErrAerospike)
 	}
 
 	if strings.EqualFold(udfLang, "lua") {
 		udf.UDFType = models.UDFTypeLUA
 	} else {
-		return nil, fmt.Errorf("invalid UDF language type: %s", udfLang)
+		return nil, fmt.Errorf("%w: invalid UDF language type: %s", errclass.ErrAerospike, udfLang)
 	}
 
 	if val, ok := udfMap["content"]; ok {
@@ -342,7 +348,7 @@ func parseUDF(udfMap m.InfoMap) (*models.UDF, error) {
 
 		udf.Content = content
 	} else {
-		return nil, fmt.Errorf("UDF info response missing content")
+		return nil, fmt.Errorf("%w: UDF info response missing content", errclass.ErrAerospike)
 	}
 
 	return &udf, nil
@@ -354,7 +360,7 @@ func parseUDF(udfMap m.InfoMap) (*models.UDF, error) {
 // e.g. "foo=bar:baz=qux;foo=bar:baz=qux"
 // the above example is returned as []infoMap{infoMap{"foo": "bar", "baz": "qux"}, InfoMap{"foo": "bar", "baz": "qux"}}
 // if the passed in info response is empty, nil is returned.
-func parseInfoResponse(resp, objSep, pairSep, kvSep string) ([]m.InfoMap, error) {
+func parseInfoResponse(resp, objSep, pairSep, kvSep string) ([]infomodels.InfoMap, error) {
 	if resp == "" {
 		return nil, nil
 	}
@@ -369,7 +375,7 @@ func parseInfoResponse(resp, objSep, pairSep, kvSep string) ([]m.InfoMap, error)
 	}
 
 	objects := strings.Split(resp, objSep)
-	info := make([]m.InfoMap, len(objects))
+	info := make([]infomodels.InfoMap, len(objects))
 
 	for i, object := range objects {
 		data, err := parseInfoObject(object, pairSep, kvSep)
@@ -383,7 +389,7 @@ func parseInfoResponse(resp, objSep, pairSep, kvSep string) ([]m.InfoMap, error)
 	return info, nil
 }
 
-func parseInfoObject(obj, pairSep, kvSep string) (m.InfoMap, error) {
+func parseInfoObject(obj, pairSep, kvSep string) (infomodels.InfoMap, error) {
 	if obj == "" {
 		return nil, nil
 	}
@@ -427,7 +433,7 @@ func parseInfoKVPair(pair, kvSep string) (key, val string, err error) {
 	// so we need to split on the first separator only
 	kv := strings.SplitN(pair, kvSep, 2)
 	if len(kv) != 2 {
-		return "", "", fmt.Errorf("invalid key-value pair: %s", pair)
+		return "", "", fmt.Errorf("%w: invalid key-value pair: %s", errclass.ErrAerospike, pair)
 	}
 
 	// make keys case-insensitive
@@ -440,25 +446,25 @@ func parseInfoKVPair(pair, kvSep string) (key, val string, err error) {
 
 // parseSindexListResponse parses a sindex-list info response
 // example resp: ns=source-ns1:indexname=idx_timestamp:set=metrics:bin=timestamp:type=numeric:indextype=default
-func parseSindexListResponse(resp string) ([]m.InfoMap, error) {
+func parseSindexListResponse(resp string) ([]infomodels.InfoMap, error) {
 	return parseInfoResponse(resp, ";", ":", "=")
 }
 
 // parseUDFListResponse parses a udf-list info response
 // example resp: filename=basic_udf.lua,hash=706c57cb29e027221560a3cb4b693573ada98bf2,type=LUA;...
-func parseUDFListResponse(resp string) ([]m.InfoMap, error) {
+func parseUDFListResponse(resp string) ([]infomodels.InfoMap, error) {
 	return parseInfoResponse(resp, ";", ",", "=")
 }
 
 // parseUDFGetResponse parses a udf-get info response
 // example resp: type=LUA;content=LS0gQSB2ZXJ5IHNpbXBsZSBhcml0
-func parseUDFGetResponse(resp string) (m.InfoMap, error) {
+func parseUDFGetResponse(resp string) (infomodels.InfoMap, error) {
 	return parseInfoObject(resp, ";", "=")
 }
 
 func executeWithRetry(ctx context.Context, policy *models.RetryPolicy, command func() error) error {
 	if policy == nil {
-		return fmt.Errorf("retry policy cannot be nil")
+		return fmt.Errorf("%w: retry policy cannot be nil", errclass.ErrInvalidConfig)
 	}
 
 	return policy.Do(ctx, command)
@@ -468,7 +474,7 @@ func executeWithRetry(ctx context.Context, policy *models.RetryPolicy, command f
 func base64StringToBitArray(base64Str string) ([]bool, error) {
 	decodedBytes, err := base64.StdEncoding.DecodeString(base64Str)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode base64 string: %w", err)
+		return nil, fmt.Errorf("%w: failed to decode base64 string: %w", errclass.ErrAerospike, err)
 	}
 
 	bitarray := make([]bool, 0, len(decodedBytes)*8) // Pre-allocate for efficiency
@@ -501,8 +507,8 @@ func bitMapToIntSlice(b []bool) []int {
 
 // filterBackupsSortedByTimeSinceDone filters backup jobs from the given list
 // and sorts them by time-since-done in ascending order.
-func filterBackupsSortedByTimeSinceDone(jobs []m.InfoMap) ([]m.InfoMap, error) {
-	fJobs := make([]m.InfoMap, 0)
+func filterBackupsSortedByTimeSinceDone(jobs []infomodels.InfoMap) ([]infomodels.InfoMap, error) {
+	fJobs := make([]infomodels.InfoMap, 0)
 
 	for _, job := range jobs {
 		if job["job-type"] != jobTypeBackup {
@@ -514,7 +520,7 @@ func filterBackupsSortedByTimeSinceDone(jobs []m.InfoMap) ([]m.InfoMap, error) {
 	type indexed struct {
 		t       int64
 		present bool
-		job     m.InfoMap
+		job     infomodels.InfoMap
 	}
 
 	idx := make([]indexed, len(fJobs))

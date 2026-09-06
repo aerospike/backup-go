@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 package backup
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -177,9 +178,22 @@ func (c *ConfigBackup) withoutFilter() bool {
 }
 
 // validate validates the ConfigBackup.
+// Every validation failure is wrapped with [ErrInvalidConfig], so callers can
+// detect configuration problems with errors.Is.
+func (c *ConfigBackup) validate() error {
+	if err := c.validateFields(); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidConfig, err)
+	}
+
+	return nil
+}
+
+// validateFields reports the first invalid field of the ConfigBackup.
+// It returns a bare error: wrapping with [ErrInvalidConfig] is done once, by
+// validate, to keep the message free of duplicated prefixes.
 //
 //nolint:gocyclo // contains a long list of validations
-func (c *ConfigBackup) validate() error {
+func (c *ConfigBackup) validateFields() error {
 	if c.ParallelRead < MinParallel || c.ParallelRead > MaxParallel {
 		return fmt.Errorf("parallel read must be between %d and %d, got %d",
 			MinParallel, MaxParallel, c.ParallelRead)
@@ -195,7 +209,7 @@ func (c *ConfigBackup) validate() error {
 	}
 
 	if c.isProcessedByNodes() && !c.isDefaultPartitionFilter() {
-		return fmt.Errorf("process by nodes, racks and/or and after digest/partition and the same time not allowed")
+		return errors.New("node list or rack list cannot be combined with partition filters or after digest")
 	}
 
 	if c.PageSize > 0 && len(c.PartitionFilters) == 0 {

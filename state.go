@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -142,7 +142,7 @@ func newStateFromFile(
 
 	var s State
 	if err = dec.Decode(&s); err != nil {
-		return nil, fmt.Errorf("failed to decode state: %w", err)
+		return nil, fmt.Errorf("%w: failed to decode state: %w", ErrCorruptData, err)
 	}
 
 	s.ctx = ctx

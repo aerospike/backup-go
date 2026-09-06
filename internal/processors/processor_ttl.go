@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"math"
 	"sync/atomic"
 
+	"github.com/aerospike/backup-go/errclass"
 	cltime "github.com/aerospike/backup-go/internal/citrusleaf_time"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
@@ -79,14 +80,14 @@ func (p *expirationSetter) Process(t *models.Token) (*models.Token, error) {
 		}
 
 		if ttl > math.MaxUint32 {
-			return nil, fmt.Errorf("calculated TTL %d is too large", ttl)
+			return nil, fmt.Errorf("%w: calculated TTL %d is too large", errclass.ErrCorruptData, ttl)
 		}
 
 		record.Expiration = uint32(ttl)
 	case record.VoidTime == 0:
 		record.Expiration = models.ExpirationNever
 	default:
-		return nil, fmt.Errorf("invalid void time %d", record.VoidTime)
+		return nil, fmt.Errorf("%w: invalid void time %d", errclass.ErrCorruptData, record.VoidTime)
 	}
 
 	return t, nil

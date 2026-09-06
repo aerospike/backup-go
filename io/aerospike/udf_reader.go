@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"io"
 	"log/slog"
 
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
@@ -61,7 +62,7 @@ func (r *UdfReader) Read(ctx context.Context) (*models.Token, error) {
 
 		udfs, err := r.client.GetUDFs(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch UDFs: %w", err)
+			return nil, fmt.Errorf("%w: failed to fetch UDFs: %w", errclass.ErrAerospike, err)
 		}
 
 		r.udfs = make(chan *models.UDF, len(udfs))

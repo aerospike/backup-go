@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"log/slog"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -55,11 +56,12 @@ func (rw *udfWriter) writeUDF(udf *models.UDF) error {
 	case models.UDFTypeLUA:
 		udfLang = a.LUA
 	default:
-		return fmt.Errorf("failed to register UDF %s: invalid UDF language %b", udf.Name, udf.UDFType)
+		return fmt.Errorf("%w: failed to register UDF %s: invalid UDF language %b",
+			errclass.ErrCorruptData, udf.Name, udf.UDFType)
 	}
 
 	if err := rw.executeWrite(udf, udfLang); err != nil {
-		return fmt.Errorf("failed to register UDF %s: %w", udf.Name, err)
+		return fmt.Errorf("%w: failed to register UDF %s: %w", errclass.ErrAerospike, udf.Name, err)
 	}
 
 	rw.logger.Debug("registered UDF", slog.String("name", udf.Name))
@@ -76,18 +78,18 @@ func (rw *udfWriter) executeWrite(udf *models.UDF, udfLang a.Language) error {
 func (rw *udfWriter) executeWriteOnce(udf *models.UDF, udfLang a.Language) error {
 	job, aerr := rw.asc.RegisterUDF(rw.writePolicy, udf.Content, udf.Name, udfLang)
 	if aerr != nil {
-		return fmt.Errorf("failed to register UDF %s: %w", udf.Name, aerr)
+		return fmt.Errorf("%w: failed to register UDF %s: %w", errclass.ErrAerospike, udf.Name, aerr)
 	}
 
 	if job == nil {
-		return fmt.Errorf("failed to register UDF %s: job is nil", udf.Name)
+		return fmt.Errorf("%w: failed to register UDF %s: job is nil", errclass.ErrAerospike, udf.Name)
 	}
 
 	errs := job.OnComplete()
 
 	err := <-errs
 	if err != nil {
-		return fmt.Errorf("failed to register UDF %s: %w", udf.Name, err)
+		return fmt.Errorf("%w: failed to register UDF %s: %w", errclass.ErrAerospike, udf.Name, err)
 	}
 
 	return nil

@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ import (
 	"math"
 	"math/rand/v2"
 	"time"
+
+	"github.com/aerospike/backup-go/errclass"
 )
 
 // RetryPolicy defines the configuration for retry attempts in case of failures.
@@ -58,11 +60,11 @@ func (p *RetryPolicy) Validate() error {
 	}
 
 	if p.BaseTimeout < 0 {
-		return fmt.Errorf("base timeout must be non-negative")
+		return fmt.Errorf("%w: base timeout must be non-negative", errclass.ErrInvalidConfig)
 	}
 
 	if p.Multiplier < 1 {
-		return fmt.Errorf("multiplier must be greater than or equal to 1")
+		return fmt.Errorf("%w: multiplier must be greater than or equal to 1", errclass.ErrInvalidConfig)
 	}
 
 	// MaxRetries validation removed - 0 is valid (means no retries)

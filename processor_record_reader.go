@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -257,8 +257,8 @@ func (rr *recordReaderProcessor) filterNodes(ctx context.Context, nodesList []st
 
 	// Check that we found all nodes.
 	if len(filteredNodes) != len(nodesList) {
-		return nil, fmt.Errorf("failed to find all nodes %d/%d in list: %v",
-			len(filteredNodes), len(nodesList), nodesList)
+		return nil, fmt.Errorf("%w: failed to find all nodes %d/%d in list: %v",
+			ErrNotFound, len(filteredNodes), len(nodesList), nodesList)
 	}
 
 	return filteredNodes, nil

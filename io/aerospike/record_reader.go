@@ -185,7 +185,7 @@ func (r *singleRecordReader) ensureActiveScan(ctx context.Context) error {
 // readResult blocks on the active scan's result channel, respecting context cancellation.
 func (r *singleRecordReader) readResult(ctx context.Context) (*a.Result, bool, error) {
 	if r.active == nil {
-		return nil, false, fmt.Errorf("active scan has no results channel")
+		return nil, false, fmt.Errorf("%w: active scan has no results channel", models.ErrAerospike)
 	}
 
 	// Fast path: if a result is immediately available, return it without
@@ -220,11 +220,11 @@ func (r *singleRecordReader) handleResult(res *a.Result) (*models.Token, error) 
 			return nil, err
 		}
 
-		return nil, fmt.Errorf("no active scan while handling record result")
+		return nil, fmt.Errorf("%w: no active scan while handling record result", models.ErrAerospike)
 	}
 
 	if res == nil {
-		return nil, fmt.Errorf("nil scan result")
+		return nil, fmt.Errorf("%w: nil scan result", models.ErrAerospike)
 	}
 
 	// On the first result only, check whether the DB signaled throttling.
@@ -246,7 +246,7 @@ func (r *singleRecordReader) handleResult(res *a.Result) (*models.Token, error) 
 		r.cancel()
 		_ = r.closeActiveScan()
 
-		return nil, fmt.Errorf("failed to read record: %w", res.Err)
+		return nil, fmt.Errorf("%w: failed to read record: %w", models.ErrAerospike, res.Err)
 	}
 
 	if r.config.rpsCollector != nil {
@@ -286,7 +286,7 @@ func (r *singleRecordReader) startNextScan() error {
 	}
 
 	if r.config.partitionFilter == nil {
-		return fmt.Errorf("partition filter is required for scan")
+		return fmt.Errorf("%w: partition filter is required for scan", models.ErrInvalidConfig)
 	}
 
 	if err := r.ctx.Err(); err != nil {
@@ -304,7 +304,7 @@ func (r *singleRecordReader) startNextScan() error {
 	if err != nil {
 		r.config.scanLimiter.Release(1)
 
-		return fmt.Errorf("failed to start scan for set %q namespace %q filter %s: %w",
+		return fmt.Errorf("%w: failed to start scan for set %q namespace %q filter %s: %w", models.ErrAerospike,
 			set, r.config.namespace, printPartitionFilter(&pf), err)
 	}
 

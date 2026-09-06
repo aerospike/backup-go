@@ -55,11 +55,12 @@ func (rw *udfWriter) writeUDF(udf *models.UDF) error {
 	case models.UDFTypeLUA:
 		udfLang = a.LUA
 	default:
-		return fmt.Errorf("failed to register UDF %s: invalid UDF language %b", udf.Name, udf.UDFType)
+		return fmt.Errorf("%w: failed to register UDF %s: invalid UDF language %b",
+			models.ErrCorruptData, udf.Name, udf.UDFType)
 	}
 
 	if err := rw.executeWrite(udf, udfLang); err != nil {
-		return fmt.Errorf("failed to register UDF %s: %w", udf.Name, err)
+		return fmt.Errorf("%w: failed to register UDF %s: %w", models.ErrAerospike, udf.Name, err)
 	}
 
 	rw.logger.Debug("registered UDF", slog.String("name", udf.Name))
@@ -76,18 +77,18 @@ func (rw *udfWriter) executeWrite(udf *models.UDF, udfLang a.Language) error {
 func (rw *udfWriter) executeWriteOnce(udf *models.UDF, udfLang a.Language) error {
 	job, aerr := rw.asc.RegisterUDF(rw.writePolicy, udf.Content, udf.Name, udfLang)
 	if aerr != nil {
-		return fmt.Errorf("failed to register UDF %s: %w", udf.Name, aerr)
+		return fmt.Errorf("%w: failed to register UDF %s: %w", models.ErrAerospike, udf.Name, aerr)
 	}
 
 	if job == nil {
-		return fmt.Errorf("failed to register UDF %s: job is nil", udf.Name)
+		return fmt.Errorf("%w: failed to register UDF %s: job is nil", models.ErrAerospike, udf.Name)
 	}
 
 	errs := job.OnComplete()
 
 	err := <-errs
 	if err != nil {
-		return fmt.Errorf("failed to register UDF %s: %w", udf.Name, err)
+		return fmt.Errorf("%w: failed to register UDF %s: %w", models.ErrAerospike, udf.Name, err)
 	}
 
 	return nil

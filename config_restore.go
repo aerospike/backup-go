@@ -94,7 +94,21 @@ func NewDefaultRestoreConfig() *ConfigRestore {
 	}
 }
 
+// validate validates the ConfigRestore.
+// Every validation failure is wrapped with [ErrInvalidConfig], so callers can
+// detect configuration problems with errors.Is.
 func (c *ConfigRestore) validate() error {
+	if err := c.validateFields(); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidConfig, err)
+	}
+
+	return nil
+}
+
+// validateFields reports the first invalid field of the ConfigRestore.
+// It returns a bare error: wrapping with [ErrInvalidConfig] is done once, by
+// validate, to keep the message free of duplicated prefixes.
+func (c *ConfigRestore) validateFields() error {
 	if c.Parallel < MinParallel || c.Parallel > MaxParallel {
 		return fmt.Errorf("parallel must be between %d and %d, got %d",
 			MinParallel, MaxParallel, c.Parallel)

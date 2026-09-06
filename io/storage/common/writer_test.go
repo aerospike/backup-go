@@ -17,6 +17,7 @@ package common
 import (
 	"testing"
 
+	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -229,8 +230,10 @@ func TestGetFullPath(t *testing.T) {
 
 			if tt.wantErr {
 				require.Error(t, err, "expected error but got none")
-				assert.Equal(t, tt.errMsg, err.Error(), "error message mismatch")
-				assert.Equal(t, tt.want, got, "expected empty string on error")
+				// The class is the contract, the message text is not.
+				require.ErrorIs(t, err, models.ErrInvalidConfig, "error class mismatch")
+				require.ErrorContains(t, err, tt.errMsg, "error message mismatch")
+				require.Equal(t, tt.want, got, "expected empty string on error")
 				return
 			}
 

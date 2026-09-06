@@ -135,7 +135,7 @@ func newStateFromFile(
 
 	var s State
 	if err = dec.Decode(&s); err != nil {
-		return nil, fmt.Errorf("failed to decode state: %w", err)
+		return nil, fmt.Errorf("%w: failed to decode state: %w", ErrCorruptData, err)
 	}
 
 	s.ctx = ctx

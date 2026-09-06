@@ -47,11 +47,11 @@ func parseUDFResponse(udfGetInfoResp string) (*models.UDF, error) {
 func parseResultResponse(cmd string, result map[string]string) (string, error) {
 	v, ok := result[cmd]
 	if !ok {
-		return "", fmt.Errorf("no response for command %s", redactCmd(cmd))
+		return "", fmt.Errorf("%w: no response for command %s", models.ErrAerospike, redactCmd(cmd))
 	}
 
 	if strings.Contains(v, errCmdRespPrefix) {
-		return "", fmt.Errorf("command %s failed: %s", redactCmd(cmd), redactCmd(v))
+		return "", fmt.Errorf("%w: command %s failed: %s", models.ErrAerospike, redactCmd(cmd), redactCmd(v))
 	}
 
 	return v, nil
@@ -114,22 +114,23 @@ func (ic *Client) getAerospikeVersion(conn infoGetter, policy *a.InfoPolicy) (m.
 func parseAerospikeVersion(versionStr string) (m.AerospikeVersion, error) {
 	matches := m.AerospikeVersionRegex.FindStringSubmatch(versionStr)
 	if len(matches) != 4 {
-		return m.AerospikeVersion{}, fmt.Errorf("failed to parse Aerospike version from '%s'", versionStr)
+		return m.AerospikeVersion{}, fmt.Errorf("%w: failed to parse Aerospike version from '%s'",
+			models.ErrAerospike, versionStr)
 	}
 
 	major, err := strconv.Atoi(matches[1])
 	if err != nil {
-		return m.AerospikeVersion{}, fmt.Errorf("failed to parse Aerospike major version %w", err)
+		return m.AerospikeVersion{}, fmt.Errorf("%w: failed to parse Aerospike major version %w", models.ErrAerospike, err)
 	}
 
 	minor, err := strconv.Atoi(matches[2])
 	if err != nil {
-		return m.AerospikeVersion{}, fmt.Errorf("failed to parse Aerospike minor version %w", err)
+		return m.AerospikeVersion{}, fmt.Errorf("%w: failed to parse Aerospike minor version %w", models.ErrAerospike, err)
 	}
 
 	patch, err := strconv.Atoi(matches[3])
 	if err != nil {
-		return m.AerospikeVersion{}, fmt.Errorf("failed to parse Aerospike patch version %w", err)
+		return m.AerospikeVersion{}, fmt.Errorf("%w: failed to parse Aerospike patch version %w", models.ErrAerospike, err)
 	}
 
 	return m.AerospikeVersion{
@@ -220,7 +221,7 @@ func parseSIndex(sindexMap m.InfoMap) (*models.SIndex, error) {
 			si.Path = path
 		case si.IndexType != models.SetSIndex:
 			// Set indexes are the only kind allowed to have no bin.
-			return nil, fmt.Errorf("sindex missing bin")
+			return nil, fmt.Errorf("%w: sindex missing bin", models.ErrAerospike)
 		}
 	} else {
 		si.Path = models.NewEmptySIndexPath()
@@ -236,7 +237,7 @@ func parseSIndex(sindexMap m.InfoMap) (*models.SIndex, error) {
 func requireField(sindexMap m.InfoMap, key string) (string, error) {
 	val, ok := sindexMap[key]
 	if !ok {
-		return "", fmt.Errorf("sindex missing %s", key)
+		return "", fmt.Errorf("%w: sindex missing %s", models.ErrAerospike, key)
 	}
 
 	return val, nil
@@ -282,7 +283,7 @@ func parseSIndexPath(sindexMap m.InfoMap) (path models.SIndexPath, hasBin bool, 
 
 	rawType, ok := sindexMap["type"]
 	if !ok {
-		return models.SIndexPath{}, true, fmt.Errorf("sindex missing type")
+		return models.SIndexPath{}, true, fmt.Errorf("%w: sindex missing type", models.ErrAerospike)
 	}
 
 	binType, err := parseSIndexBinType(rawType)
@@ -311,7 +312,7 @@ func parseSIndexBinType(val string) (models.SIPathBinType, error) {
 		return models.EmptySIDataType, nil
 	default:
 		var zero models.SIPathBinType
-		return zero, fmt.Errorf("invalid sindex type: %s", val)
+		return zero, fmt.Errorf("%w: invalid sindex type: %s", models.ErrAerospike, val)
 	}
 }
 
@@ -324,13 +325,13 @@ func parseUDF(udfMap m.InfoMap) (*models.UDF, error) {
 	if val, ok := udfMap["type"]; ok {
 		udfLang = val
 	} else {
-		return nil, fmt.Errorf("UDF info response missing language type")
+		return nil, fmt.Errorf("%w: UDF info response missing language type", models.ErrAerospike)
 	}
 
 	if strings.EqualFold(udfLang, "lua") {
 		udf.UDFType = models.UDFTypeLUA
 	} else {
-		return nil, fmt.Errorf("invalid UDF language type: %s", udfLang)
+		return nil, fmt.Errorf("%w: invalid UDF language type: %s", models.ErrAerospike, udfLang)
 	}
 
 	if val, ok := udfMap["content"]; ok {
@@ -342,7 +343,7 @@ func parseUDF(udfMap m.InfoMap) (*models.UDF, error) {
 
 		udf.Content = content
 	} else {
-		return nil, fmt.Errorf("UDF info response missing content")
+		return nil, fmt.Errorf("%w: UDF info response missing content", models.ErrAerospike)
 	}
 
 	return &udf, nil
@@ -427,7 +428,7 @@ func parseInfoKVPair(pair, kvSep string) (key, val string, err error) {
 	// so we need to split on the first separator only
 	kv := strings.SplitN(pair, kvSep, 2)
 	if len(kv) != 2 {
-		return "", "", fmt.Errorf("invalid key-value pair: %s", pair)
+		return "", "", fmt.Errorf("%w: invalid key-value pair: %s", models.ErrAerospike, pair)
 	}
 
 	// make keys case-insensitive
@@ -458,7 +459,7 @@ func parseUDFGetResponse(resp string) (m.InfoMap, error) {
 
 func executeWithRetry(ctx context.Context, policy *models.RetryPolicy, command func() error) error {
 	if policy == nil {
-		return fmt.Errorf("retry policy cannot be nil")
+		return fmt.Errorf("%w: retry policy cannot be nil", models.ErrInvalidConfig)
 	}
 
 	return policy.Do(ctx, command)
@@ -468,7 +469,7 @@ func executeWithRetry(ctx context.Context, policy *models.RetryPolicy, command f
 func base64StringToBitArray(base64Str string) ([]bool, error) {
 	decodedBytes, err := base64.StdEncoding.DecodeString(base64Str)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode base64 string: %w", err)
+		return nil, fmt.Errorf("%w: failed to decode base64 string: %w", models.ErrAerospike, err)
 	}
 
 	bitarray := make([]bool, 0, len(decodedBytes)*8) // Pre-allocate for efficiency

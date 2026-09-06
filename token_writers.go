@@ -16,7 +16,6 @@ package backup
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -72,7 +71,7 @@ func (tw *tokenStatsWriter) Write(data *models.Token) (int, error) {
 		case models.TokenTypeSIndex:
 			tw.stats.AddSIndexes(1)
 		case models.TokenTypeInvalid:
-			return 0, errors.New("invalid token")
+			return 0, fmt.Errorf("%w: invalid token", ErrCorruptData)
 		}
 	}
 

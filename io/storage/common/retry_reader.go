@@ -94,7 +94,7 @@ func NewRetryableReader(
 // openStream opens a new stream with offset if needed.
 func (r *RetryableReader) openStream() error {
 	if r.closed.Load() {
-		return fmt.Errorf("reader is closed")
+		return fmt.Errorf("%w: reader is closed", models.ErrStorage)
 	}
 
 	if r.offset > 0 {
@@ -135,7 +135,7 @@ func (r *RetryableReader) setReader(body io.ReadCloser) {
 // Read reads from the stream.
 func (r *RetryableReader) Read(p []byte) (int, error) {
 	if r.closed.Load() {
-		return 0, fmt.Errorf("reader is closed")
+		return 0, fmt.Errorf("%w: reader is closed", models.ErrStorage)
 	}
 	// If we reached end of file, return EOF.
 	if r.offset >= r.totalSize {

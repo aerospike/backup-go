@@ -170,7 +170,7 @@ func (r *paginatedRecordReader) startNextScan() error {
 	)
 	if aErr != nil {
 		r.config.scanLimiter.Release(1)
-		return fmt.Errorf("failed to start scan: %w", aErr.Unwrap())
+		return fmt.Errorf("%w: failed to start scan: %w", models.ErrAerospike, aErr.Unwrap())
 	}
 
 	r.logger.Debug("partition scan started",
@@ -200,7 +200,7 @@ func (r *paginatedRecordReader) startNextScan() error {
 func (r *paginatedRecordReader) readResult(ctx context.Context) (*a.Result, bool, error) {
 	active := r.active
 	if active == nil {
-		return nil, false, fmt.Errorf("active scan has no results channel")
+		return nil, false, fmt.Errorf("%w: active scan has no results channel", models.ErrAerospike)
 	}
 
 	// Fast path
@@ -231,11 +231,11 @@ func (r *paginatedRecordReader) handleResult(res *a.Result) (*models.Token, erro
 			return nil, err
 		}
 
-		return nil, fmt.Errorf("no active scan while handling record result")
+		return nil, fmt.Errorf("%w: no active scan while handling record result", models.ErrAerospike)
 	}
 
 	if res == nil {
-		return nil, fmt.Errorf("nil scan result")
+		return nil, fmt.Errorf("%w: nil scan result", models.ErrAerospike)
 	}
 
 	if active.needsThrottleCheck {
@@ -261,7 +261,7 @@ func (r *paginatedRecordReader) handleResult(res *a.Result) (*models.Token, erro
 		r.cancel()
 		_ = r.closeActiveScan()
 
-		return nil, fmt.Errorf("failed to read record: %w", res.Err)
+		return nil, fmt.Errorf("%w: failed to read record: %w", models.ErrAerospike, res.Err)
 	}
 
 	r.active.count++

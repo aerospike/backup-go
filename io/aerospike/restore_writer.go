@@ -16,7 +16,6 @@ package aerospike
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 
@@ -126,7 +125,7 @@ func (rw *RestoreWriter) Write(data *models.Token) (int, error) {
 	case *models.Token:
 		return rw.writeToken(v)
 	default:
-		return 0, fmt.Errorf("unsupported type: %T", data)
+		return 0, fmt.Errorf("%w: unsupported type: %T", models.ErrUnsupported, data)
 	}
 }
 
@@ -139,9 +138,9 @@ func (rw *RestoreWriter) writeToken(token *models.Token) (int, error) {
 	case models.TokenTypeSIndex:
 		return int(token.Size), rw.writeSecondaryIndex(token.SIndex)
 	case models.TokenTypeInvalid:
-		return 0, errors.New("invalid token")
+		return 0, fmt.Errorf("%w: invalid token", models.ErrCorruptData)
 	default:
-		return 0, errors.New("unsupported token type")
+		return 0, fmt.Errorf("%w: unsupported token type", models.ErrUnsupported)
 	}
 }
 

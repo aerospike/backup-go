@@ -39,7 +39,7 @@ func NewPartitionFilterSerialized(pf *a.PartitionFilter) (PartitionFilterSeriali
 
 	c, err := pf.EncodeCursor()
 	if err != nil {
-		return PartitionFilterSerialized{}, fmt.Errorf("failed to encode cursor: %w", err)
+		return PartitionFilterSerialized{}, fmt.Errorf("%w: failed to encode cursor: %w", ErrInvalidConfig, err)
 	}
 
 	return PartitionFilterSerialized{
@@ -54,7 +54,7 @@ func NewPartitionFilterSerialized(pf *a.PartitionFilter) (PartitionFilterSeriali
 func (p *PartitionFilterSerialized) Decode() (*a.PartitionFilter, error) {
 	pf := &a.PartitionFilter{Begin: p.Begin, Count: p.Count, Digest: p.Digest}
 	if err := pf.DecodeCursor(p.Cursor); err != nil {
-		return nil, fmt.Errorf("failed to decode cursor: %w", err)
+		return nil, fmt.Errorf("%w: failed to decode cursor: %w", ErrCorruptData, err)
 	}
 
 	return pf, nil

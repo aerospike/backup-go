@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/aerospike/backup-go/models"
 )
 
 // Bucket implements a thread-safe leaky bucket rate limiter.
@@ -42,11 +44,11 @@ type Bucket struct {
 // NewBucket creates a new rate limiter with the specified limit and interval.
 func NewBucket(limit int64, interval time.Duration) (*Bucket, error) {
 	if limit <= 0 {
-		return nil, fmt.Errorf("limit must be greater than 0")
+		return nil, fmt.Errorf("%w: limit must be greater than 0", models.ErrInvalidConfig)
 	}
 
 	if interval <= 0 {
-		return nil, fmt.Errorf("interval must be greater than 0")
+		return nil, fmt.Errorf("%w: interval must be greater than 0", models.ErrInvalidConfig)
 	}
 	// Calculate rate as tokens per nanosecond for precise calculations.
 	rate := float64(limit) / float64(interval.Nanoseconds())

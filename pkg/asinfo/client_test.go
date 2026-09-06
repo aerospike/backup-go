@@ -1879,16 +1879,18 @@ func TestClient_parseResultResponse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			result, err := parseResultResponse(tt.cmd, tt.input)
-			if result != tt.expected {
-				t.Errorf("expected result %v, got %v", tt.expected, result)
+
+			if tt.errMsg == "" {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+
+				return
 			}
-			if err != nil {
-				if err.Error() != tt.errMsg {
-					t.Errorf("expected error message %v, got %v", tt.errMsg, err)
-				}
-			} else if tt.errMsg != "" {
-				t.Errorf("expected error message %v, got nil", tt.errMsg)
-			}
+
+			// The class is the contract, the message text is not.
+			require.ErrorIs(t, err, models.ErrAerospike)
+			require.ErrorContains(t, err, tt.errMsg)
+			require.Equal(t, tt.expected, result)
 		})
 	}
 }

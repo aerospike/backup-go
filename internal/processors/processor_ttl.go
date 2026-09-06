@@ -79,14 +79,14 @@ func (p *expirationSetter) Process(t *models.Token) (*models.Token, error) {
 		}
 
 		if ttl > math.MaxUint32 {
-			return nil, fmt.Errorf("calculated TTL %d is too large", ttl)
+			return nil, fmt.Errorf("%w: calculated TTL %d is too large", models.ErrCorruptData, ttl)
 		}
 
 		record.Expiration = uint32(ttl)
 	case record.VoidTime == 0:
 		record.Expiration = models.ExpirationNever
 	default:
-		return nil, fmt.Errorf("invalid void time %d", record.VoidTime)
+		return nil, fmt.Errorf("%w: invalid void time %d", models.ErrCorruptData, record.VoidTime)
 	}
 
 	return t, nil

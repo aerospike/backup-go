@@ -65,8 +65,8 @@ func readPrivateKey(ctx context.Context, encPolicy *EncryptionPolicy, secretAgen
 	// Decode the PEM file
 	block, _ := pem.Decode(pemData)
 	if block == nil {
-		return nil, fmt.Errorf("failed to decode PEM block containing private key, please " +
-			"check key file format, it must be valid PEM with header and footer")
+		return nil, fmt.Errorf("%w: failed to decode PEM block containing private key, please "+
+			"check key file format, it must be valid PEM with header and footer", ErrInvalidConfig)
 	}
 
 	key, err := parsePK(block.Bytes)
@@ -124,7 +124,7 @@ func parsePK(block []byte) (*rsa.PrivateKey, error) {
 	if err8 == nil {
 		rsaKey, ok := privateKey.(*rsa.PrivateKey)
 		if !ok {
-			return nil, fmt.Errorf("expected RSA private key, got %T", privateKey)
+			return nil, fmt.Errorf("%w: expected RSA private key, got %T", ErrInvalidConfig, privateKey)
 		}
 
 		return rsaKey, nil
@@ -136,14 +136,14 @@ func parsePK(block []byte) (*rsa.PrivateKey, error) {
 		return pkcs1Key, nil
 	}
 
-	return nil, errors.Join(err8, err1)
+	return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, errors.Join(err8, err1))
 }
 
 // readPemFromFile reads the key from the file.
 func readPemFromFile(file string) ([]byte, error) {
 	pemData, err := os.ReadFile(file)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read PEM file: %w", err)
+		return nil, fmt.Errorf("%w: failed to read PEM file: %w", ErrInvalidConfig, err)
 	}
 
 	return pemData, nil
@@ -154,7 +154,7 @@ func readPemFromFile(file string) ([]byte, error) {
 func readPemFromEnv(keyEnv string) ([]byte, error) {
 	key := os.Getenv(keyEnv)
 	if key == "" {
-		return nil, fmt.Errorf("environment variable %s not set", keyEnv)
+		return nil, fmt.Errorf("%w: environment variable %s not set", ErrInvalidConfig, keyEnv)
 	}
 
 	return decodeKeyContent(key)
@@ -179,12 +179,12 @@ func readPemFromSecret(ctx context.Context, secret string, client *saClient.Clie
 // 4. Base64 encoded Raw Body (Double Base64)
 func decodeKeyContent(key string) ([]byte, error) {
 	if key == "" {
-		return nil, errors.New("key is empty")
+		return nil, fmt.Errorf("%w: key is empty", ErrInvalidConfig)
 	}
 
 	keyTrimmed := strings.TrimSpace(key)
 	if keyTrimmed == "" {
-		return nil, errors.New("key contains only whitespace")
+		return nil, fmt.Errorf("%w: key contains only whitespace", ErrInvalidConfig)
 	}
 
 	keyTrimmed = ensurePEMMarkerNewlines(keyTrimmed)
@@ -199,7 +199,7 @@ func decodeKeyContent(key string) ([]byte, error) {
 	// Attempt First Decode
 	decodedBytes, err := base64.StdEncoding.DecodeString(keyTrimmed)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode PEM block containing private key: %w", err)
+		return nil, fmt.Errorf("%w: failed to decode PEM block containing private key: %w", ErrInvalidConfig, err)
 	}
 
 	// --- SCENARIO 2: Base64 encoded PEM ---

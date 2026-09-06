@@ -28,6 +28,7 @@ import (
 	"sync"
 	"time"
 
+	bModels "github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/server/lister/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -55,7 +56,9 @@ const (
 )
 
 // ErrMetadataNotFound is returned when metadata.json is not found.
-var ErrMetadataNotFound = errors.New("metadata.json not found")
+// ErrMetadataNotFound is returned when a backup has no metadata.json.
+// It belongs to the [bModels.ErrNotFound] class.
+var ErrMetadataNotFound = fmt.Errorf("%w: metadata.json not found", bModels.ErrNotFound)
 
 // S3API is an interface for the S3 client.
 type S3API interface {

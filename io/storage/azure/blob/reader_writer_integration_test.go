@@ -780,7 +780,8 @@ func TestParseAccessTier(t *testing.T) {
 			tier, err := parseAccessTier(tt.tier)
 
 			if tt.expectedError != nil {
-				assert.EqualError(t, err, tt.expectedError.Error())
+				require.ErrorIs(t, err, models.ErrInvalidConfig)
+				assert.ErrorContains(t, err, tt.expectedError.Error())
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, tt.expectedTier, tier)

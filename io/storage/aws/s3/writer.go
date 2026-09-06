@@ -103,18 +103,18 @@ func NewWriter(
 		// Check if backup dir is empty.
 		isEmpty, err := isEmptyDirectory(ctx, client, bucketName, w.prefix)
 		if err != nil {
-			return nil, fmt.Errorf("failed to check if the directory is empty: %w", err)
+			return nil, fmt.Errorf("%w: failed to check if the directory is empty: %w", models.ErrStorage, err)
 		}
 
 		if !isEmpty && !w.IsRemovingFiles {
-			return nil, fmt.Errorf("backup folder must be empty or set RemoveFiles = true")
+			return nil, fmt.Errorf("%w: backup folder must be empty or set RemoveFiles = true", models.ErrInvalidConfig)
 		}
 	}
 
 	if w.IsRemovingFiles {
 		err := w.RemoveFiles(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to delete files under prefix %s: %w", w.prefix, err)
+			return nil, fmt.Errorf("%w: failed to delete files under prefix %s: %w", models.ErrStorage, w.prefix, err)
 		}
 	}
 
@@ -122,7 +122,7 @@ func NewWriter(
 		// validation.
 		class, err := parseStorageClass(w.StorageClass)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse storage class: %w", err)
+			return nil, fmt.Errorf("%w: failed to parse storage class: %w", models.ErrInvalidConfig, err)
 		}
 
 		w.storageClass = class
@@ -133,17 +133,18 @@ func NewWriter(
 
 func (w *Writer) validate(ctx context.Context) error {
 	if len(w.PathList) != 1 {
-		return fmt.Errorf("one path is required, use WithDir(path string) or WithFile(path string) to set")
+		return fmt.Errorf("%w: one path is required, use WithDir(path string) or WithFile(path string) to set",
+			models.ErrInvalidConfig)
 	}
 
 	if w.ChunkSize < 0 {
-		return fmt.Errorf("chunk size must be positive")
+		return fmt.Errorf("%w: chunk size must be positive", models.ErrInvalidConfig)
 	}
 
 	// Check if the bucket exists and we have permissions.
 	_, err := w.client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(w.bucketName)})
 	if err != nil {
-		return fmt.Errorf("bucket %s does not exist or you don't have access: %w", w.bucketName, err)
+		return fmt.Errorf("%w: bucket %s does not exist or you don't have access: %w", models.ErrNotFound, w.bucketName, err)
 	}
 
 	return nil
@@ -169,7 +170,7 @@ func (w *Writer) NewWriter(ctx context.Context, filename string) (io.WriteCloser
 
 	upload, err := w.client.CreateMultipartUpload(ctx, muInput)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create multipart upload: %w", err)
+		return nil, fmt.Errorf("%w: failed to create multipart upload: %w", models.ErrStorage, err)
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -351,7 +352,7 @@ func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
 		return uploadErr
 	})
 	if err != nil {
-		uploadFailure := fmt.Errorf("failed to upload part %d: %w", partNumber, err)
+		uploadFailure := fmt.Errorf("%w: failed to upload part %d: %w", models.ErrStorage, partNumber, err)
 		if w.uploadErr.CompareAndSwap(nil, &uploadFailure) {
 			w.cancel()
 		}
@@ -425,7 +426,7 @@ func (w *s3Writer) Close() error {
 		})
 	if err != nil {
 		w.abortUpload()
-		return fmt.Errorf("failed to complete multipart upload: %w", err)
+		return fmt.Errorf("%w: failed to complete multipart upload: %w", models.ErrStorage, err)
 	}
 
 	w.logger.Debug("completed multipart upload",
@@ -445,7 +446,7 @@ func verifyNoGapsInPartNumbers(parts []types.CompletedPart) error {
 	for i, part := range parts {
 		expectedPartNum := int32(i + 1)
 		if *part.PartNumber != expectedPartNum {
-			return fmt.Errorf("missing part %d in upload sequence", expectedPartNum)
+			return fmt.Errorf("%w: missing part %d in upload sequence", models.ErrStorage, expectedPartNum)
 		}
 	}
 
@@ -478,7 +479,7 @@ func isEmptyDirectory(ctx context.Context, client Client, bucketName, prefix str
 		MaxKeys: aws.Int32(1),
 	})
 	if err != nil {
-		return false, fmt.Errorf("failed to list bucket objects: %w", err)
+		return false, fmt.Errorf("%w: failed to list bucket objects: %w", models.ErrStorage, err)
 	}
 
 	// Check if it's a single object
@@ -502,7 +503,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 			Bucket: aws.String(w.bucketName),
 			Key:    aws.String(targetPath),
 		}); err != nil {
-			return fmt.Errorf("failed to delete object %s: %w", targetPath, err)
+			return fmt.Errorf("%w: failed to delete object %s: %w", models.ErrStorage, targetPath, err)
 		}
 
 		return nil
@@ -534,7 +535,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 			ContinuationToken: continuationToken,
 		})
 		if err != nil {
-			return fmt.Errorf("failed to list objects: %w", err)
+			return fmt.Errorf("%w: failed to list objects: %w", models.ErrStorage, err)
 		}
 
 		for _, p := range listResponse.Contents {
@@ -575,7 +576,7 @@ func (w *Writer) deleteObjectsBatch(ctx context.Context, objects []types.ObjectI
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("failed to delete objects batch: %w", err)
+		return fmt.Errorf("%w: failed to delete objects batch: %w", models.ErrStorage, err)
 	}
 
 	if len(out.Errors) > 0 {
@@ -585,7 +586,7 @@ func (w *Writer) deleteObjectsBatch(ctx context.Context, objects []types.ObjectI
 				aws.ToString(fr.Key), aws.ToString(fr.Code), aws.ToString(fr.Message)))
 		}
 
-		return fmt.Errorf("failed to delete objects batch: %w", errors.Join(errs...))
+		return fmt.Errorf("%w: failed to delete objects batch: %w", models.ErrStorage, errors.Join(errs...))
 	}
 
 	return nil
@@ -607,7 +608,7 @@ func parseStorageClass(class string) (types.StorageClass, error) {
 	}
 
 	if result == "" {
-		return "", fmt.Errorf("invalid storage class %s", class)
+		return "", fmt.Errorf("%w: invalid storage class %s", models.ErrInvalidConfig, class)
 	}
 
 	return result, nil

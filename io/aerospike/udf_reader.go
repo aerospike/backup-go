@@ -61,7 +61,7 @@ func (r *UdfReader) Read(ctx context.Context) (*models.Token, error) {
 
 		udfs, err := r.client.GetUDFs(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch UDFs: %w", err)
+			return nil, fmt.Errorf("%w: failed to fetch UDFs: %w", models.ErrAerospike, err)
 		}
 
 		r.udfs = make(chan *models.UDF, len(udfs))

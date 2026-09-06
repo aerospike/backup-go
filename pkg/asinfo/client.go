@@ -16,7 +16,6 @@ package asinfo
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -58,19 +57,20 @@ const (
 )
 
 var (
-	ErrReplicationFactorZero = errors.New("replication factor is zero")
-	ErrNoNode                = errors.New("no node found")
-	ErrNotFound              = errors.New("not found")
-	ErrInvalidSIndexType     = errors.New("invalid sindex index type")
+	ErrReplicationFactorZero = fmt.Errorf("%w: replication factor is zero", models.ErrAerospike)
+	ErrNoNode                = fmt.Errorf("%w: no node found", models.ErrNotFound)
+	ErrNotFound              = models.ErrNotFound
+	ErrInvalidSIndexType     = fmt.Errorf("%w: invalid sindex index type", models.ErrCorruptData)
 
 	// Static internal errors. Kept as package-level sentinels so they can be
 	// matched with errors.Is and satisfy err113/perfsprint linters.
-	errNoInfoCommands            = errors.New("no info commands provided or command not supported")
-	errNoNodesAvailable          = errors.New("no nodes available in cluster")
-	errNoNodesConnected          = errors.New("no nodes connected")
-	errReplicationFactorNotFound = errors.New("replication factor not found")
-	errParseRecordInfo           = errors.New("failed to parse record info request")
-	errUDFMissingFilename        = errors.New("udf-list response missing filename")
+	errNoInfoCommands = fmt.Errorf("%w: no info commands provided or command not supported",
+		models.ErrInvalidConfig)
+	errNoNodesAvailable          = fmt.Errorf("%w: no nodes available in cluster", models.ErrAerospike)
+	errNoNodesConnected          = fmt.Errorf("%w: no nodes connected", models.ErrAerospike)
+	errReplicationFactorNotFound = fmt.Errorf("%w: replication factor not found", models.ErrAerospike)
+	errParseRecordInfo           = fmt.Errorf("%w: failed to parse record info request", models.ErrAerospike)
+	errUDFMissingFilename        = fmt.Errorf("%w: udf-list response missing filename", models.ErrAerospike)
 
 	secretAgentValRegex = regexp.MustCompile(`(.+?)=secrets:(.+?):(.+?)`)
 )
@@ -147,19 +147,22 @@ func (ic *Client) GetInfo(ctx context.Context, names ...string) (map[string]stri
 
 		return err
 	})
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", models.ErrAerospike, err)
+	}
 
-	return result, err
+	return result, nil
 }
 
 func (ic *Client) requestByNode(nodeName string, names ...string) (map[string]string, error) {
 	node, err := ic.cluster.GetNodeByName(nodeName)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", models.ErrAerospike, err)
 	}
 
 	result, err := node.RequestInfo(ic.policy, names...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", models.ErrAerospike, err)
 	}
 
 	return result, nil
@@ -235,7 +238,7 @@ func (ic *Client) getSIndexes(ctx context.Context, namespace string, noWarn bool
 	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
 		node, aErr := ic.cluster.GetRandomNode()
 		if aErr != nil {
-			return aErr.Unwrap()
+			return fmt.Errorf("%w: %w", models.ErrAerospike, aErr.Unwrap())
 		}
 
 		var indErr error
@@ -254,7 +257,7 @@ func (ic *Client) GetUDFs(ctx context.Context) ([]*models.UDF, error) {
 	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
 		node, aErr := ic.cluster.GetRandomNode()
 		if aErr != nil {
-			return aErr.Unwrap()
+			return fmt.Errorf("%w: %w", models.ErrAerospike, aErr.Unwrap())
 		}
 
 		var getErr error
@@ -283,7 +286,7 @@ func (ic *Client) GetRecordCount(ctx context.Context, namespace string, sets []s
 	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
 		node, aErr := ic.cluster.GetRandomNode()
 		if aErr != nil {
-			return aErr
+			return fmt.Errorf("%w: %w", models.ErrAerospike, aErr)
 		}
 
 		effectiveReplicationFactor, err := ic.getEffectiveReplicationFactor(node, ic.policy, namespace)
@@ -371,7 +374,7 @@ func (ic *Client) getPendingMigrations(node infoGetter, namespace string) (uint6
 
 	response, aErr := node.RequestInfo(ic.policy, cmd)
 	if aErr != nil {
-		return 0, fmt.Errorf("failed to get request info: %w", aErr)
+		return 0, fmt.Errorf("%w: failed to get request info: %w", models.ErrAerospike, aErr)
 	}
 
 	resultMap, err := parseInfoResponse(response[cmd], ";", ":", "=")
@@ -630,7 +633,7 @@ func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
 	}
 
 	if base64Res == "" {
-		return nil, fmt.Errorf("failed to find replicas for node %s", node)
+		return nil, fmt.Errorf("%w: failed to find replicas for node %s", models.ErrNotFound, node)
 	}
 
 	bitMap, err := base64StringToBitArray(base64Res)
@@ -798,7 +801,7 @@ func (ic *Client) getBackupStatusByNode(node infoGetter, jobID string) ([]iModel
 
 	response, aErr := node.RequestInfo(ic.policy, cmd)
 	if aErr != nil {
-		return nil, fmt.Errorf("failed to get backup status: %w", aErr)
+		return nil, fmt.Errorf("%w: failed to get backup status: %w", models.ErrAerospike, aErr)
 	}
 
 	result, err := parseResultResponse(cmd, response)
@@ -855,7 +858,7 @@ func (ic *Client) getRestoreStatusByNode(node infoGetter, namespace string) ([]i
 
 	response, aErr := node.RequestInfo(ic.policy, cmd)
 	if aErr != nil {
-		return nil, fmt.Errorf("failed to get restore status: %w", aErr)
+		return nil, fmt.Errorf("%w: failed to get restore status: %w", models.ErrAerospike, aErr)
 	}
 
 	result, err := parseResultResponse(cmd, response)
@@ -876,7 +879,7 @@ func (ic *Client) getUDFs(node infoGetter, policy *a.InfoPolicy) ([]*models.UDF,
 
 	response, aErr := node.RequestInfo(policy, cmd)
 	if aErr != nil {
-		return nil, fmt.Errorf("failed to list UDFs: %w", aErr)
+		return nil, fmt.Errorf("%w: failed to list UDFs: %w", models.ErrAerospike, aErr)
 	}
 
 	cmdResp, err := parseResultResponse(cmd, response)
@@ -918,7 +921,7 @@ func (ic *Client) getUDF(node infoGetter, name string, policy *a.InfoPolicy) (*m
 
 	response, aErr := node.RequestInfo(policy, cmd)
 	if aErr != nil {
-		return nil, fmt.Errorf("udf-get info command failed: %w", aErr)
+		return nil, fmt.Errorf("%w: udf-get info command failed: %w", models.ErrAerospike, aErr)
 	}
 
 	cmdResp, err := parseResultResponse(cmd, response)
@@ -942,7 +945,7 @@ func (ic *Client) getRecordCountForNode(node infoGetter, policy *a.InfoPolicy, n
 
 	response, aErr := node.RequestInfo(policy, cmd)
 	if aErr != nil {
-		return 0, fmt.Errorf("failed to get record count: %w", aErr)
+		return 0, fmt.Errorf("%w: failed to get record count: %w", models.ErrAerospike, aErr)
 	}
 
 	infoResponse, err := parseInfoResponse(response[cmd], ";", ":", "=")
@@ -955,7 +958,7 @@ func (ic *Client) getRecordCountForNode(node infoGetter, policy *a.InfoPolicy, n
 	for _, setInfo := range infoResponse {
 		setName, ok := setInfo["set"]
 		if !ok {
-			return 0, fmt.Errorf("set name missing in response %s", response[cmd])
+			return 0, fmt.Errorf("%w: set name missing in response %s", models.ErrAerospike, response[cmd])
 		}
 
 		// Skip MRT monitor records.
@@ -966,7 +969,7 @@ func (ic *Client) getRecordCountForNode(node infoGetter, policy *a.InfoPolicy, n
 		if len(sets) == 0 || slices.Contains(sets, setName) {
 			objectCount, ok := setInfo["objects"]
 			if !ok {
-				return 0, fmt.Errorf("objects number missing in response %s", response[cmd])
+				return 0, fmt.Errorf("%w: objects number missing in response %s", models.ErrAerospike, response[cmd])
 			}
 
 			objects, err := strconv.ParseUint(objectCount, 10, 64)
@@ -987,7 +990,7 @@ func (ic *Client) getRecordCountForNodeNamespace(node infoGetter, policy *a.Info
 
 	response, aErr := node.RequestInfo(policy, cmd)
 	if aErr != nil {
-		return 0, fmt.Errorf("failed to request info: %w", aErr)
+		return 0, fmt.Errorf("%w: failed to request info: %w", models.ErrAerospike, aErr)
 	}
 
 	resultMap, err := parseInfoResponse(response[cmd], ";", ":", "=")
@@ -1015,7 +1018,7 @@ func (ic *Client) getEffectiveReplicationFactor(node infoGetter, policy *a.InfoP
 
 	response, aErr := node.RequestInfo(policy, cmd)
 	if aErr != nil {
-		return 0, fmt.Errorf("failed to get namespace info: %w", aErr)
+		return 0, fmt.Errorf("%w: failed to get namespace info: %w", models.ErrAerospike, aErr)
 	}
 
 	infoResponse, err := parseInfoResponse(response[cmd], ";", ":", "=")
@@ -1063,7 +1066,7 @@ func (ic *Client) getClusterStable(ctx context.Context, namespace string) (bool,
 
 	clusterKey, ok := searchInInfoResponse(stats, "cluster_key")
 	if !ok {
-		return false, fmt.Errorf("cluster key not found in statistics")
+		return false, fmt.Errorf("%w: cluster key not found in statistics", models.ErrAerospike)
 	}
 
 	for _, node := range nodes {
@@ -1080,7 +1083,7 @@ func (ic *Client) getClusterStable(ctx context.Context, namespace string) (bool,
 		}
 
 		if result != clusterKey {
-			return false, fmt.Errorf("cluster %s is not stable, result is %s", clusterKey, result)
+			return false, fmt.Errorf("%w: cluster %s is not stable, result is %s", models.ErrAerospike, clusterKey, result)
 		}
 	}
 
@@ -1117,11 +1120,11 @@ func (ic *Client) getPrincipal(ctx context.Context) (string, error) {
 
 	principal, ok := searchInInfoResponse(stats, "cluster_principal")
 	if !ok {
-		return "", fmt.Errorf("cluster key not found in statistics")
+		return "", fmt.Errorf("%w: cluster key not found in statistics", models.ErrAerospike)
 	}
 
 	if principal == "" {
-		return "", fmt.Errorf("cluster principal is empty")
+		return "", fmt.Errorf("%w: cluster principal is empty", models.ErrAerospike)
 	}
 
 	return principal, nil

@@ -63,20 +63,20 @@ func NewFanout(
 
 	// Validations.
 	if len(f.Outputs) == 0 {
-		return nil, fmt.Errorf("no outputs provided")
+		return nil, fmt.Errorf("%w: no outputs provided", models.ErrInvalidConfig)
 	}
 
 	if len(f.Inputs) == 0 {
-		return nil, fmt.Errorf("no inputs provided")
+		return nil, fmt.Errorf("%w: no inputs provided", models.ErrInvalidConfig)
 	}
 
 	if f.strategy == Fixed && len(f.Inputs) != len(f.Outputs) {
-		return nil, fmt.Errorf("invalid inputs %d and outputs %d number for Fixed strategy",
+		return nil, fmt.Errorf("%w: invalid inputs %d and outputs %d number for Fixed strategy", models.ErrInvalidConfig,
 			len(f.Inputs), len(f.Outputs))
 	}
 
 	if f.strategy != Fixed && f.strategy != RoundRobin {
-		return nil, fmt.Errorf("unsupported fanout strategy: %d", f.strategy)
+		return nil, fmt.Errorf("%w: unsupported fanout strategy: %d", models.ErrUnsupported, f.strategy)
 	}
 
 	return f, nil

@@ -42,6 +42,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/aerospike/backup-go/models"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -185,7 +186,7 @@ func WithSeed(seed uint64) Option {
 // newStreamer creates a streamer over one backup of a storage.
 func newStreamer(st store, backupID string, opts ...Option) (*Streamer, error) {
 	if backupID == "" {
-		return nil, errors.New("backup id must not be empty")
+		return nil, fmt.Errorf("%w: backup id must not be empty", models.ErrInvalidConfig)
 	}
 
 	s := &Streamer{

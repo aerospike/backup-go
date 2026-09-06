@@ -23,6 +23,7 @@ import (
 	"net"
 	"time"
 
+	bModels "github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/secret-agent/models"
 )
 
@@ -58,7 +59,7 @@ func Write(conn connector, timeout time.Duration, resource, secretKey string) er
 	// Setting writing timeout.
 	deadline := time.Now().Add(timeout)
 	if err := conn.SetWriteDeadline(deadline); err != nil {
-		return fmt.Errorf("failed to set write deadline: %w", err)
+		return fmt.Errorf("%w: failed to set write deadline: %w", bModels.ErrSecretAgent, err)
 	}
 
 	msg := models.Request{
@@ -68,7 +69,7 @@ func Write(conn connector, timeout time.Duration, resource, secretKey string) er
 
 	data, err := json.Marshal(msg)
 	if err != nil {
-		return fmt.Errorf("failed to marshal request: %w", err)
+		return fmt.Errorf("%w: failed to marshal request: %w", bModels.ErrSecretAgent, err)
 	}
 
 	// Adding headers.
@@ -80,7 +81,7 @@ func Write(conn connector, timeout time.Duration, resource, secretKey string) er
 	// Sending message.
 	_, err = conn.Write(append(header, data...))
 	if err != nil {
-		return fmt.Errorf("failed to send request: %w", err)
+		return fmt.Errorf("%w: failed to send request: %w", bModels.ErrSecretAgent, err)
 	}
 
 	return nil
@@ -91,12 +92,12 @@ func Read(conn connector, timeout time.Duration) (string, error) {
 	// Setting reading timeout.
 	deadline := time.Now().Add(timeout)
 	if err := conn.SetReadDeadline(deadline); err != nil {
-		return "", fmt.Errorf("failed to set read deadline: %w", err)
+		return "", fmt.Errorf("%w: failed to set read deadline: %w", bModels.ErrSecretAgent, err)
 	}
 	// Reading headers.
 	header, err := ReadBytes(conn, 8)
 	if err != nil {
-		return "", fmt.Errorf("failed to read header: %w", err)
+		return "", fmt.Errorf("%w: failed to read header: %w", bModels.ErrSecretAgent, err)
 	}
 
 	// Checking headers.
@@ -104,22 +105,22 @@ func Read(conn connector, timeout time.Duration) (string, error) {
 	length := binary.BigEndian.Uint32(header[4:])
 
 	if receivedMagic != magic {
-		return "", fmt.Errorf("invalid magic number: %x", receivedMagic)
+		return "", fmt.Errorf("%w: invalid magic number: %x", bModels.ErrCorruptData, receivedMagic)
 	}
 
 	// Reading body.
 	body, err := ReadBytes(conn, int(length))
 	if err != nil {
-		return "", fmt.Errorf("failed to read header: %w", err)
+		return "", fmt.Errorf("%w: failed to read header: %w", bModels.ErrSecretAgent, err)
 	}
 
 	var res models.Response
 	if err = json.Unmarshal(body, &res); err != nil {
-		return "", fmt.Errorf("failed to unmarshal response: %w", err)
+		return "", fmt.Errorf("%w: failed to unmarshal response: %w", bModels.ErrSecretAgent, err)
 	}
 
 	if res.Error != "" {
-		return "", fmt.Errorf("%s", res.Error)
+		return "", fmt.Errorf("%w: %s", bModels.ErrSecretAgent, res.Error)
 	}
 
 	return res.SecretValue, nil

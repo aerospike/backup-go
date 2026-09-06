@@ -77,7 +77,7 @@ func (rw *singleRecordWriter) writeRecord(record *models.Record) error {
 
 	err := rw.executeWrite(&writePolicy, record)
 	if err != nil {
-		return fmt.Errorf("failed to write record %s: %w", record.Key.Digest(), err)
+		return fmt.Errorf("%w: failed to write record %s: %w", models.ErrAerospike, record.Key.Digest(), err)
 	}
 
 	return nil

@@ -15,72 +15,73 @@
 package segment
 
 import (
-	"errors"
 	"fmt"
+
+	"github.com/aerospike/backup-go/models"
 )
 
 // Segment level errors.
 var (
 	// ErrEmptySegment is returned for a zero length payload.
-	ErrEmptySegment = errors.New("segment is empty")
+	ErrEmptySegment = fmt.Errorf("%w: segment is empty", models.ErrCorruptData)
 	// ErrNoRecords is returned when a payload carries no record at all.
-	ErrNoRecords = errors.New("segment contains no records")
+	ErrNoRecords = fmt.Errorf("%w: segment contains no records", models.ErrCorruptData)
 	// ErrBadTailSlack is returned when the bytes after the last record are not zero.
-	ErrBadTailSlack = errors.New("non-zero tail slack")
+	ErrBadTailSlack = fmt.Errorf("%w: non-zero tail slack", models.ErrCorruptData)
 )
 
 // Record level errors.
 var (
-	ErrHeaderTooShort    = errors.New("record header too short")
-	ErrBadMagic          = errors.New("bad record magic")
-	ErrRecordTooSmall    = errors.New("record size below minimum")
-	ErrRecordOutOfBounds = errors.New("record extends past segment buffer")
-	ErrContentOverflow   = errors.New("record content overflows record boundary")
-	ErrBadEndMark        = errors.New("bad end marker")
-	ErrNonZeroPadding    = errors.New("non-zero padding inside record")
+	ErrHeaderTooShort    = fmt.Errorf("%w: record header too short", models.ErrCorruptData)
+	ErrBadMagic          = fmt.Errorf("%w: bad record magic", models.ErrCorruptData)
+	ErrRecordTooSmall    = fmt.Errorf("%w: record size below minimum", models.ErrCorruptData)
+	ErrRecordOutOfBounds = fmt.Errorf("%w: record extends past segment buffer", models.ErrCorruptData)
+	ErrContentOverflow   = fmt.Errorf("%w: record content overflows record boundary", models.ErrCorruptData)
+	ErrBadEndMark        = fmt.Errorf("%w: bad end marker", models.ErrCorruptData)
+	ErrNonZeroPadding    = fmt.Errorf("%w: non-zero padding inside record", models.ErrCorruptData)
 )
 
 // Metadata level errors.
 var (
-	ErrZeroGeneration         = errors.New("generation is zero")
-	ErrIncompleteExtraFlags   = errors.New("incomplete extra flags")
-	ErrUnsupportedExtraFields = errors.New("unsupported extra storage fields")
-	ErrIncompleteMRTID        = errors.New("incomplete MRT id")
-	ErrIncompleteMRTOrigV     = errors.New("incomplete MRT original version")
-	ErrIncompleteVoidTime     = errors.New("incomplete void-time")
-	ErrIncompleteSetName      = errors.New("incomplete set name")
-	ErrBadSetNameLength       = errors.New("bad set name length")
-	ErrZeroKeySize            = errors.New("key size is zero")
-	ErrIncompleteKey          = errors.New("incomplete user key")
-	ErrBadBinCount            = errors.New("bad n-bins")
-	ErrIncompleteMeta         = errors.New("incomplete record metadata")
+	ErrZeroGeneration         = fmt.Errorf("%w: generation is zero", models.ErrCorruptData)
+	ErrIncompleteExtraFlags   = fmt.Errorf("%w: incomplete extra flags", models.ErrCorruptData)
+	ErrUnsupportedExtraFields = fmt.Errorf("%w: unsupported extra storage fields", models.ErrUnsupported)
+	ErrIncompleteMRTID        = fmt.Errorf("%w: incomplete MRT id", models.ErrCorruptData)
+	ErrIncompleteMRTOrigV     = fmt.Errorf("%w: incomplete MRT original version", models.ErrCorruptData)
+	ErrIncompleteVoidTime     = fmt.Errorf("%w: incomplete void-time", models.ErrCorruptData)
+	ErrIncompleteSetName      = fmt.Errorf("%w: incomplete set name", models.ErrCorruptData)
+	ErrBadSetNameLength       = fmt.Errorf("%w: bad set name length", models.ErrCorruptData)
+	ErrZeroKeySize            = fmt.Errorf("%w: key size is zero", models.ErrCorruptData)
+	ErrIncompleteKey          = fmt.Errorf("%w: incomplete user key", models.ErrCorruptData)
+	ErrBadBinCount            = fmt.Errorf("%w: bad n-bins", models.ErrCorruptData)
+	ErrIncompleteMeta         = fmt.Errorf("%w: incomplete record metadata", models.ErrCorruptData)
 )
 
 // Uintvar errors.
 var (
-	ErrTruncatedUintvar = errors.New("truncated uintvar")
-	ErrLeadingZeroUvar  = errors.New("illegal leading zero in uintvar")
-	ErrUintvarTooLong   = errors.New("uintvar too long")
+	ErrTruncatedUintvar = fmt.Errorf("%w: truncated uintvar", models.ErrCorruptData)
+	ErrLeadingZeroUvar  = fmt.Errorf("%w: illegal leading zero in uintvar", models.ErrCorruptData)
+	ErrUintvarTooLong   = fmt.Errorf("%w: uintvar too long", models.ErrCorruptData)
 )
 
 // Bin and particle level errors.
 var (
-	ErrIncompleteBin       = errors.New("incomplete flat bin")
-	ErrIncompleteBinMeta   = errors.New("incomplete flat bin metadata")
-	ErrBadBinNameLength    = errors.New("bad flat bin name length")
-	ErrIncompleteBinName   = errors.New("incomplete flat bin name")
-	ErrUnknownBinFlags     = errors.New("unknown bin flags")
-	ErrIncompleteBinLUT    = errors.New("incomplete flat bin LUT")
-	ErrIncompleteBinSrcID  = errors.New("incomplete flat bin src-id")
-	ErrExtraRBlocks        = errors.New("extra rblocks follow flat bins")
-	ErrIncompleteParticle  = errors.New("incomplete flat particle")
-	ErrUnknownParticleType = errors.New("unknown particle type")
-	ErrIncompleteInteger   = errors.New("incomplete flat integer")
-	ErrBadIntegerSize      = errors.New("bad flat integer size")
-	ErrIncompleteFloat     = errors.New("incomplete flat float")
-	ErrIncompleteBool      = errors.New("incomplete flat bool")
-	ErrBadBoolValue        = errors.New("bad flat bool value")
-	ErrIncompleteBlob      = errors.New("incomplete flat blob")
+	ErrIncompleteBin       = fmt.Errorf("%w: incomplete flat bin", models.ErrCorruptData)
+	ErrIncompleteBinMeta   = fmt.Errorf("%w: incomplete flat bin metadata", models.ErrCorruptData)
+	ErrBadBinNameLength    = fmt.Errorf("%w: bad flat bin name length", models.ErrCorruptData)
+	ErrIncompleteBinName   = fmt.Errorf("%w: incomplete flat bin name", models.ErrCorruptData)
+	ErrUnknownBinFlags     = fmt.Errorf("%w: unknown bin flags", models.ErrCorruptData)
+	ErrIncompleteBinLUT    = fmt.Errorf("%w: incomplete flat bin LUT", models.ErrCorruptData)
+	ErrIncompleteBinSrcID  = fmt.Errorf("%w: incomplete flat bin src-id", models.ErrCorruptData)
+	ErrExtraRBlocks        = fmt.Errorf("%w: extra rblocks follow flat bins", models.ErrCorruptData)
+	ErrIncompleteParticle  = fmt.Errorf("%w: incomplete flat particle", models.ErrCorruptData)
+	ErrUnknownParticleType = fmt.Errorf("%w: unknown particle type", models.ErrUnsupported)
+	ErrIncompleteInteger   = fmt.Errorf("%w: incomplete flat integer", models.ErrCorruptData)
+	ErrBadIntegerSize      = fmt.Errorf("%w: bad flat integer size", models.ErrCorruptData)
+	ErrIncompleteFloat     = fmt.Errorf("%w: incomplete flat float", models.ErrCorruptData)
+	ErrIncompleteBool      = fmt.Errorf("%w: incomplete flat bool", models.ErrCorruptData)
+	ErrBadBoolValue        = fmt.Errorf("%w: bad flat bool value", models.ErrCorruptData)
+	ErrIncompleteBlob      = fmt.Errorf("%w: incomplete flat blob", models.ErrCorruptData)
 )
 
 // RecordError locates the record inside a segment that failed validation.

@@ -66,14 +66,15 @@ func NewReader(
 	}
 
 	if len(r.PathList) == 0 {
-		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
+		return nil, fmt.Errorf("%w: path is required, use WithDir(path string) or WithFile(path string) to set",
+			models.ErrInvalidConfig)
 	}
 
 	bucket := client.Bucket(bucketName)
 	// Check if bucket exists, to avoid errors.
 	_, err := bucket.Attrs(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get bucket %s attributes: %w", bucketName, err)
+		return nil, fmt.Errorf("%w: failed to get bucket %s attributes: %w", models.ErrNotFound, bucketName, err)
 	}
 
 	r.bucketHandle = bucket
@@ -141,7 +142,8 @@ func (r *Reader) streamDirectory(
 		objAttrs, err := it.Next()
 		if err != nil {
 			if !errors.Is(err, iterator.Done) {
-				common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to read object attributes from bucket %s: %w",
+				common.ErrToChan(ctx, errorsCh, fmt.Errorf(
+					"%w: failed to read object attributes from bucket %s: %w", models.ErrStorage,
 					r.bucketName, err))
 			}
 			// If the previous call to Next returned an error other than iterator.Done, all
@@ -186,7 +188,7 @@ func (r *Reader) openObject(
 ) {
 	rReader, err := newRangeReader(ctx, newGcpStorageClient(r.bucketHandle), r.bucketName, path)
 	if err != nil {
-		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to prepare rangeReader %s: %w", path, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to prepare rangeReader %s: %w", models.ErrStorage, path, err))
 		return
 	}
 
@@ -197,7 +199,7 @@ func (r *Reader) openObject(
 			return
 		}
 
-		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open directory file %s: %w", path, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to open directory file %s: %w", models.ErrStorage, path, err))
 
 		return
 	}
@@ -231,7 +233,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 		objAttrs, err := it.Next()
 		if err != nil {
 			if !errors.Is(err, iterator.Done) {
-				return fmt.Errorf("failed to read object attributes from bucket %s: %w",
+				return fmt.Errorf("%w: failed to read object attributes from bucket %s: %w", models.ErrStorage,
 					r.bucketName, err)
 			}
 			// If the previous call to Next returned an error other than iterator.Done, all
@@ -259,7 +261,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 		}
 	}
 
-	return fmt.Errorf("%s is empty", path)
+	return fmt.Errorf("%w: %s is empty", models.ErrNotFound, path)
 }
 
 // ListObjects list all objects in the path.
@@ -280,7 +282,7 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 		objAttrs, err := it.Next()
 		if err != nil {
 			if !errors.Is(err, iterator.Done) {
-				return nil, fmt.Errorf("failed to read object attributes from bucket %s: %w",
+				return nil, fmt.Errorf("%w: failed to read object attributes from bucket %s: %w", models.ErrStorage,
 					r.bucketName, err)
 			}
 
@@ -350,7 +352,7 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 	if !r.IsDir {
 		objAttrs, err := r.bucketHandle.Object(path).Attrs(ctx)
 		if err != nil {
-			return 0, 0, fmt.Errorf("failed to get object attributes for %s: %w", path, err)
+			return 0, 0, fmt.Errorf("%w: failed to get object attributes for %s: %w", models.ErrStorage, path, err)
 		}
 
 		return objAttrs.Size, 1, nil
@@ -366,7 +368,7 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 		objAttrs, err := it.Next()
 		if err != nil {
 			if !errors.Is(err, iterator.Done) {
-				return 0, 0, fmt.Errorf("failed to read object attributes from bucket %s: %w",
+				return 0, 0, fmt.Errorf("%w: failed to read object attributes from bucket %s: %w", models.ErrStorage,
 					r.bucketName, err)
 			}
 

@@ -24,7 +24,7 @@ func TestRecordError(t *testing.T) {
 
 	err := newRecordError(3, 192, ErrBadEndMark)
 
-	const want = "record 3 at offset 192: bad end marker"
+	want := "record 3 at offset 192: " + ErrBadEndMark.Error()
 	if got := err.Error(); got != want {
 		t.Errorf("Error() = %q, want %q", got, want)
 	}

@@ -17,6 +17,8 @@ package asb
 import (
 	"fmt"
 	"math"
+
+	"github.com/aerospike/backup-go/models"
 )
 
 // readSignedInt reads a signed int64 directly from the reader without string allocation.
@@ -43,7 +45,7 @@ func readSignedInt(src *countingReader, delim byte) (int64, error) {
 		// Handle negative sign - must be first character
 		if b == '-' {
 			if hasDigits || negative {
-				return 0, fmt.Errorf("invalid number: unexpected '-'")
+				return 0, fmt.Errorf("%w: invalid number: unexpected '-'", models.ErrCorruptData)
 			}
 
 			negative = true
@@ -52,7 +54,7 @@ func readSignedInt(src *countingReader, delim byte) (int64, error) {
 		}
 
 		if b < '0' || b > '9' {
-			return 0, fmt.Errorf("invalid number character: %c", b)
+			return 0, fmt.Errorf("%w: invalid number character: %c", models.ErrCorruptData, b)
 		}
 
 		hasDigits = true
@@ -60,7 +62,7 @@ func readSignedInt(src *countingReader, delim byte) (int64, error) {
 	}
 
 	if !hasDigits {
-		return 0, fmt.Errorf("empty number")
+		return 0, fmt.Errorf("%w: empty number", models.ErrCorruptData)
 	}
 
 	if negative {
@@ -91,7 +93,7 @@ func readUnsignedInt(src *countingReader, delim byte) (uint32, error) {
 		}
 
 		if b < '0' || b > '9' {
-			return 0, fmt.Errorf("invalid number character: %c", b)
+			return 0, fmt.Errorf("%w: invalid number character: %c", models.ErrCorruptData, b)
 		}
 
 		hasDigits = true
@@ -101,15 +103,15 @@ func readUnsignedInt(src *countingReader, delim byte) (uint32, error) {
 		if result > math.MaxUint32 {
 			// Consume remaining digits
 			if err := consumeUntil(src, delim); err != nil {
-				return math.MaxUint32, fmt.Errorf("value exceeds uint32 max")
+				return math.MaxUint32, fmt.Errorf("%w: value exceeds uint32 max", models.ErrCorruptData)
 			}
 
-			return math.MaxUint32, fmt.Errorf("value exceeds uint32 max")
+			return math.MaxUint32, fmt.Errorf("%w: value exceeds uint32 max", models.ErrCorruptData)
 		}
 	}
 
 	if !hasDigits {
-		return 0, fmt.Errorf("empty number")
+		return 0, fmt.Errorf("%w: empty number", models.ErrCorruptData)
 	}
 
 	return uint32(result), nil

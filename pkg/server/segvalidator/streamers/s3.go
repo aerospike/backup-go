@@ -21,6 +21,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/smithy-go"
@@ -40,11 +41,11 @@ type S3API interface {
 // NewS3 creates a streamer over the backup identified by backupID in a bucket.
 func NewS3(client S3API, bucket, backupID string, opts ...Option) (*Streamer, error) {
 	if client == nil {
-		return nil, errors.New("s3 client must not be nil")
+		return nil, fmt.Errorf("%w: s3 client must not be nil", models.ErrInvalidConfig)
 	}
 
 	if bucket == "" {
-		return nil, errors.New("bucket must not be empty")
+		return nil, fmt.Errorf("%w: bucket must not be empty", models.ErrInvalidConfig)
 	}
 
 	return newStreamer(&s3Store{client: client, bucket: bucket}, backupID, opts...)
@@ -72,7 +73,7 @@ func (s *s3Store) listLevel(ctx context.Context, dir string, fn func(levelEntry)
 	for pager.HasMorePages() {
 		page, err := pager.NextPage(ctx)
 		if err != nil {
-			return fmt.Errorf("list %s: %w", prefix, err)
+			return fmt.Errorf("%w: list %s: %w", models.ErrStorage, prefix, err)
 		}
 
 		for _, cp := range page.CommonPrefixes {
@@ -123,7 +124,7 @@ func (s *s3Store) listFiles(ctx context.Context, dir string, fn func(file) error
 	for pager.HasMorePages() {
 		page, err := pager.NextPage(ctx)
 		if err != nil {
-			return fmt.Errorf("list %s: %w", prefix, err)
+			return fmt.Errorf("%w: list %s: %w", models.ErrStorage, prefix, err)
 		}
 
 		for _, obj := range page.Contents {
@@ -155,7 +156,7 @@ func (s *s3Store) open(ctx context.Context, key string) (io.ReadCloser, error) {
 	case isNotFound(err):
 		return nil, fmt.Errorf("%w: %s", ErrSegmentMissing, key)
 	case err != nil:
-		return nil, fmt.Errorf("get object %s: %w", key, err)
+		return nil, fmt.Errorf("%w: get object %s: %w", models.ErrStorage, key, err)
 	}
 
 	return out.Body, nil

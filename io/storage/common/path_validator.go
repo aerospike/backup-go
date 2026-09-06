@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/aerospike/backup-go/models"
 )
 
 const parentDirName = ".."
@@ -31,15 +33,15 @@ func ValidateObjectKey(key string) error {
 	}
 
 	if strings.ContainsRune(key, '\x00') {
-		return fmt.Errorf("object key must not contain NUL bytes")
+		return fmt.Errorf("%w: object key must not contain NUL bytes", models.ErrInvalidConfig)
 	}
 
 	if strings.HasPrefix(key, "/") {
-		return fmt.Errorf("object key must not start with '/'")
+		return fmt.Errorf("%w: object key must not start with '/'", models.ErrInvalidConfig)
 	}
 
 	if slices.Contains(strings.Split(key, "/"), parentDirName) {
-		return fmt.Errorf("object key must not contain '..' path segments")
+		return fmt.Errorf("%w: object key must not contain '..' path segments", models.ErrInvalidConfig)
 	}
 
 	return nil

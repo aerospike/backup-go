@@ -23,6 +23,7 @@ import (
 
 	"github.com/aerospike/backup-go/io/storage/aws/s3/mocks"
 	"github.com/aerospike/backup-go/io/storage/options"
+	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -125,8 +126,8 @@ func TestParseStorageClass(t *testing.T) {
 			result, err := parseStorageClass(tc.class)
 
 			if tc.expectedError != nil {
-				require.Error(t, err)
-				assert.Equal(t, tc.expectedError.Error(), err.Error())
+				require.ErrorIs(t, err, models.ErrInvalidConfig)
+				require.ErrorContains(t, err, tc.expectedError.Error())
 			} else {
 				require.NoError(t, err)
 			}
@@ -192,8 +193,8 @@ func TestParseAccessTier(t *testing.T) {
 			result, err := parseAccessTier(tc.tier)
 
 			if tc.expectedError != nil {
-				require.Error(t, err)
-				assert.Equal(t, tc.expectedError.Error(), err.Error())
+				require.ErrorIs(t, err, models.ErrInvalidConfig)
+				require.ErrorContains(t, err, tc.expectedError.Error())
 			} else {
 				require.NoError(t, err)
 			}

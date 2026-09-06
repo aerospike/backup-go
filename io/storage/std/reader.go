@@ -40,7 +40,7 @@ func NewReader(ctx context.Context, bufferSize int) (*Reader, error) {
 	}
 
 	if bufferSize < 0 {
-		return nil, fmt.Errorf("buffer size must not be negative")
+		return nil, fmt.Errorf("%w: buffer size must not be negative", models.ErrInvalidConfig)
 	}
 
 	if bufferSize == 0 {

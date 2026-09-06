@@ -58,11 +58,11 @@ func (p *RetryPolicy) Validate() error {
 	}
 
 	if p.BaseTimeout < 0 {
-		return fmt.Errorf("base timeout must be non-negative")
+		return fmt.Errorf("%w: base timeout must be non-negative", ErrInvalidConfig)
 	}
 
 	if p.Multiplier < 1 {
-		return fmt.Errorf("multiplier must be greater than or equal to 1")
+		return fmt.Errorf("%w: multiplier must be greater than or equal to 1", ErrInvalidConfig)
 	}
 
 	// MaxRetries validation removed - 0 is valid (means no retries)

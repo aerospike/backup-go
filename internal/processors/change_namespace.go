@@ -48,7 +48,7 @@ func (p changeNamespace) Process(t *models.Token) (*models.Token, error) {
 
 	key := t.Record.Key
 	if key.Namespace() != *p.source {
-		return nil, fmt.Errorf("invalid namespace %s (expected: %s)", key.Namespace(), *p.source)
+		return nil, fmt.Errorf("%w: invalid namespace %s (expected: %s)", models.ErrInvalidConfig, key.Namespace(), *p.source)
 	}
 
 	newKey, err := a.NewKeyWithDigest(*p.destination, key.SetName(), key.Value(), key.Digest())

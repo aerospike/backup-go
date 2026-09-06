@@ -90,26 +90,27 @@ func NewPartitionFilterAll() *a.PartitionFilter {
 // splitPartitions splits the partitions to groups.
 func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*a.PartitionFilter, error) {
 	if numWorkers < 1 {
-		return nil, fmt.Errorf("number of workers is less than 1, cannot split partition filters")
+		return nil, fmt.Errorf("%w: number of workers is less than 1, cannot split partition filters", ErrInvalidConfig)
 	}
 
 	if numWorkers < len(partitionFilters) {
-		return nil, fmt.Errorf("number of workers is less than partition filters, cannot split partition filters")
+		return nil, fmt.Errorf("%w: number of workers is less than partition filters, cannot split partition filters",
+			ErrInvalidConfig)
 	}
 
 	// Validations.
 	for i := range partitionFilters {
 		if partitionFilters[i].Begin < 0 {
-			return nil, fmt.Errorf("start partition is less than 0, cannot split partition filters")
+			return nil, fmt.Errorf("%w: start partition is less than 0, cannot split partition filters", ErrInvalidConfig)
 		}
 
 		if partitionFilters[i].Count < 1 {
-			return nil, fmt.Errorf("partitions count is less than 1, cannot split partition filters")
+			return nil, fmt.Errorf("%w: partitions count is less than 1, cannot split partition filters", ErrInvalidConfig)
 		}
 
 		if partitionFilters[i].Begin+partitionFilters[i].Count > MaxPartitions {
-			return nil, fmt.Errorf("start partition + partitions count is greater than the max partition filters: %d",
-				MaxPartitions)
+			return nil, fmt.Errorf("%w: start partition + partitions count is greater than the max partition filters: %d",
+				ErrInvalidConfig, MaxPartitions)
 		}
 	}
 
@@ -186,15 +187,15 @@ func splitPartitions(partitionFilters []*a.PartitionFilter, numWorkers int) ([]*
 // splitPartitionIDs splits the partition ids to groups. Returns a slice of `aerospike.PartitionFilter`s.
 func splitPartitionIDs(ids []int, numWorkers int) ([]*a.PartitionFilter, error) {
 	if numWorkers <= 0 {
-		return nil, fmt.Errorf("number of workers is less than 1, cannot split partition ids")
+		return nil, fmt.Errorf("%w: number of workers is less than 1, cannot split partition ids", ErrInvalidConfig)
 	}
 
 	if len(ids) == 0 {
-		return nil, fmt.Errorf("partition ids is empty")
+		return nil, fmt.Errorf("%w: partition ids is empty", ErrInvalidConfig)
 	}
 
 	if len(ids) > MaxPartitions {
-		return nil, fmt.Errorf("partition ids count is greater than max partitions: %d", len(ids))
+		return nil, fmt.Errorf("%w: partition ids count is greater than max partitions: %d", ErrInvalidConfig, len(ids))
 	}
 
 	var err error
@@ -231,7 +232,8 @@ func splitPartitionIDs(ids []int, numWorkers int) ([]*a.PartitionFilter, error) 
 // splitPartitionRange splits one range filter to numWorkers.
 func splitPartitionRange(partitionFilters *a.PartitionFilter, numWorkers int) ([]*a.PartitionFilter, error) {
 	if partitionFilters.Count < numWorkers {
-		return nil, fmt.Errorf("number of partitions is less than workers number, cannot split partitions")
+		return nil, fmt.Errorf("%w: number of partitions is less than workers number, cannot split partitions",
+			ErrInvalidConfig)
 	}
 
 	result := make([]*a.PartitionFilter, numWorkers)
@@ -254,7 +256,7 @@ func splitPartitionRange(partitionFilters *a.PartitionFilter, numWorkers int) ([
 // Namespace can be empty, must be set only for partition by digest.
 func ParsePartitionFilterListString(namespace, filters string) ([]*a.PartitionFilter, error) {
 	if filters == "" {
-		return nil, fmt.Errorf("empty filters")
+		return nil, fmt.Errorf("%w: empty filters", ErrInvalidConfig)
 	}
 
 	filterSlice := strings.Split(filters, ",")
@@ -263,7 +265,7 @@ func ParsePartitionFilterListString(namespace, filters string) ([]*a.PartitionFi
 	for _, filter := range filterSlice {
 		partitionFilter, err := ParsePartitionFilterString(namespace, filter)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse partition filter, filter: %s, err: %w", filter, err)
+			return nil, fmt.Errorf("%w: failed to parse partition filter %s: %w", ErrInvalidConfig, filter, err)
 		}
 
 		partitionFilters = append(partitionFilters, partitionFilter)
@@ -291,23 +293,23 @@ func ParsePartitionFilterString(namespace, filter string) (*a.PartitionFilter, e
 		return parsePartitionFilterByDigest(namespace, filter)
 	}
 
-	return nil, fmt.Errorf("failed to parse partition filter: %s", filter)
+	return nil, fmt.Errorf("%w: failed to parse partition filter: %s", ErrInvalidConfig, filter)
 }
 
 func parsePartitionFilterByRange(filter string) (*a.PartitionFilter, error) {
 	bounds := strings.Split(filter, "-")
 	if len(bounds) != 2 {
-		return nil, fmt.Errorf("invalid partition filter: %s", filter)
+		return nil, fmt.Errorf("%w: invalid partition filter: %s", ErrInvalidConfig, filter)
 	}
 
 	begin, err := strconv.Atoi(bounds[0])
 	if err != nil {
-		return nil, fmt.Errorf("invalid partition filter %s begin value: %w", filter, err)
+		return nil, fmt.Errorf("%w: invalid partition filter %s begin value: %w", ErrInvalidConfig, filter, err)
 	}
 
 	count, err := strconv.Atoi(bounds[1])
 	if err != nil {
-		return nil, fmt.Errorf("invalid partition filter %s count value: %w", filter, err)
+		return nil, fmt.Errorf("%w: invalid partition filter %s count value: %w", ErrInvalidConfig, filter, err)
 	}
 
 	return NewPartitionFilterByRange(begin, count), nil
@@ -316,7 +318,7 @@ func parsePartitionFilterByRange(filter string) (*a.PartitionFilter, error) {
 func parsePartitionFilterByID(filter string) (*a.PartitionFilter, error) {
 	id, err := strconv.Atoi(filter)
 	if err != nil {
-		return nil, fmt.Errorf("invalid partition filter %s id value: %w", filter, err)
+		return nil, fmt.Errorf("%w: invalid partition filter %s id value: %w", ErrInvalidConfig, filter, err)
 	}
 
 	return NewPartitionFilterByID(id), nil

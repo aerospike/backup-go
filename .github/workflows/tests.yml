@@ -41,7 +41,7 @@ jobs:
     services:
       # Aerospike service container
       aerospike:
-        image: aerospike/aerospike-server-enterprise:8.0.0.7
+        image: aerospike/aerospike-server-enterprise:8.1.2.4
         ports:
           - 3000:3000
           - 3001:3001

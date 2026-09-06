@@ -363,7 +363,7 @@ func (w *s3Writer) uploadPart(p []byte, partNumber int32) {
 	}
 
 	if response == nil {
-		uploadFailure := fmt.Errorf("nil response uploading part %d", partNumber)
+		uploadFailure := fmt.Errorf("%w: nil response uploading part %d", errclass.ErrStorage, partNumber)
 		if w.uploadErr.CompareAndSwap(nil, &uploadFailure) {
 			w.cancel()
 		}

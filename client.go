@@ -422,12 +422,12 @@ func (c *Client) Estimate(
 		return 0, fmt.Errorf("%w: backup config required", ErrInvalidConfig)
 	}
 
-	if c.aerospikeClient == nil {
-		return 0, fmt.Errorf("%w: aerospike client is nil", ErrInvalidConfig)
+	if config.StateFile != "" {
+		return 0, fmt.Errorf("%w: state file is not supported for estimate", ErrInvalidConfig)
 	}
 
-	if config.StateFile != "" {
-		return 0, fmt.Errorf("state file is not supported for estimate")
+	if c.aerospikeClient == nil {
+		return 0, fmt.Errorf("%w: aerospike client is nil", ErrInvalidConfig)
 	}
 
 	// Fill in the default policy on the caller's config. The default itself is

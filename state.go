@@ -77,12 +77,12 @@ func NewState(
 	logger.Debug("initializing state", slog.String("path", config.StateFile))
 
 	if config.StateFile == "" {
-		return nil, fmt.Errorf("state file is required")
+		return nil, fmt.Errorf("%w: state file is required", ErrInvalidConfig)
 	}
 
 	if config.Continue {
 		if reader == nil {
-			return nil, fmt.Errorf("reader is required when continuing from a state file")
+			return nil, fmt.Errorf("%w: reader is required when continuing from a state file", ErrInvalidConfig)
 		}
 
 		logger.Debug("initializing state from file", slog.String("file", config.StateFile))

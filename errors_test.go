@@ -130,6 +130,16 @@ func TestClientErrors_InvalidConfig(t *testing.T) {
 			},
 			wantErr: "backup config required",
 		},
+		{
+			name: "estimate with a state file",
+			call: func() error {
+				config := NewDefaultBackupConfig()
+				config.StateFile = "state.json"
+				_, err := client.Estimate(t.Context(), config, 1)
+				return err
+			},
+			wantErr: "state file is not supported for estimate",
+		},
 	}
 
 	for _, tt := range tests {
@@ -267,6 +277,16 @@ func TestErrorClass_ExactlyOne(t *testing.T) {
 			name: "restore without config",
 			call: func() error {
 				_, err := client.Restore(ctx, nil, nil)
+				return err
+			},
+			want: ErrInvalidConfig,
+		},
+		{
+			name: "estimate with a state file",
+			call: func() error {
+				config := NewDefaultBackupConfig()
+				config.StateFile = "state.json"
+				_, err := client.Estimate(ctx, config, 1)
 				return err
 			},
 			want: ErrInvalidConfig,

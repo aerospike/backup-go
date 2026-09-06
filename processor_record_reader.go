@@ -20,6 +20,7 @@ import (
 	"log/slog"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/internal/scanlimiter"
 	"github.com/aerospike/backup-go/io/aerospike"
@@ -172,7 +173,7 @@ func (rr *recordReaderProcessor) getPrimaryPartitions(ctx context.Context) ([]in
 	}
 
 	if len(partIDs) == 0 {
-		return nil, fmt.Errorf("no primary partitions found")
+		return nil, fmt.Errorf("%w: no primary partitions found", errclass.ErrAerospike)
 	}
 
 	return partIDs, nil

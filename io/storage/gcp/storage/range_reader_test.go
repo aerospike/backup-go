@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"cloud.google.com/go/storage"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/io/storage/gcp/storage/mocks"
 	"github.com/stretchr/testify/require"
 )
@@ -127,7 +128,23 @@ func TestNewRangeReader(t *testing.T) {
 		reader, err := newRangeReader(ctx, clientMock, testBucket, testPath)
 
 		require.ErrorIs(t, err, errGCPTest)
+		require.ErrorIs(t, err, errclass.ErrStorage)
 		require.Contains(t, err.Error(), "failed to get attr")
+		require.Contains(t, err.Error(), testPath)
+		require.Nil(t, reader)
+	})
+
+	t.Run("Error GetAttrs returned nil attributes", func(t *testing.T) {
+		t.Parallel()
+
+		clientMock := mocks.NewMockgcpGetter(t)
+		clientMock.On("GetAttrs", ctx, testPath).
+			Return(nil, nil)
+
+		reader, err := newRangeReader(ctx, clientMock, testBucket, testPath)
+
+		require.ErrorIs(t, err, errclass.ErrStorage)
+		require.Contains(t, err.Error(), "nil object attributes")
 		require.Contains(t, err.Error(), testPath)
 		require.Nil(t, reader)
 	})

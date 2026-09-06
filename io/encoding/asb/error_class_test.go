@@ -15,6 +15,7 @@
 package asb
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
@@ -44,6 +45,13 @@ func TestErrorClasses_Corrupt(t *testing.T) {
 			name: "malformed number",
 			call: func() error {
 				_, err := readUnsignedInt(newCountingReader(strings.NewReader("12x\n"), "test"), '\n')
+				return err
+			},
+		},
+		{
+			name: "nil raw blob bin",
+			call: func() error {
+				_, err := writeRawBlobBin(nil, "bin", false, &bytes.Buffer{})
 				return err
 			},
 		},

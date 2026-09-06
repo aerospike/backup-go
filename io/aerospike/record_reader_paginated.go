@@ -102,7 +102,7 @@ func (r *paginatedRecordReader) Read(ctx context.Context) (*models.Token, error)
 		}
 
 		if res == nil {
-			return nil, fmt.Errorf("nil scan result")
+			return nil, fmt.Errorf("%w: nil scan result", errclass.ErrAerospike)
 		}
 
 		if shouldSkipPaginatedDrainError(res.Err) {

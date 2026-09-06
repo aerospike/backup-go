@@ -303,7 +303,7 @@ func writeBinNil(name string, w *bytes.Buffer) (int, error) {
 
 func writeRawBlobBin(cdt *a.RawBlobValue, name string, compact bool, w *bytes.Buffer) (int, error) {
 	if cdt == nil {
-		return 0, fmt.Errorf("raw blob bin %q is nil", name)
+		return 0, fmt.Errorf("%w: raw blob bin %q is nil", errclass.ErrCorruptData, name)
 	}
 
 	switch cdt.ParticleType {

@@ -100,6 +100,10 @@ func (r *paginatedRecordReader) Read(ctx context.Context) (*models.Token, error)
 			continue
 		}
 
+		if res == nil {
+			return nil, fmt.Errorf("nil scan result")
+		}
+
 		if shouldSkipPaginatedDrainError(res.Err) {
 			continue
 		}

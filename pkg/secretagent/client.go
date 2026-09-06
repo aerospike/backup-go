@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/pkg/secretagent/connection"
 	"github.com/segmentio/asm/base64"
 )
@@ -55,7 +55,7 @@ func NewClient(connectionType, address string, timeout time.Duration, isBase64 b
 	tlsConfig *tls.Config,
 ) (*Client, error) {
 	if tlsConfig != nil && connectionType != ConnectionTypeTCP {
-		return nil, fmt.Errorf("%w: tls connection type %s is not supported", models.ErrUnsupported, connectionType)
+		return nil, fmt.Errorf("%w: tls connection type %s is not supported", errclass.ErrUnsupported, connectionType)
 	}
 
 	return &Client{
@@ -73,7 +73,7 @@ func NewClient(connectionType, address string, timeout time.Duration, isBase64 b
 func (c *Client) GetSecret(ctx context.Context, resource, secretKey string) (string, error) {
 	conn, err := connection.Get(ctx, c.connectionType, c.address, c.timeout, c.tlsConfig)
 	if err != nil {
-		return "", fmt.Errorf("%w: failed to connect to secret agent: %w", models.ErrSecretAgent, err)
+		return "", fmt.Errorf("%w: failed to connect to secret agent: %w", errclass.ErrSecretAgent, err)
 	}
 
 	defer func() { _ = conn.Close() }()

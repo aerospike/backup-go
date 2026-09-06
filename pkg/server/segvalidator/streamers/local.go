@@ -24,14 +24,14 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/errclass"
 )
 
 // NewLocal creates a streamer over the backup identified by backupID in a
 // directory holding backups, laid out the way an object storage would be.
 func NewLocal(root, backupID string, opts ...Option) (*Streamer, error) {
 	if root == "" {
-		return nil, fmt.Errorf("%w: root directory must not be empty", models.ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: root directory must not be empty", errclass.ErrInvalidConfig)
 	}
 
 	return newStreamer(&localStore{root: filepath.Clean(root)}, backupID, opts...)
@@ -61,7 +61,7 @@ func (l *localStore) listLevel(ctx context.Context, dir string, fn func(levelEnt
 		// what an object storage would say about a prefix nothing is under.
 		return nil
 	case err != nil:
-		return fmt.Errorf("%w: read directory %s: %w", models.ErrStorage, dir, err)
+		return fmt.Errorf("%w: read directory %s: %w", errclass.ErrStorage, dir, err)
 	}
 
 	for _, entry := range entries {
@@ -74,7 +74,7 @@ func (l *localStore) listLevel(ctx context.Context, dir string, fn func(levelEnt
 		if !level.IsDir {
 			info, err := entry.Info()
 			if err != nil {
-				return fmt.Errorf("%w: stat %s: %w", models.ErrStorage, path.Join(dir, entry.Name()), err)
+				return fmt.Errorf("%w: stat %s: %w", errclass.ErrStorage, path.Join(dir, entry.Name()), err)
 			}
 
 			level.file = file{Path: path.Join(dir, entry.Name()), Size: info.Size()}
@@ -113,7 +113,7 @@ func (l *localStore) listFiles(ctx context.Context, dir string, fn func(file) er
 
 		info, err := d.Info()
 		if err != nil {
-			return fmt.Errorf("%w: stat %s: %w", models.ErrStorage, p, err)
+			return fmt.Errorf("%w: stat %s: %w", errclass.ErrStorage, p, err)
 		}
 
 		if err := fn(file{Path: l.storagePath(p), Size: info.Size()}); err != nil {
@@ -127,7 +127,7 @@ func (l *localStore) listFiles(ctx context.Context, dir string, fn func(file) er
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("%w: walk %s: %w", models.ErrStorage, dir, err)
+		return fmt.Errorf("%w: walk %s: %w", errclass.ErrStorage, dir, err)
 	}
 
 	return nil
@@ -146,7 +146,7 @@ func (l *localStore) open(_ context.Context, storagePath string) (io.ReadCloser,
 	case errors.Is(err, fs.ErrNotExist):
 		return nil, fmt.Errorf("%w: %s", ErrSegmentMissing, storagePath)
 	case err != nil:
-		return nil, fmt.Errorf("%w: open %s: %w", models.ErrStorage, storagePath, err)
+		return nil, fmt.Errorf("%w: open %s: %w", errclass.ErrStorage, storagePath, err)
 	}
 
 	return f, nil
@@ -157,7 +157,7 @@ func (l *localStore) open(_ context.Context, storagePath string) (io.ReadCloser,
 func (l *localStore) resolve(storagePath string) (string, error) {
 	local := filepath.FromSlash(storagePath)
 	if !filepath.IsLocal(local) {
-		return "", fmt.Errorf("%w: path %q is outside the root directory", models.ErrInvalidConfig, storagePath)
+		return "", fmt.Errorf("%w: path %q is outside the root directory", errclass.ErrInvalidConfig, storagePath)
 	}
 
 	return filepath.Join(l.root, local), nil

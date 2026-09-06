@@ -29,6 +29,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
@@ -89,13 +90,13 @@ func NewReader(
 
 	if len(r.PathList) == 0 {
 		return nil, fmt.Errorf("%w: path is required, use WithDir(path string) or WithFile(path string) to set",
-			models.ErrInvalidConfig)
+			errclass.ErrInvalidConfig)
 	}
 
 	// Check if a container exists.
 	r.containerClient = client.ServiceClient().NewContainerClient(containerName)
 	if _, err := r.containerClient.GetProperties(ctx, nil); err != nil {
-		return nil, fmt.Errorf("%w: failed to get container properties: %w", models.ErrNotFound, err)
+		return nil, fmt.Errorf("%w: failed to get container properties: %w", errclass.ErrNotFound, err)
 	}
 
 	r.containerName = containerName
@@ -113,13 +114,13 @@ func NewReader(
 
 		tier, err := parseAccessTier(r.AccessTier)
 		if err != nil {
-			return nil, fmt.Errorf("%w: failed to parse restore tier: %w", models.ErrInvalidConfig, err)
+			return nil, fmt.Errorf("%w: failed to parse restore tier: %w", errclass.ErrInvalidConfig, err)
 		}
 
 		r.Logger.Debug("parsed tier", slog.String("value", string(tier)))
 
 		if err := r.warmStorage(ctx, tier); err != nil {
-			return nil, fmt.Errorf("%w: failed to warm storage: %w", models.ErrStorage, err)
+			return nil, fmt.Errorf("%w: failed to warm storage: %w", errclass.ErrStorage, err)
 		}
 
 		r.Logger.Debug("finish warming storage")
@@ -178,7 +179,7 @@ func (r *Reader) streamDirectory(
 	for pager.More() {
 		page, err := pager.NextPage(ctx)
 		if err != nil {
-			common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to get next page: %w", models.ErrStorage, err))
+			common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to get next page: %w", errclass.ErrStorage, err))
 
 			return
 		}
@@ -186,7 +187,7 @@ func (r *Reader) streamDirectory(
 		// Iterate over the blobs in the page.
 		for _, blobItem := range page.Segment.BlobItems {
 			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
-				common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to get object attributes for %s", models.ErrStorage, path))
+				common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to get object attributes for %s", errclass.ErrStorage, path))
 
 				return
 			}
@@ -227,7 +228,7 @@ func (r *Reader) openObject(
 ) {
 	state, err := r.checkObjectAvailability(ctx, path)
 	if err != nil {
-		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to check object availability: %w", models.ErrStorage, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to check object availability: %w", errclass.ErrStorage, err))
 		return
 	}
 
@@ -238,7 +239,9 @@ func (r *Reader) openObject(
 
 	rReader, err := newRangeReader(ctx, newAzureBlobClient(r.client, r.containerClient), r.containerName, path)
 	if err != nil {
-		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to prepare rangeReader %s: %w", models.ErrStorage, path, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to prepare rangeReader %s: %w",
+			errclass.ErrStorage, path, err))
+
 		return
 	}
 
@@ -250,7 +253,7 @@ func (r *Reader) openObject(
 			return
 		}
 
-		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to open file %s: %w", models.ErrStorage, path, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to open file %s: %w", errclass.ErrStorage, path, err))
 
 		return
 	}
@@ -290,12 +293,12 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 	for pager.More() {
 		page, err := pager.NextPage(ctx)
 		if err != nil {
-			return fmt.Errorf("%w: failed to get next page: %w", models.ErrStorage, err)
+			return fmt.Errorf("%w: failed to get next page: %w", errclass.ErrStorage, err)
 		}
 
 		for _, blobItem := range page.Segment.BlobItems {
 			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
-				return fmt.Errorf("%w: failed to get object attributes for %s", models.ErrStorage, path)
+				return fmt.Errorf("%w: failed to get object attributes for %s", errclass.ErrStorage, path)
 			}
 
 			// Skip files in folders.
@@ -318,7 +321,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 		}
 	}
 
-	return fmt.Errorf("%w: %s is empty", models.ErrNotFound, path)
+	return fmt.Errorf("%w: %s is empty", errclass.ErrNotFound, path)
 }
 
 // ListObjects list all object in the path.
@@ -336,12 +339,12 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 	for pager.More() {
 		page, err := pager.NextPage(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("%w: failed to get next page: %w", models.ErrStorage, err)
+			return nil, fmt.Errorf("%w: failed to get next page: %w", errclass.ErrStorage, err)
 		}
 
 		for _, blobItem := range page.Segment.BlobItems {
 			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
-				return nil, fmt.Errorf("%w: failed to get object attributes for %s", models.ErrStorage, path)
+				return nil, fmt.Errorf("%w: failed to get object attributes for %s", errclass.ErrStorage, path)
 			}
 
 			// Skip files in folders.
@@ -378,7 +381,7 @@ func (r *Reader) rehydrateObject(ctx context.Context, path string, tier blob.Acc
 			RehydratePriority: &priority,
 		})
 	if err != nil {
-		return fmt.Errorf("%w: failed to set tier: %w", models.ErrStorage, err)
+		return fmt.Errorf("%w: failed to set tier: %w", errclass.ErrStorage, err)
 	}
 
 	return nil
@@ -391,7 +394,7 @@ func (r *Reader) checkObjectAvailability(ctx context.Context, path string) (int,
 
 	objProps, err := bClient.GetProperties(ctx, nil)
 	if err != nil {
-		return objStatusArchived, fmt.Errorf("%w: failed to get container properties: %w", models.ErrStorage, err)
+		return objStatusArchived, fmt.Errorf("%w: failed to get container properties: %w", errclass.ErrStorage, err)
 	}
 
 	if objProps.AccessTier != nil && *objProps.AccessTier == string(blob.AccessTierArchive) {
@@ -410,7 +413,7 @@ func (r *Reader) checkObjectAvailability(ctx context.Context, path string) (int,
 func (r *Reader) warmStorage(ctx context.Context, tier blob.AccessTier) error {
 	for _, path := range r.PathList {
 		if err := r.warmDirectory(ctx, path, tier); err != nil {
-			return fmt.Errorf("%w: failed to warm directory %s: %w", models.ErrStorage, path, err)
+			return fmt.Errorf("%w: failed to warm directory %s: %w", errclass.ErrStorage, path, err)
 		}
 	}
 
@@ -418,7 +421,7 @@ func (r *Reader) warmStorage(ctx context.Context, tier blob.AccessTier) error {
 
 	// Start polling objects.
 	if err := r.checkWarm(ctx); err != nil {
-		return fmt.Errorf("%w: failed to check directory warming status: %w", models.ErrStorage, err)
+		return fmt.Errorf("%w: failed to check directory warming status: %w", errclass.ErrStorage, err)
 	}
 
 	r.Logger.Info("storage warm up finished")
@@ -442,7 +445,7 @@ func (r *Reader) warmDirectory(ctx context.Context, path string, tier blob.Acces
 		switch state {
 		case objStatusArchived:
 			if err = r.rehydrateObject(ctx, object, tier); err != nil {
-				return fmt.Errorf("%w: failed to rehydrate object: %w", models.ErrStorage, err)
+				return fmt.Errorf("%w: failed to rehydrate object: %w", errclass.ErrStorage, err)
 			}
 
 			r.objectsToWarm = append(r.objectsToWarm, object)
@@ -466,7 +469,7 @@ func (r *Reader) checkWarm(ctx context.Context) error {
 
 	for i := range r.objectsToWarm {
 		if err := r.pollWarmDirStatus(ctx, r.objectsToWarm[i]); err != nil {
-			return fmt.Errorf("%w: failed to poll dir status %s: %w", models.ErrStorage, r.objectsToWarm[i], err)
+			return fmt.Errorf("%w: failed to poll dir status %s: %w", errclass.ErrStorage, r.objectsToWarm[i], err)
 		}
 	}
 
@@ -522,9 +525,9 @@ func parseAccessTier(tier string) (blob.AccessTier, error) {
 
 	switch result {
 	case blob.AccessTierArchive:
-		return "", fmt.Errorf("%w: archive tier is not allowed", models.ErrInvalidConfig)
+		return "", fmt.Errorf("%w: archive tier is not allowed", errclass.ErrInvalidConfig)
 	case "":
-		return "", fmt.Errorf("%w: invalid access tier %s", models.ErrInvalidConfig, tier)
+		return "", fmt.Errorf("%w: invalid access tier %s", errclass.ErrInvalidConfig, tier)
 	default:
 		return result, nil
 	}
@@ -582,11 +585,11 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 		objProps, err := r.containerClient.
 			NewBlobClient(path).GetProperties(ctx, nil)
 		if err != nil {
-			return 0, 0, fmt.Errorf("%w: failed to get object properties: %s: %w", models.ErrStorage, path, err)
+			return 0, 0, fmt.Errorf("%w: failed to get object properties: %s: %w", errclass.ErrStorage, path, err)
 		}
 
 		if objProps.ContentLength == nil {
-			return 0, 0, fmt.Errorf("%w: failed to get length of object %s", models.ErrStorage, path)
+			return 0, 0, fmt.Errorf("%w: failed to get length of object %s", errclass.ErrStorage, path)
 		}
 
 		return *objProps.ContentLength, 1, nil
@@ -599,12 +602,12 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 	for pager.More() {
 		page, err := pager.NextPage(ctx)
 		if err != nil {
-			return 0, 0, fmt.Errorf("%w: failed to get next page: %w", models.ErrStorage, err)
+			return 0, 0, fmt.Errorf("%w: failed to get next page: %w", errclass.ErrStorage, err)
 		}
 
 		for _, blobItem := range page.Segment.BlobItems {
 			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
-				return 0, 0, fmt.Errorf("%w: failed to get object attributes for %s", models.ErrStorage, path)
+				return 0, 0, fmt.Errorf("%w: failed to get object attributes for %s", errclass.ErrStorage, path)
 			}
 
 			// Skip files in folders.

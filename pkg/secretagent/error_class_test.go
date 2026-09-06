@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,7 +36,7 @@ func TestNewClient_UnsupportedConnectionType(t *testing.T) {
 	_, err := NewClient(ConnectionTypeUDS, testMissingSocket, testShortTimeout, false,
 		&tls.Config{MinVersion: tls.VersionTLS12})
 
-	require.ErrorIs(t, err, models.ErrUnsupported)
+	require.ErrorIs(t, err, errclass.ErrUnsupported)
 }
 
 func TestGetSecret_Unreachable(t *testing.T) {
@@ -62,7 +62,7 @@ func TestGetSecret_Unreachable(t *testing.T) {
 
 			_, err = client.GetSecret(t.Context(), testResource, testSecretKey)
 
-			require.ErrorIs(t, err, models.ErrSecretAgent)
+			require.ErrorIs(t, err, errclass.ErrSecretAgent)
 		})
 	}
 }

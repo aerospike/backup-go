@@ -26,6 +26,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
@@ -780,7 +781,7 @@ func TestParseAccessTier(t *testing.T) {
 			tier, err := parseAccessTier(tt.tier)
 
 			if tt.expectedError != nil {
-				require.ErrorIs(t, err, models.ErrInvalidConfig)
+				require.ErrorIs(t, err, errclass.ErrInvalidConfig)
 				assert.ErrorContains(t, err, tt.expectedError.Error())
 			} else {
 				require.NoError(t, err)

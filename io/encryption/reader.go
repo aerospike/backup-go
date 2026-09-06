@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/errclass"
 )
 
 // NewEncryptedReader create new reader, decrypting data from underlying reader
@@ -29,7 +29,7 @@ import (
 func NewEncryptedReader(r io.ReadCloser, key []byte) (io.ReadCloser, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, fmt.Errorf("%w: failed to create new cipher.Block: %w", models.ErrInvalidConfig, err)
+		return nil, fmt.Errorf("%w: failed to create new cipher.Block: %w", errclass.ErrInvalidConfig, err)
 	}
 
 	iv := make([]byte, aes.BlockSize)

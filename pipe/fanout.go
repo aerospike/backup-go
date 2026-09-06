@@ -20,6 +20,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -63,20 +64,20 @@ func NewFanout(
 
 	// Validations.
 	if len(f.Outputs) == 0 {
-		return nil, fmt.Errorf("%w: no outputs provided", models.ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: no outputs provided", errclass.ErrInvalidConfig)
 	}
 
 	if len(f.Inputs) == 0 {
-		return nil, fmt.Errorf("%w: no inputs provided", models.ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: no inputs provided", errclass.ErrInvalidConfig)
 	}
 
 	if f.strategy == Fixed && len(f.Inputs) != len(f.Outputs) {
-		return nil, fmt.Errorf("%w: invalid inputs %d and outputs %d number for Fixed strategy", models.ErrInvalidConfig,
+		return nil, fmt.Errorf("%w: invalid inputs %d and outputs %d number for Fixed strategy", errclass.ErrInvalidConfig,
 			len(f.Inputs), len(f.Outputs))
 	}
 
 	if f.strategy != Fixed && f.strategy != RoundRobin {
-		return nil, fmt.Errorf("%w: unsupported fanout strategy: %d", models.ErrUnsupported, f.strategy)
+		return nil, fmt.Errorf("%w: unsupported fanout strategy: %d", errclass.ErrUnsupported, f.strategy)
 	}
 
 	return f, nil

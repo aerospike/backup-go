@@ -21,8 +21,8 @@ import (
 	"io"
 	"os"
 
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/io/storage/options"
-	"github.com/aerospike/backup-go/models"
 )
 
 const (
@@ -42,7 +42,7 @@ func NewWriter(ctx context.Context, bufferSize int) (*Writer, error) {
 	}
 
 	if bufferSize < 0 {
-		return nil, fmt.Errorf("%w: buffer size must not be negative", models.ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: buffer size must not be negative", errclass.ErrInvalidConfig)
 	}
 
 	if bufferSize == 0 {

@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/errclass"
 )
 
 const parentDirName = ".."
@@ -32,19 +32,19 @@ func ValidateFilename(filename string) error {
 	}
 
 	if filename == "." {
-		return fmt.Errorf("%w: filename must not be '.' (current directory)", models.ErrInvalidConfig)
+		return fmt.Errorf("%w: filename must not be '.' (current directory)", errclass.ErrInvalidConfig)
 	}
 
 	if filename == parentDirName {
-		return fmt.Errorf("%w: filename must not be '..' (parent directory)", models.ErrInvalidConfig)
+		return fmt.Errorf("%w: filename must not be '..' (parent directory)", errclass.ErrInvalidConfig)
 	}
 
 	if strings.ContainsRune(filename, '/') {
-		return fmt.Errorf("%w: filename must not contain path separators ('/')", models.ErrInvalidConfig)
+		return fmt.Errorf("%w: filename must not contain path separators ('/')", errclass.ErrInvalidConfig)
 	}
 
 	if strings.ContainsRune(filename, '\x00') {
-		return fmt.Errorf("%w: filename must not contain NUL bytes", models.ErrInvalidConfig)
+		return fmt.Errorf("%w: filename must not contain NUL bytes", errclass.ErrInvalidConfig)
 	}
 
 	return nil

@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
@@ -37,7 +37,7 @@ type rangeReader struct {
 // newRangeReader creates a new file reader.
 func newRangeReader(ctx context.Context, client Client, bucket, key *string) (*rangeReader, error) {
 	if key == nil {
-		return nil, fmt.Errorf("%w: key is nil", models.ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: key is nil", errclass.ErrInvalidConfig)
 	}
 
 	head, err := client.HeadObject(ctx, &s3.HeadObjectInput{
@@ -45,7 +45,7 @@ func newRangeReader(ctx context.Context, client Client, bucket, key *string) (*r
 		Key:    key,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("%w: failed to get head %s: %w", models.ErrStorage, *key, err)
+		return nil, fmt.Errorf("%w: failed to get head %s: %w", errclass.ErrStorage, *key, err)
 	}
 
 	size := int64(0)
@@ -74,7 +74,7 @@ func (r *rangeReader) OpenRange(ctx context.Context, offset, count int64) (io.Re
 		IfMatch: r.etag,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("%w: failed to get object %s: %w", models.ErrStorage, *r.key, err)
+		return nil, fmt.Errorf("%w: failed to get object %s: %w", errclass.ErrStorage, *r.key, err)
 	}
 
 	return resp.Body, nil

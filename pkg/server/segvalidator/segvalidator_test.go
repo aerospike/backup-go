@@ -27,7 +27,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/aerospike/backup-go/pkg/server/segvalidator/models"
+	segmodels "github.com/aerospike/backup-go/pkg/server/segvalidator/models"
 	"github.com/aerospike/backup-go/pkg/server/segvalidator/segment"
 	"github.com/aerospike/backup-go/pkg/server/segvalidator/streamers"
 )
@@ -691,9 +691,9 @@ func TestSegValidator_SegmentReadFails(t *testing.T) {
 	}
 
 	// Nothing was parsed, so the failure points at no record in particular.
-	if report.Issues[0].RecordIndex != models.UnknownRecordIndex {
+	if report.Issues[0].RecordIndex != segmodels.UnknownRecordIndex {
 		t.Errorf("issue record index = %d, want %d",
-			report.Issues[0].RecordIndex, models.UnknownRecordIndex)
+			report.Issues[0].RecordIndex, segmodels.UnknownRecordIndex)
 	}
 
 	if report.InvalidSegments != 1 || report.ValidSegments != 0 {

@@ -17,7 +17,7 @@ package common
 import (
 	"testing"
 
-	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,8 +31,8 @@ func TestErrorClasses(t *testing.T) {
 		err   error
 		class error
 	}{
-		{name: "empty storage", err: ErrEmptyStorage, class: models.ErrNotFound},
-		{name: "archived object", err: ErrArchivedObject, class: models.ErrStorage},
+		{name: "empty storage", err: ErrEmptyStorage, class: errclass.ErrNotFound},
+		{name: "archived object", err: ErrArchivedObject, class: errclass.ErrStorage},
 	}
 
 	for _, tt := range tests {
@@ -60,7 +60,7 @@ func TestValidateObjectKey_InvalidConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			require.ErrorIs(t, ValidateObjectKey(tt.key), models.ErrInvalidConfig)
+			require.ErrorIs(t, ValidateObjectKey(tt.key), errclass.ErrInvalidConfig)
 		})
 	}
 }
@@ -69,5 +69,5 @@ func TestGetFullPath_InvalidConfig(t *testing.T) {
 	t.Parallel()
 
 	_, err := GetFullPath("", testObjectKey, nil, false)
-	require.ErrorIs(t, err, models.ErrInvalidConfig)
+	require.ErrorIs(t, err, errclass.ErrInvalidConfig)
 }

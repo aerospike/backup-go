@@ -18,8 +18,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/io/storage/options"
-	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/require"
 )
 
@@ -40,7 +40,7 @@ func TestValidateFilename_InvalidConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			require.ErrorIs(t, ValidateFilename(tt.filename), models.ErrInvalidConfig)
+			require.ErrorIs(t, ValidateFilename(tt.filename), errclass.ErrInvalidConfig)
 		})
 	}
 }
@@ -52,5 +52,5 @@ func TestReader_MissingDirectory_NotFound(t *testing.T) {
 
 	_, err := NewReader(t.Context(), options.WithDir(missing))
 
-	require.ErrorIs(t, err, models.ErrNotFound)
+	require.ErrorIs(t, err, errclass.ErrNotFound)
 }

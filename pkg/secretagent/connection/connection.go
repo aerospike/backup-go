@@ -23,8 +23,8 @@ import (
 	"net"
 	"time"
 
-	bModels "github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pkg/secretagent/models"
+	"github.com/aerospike/backup-go/errclass"
+	samodels "github.com/aerospike/backup-go/pkg/secretagent/models"
 )
 
 // magic const is taken from the Secret Agent service. It is used
@@ -59,17 +59,17 @@ func Write(conn connector, timeout time.Duration, resource, secretKey string) er
 	// Setting writing timeout.
 	deadline := time.Now().Add(timeout)
 	if err := conn.SetWriteDeadline(deadline); err != nil {
-		return fmt.Errorf("%w: failed to set write deadline: %w", bModels.ErrSecretAgent, err)
+		return fmt.Errorf("%w: failed to set write deadline: %w", errclass.ErrSecretAgent, err)
 	}
 
-	msg := models.Request{
+	msg := samodels.Request{
 		Resource:  resource,
 		SecretKey: secretKey,
 	}
 
 	data, err := json.Marshal(msg)
 	if err != nil {
-		return fmt.Errorf("%w: failed to marshal request: %w", bModels.ErrSecretAgent, err)
+		return fmt.Errorf("%w: failed to marshal request: %w", errclass.ErrSecretAgent, err)
 	}
 
 	// Adding headers.
@@ -81,7 +81,7 @@ func Write(conn connector, timeout time.Duration, resource, secretKey string) er
 	// Sending message.
 	_, err = conn.Write(append(header, data...))
 	if err != nil {
-		return fmt.Errorf("%w: failed to send request: %w", bModels.ErrSecretAgent, err)
+		return fmt.Errorf("%w: failed to send request: %w", errclass.ErrSecretAgent, err)
 	}
 
 	return nil
@@ -92,12 +92,12 @@ func Read(conn connector, timeout time.Duration) (string, error) {
 	// Setting reading timeout.
 	deadline := time.Now().Add(timeout)
 	if err := conn.SetReadDeadline(deadline); err != nil {
-		return "", fmt.Errorf("%w: failed to set read deadline: %w", bModels.ErrSecretAgent, err)
+		return "", fmt.Errorf("%w: failed to set read deadline: %w", errclass.ErrSecretAgent, err)
 	}
 	// Reading headers.
 	header, err := ReadBytes(conn, 8)
 	if err != nil {
-		return "", fmt.Errorf("%w: failed to read header: %w", bModels.ErrSecretAgent, err)
+		return "", fmt.Errorf("%w: failed to read header: %w", errclass.ErrSecretAgent, err)
 	}
 
 	// Checking headers.
@@ -105,22 +105,22 @@ func Read(conn connector, timeout time.Duration) (string, error) {
 	length := binary.BigEndian.Uint32(header[4:])
 
 	if receivedMagic != magic {
-		return "", fmt.Errorf("%w: invalid magic number: %x", bModels.ErrCorruptData, receivedMagic)
+		return "", fmt.Errorf("%w: invalid magic number: %x", errclass.ErrCorruptData, receivedMagic)
 	}
 
 	// Reading body.
 	body, err := ReadBytes(conn, int(length))
 	if err != nil {
-		return "", fmt.Errorf("%w: failed to read header: %w", bModels.ErrSecretAgent, err)
+		return "", fmt.Errorf("%w: failed to read body: %w", errclass.ErrSecretAgent, err)
 	}
 
-	var res models.Response
+	var res samodels.Response
 	if err = json.Unmarshal(body, &res); err != nil {
-		return "", fmt.Errorf("%w: failed to unmarshal response: %w", bModels.ErrSecretAgent, err)
+		return "", fmt.Errorf("%w: failed to unmarshal response: %w", errclass.ErrSecretAgent, err)
 	}
 
 	if res.Error != "" {
-		return "", fmt.Errorf("%w: %s", bModels.ErrSecretAgent, res.Error)
+		return "", fmt.Errorf("%w: %s", errclass.ErrSecretAgent, res.Error)
 	}
 
 	return res.SecretValue, nil

@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -33,13 +33,13 @@ func TestErrorClasses_Aliases(t *testing.T) {
 		alias     error
 		canonical error
 	}{
-		{name: "invalid config", alias: ErrInvalidConfig, canonical: models.ErrInvalidConfig},
-		{name: "not found", alias: ErrNotFound, canonical: models.ErrNotFound},
-		{name: "storage", alias: ErrStorage, canonical: models.ErrStorage},
-		{name: "corrupt data", alias: ErrCorruptData, canonical: models.ErrCorruptData},
-		{name: "unsupported", alias: ErrUnsupported, canonical: models.ErrUnsupported},
-		{name: "aerospike", alias: ErrAerospike, canonical: models.ErrAerospike},
-		{name: "secret agent", alias: ErrSecretAgent, canonical: models.ErrSecretAgent},
+		{name: "invalid config", alias: ErrInvalidConfig, canonical: errclass.ErrInvalidConfig},
+		{name: "not found", alias: ErrNotFound, canonical: errclass.ErrNotFound},
+		{name: "storage", alias: ErrStorage, canonical: errclass.ErrStorage},
+		{name: "corrupt data", alias: ErrCorruptData, canonical: errclass.ErrCorruptData},
+		{name: "unsupported", alias: ErrUnsupported, canonical: errclass.ErrUnsupported},
+		{name: "aerospike", alias: ErrAerospike, canonical: errclass.ErrAerospike},
+		{name: "secret agent", alias: ErrSecretAgent, canonical: errclass.ErrSecretAgent},
 	}
 
 	for _, tt := range tests {
@@ -183,7 +183,7 @@ func TestPartitionFilterParsing_InvalidConfig(t *testing.T) {
 func TestErrorClass_SurvivesWrapping(t *testing.T) {
 	t.Parallel()
 
-	leaf := fmt.Errorf("%w: bad thing", models.ErrStorage)
+	leaf := fmt.Errorf("%w: bad thing", errclass.ErrStorage)
 	wrapped := fmt.Errorf("failed to write chunk: %w", fmt.Errorf("failed to open file: %w", leaf))
 
 	require.ErrorIs(t, wrapped, ErrStorage)

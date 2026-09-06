@@ -14,7 +14,9 @@
 
 package backup
 
-import "github.com/aerospike/backup-go/models"
+import (
+	"github.com/aerospike/backup-go/errclass"
+)
 
 // Error classes reported by this library.
 //
@@ -41,29 +43,29 @@ import "github.com/aerospike/backup-go/models"
 var (
 	// ErrInvalidConfig marks a configuration or an argument rejected by
 	// validation. See [models.ErrInvalidConfig].
-	ErrInvalidConfig = models.ErrInvalidConfig
+	ErrInvalidConfig = errclass.ErrInvalidConfig
 
 	// ErrNotFound marks a backup, a directory, a file or an object that does
 	// not exist. See [models.ErrNotFound].
-	ErrNotFound = models.ErrNotFound
+	ErrNotFound = errclass.ErrNotFound
 
 	// ErrStorage marks a failure reported by a storage backend.
 	// See [models.ErrStorage].
-	ErrStorage = models.ErrStorage
+	ErrStorage = errclass.ErrStorage
 
 	// ErrCorruptData marks backup content that cannot be trusted.
 	// See [models.ErrCorruptData].
-	ErrCorruptData = models.ErrCorruptData
+	ErrCorruptData = errclass.ErrCorruptData
 
 	// ErrUnsupported marks a mode, a format or a feature this version of the
 	// library cannot handle. See [models.ErrUnsupported].
-	ErrUnsupported = models.ErrUnsupported
+	ErrUnsupported = errclass.ErrUnsupported
 
 	// ErrAerospike marks a failure reported by the Aerospike cluster or by the
 	// Aerospike client. See [models.ErrAerospike].
-	ErrAerospike = models.ErrAerospike
+	ErrAerospike = errclass.ErrAerospike
 
 	// ErrSecretAgent marks a failure while talking to the Aerospike Secret
 	// Agent. See [models.ErrSecretAgent].
-	ErrSecretAgent = models.ErrSecretAgent
+	ErrSecretAgent = errclass.ErrSecretAgent
 )

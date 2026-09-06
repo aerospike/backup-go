@@ -21,6 +21,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/models"
@@ -125,7 +126,7 @@ func (rw *RestoreWriter) Write(data *models.Token) (int, error) {
 	case *models.Token:
 		return rw.writeToken(v)
 	default:
-		return 0, fmt.Errorf("%w: unsupported type: %T", models.ErrUnsupported, data)
+		return 0, fmt.Errorf("%w: unsupported type: %T", errclass.ErrUnsupported, data)
 	}
 }
 
@@ -138,9 +139,9 @@ func (rw *RestoreWriter) writeToken(token *models.Token) (int, error) {
 	case models.TokenTypeSIndex:
 		return int(token.Size), rw.writeSecondaryIndex(token.SIndex)
 	case models.TokenTypeInvalid:
-		return 0, fmt.Errorf("%w: invalid token", models.ErrCorruptData)
+		return 0, fmt.Errorf("%w: invalid token", errclass.ErrCorruptData)
 	default:
-		return 0, fmt.Errorf("%w: unsupported token type", models.ErrUnsupported)
+		return 0, fmt.Errorf("%w: unsupported token type", errclass.ErrUnsupported)
 	}
 }
 

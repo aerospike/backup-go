@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/models"
 )
@@ -40,7 +41,7 @@ func NewReader(ctx context.Context, bufferSize int) (*Reader, error) {
 	}
 
 	if bufferSize < 0 {
-		return nil, fmt.Errorf("%w: buffer size must not be negative", models.ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: buffer size must not be negative", errclass.ErrInvalidConfig)
 	}
 
 	if bufferSize == 0 {

@@ -18,7 +18,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/stretchr/testify/require"
 )
 
@@ -53,7 +53,7 @@ func TestErrorClasses_Corrupt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			require.ErrorIs(t, tt.call(), models.ErrCorruptData)
+			require.ErrorIs(t, tt.call(), errclass.ErrCorruptData)
 		})
 	}
 }
@@ -63,6 +63,6 @@ func TestValidator_Unsupported(t *testing.T) {
 
 	err := NewValidator().Run("backup.txt")
 
-	require.ErrorIs(t, err, models.ErrUnsupported)
+	require.ErrorIs(t, err, errclass.ErrUnsupported)
 	require.ErrorContains(t, err, "expected extension")
 }

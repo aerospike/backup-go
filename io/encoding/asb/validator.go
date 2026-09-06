@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/errclass"
 )
 
 const Extension = ".asb"
@@ -36,7 +36,7 @@ func NewValidator() *Validator {
 func (v *Validator) Run(fileName string) error {
 	if filepath.Ext(fileName) != Extension {
 		return fmt.Errorf("%w: restore file %s is in an invalid format, expected extension: .asb, got: %s",
-			models.ErrUnsupported, fileName, filepath.Ext(fileName))
+			errclass.ErrUnsupported, fileName, filepath.Ext(fileName))
 	}
 
 	return nil

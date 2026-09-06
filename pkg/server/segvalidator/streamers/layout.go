@@ -21,7 +21,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/errclass"
 )
 
 // A server side backup has a fixed layout, and everything in this package is
@@ -78,7 +78,7 @@ var streams = []Stream{QueryStream, ChangeStream}
 // ErrManifestUnusable is returned for a manifest that cannot be turned into a
 // list of segments, whether because it did not parse or because it names
 // something that cannot be located in the storage.
-var ErrManifestUnusable = fmt.Errorf("%w: manifest cannot be read", models.ErrCorruptData)
+var ErrManifestUnusable = fmt.Errorf("%w: manifest cannot be read", errclass.ErrCorruptData)
 
 // namespacesRoot locates the directory naming the namespaces of the backup.
 func namespacesRoot(backupID string) string {

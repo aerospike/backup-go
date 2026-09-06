@@ -21,7 +21,7 @@ import (
 	"io"
 	"math/rand/v2"
 
-	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/errclass"
 )
 
 // errStopListing ends a listing early without failing it. A sampler asks for a
@@ -32,7 +32,7 @@ var errStopListing = errors.New("listing stopped")
 // ErrSegmentMissing is returned by OpenSegment for a segment the storage does
 // not hold. A manifest naming a segment that is gone is the one failure a
 // validator cannot find by reading segments alone.
-var ErrSegmentMissing = fmt.Errorf("%w: segment does not exist", models.ErrNotFound)
+var ErrSegmentMissing = fmt.Errorf("%w: segment does not exist", errclass.ErrNotFound)
 
 // file is one file of a backup, as a listing describes it: where it is and how
 // big the storage says it is. Nothing is downloaded to produce one.
@@ -105,7 +105,7 @@ func listDirs(ctx context.Context, st store, dir string) ([]string, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("%w: list %s: %w", models.ErrStorage, dir, err)
+		return nil, fmt.Errorf("%w: list %s: %w", errclass.ErrStorage, dir, err)
 	}
 
 	return dirs, nil

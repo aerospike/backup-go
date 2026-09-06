@@ -26,9 +26,9 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
-	"github.com/aerospike/backup-go/models"
 )
 
 const (
@@ -87,18 +87,18 @@ func NewWriter(
 		// Check if backup dir is empty.
 		isEmpty, err := isEmptyDirectory(ctx, client, containerName, w.prefix)
 		if err != nil {
-			return nil, fmt.Errorf("%w: failed to check if directory is empty: %w", models.ErrStorage, err)
+			return nil, fmt.Errorf("%w: failed to check if directory is empty: %w", errclass.ErrStorage, err)
 		}
 
 		if !isEmpty && !w.IsRemovingFiles {
-			return nil, fmt.Errorf("%w: backup folder must be empty or set RemoveFiles = true", models.ErrInvalidConfig)
+			return nil, fmt.Errorf("%w: backup folder must be empty or set RemoveFiles = true", errclass.ErrInvalidConfig)
 		}
 	}
 
 	if w.IsRemovingFiles {
 		// As we accept only empty dir or dir with files for removing. We can remove them even in an empty bucket.
 		if err := w.RemoveFiles(ctx); err != nil {
-			return nil, fmt.Errorf("%w: failed to remove files from folder: %w", models.ErrStorage, err)
+			return nil, fmt.Errorf("%w: failed to remove files from folder: %w", errclass.ErrStorage, err)
 		}
 	}
 
@@ -106,7 +106,7 @@ func NewWriter(
 		// validation.
 		tier, err := parseAccessTier(w.StorageClass)
 		if err != nil {
-			return nil, fmt.Errorf("%w: failed to parse access tier: %w", models.ErrInvalidConfig, err)
+			return nil, fmt.Errorf("%w: failed to parse access tier: %w", errclass.ErrInvalidConfig, err)
 		}
 
 		w.tier = &tier
@@ -117,17 +117,17 @@ func NewWriter(
 
 func (w *Writer) validate(ctx context.Context) error {
 	if w.ChunkSize < 0 {
-		return fmt.Errorf("%w: chunk size must be positive", models.ErrInvalidConfig)
+		return fmt.Errorf("%w: chunk size must be positive", errclass.ErrInvalidConfig)
 	}
 
 	if len(w.PathList) != 1 {
 		return fmt.Errorf("%w: one path is required, use WithDir(path string) or WithFile(path string) to set",
-			models.ErrInvalidConfig)
+			errclass.ErrInvalidConfig)
 	}
 
 	// Check if a container exists.
 	if _, err := w.containerClient.GetProperties(ctx, nil); err != nil {
-		return fmt.Errorf("%w: failed to get container properties: %w", models.ErrNotFound, err)
+		return fmt.Errorf("%w: failed to get container properties: %w", errclass.ErrNotFound, err)
 	}
 
 	return nil
@@ -261,7 +261,7 @@ func isEmptyDirectory(ctx context.Context, client Client, containerName, prefix 
 	for pager.More() {
 		page, err := pager.NextPage(ctx)
 		if err != nil {
-			return false, fmt.Errorf("%w: failed to get next page: %w", models.ErrStorage, err)
+			return false, fmt.Errorf("%w: failed to get next page: %w", errclass.ErrStorage, err)
 		}
 
 		if len(page.Segment.BlobItems) == 0 {
@@ -287,7 +287,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 	if !w.IsDir {
 		_, err := w.client.DeleteBlob(ctx, w.containerName, targetPath, nil)
 		if err != nil {
-			return fmt.Errorf("%w: failed to delete blob %s: %w", models.ErrStorage, targetPath, err)
+			return fmt.Errorf("%w: failed to delete blob %s: %w", errclass.ErrStorage, targetPath, err)
 		}
 
 		return nil
@@ -302,7 +302,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 	for pager.More() {
 		page, err := pager.NextPage(ctx)
 		if err != nil {
-			return fmt.Errorf("%w: failed to get next page: %w", models.ErrStorage, err)
+			return fmt.Errorf("%w: failed to get next page: %w", errclass.ErrStorage, err)
 		}
 
 		for _, blobItem := range page.Segment.BlobItems {
@@ -320,7 +320,7 @@ func (w *Writer) Remove(ctx context.Context, targetPath string) error {
 
 			_, err = w.client.DeleteBlob(ctx, w.containerName, *blobItem.Name, nil)
 			if err != nil {
-				return fmt.Errorf("%w: failed to delete blobItem %s: %w", models.ErrStorage, *blobItem.Name, err)
+				return fmt.Errorf("%w: failed to delete blobItem %s: %w", errclass.ErrStorage, *blobItem.Name, err)
 			}
 		}
 	}

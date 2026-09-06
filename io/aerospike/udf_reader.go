@@ -20,6 +20,7 @@ import (
 	"io"
 	"log/slog"
 
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/internal/logging"
 	"github.com/aerospike/backup-go/models"
 	"github.com/google/uuid"
@@ -61,7 +62,7 @@ func (r *UdfReader) Read(ctx context.Context) (*models.Token, error) {
 
 		udfs, err := r.client.GetUDFs(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("%w: failed to fetch UDFs: %w", models.ErrAerospike, err)
+			return nil, fmt.Errorf("%w: failed to fetch UDFs: %w", errclass.ErrAerospike, err)
 		}
 
 		r.udfs = make(chan *models.UDF, len(udfs))

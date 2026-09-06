@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/klauspost/compress/zstd"
 )
 
@@ -33,7 +33,7 @@ type writer struct {
 func NewWriter(w io.WriteCloser, level int) (io.WriteCloser, error) {
 	zstWriter, err := zstd.NewWriter(w, zstd.WithEncoderLevel(zstd.EncoderLevelFromZstd(level)))
 	if err != nil {
-		return nil, fmt.Errorf("%w: failed to create zstd writer: %w", models.ErrInvalidConfig, err)
+		return nil, fmt.Errorf("%w: failed to create zstd writer: %w", errclass.ErrInvalidConfig, err)
 	}
 
 	return &writer{

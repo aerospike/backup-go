@@ -18,18 +18,18 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/errclass"
 )
 
 var (
 	// ErrEmptyStorage describes the empty storage error for the restore operation.
 	// It belongs to the [models.ErrNotFound] class.
-	ErrEmptyStorage = fmt.Errorf("%w: empty storage", models.ErrNotFound)
+	ErrEmptyStorage = fmt.Errorf("%w: empty storage", errclass.ErrNotFound)
 
 	// ErrArchivedObject is returned for an object that is archived and must be
 	// restored by the user before it can be read.
 	// It belongs to the [models.ErrStorage] class.
-	ErrArchivedObject = fmt.Errorf("%w: archived object", models.ErrStorage)
+	ErrArchivedObject = fmt.Errorf("%w: archived object", errclass.ErrStorage)
 )
 
 // ErrToChan checks context before sending an error to errors chan.

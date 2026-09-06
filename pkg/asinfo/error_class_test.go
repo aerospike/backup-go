@@ -17,7 +17,7 @@ package asinfo
 import (
 	"testing"
 
-	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,16 +29,16 @@ func TestErrorClasses(t *testing.T) {
 		err   error
 		class error
 	}{
-		{name: "replication factor zero", err: ErrReplicationFactorZero, class: models.ErrAerospike},
-		{name: "no node", err: ErrNoNode, class: models.ErrNotFound},
-		{name: "not found", err: ErrNotFound, class: models.ErrNotFound},
-		{name: "invalid sindex type", err: ErrInvalidSIndexType, class: models.ErrCorruptData},
-		{name: "no info commands", err: errNoInfoCommands, class: models.ErrInvalidConfig},
-		{name: "no nodes available", err: errNoNodesAvailable, class: models.ErrAerospike},
-		{name: "no nodes connected", err: errNoNodesConnected, class: models.ErrAerospike},
-		{name: "replication factor not found", err: errReplicationFactorNotFound, class: models.ErrAerospike},
-		{name: "parse record info", err: errParseRecordInfo, class: models.ErrAerospike},
-		{name: "udf missing filename", err: errUDFMissingFilename, class: models.ErrAerospike},
+		{name: "replication factor zero", err: ErrReplicationFactorZero, class: errclass.ErrAerospike},
+		{name: "no node", err: ErrNoNode, class: errclass.ErrNotFound},
+		{name: "not found", err: ErrNotFound, class: errclass.ErrNotFound},
+		{name: "invalid sindex type", err: ErrInvalidSIndexType, class: errclass.ErrCorruptData},
+		{name: "no info commands", err: errNoInfoCommands, class: errclass.ErrInvalidConfig},
+		{name: "no nodes available", err: errNoNodesAvailable, class: errclass.ErrAerospike},
+		{name: "no nodes connected", err: errNoNodesConnected, class: errclass.ErrAerospike},
+		{name: "replication factor not found", err: errReplicationFactorNotFound, class: errclass.ErrAerospike},
+		{name: "parse record info", err: errParseRecordInfo, class: errclass.ErrAerospike},
+		{name: "udf missing filename", err: errUDFMissingFilename, class: errclass.ErrAerospike},
 	}
 
 	for _, tt := range tests {
@@ -57,5 +57,5 @@ func TestGetInfo_NoCommands(t *testing.T) {
 
 	_, err := ic.GetInfo(t.Context(), "")
 
-	require.ErrorIs(t, err, models.ErrInvalidConfig)
+	require.ErrorIs(t, err, errclass.ErrInvalidConfig)
 }

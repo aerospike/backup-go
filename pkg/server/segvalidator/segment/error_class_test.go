@@ -17,7 +17,7 @@ package segment
 import (
 	"testing"
 
-	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/stretchr/testify/require"
 )
 
@@ -60,8 +60,8 @@ func TestErrorClasses(t *testing.T) {
 		errs  []error
 		class error
 	}{
-		{name: "corrupt data", errs: corrupt, class: models.ErrCorruptData},
-		{name: "unsupported", errs: unsupported, class: models.ErrUnsupported},
+		{name: "corrupt data", errs: corrupt, class: errclass.ErrCorruptData},
+		{name: "unsupported", errs: unsupported, class: errclass.ErrUnsupported},
 	}
 
 	for _, tt := range tests {
@@ -82,6 +82,6 @@ func TestRecordError_KeepsClass(t *testing.T) {
 
 	err := newRecordError(3, 128, ErrBadMagic)
 
-	require.ErrorIs(t, err, models.ErrCorruptData)
+	require.ErrorIs(t, err, errclass.ErrCorruptData)
 	require.ErrorIs(t, err, ErrBadMagic)
 }

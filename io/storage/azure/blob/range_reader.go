@@ -23,7 +23,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
-	"github.com/aerospike/backup-go/models"
+	"github.com/aerospike/backup-go/errclass"
 )
 
 // azblobGetter is an interface for azblob client. Used for mocking tests.
@@ -76,7 +76,7 @@ type rangeReader struct {
 func newRangeReader(ctx context.Context, client azblobGetter, containerName, path string) (*rangeReader, error) {
 	objProps, err := client.GetBlobProperties(ctx, path)
 	if err != nil {
-		return nil, fmt.Errorf("%w: failed to get properties %s: %w", models.ErrStorage, path, err)
+		return nil, fmt.Errorf("%w: failed to get properties %s: %w", errclass.ErrStorage, path, err)
 	}
 
 	size := int64(0)
@@ -97,7 +97,7 @@ func newRangeReader(ctx context.Context, client azblobGetter, containerName, pat
 func (r *rangeReader) OpenRange(ctx context.Context, offset, count int64) (io.ReadCloser, error) {
 	resp, err := r.client.DownloadStream(ctx, r.container, r.path, r.getStreamOptions(offset, count))
 	if err != nil {
-		return nil, fmt.Errorf("%w: failed to download stream %s: %w", models.ErrStorage, r.path, err)
+		return nil, fmt.Errorf("%w: failed to download stream %s: %w", errclass.ErrStorage, r.path, err)
 	}
 
 	return resp.NewRetryReader(ctx, &azblob.RetryReaderOptions{}), nil

@@ -40,8 +40,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	bModels "github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pkg/server/segvalidator/models"
+	"github.com/aerospike/backup-go/errclass"
+	segmodels "github.com/aerospike/backup-go/pkg/server/segvalidator/models"
 	"github.com/aerospike/backup-go/pkg/server/segvalidator/segment"
 	"github.com/aerospike/backup-go/pkg/server/segvalidator/streamers"
 	"golang.org/x/sync/errgroup"
@@ -63,17 +63,17 @@ const defaultMaxIssues = 1000
 var (
 	// ErrNoSegments is returned when a run checked no segment at all, which
 	// also covers a backup id that does not exist.
-	ErrNoSegments = fmt.Errorf("%w: no segments found for backup", bModels.ErrNotFound)
+	ErrNoSegments = fmt.Errorf("%w: no segments found for backup", errclass.ErrNotFound)
 	// ErrSegmentTooLarge is returned for a segment bigger than any record a
 	// flat header can describe.
-	ErrSegmentTooLarge = fmt.Errorf("%w: segment is too large", bModels.ErrCorruptData)
+	ErrSegmentTooLarge = fmt.Errorf("%w: segment is too large", errclass.ErrCorruptData)
 	// ErrSizeMismatch is returned for a segment whose stored size is not the
 	// one its manifest records.
-	ErrSizeMismatch = fmt.Errorf("%w: segment size does not match the manifest", bModels.ErrCorruptData)
+	ErrSizeMismatch = fmt.Errorf("%w: segment size does not match the manifest", errclass.ErrCorruptData)
 	// ErrChecksumMismatch is returned for a segment whose bytes do not
 	// checksum to what its manifest records. It is the only check that catches
 	// a segment whose contents rotted without its structure breaking.
-	ErrChecksumMismatch = fmt.Errorf("%w: segment checksum does not match the manifest", bModels.ErrCorruptData)
+	ErrChecksumMismatch = fmt.Errorf("%w: segment checksum does not match the manifest", errclass.ErrCorruptData)
 )
 
 // Streamer names the segments of one backup and opens them. It is what a
@@ -143,7 +143,7 @@ func WithMaxIssues(n int) Option {
 // segments at once as the machine has CPUs and logs nothing.
 func NewSegValidator(streamer Streamer, opts ...Option) (*SegValidator, error) {
 	if streamer == nil {
-		return nil, fmt.Errorf("%w: streamer must not be nil", bModels.ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: streamer must not be nil", errclass.ErrInvalidConfig)
 	}
 
 	v := &SegValidator{
@@ -174,7 +174,7 @@ func NewSegValidator(streamer Streamer, opts ...Option) (*SegValidator, error) {
 // Anything wrong with a segment is recorded in the report rather than aborting
 // the run; only a canceled context and a storage that stops answering stop it
 // early.
-func (v *SegValidator) Validate(ctx context.Context, sampleSize int) (*models.ValidationReport, error) {
+func (v *SegValidator) Validate(ctx context.Context, sampleSize int) (*segmodels.ValidationReport, error) {
 	c := newCollector(v.maxIssues)
 
 	// The streamer fills a channel a pool of workers drains, so a slow check
@@ -303,8 +303,8 @@ func checkAgainstManifest(seg *streamers.Segment, payload []byte) error {
 // from end to end cannot exhaust memory through its own report.
 type collector struct {
 	mu             sync.Mutex
-	issues         []models.ValidationIssue
-	manifestIssues []models.ManifestIssue
+	issues         []segmodels.ValidationIssue
+	manifestIssues []segmodels.ManifestIssue
 	maxIssues      int
 
 	unrecorded        []string
@@ -395,7 +395,7 @@ func (c *collector) addManifestIssue(namespace, manifestPath, segmentPath string
 	defer c.mu.Unlock()
 
 	if len(c.manifestIssues) < c.maxIssues {
-		c.manifestIssues = append(c.manifestIssues, models.ManifestIssue{
+		c.manifestIssues = append(c.manifestIssues, segmodels.ManifestIssue{
 			Err:          err,
 			Namespace:    namespace,
 			ManifestPath: manifestPath,
@@ -406,7 +406,7 @@ func (c *collector) addManifestIssue(namespace, manifestPath, segmentPath string
 
 // report turns what was collected, together with what the streamer saw on its
 // way, into a report.
-func (c *collector) report(backupID string, streamed streamers.Stats) *models.ValidationReport {
+func (c *collector) report(backupID string, streamed streamers.Stats) *segmodels.ValidationReport {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -422,14 +422,14 @@ func (c *collector) report(backupID string, streamed streamers.Stats) *models.Va
 			break
 		}
 
-		manifestIssues = append(manifestIssues, models.ManifestIssue{
+		manifestIssues = append(manifestIssues, segmodels.ManifestIssue{
 			Err:          issue.Err,
 			Namespace:    issue.Namespace,
 			ManifestPath: issue.Path,
 		})
 	}
 
-	return &models.ValidationReport{
+	return &segmodels.ValidationReport{
 		BackupID:          backupID,
 		Issues:            c.issues,
 		TotalSegments:     streamed.Segments,
@@ -439,7 +439,7 @@ func (c *collector) report(backupID string, streamed streamers.Stats) *models.Va
 		TotalRecords:      c.records.Load(),
 		TotalBytes:        c.parsedBytes.Load(),
 		SkippedCompressed: c.skippedCompressed.Load(),
-		Manifests: models.ManifestReport{
+		Manifests: segmodels.ManifestReport{
 			Issues:          manifestIssues,
 			Total:           streamed.ManifestsFound,
 			Checked:         streamed.ManifestsRead,
@@ -456,12 +456,12 @@ func (c *collector) report(backupID string, streamed streamers.Stats) *models.Va
 
 // newIssue describes a failed segment, pointing at the offending record when
 // the failure came from parsing one.
-func newIssue(seg *streamers.Segment, err error) models.ValidationIssue {
-	issue := models.ValidationIssue{
+func newIssue(seg *streamers.Segment, err error) segmodels.ValidationIssue {
+	issue := segmodels.ValidationIssue{
 		Err:         err,
 		Namespace:   seg.Namespace,
 		SegmentPath: seg.Path,
-		RecordIndex: models.UnknownRecordIndex,
+		RecordIndex: segmodels.UnknownRecordIndex,
 	}
 
 	var recErr *segment.RecordError

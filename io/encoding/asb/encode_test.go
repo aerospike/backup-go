@@ -932,6 +932,79 @@ func TestMetadataCacheHit(t *testing.T) {
 	require.Equal(t, 1, bytes.Count(second, []byte("+ n cached-ns\n")))
 }
 
+func TestEncodeTokenManySets(t *testing.T) {
+	t.Parallel()
+
+	encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
+	fresh := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
+	out := make([]byte, 0, 512)
+
+	for i := range 128 {
+		set := fmt.Sprintf("set_%03d", i)
+		key, err := a.NewKey("test", set, i)
+		require.NoError(t, err)
+
+		token := &models.Token{
+			Type: models.TokenTypeRecord,
+			Record: &models.Record{
+				Record: &a.Record{
+					Key:        key,
+					Bins:       a.BinMap{"value": int64(i)},
+					Generation: uint32(i%200 + 1),
+				},
+				VoidTime: int64(i + 10),
+			},
+		}
+
+		out = out[:0]
+		out, encodeErr := encoder.EncodeToken(token, out)
+		require.NoError(t, encodeErr)
+		require.Contains(t, string(out), "+ s "+set+"\n")
+		require.Contains(t, string(out), "+ n test\n")
+
+		expected, encodeErr := fresh.EncodeToken(token, nil)
+		require.NoError(t, encodeErr)
+		require.Equal(t, expected, out)
+	}
+}
+
+func TestEncodeTokenReusedBufferDoesNotGrowUnbounded(t *testing.T) {
+	t.Parallel()
+
+	encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
+	out := make([]byte, 0, 64)
+	maxCap := cap(out)
+
+	for i := range 2048 {
+		set := fmt.Sprintf("set_%d", i%256)
+		key, err := a.NewKey("test", set, i)
+		require.NoError(t, err)
+
+		token := &models.Token{
+			Type: models.TokenTypeRecord,
+			Record: &models.Record{
+				Record: &a.Record{
+					Key:        key,
+					Bins:       a.BinMap{"value": int64(i), "name": set},
+					Generation: 7,
+				},
+				VoidTime: 100,
+			},
+		}
+
+		out = out[:0]
+		out, encodeErr := encoder.EncodeToken(token, out)
+		require.NoError(t, encodeErr)
+		require.NotEmpty(t, out)
+
+		if cap(out) > maxCap {
+			maxCap = cap(out)
+		}
+	}
+
+	require.Less(t, maxCap, 4096, "reused encode buffer grew to %d bytes", maxCap)
+}
+
 func TestAppendUserKeyTypedValues(t *testing.T) {
 	t.Parallel()
 
@@ -1323,6 +1396,108 @@ func benchmarkEncoderCacheHighGeneration(b *testing.B, encoder *Encoder, token *
 		if err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func mixedBenchmarkRecord() *models.Record {
+	key, err := a.NewKey("test", "demo", "benchmark-key")
+	if err != nil {
+		panic(err)
+	}
+
+	return &models.Record{
+		Record: &a.Record{
+			Key: key,
+			Bins: a.BinMap{
+				"IntBin":     123456789,
+				"FloatBin":   98.6,
+				"StringBin":  "This is a longer string to test buffer allocation",
+				"BoolBin":    true,
+				"NilBin":     nil,
+				"SmallBlob":  []byte("small"),
+				"LargeBlob":  bytes.Repeat([]byte("A"), 1024),
+				"GeoJSONBin": a.GeoJSONValue(`{"type": "Point", "coordinates": [12.49, 41.89]}`),
+				"MapBin": &a.RawBlobValue{
+					ParticleType: particleType.MAP,
+					Data:         []byte{0x81, 0xA2, 'i', 'd', 0x2A},
+				},
+				"ListBin": &a.RawBlobValue{
+					ParticleType: particleType.LIST,
+					Data:         []byte{0x93, 0x01, 0x02, 0x03},
+				},
+			},
+			Generation: 5,
+		},
+		VoidTime: 3600,
+	}
+}
+
+// BenchmarkEncodeRecord matches legacy_encoder.BenchmarkEncodeRecord on the same mixed-type record.
+func BenchmarkEncodeRecord(b *testing.B) {
+	token := &models.Token{
+		Type:   models.TokenTypeRecord,
+		Record: mixedBenchmarkRecord(),
+	}
+	encoder := NewEncoder(testEncoderConfig)
+	warmOut, err := encoder.EncodeToken(token, nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.SetBytes(int64(len(warmOut)))
+	b.ReportAllocs()
+
+	out := make([]byte, 0, len(warmOut)+64)
+	for b.Loop() {
+		out = out[:0]
+
+		out, err = encoder.EncodeToken(token, out)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkEncodeTokenManySets(b *testing.B) {
+	encoder := NewEncoder(testEncoderConfig)
+	tokens := make([]*models.Token, 256)
+	for i := range tokens {
+		key, err := a.NewKey("test", fmt.Sprintf("set_%03d", i), i)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		tokens[i] = &models.Token{
+			Type: models.TokenTypeRecord,
+			Record: &models.Record{
+				Record: &a.Record{
+					Key:        key,
+					Bins:       a.BinMap{"value": int64(i)},
+					Generation: 3,
+				},
+				VoidTime: 100,
+			},
+		}
+	}
+
+	warmOut, err := encoder.EncodeToken(tokens[0], nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.SetBytes(int64(len(warmOut)))
+	b.ReportAllocs()
+
+	out := make([]byte, 0, 512)
+	i := 0
+	for b.Loop() {
+		out = out[:0]
+		out, err = encoder.EncodeToken(tokens[i%len(tokens)], out)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		i++
 	}
 }
 

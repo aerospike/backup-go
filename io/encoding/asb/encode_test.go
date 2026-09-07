@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
@@ -542,11 +543,11 @@ func TestAppendRecordKey(t *testing.T) {
 		},
 	}
 
-	encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
 			got, err := encoder.appendRecordKey(nil, tt.key)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
@@ -1003,6 +1004,60 @@ func TestEncodeTokenReusedBufferDoesNotGrowUnbounded(t *testing.T) {
 	}
 
 	require.Less(t, maxCap, 4096, "reused encode buffer grew to %d bytes", maxCap)
+}
+
+func TestEncodeTokenConcurrent(t *testing.T) {
+	t.Parallel()
+
+	encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
+	tokens := make([]*models.Token, 32)
+
+	for i := range tokens {
+		key, err := a.NewKey("test", fmt.Sprintf("set_%d", i), i)
+		require.NoError(t, err)
+
+		tokens[i] = &models.Token{
+			Type: models.TokenTypeRecord,
+			Record: &models.Record{
+				Record: &a.Record{
+					Key:        key,
+					Bins:       a.BinMap{"value": int64(i)},
+					Generation: 1,
+				},
+				VoidTime: 10,
+			},
+		}
+	}
+
+	errCh := make(chan error, 32)
+
+	var wg sync.WaitGroup
+	for i := range 32 {
+		wg.Go(func() {
+			out := make([]byte, 0, 512)
+			for j := range 64 {
+				var err error
+				out = out[:0]
+				out, err = encoder.EncodeToken(tokens[(i+j)%len(tokens)], out)
+				if err != nil {
+					errCh <- err
+					return
+				}
+
+				if !bytes.Contains(out, []byte("+ n test\n")) {
+					errCh <- fmt.Errorf("missing namespace line in %q", out)
+					return
+				}
+			}
+		})
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		require.NoError(t, err)
+	}
 }
 
 func TestAppendUserKeyTypedValues(t *testing.T) {

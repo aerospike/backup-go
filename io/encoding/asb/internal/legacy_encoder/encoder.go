@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -227,6 +227,10 @@ func writeBinNil(name string, w *bytes.Buffer) (int, error) {
 }
 
 func writeRawBlobBin(cdt *a.RawBlobValue, name string, compact bool, w *bytes.Buffer) (int, error) {
+	if cdt == nil {
+		return 0, fmt.Errorf("raw blob bin %q is nil", name)
+	}
+
 	switch cdt.ParticleType {
 	case particleType.MAP:
 		return writeRawMapBin(cdt, name, compact, w)

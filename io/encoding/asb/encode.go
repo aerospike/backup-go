@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"sync"
 	"sync/atomic"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
@@ -46,12 +47,14 @@ func init() {
 
 // Encoder contains logic for encoding backup data into the .asb format.
 // This is a stateful object that must be created for every backup operation.
+// EncodeToken is safe for concurrent use; parallel file writers share one Encoder.
 type Encoder struct {
 	config           *EncoderConfig
 	recordNamespace  recentLine
 	recordSet        recentLine
 	firstFileWritten atomic.Bool
 	id               atomic.Int64
+	mu               sync.Mutex
 
 	// cacheLine enables recentLine caching for namespace/set metadata lines.
 	// cacheGen enables precomputed generation, bin-count, and never-expire void-time lines.
@@ -144,6 +147,9 @@ func (e *Encoder) appendRecord(dst []byte, r *models.Record) ([]byte, error) {
 }
 
 func (e *Encoder) appendRecordKey(dst []byte, key *a.Key) ([]byte, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	if userKey := key.Value(); userKey != nil {
 		var err error
 

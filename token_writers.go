@@ -15,7 +15,6 @@
 package backup
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"log/slog"
@@ -61,18 +60,14 @@ func (tw *tokenStatsWriter) Write(data *models.Token) (int, error) {
 		return 0, err
 	}
 
-	// We set stats only for ASB Tokens at the moment.
-	t, ok := any(data).(*models.Token)
-	if ok {
-		switch t.Type {
-		case models.TokenTypeRecord:
-		case models.TokenTypeUDF:
-			tw.stats.AddUDFs(1)
-		case models.TokenTypeSIndex:
-			tw.stats.AddSIndexes(1)
-		case models.TokenTypeInvalid:
-			return 0, fmt.Errorf("%w: invalid token", ErrCorruptData)
-		}
+	switch data.Type {
+	case models.TokenTypeRecord:
+	case models.TokenTypeUDF:
+		tw.stats.AddUDFs(1)
+	case models.TokenTypeSIndex:
+		tw.stats.AddSIndexes(1)
+	case models.TokenTypeInvalid:
+		return 0, fmt.Errorf("%w: invalid token", ErrCorruptData)
 	}
 
 	return n, nil
@@ -90,7 +85,7 @@ type tokenWriter struct {
 	output    io.WriteCloser
 	logger    *slog.Logger
 	stateInfo *stateInfo
-	buf       bytes.Buffer
+	buf       []byte
 }
 
 type stateInfo struct {
@@ -128,23 +123,22 @@ func newTokenWriter(
 
 // Write encodes v and writes it to the output.
 func (w *tokenWriter) Write(v *models.Token) (int, error) {
-	w.buf.Reset()
+	w.buf = w.buf[:0]
 
-	if err := w.encoder.EncodeToken(v, &w.buf); err != nil {
+	var err error
+
+	w.buf, err = w.encoder.EncodeToken(v, w.buf)
+	if err != nil {
 		return 0, fmt.Errorf("failed to encode token: %w", err)
 	}
 
-	// We set state only for ASB Tokens at the moment.
-	t, ok := any(v).(*models.Token)
-	if ok {
-		if w.stateInfo != nil && t.Filter != nil {
-			// Set a worker number.
-			t.Filter.N = w.stateInfo.n
-			w.stateInfo.recordsStateChan <- *t.Filter
-		}
+	if w.stateInfo != nil && v.Filter != nil {
+		// Set a worker number.
+		v.Filter.N = w.stateInfo.n
+		w.stateInfo.recordsStateChan <- *v.Filter
 	}
 
-	return w.output.Write(w.buf.Bytes())
+	return w.output.Write(w.buf)
 }
 
 // Close releases resources associated with the tokenWriter and ensures the underlying writer is properly closed.

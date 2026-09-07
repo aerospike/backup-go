@@ -15,7 +15,6 @@
 package backup
 
 import (
-	"bytes"
 	"io"
 	"log/slog"
 
@@ -25,8 +24,10 @@ import (
 
 // Encoder is an interface for encoding the types from the models package.
 // It is used to support different data formats.
+//
+//go:generate mockery --name Encoder
 type Encoder interface {
-	EncodeToken(*models.Token, *bytes.Buffer) error
+	EncodeToken(*models.Token, []byte) ([]byte, error)
 	GetHeader(bool) []byte
 	GenerateFilename(prefix, suffix string) string
 }

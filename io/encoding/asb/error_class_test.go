@@ -15,7 +15,6 @@
 package asb
 
 import (
-	"bytes"
 	"strings"
 	"testing"
 
@@ -51,7 +50,8 @@ func TestErrorClasses_Corrupt(t *testing.T) {
 		{
 			name: "nil raw blob bin",
 			call: func() error {
-				_, err := writeRawBlobBin(nil, "bin", false, &bytes.Buffer{})
+				encoder := NewEncoder(testEncoderConfig)
+				_, err := encoder.appendRawBlobBin(nil, "bin", nil, new([32]byte))
 				return err
 			},
 		},

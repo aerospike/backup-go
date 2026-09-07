@@ -6,7 +6,7 @@ NPROC := $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN)
 # Build tag guarding the tests that need Aerospike or object storage.
 INTEGRATION_TAG = integration
 
-GO_TEST_FLAGS = -parallel $(NPROC) -timeout=5m -count=1
+GO_TEST_FLAGS = -parallel $(NPROC) -timeout=10m -count=1
 
 GOVULNCHECK_VERSION = v1.7.0
 # go.uber.org/nilaway has no tagged releases; pin the module pseudo-version.

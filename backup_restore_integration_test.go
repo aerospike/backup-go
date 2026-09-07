@@ -21,11 +21,18 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
+	"math/rand/v2"
 	"os"
 	"path"
+	"reflect"
+	"slices"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/io/encoding/asb"
@@ -50,6 +57,182 @@ const (
 	testASPort          = 3000
 	testTimeout         = 60 * time.Second
 )
+
+// Record size buckets. Aerospike caps a record, metadata included, at 8 MiB;
+// max-record-size is the namespace knob that enforces it and since server
+// 7.1.0 it defaults to 1 MiB, so the 7 MiB bucket needs it raised first.
+const (
+	dtMaxRecordSize = 8 << 20
+
+	dtSizeScalar = 0         // fixed-width types: the size bucket does not apply
+	dtSizeSmall  = 1536      // 1.5 KiB
+	dtSizeMedium = 100 << 10 // 100 KiB
+	dtSizeLarge  = 1 << 20   // 1 MiB
+	dtSizeHuge   = 7 << 20   // 7 MiB
+)
+
+// Records per bucket. The small buckets carry the full sample; the large ones
+// are trimmed because 100 records of 7 MiB is 700 MiB per set, which neither
+// the namespace nor the package test timeout can absorb. The point of the test
+// is type coverage, and that is already reached with a handful of records.
+const (
+	dtRecordsDefault = 100
+	dtRecordsLarge   = 20
+	dtRecordsHuge    = 5
+)
+
+const (
+	dtSetPrefix   = "testDT"
+	dtTestTimeout = 3 * time.Minute
+
+	// dtLargeRecordThreshold is the record size above which the test throttles
+	// both the write path and the restore path. Multi-megabyte records pushed
+	// through the default batch settings make the server answer with
+	// DEVICE_OVERLOAD.
+	dtLargeRecordThreshold = 128 << 10
+
+	// dtInFlightBudget bounds how many bytes one restore batch may carry.
+	dtInFlightBudget = 8 << 20
+
+	// dtLargeMaxAsyncBatches limits concurrent restore batches for large records.
+	dtLargeMaxAsyncBatches = 2
+
+	dtMaxRetries          = 5
+	dtSleepBetweenRetries = 200 * time.Millisecond
+)
+
+// Type names, used to build set and subtest names.
+const (
+	dtTypeInt     = "Int"
+	dtTypeFloat   = "Float"
+	dtTypeBool    = "Bool"
+	dtTypeString  = "String"
+	dtTypeBlob    = "Blob"
+	dtTypeList    = "List"
+	dtTypeMap     = "Map"
+	dtTypeGeoJSON = "GeoJSON"
+	dtTypeHLL     = "HLL"
+)
+
+// Bin names.
+const (
+	dtBinInt     = "IntBin"
+	dtBinFloat   = "FloatBin"
+	dtBinBool    = "BoolBin"
+	dtBinString  = "StringBin"
+	dtBinBlob    = "BlobBin"
+	dtBinList    = "ListBin"
+	dtBinMap     = "MapBin"
+	dtBinGeoJSON = "GeoJSONBin"
+	dtBinHLL     = "HLLBin"
+)
+
+// Map keys used by the nested structures.
+const (
+	dtMapKeyIntValue = 1 // integer map key, Aerospike supports those next to strings
+	dtMapKeyInt      = "int"
+	dtMapKeyFloat    = "float"
+	dtMapKeyString   = "string"
+	dtMapKeyBool     = "bool"
+	dtMapKeyNil      = "nil"
+	dtMapKeyList     = "list"
+	dtMapKeyNested   = "nested"
+	dtMapKeyPayload  = "payload"
+)
+
+// Info command building blocks.
+const (
+	dtMaxRecordSizeParam = "max-record-size"
+	dtInfoResponseOK     = "ok"
+)
+
+// Payload generation.
+const (
+	// dtSeed keeps every generated payload reproducible across runs.
+	dtSeed uint64 = 0x5DEECE66D
+
+	// dtStructureOverhead is a deliberate overestimate of the fixed part of a
+	// generated list or map, subtracted from the target size before the filler
+	// is produced. Sizes are therefore exact for strings and blobs and
+	// approximate for the structured types.
+	dtStructureOverhead = 512
+	dtMinPayloadSize    = 16
+	dtNestedSize        = 64
+	dtPadByte           = 'x'
+
+	dtUserKeyKinds  = 3
+	dtUserKeyPrefix = "dtKey"
+)
+
+// GeoJSON generation. The polygon is a circle approximated with as many
+// vertices as the target size allows.
+const (
+	dtGeoPrefix       = `{"type":"Polygon","coordinates":[[`
+	dtGeoSuffix       = `]]}`
+	dtGeoVertexLen    = 21 // approximate length of one "[lon,lat]," chunk
+	dtGeoMinVertices  = 8
+	dtGeoPrecision    = 6
+	dtGeoBaseRadius   = 1.0
+	dtGeoRadiusStepPD = 1000.0 // per-record radius step, keeps every polygon distinct
+)
+
+// HLL particle geometry. The particle occupies 2^indexBits * (6 + minHashBits)
+// bits, so these two shapes land on 1536 B and 102400 B respectively. There is
+// no configuration that reaches 1 MiB, which is why HLL has no large buckets.
+const (
+	dtHLLSmallIndexBits    = 11
+	dtHLLMediumIndexBits   = 14
+	dtHLLMediumMinHashBits = 44
+	// dtHLLNoMinHash disables the minhash part of the particle.
+	dtHLLNoMinHash = -1
+)
+
+// dtIntValues cycles through the edges of the integer particle.
+var dtIntValues = []int{0, 1, -1, math.MaxInt32, math.MinInt32, math.MaxInt64, math.MinInt64}
+
+// dtFloatValues cycles through the edges of the double particle. NaN and the
+// infinities are left out on purpose: they are not comparable by value.
+var dtFloatValues = []float64{
+	0,
+	1.1,
+	-1.1,
+	math.Pi,
+	math.MaxFloat64,
+	-math.MaxFloat64,
+	math.SmallestNonzeroFloat64,
+}
+
+// dtStringAlphabet mixes ASCII, multi-byte UTF-8 and the characters the ASB
+// encoder has to escape, so the string bucket also exercises escaping.
+var dtStringAlphabet = []rune("abcXYZ019 \n\r\t\\\"'привет日本語😀")
+
+// dtSizeClass is one record-size bucket of the type matrix.
+type dtSizeClass struct {
+	name    string
+	size    int
+	records int
+}
+
+var (
+	dtClassScalar = dtSizeClass{name: "scalar", size: dtSizeScalar, records: dtRecordsDefault}
+	dtClassSmall  = dtSizeClass{name: "1536b", size: dtSizeSmall, records: dtRecordsDefault}
+	dtClassMedium = dtSizeClass{name: "100kb", size: dtSizeMedium, records: dtRecordsDefault}
+	dtClassLarge  = dtSizeClass{name: "1mb", size: dtSizeLarge, records: dtRecordsLarge}
+	dtClassHuge   = dtSizeClass{name: "7mb", size: dtSizeHuge, records: dtRecordsHuge}
+)
+
+// dtWriter populates one test set and reports the bins the database is expected
+// to hold, keyed by record digest.
+type dtWriter interface {
+	Write(client *a.Client, keys []*a.Key, size int) (map[digestT]a.BinMap, error)
+}
+
+// dtSpec describes one Aerospike data type under test.
+type dtSpec struct {
+	writer  dtWriter
+	name    string
+	classes []dtSizeClass
+}
 
 // testBins is a collection of all supported bin types
 // useful for testing backup and restore
@@ -164,6 +347,583 @@ func runBackupRestoreLocal(
 	}
 
 	return bh.GetStats(), rh.GetStats(), nil
+}
+
+// TestBackupRestoreAllDataTypes writes every Aerospike data type in every
+// record-size bucket that makes sense for it, backs the set up, truncates it,
+// restores it and asserts that the restored records match the pre-backup
+// snapshot bit for bit, nested values included.
+//
+// The test is deliberately not parallel: it writes multi-megabyte records and
+// running it next to the rest of the integration suite provokes DEVICE_OVERLOAD.
+// Sets are processed one at a time and truncated afterwards for the same reason.
+func TestBackupRestoreAllDataTypes(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), dtTestTimeout)
+	defer cancel()
+
+	asClient, err := testAerospikeClient()
+	require.NoError(t, err)
+
+	// t.Cleanup rather than defer: deferred calls run when the test body
+	// returns, cleanups run after that, so a deferred Close would shut the
+	// client down before the max-record-size rollback could reach the cluster.
+	// Cleanups run LIFO, so registering Close first makes it run last.
+	t.Cleanup(asClient.Close)
+	t.Cleanup(dtRaiseMaxRecordSize(t, asClient))
+
+	for _, spec := range dtSpecs() {
+		for _, class := range spec.classes {
+			t.Run(fmt.Sprintf("%s_%s", spec.name, class.name), func(t *testing.T) {
+				dtRunCase(ctx, t, asClient, spec, class)
+			})
+		}
+	}
+}
+
+// dtSpecs is the type matrix. Fixed-width types get a single bucket; only the
+// container types can be grown to arbitrary sizes.
+func dtSpecs() []dtSpec {
+	scalable := []dtSizeClass{dtClassSmall, dtClassMedium, dtClassLarge, dtClassHuge}
+
+	return []dtSpec{
+		{
+			name:    dtTypeInt,
+			writer:  dtGenWriter{gen: dtGenInt},
+			classes: []dtSizeClass{dtClassScalar},
+		},
+		{
+			name:    dtTypeFloat,
+			writer:  dtGenWriter{gen: dtGenFloat},
+			classes: []dtSizeClass{dtClassScalar},
+		},
+		{
+			name:    dtTypeBool,
+			writer:  dtGenWriter{gen: dtGenBool},
+			classes: []dtSizeClass{dtClassScalar},
+		},
+		{
+			name:    dtTypeString,
+			writer:  dtGenWriter{gen: dtGenString},
+			classes: scalable,
+		},
+		{
+			name:    dtTypeBlob,
+			writer:  dtGenWriter{gen: dtGenBlob},
+			classes: scalable,
+		},
+		{
+			name:    dtTypeList,
+			writer:  dtGenWriter{gen: dtGenList},
+			classes: scalable,
+		},
+		{
+			name:    dtTypeMap,
+			writer:  dtGenWriter{gen: dtGenMap},
+			classes: scalable,
+		},
+		{
+			// A GeoJSON value is validated by the server on every write, so it
+			// is kept small on purpose.
+			name:    dtTypeGeoJSON,
+			writer:  dtGenWriter{gen: dtGenGeoJSON},
+			classes: []dtSizeClass{dtClassSmall},
+		},
+		{
+			name:    dtTypeHLL,
+			writer:  dtHLLWriter{indexBits: dtHLLSmallIndexBits, minHashBits: dtHLLNoMinHash},
+			classes: []dtSizeClass{dtClassSmall},
+		},
+		{
+			name:    dtTypeHLL,
+			writer:  dtHLLWriter{indexBits: dtHLLMediumIndexBits, minHashBits: dtHLLMediumMinHashBits},
+			classes: []dtSizeClass{dtClassMedium},
+		},
+	}
+}
+
+// dtRunCase runs the full write - backup - truncate - restore - compare cycle
+// for a single (type, size) pair.
+func dtRunCase(ctx context.Context, t *testing.T, client *a.Client, spec dtSpec, class dtSizeClass) {
+	t.Helper()
+
+	setName := dtSetName(spec.name, class.name)
+	t.Cleanup(func() {
+		// Leaving multi-megabyte records behind would skew the namespace for
+		// every test that runs after this one.
+		require.NoError(t, client.Truncate(nil, testASNamespace, setName, nil))
+	})
+
+	keys, err := dtGenKeys(setName, class.records)
+	require.NoError(t, err)
+
+	generated, err := spec.writer.Write(client, keys, class.size)
+	require.NoError(t, err)
+	require.Len(t, generated, class.records)
+
+	// Snapshot of the set exactly as the database holds it before the backup.
+	// This is the reference the restored records must match. For HLL the
+	// generated bins were themselves read back from the database, so the check
+	// against `generated` is a tautology there and a real assertion everywhere else.
+	before, err := readAllRecords(client, testASNamespace, setName)
+	require.NoError(t, err)
+	require.Equal(t, class.records, before.Len())
+
+	for _, key := range keys {
+		record, ok := before.Get(string(key.Digest()))
+		require.Truef(t, ok, "record was not written: %v", key)
+		dtRequireBinsEqual(t, generated[string(key.Digest())], record.Bins, key)
+	}
+
+	directory := path.Join(t.TempDir(), fmt.Sprintf("%s_%d", setName, time.Now().UnixNano()))
+
+	bStat, rStat, err := runBackupRestoreLocal(
+		ctx,
+		client,
+		directory,
+		dtBackupConfig(setName, class.size),
+		dtRestoreConfig(client, class.size),
+	)
+	require.NoError(t, err)
+
+	// Validate stats.
+	require.Equal(t, uint64(class.records), bStat.GetReadRecords())
+	require.Equal(t, bStat.GetReadRecords(), rStat.GetRecordsInserted())
+	require.Equal(t, uint64(0), rStat.GetRecordsExpired())
+	require.Equal(t, uint64(0), rStat.GetRecordsSkipped())
+	require.Equal(t, uint64(0), rStat.GetRecordsFresher())
+	require.Equal(t, uint64(0), rStat.GetRecordsExisted())
+	require.Equal(t, uint64(0), rStat.GetRecordsIgnored())
+
+	// Validate records.
+	after, err := readAllRecords(client, testASNamespace, setName)
+	require.NoError(t, err)
+	require.Equal(t, before.Len(), after.Len())
+
+	for _, key := range keys {
+		digest := string(key.Digest())
+
+		expected, ok := before.Get(digest)
+		require.Truef(t, ok, "record missing before backup: %v", key)
+
+		actual, ok := after.Get(digest)
+		require.Truef(t, ok, "record missing after restore: %v", key)
+
+		dtRequireBinsEqual(t, expected.Bins, actual.Bins, key)
+
+		// SendKey is set on write, so the user key travels through the backup
+		// file and must come back unchanged.
+		require.Equalf(t, expected.Key.Value(), actual.Key.Value(), "user key mismatch: %v", key)
+
+		// Generation is not compared: restore rewrites the record, so a fresh
+		// generation is expected. Void time is preserved and therefore is.
+		require.Equalf(t, expected.Expiration, actual.Expiration, "expiration mismatch: %v", key)
+	}
+}
+
+// dtSetName builds the Aerospike set name for one matrix cell.
+func dtSetName(typeName, className string) string {
+	return fmt.Sprintf("%s_%s_%s", dtSetPrefix, typeName, className)
+}
+
+// dtBackupConfig returns a backup config tuned for the given record size.
+func dtBackupConfig(setName string, recordSize int) *ConfigBackup {
+	cfg := NewDefaultBackupConfig()
+	cfg.SetList = []string{setName}
+
+	if recordSize >= dtLargeRecordThreshold {
+		cfg.ParallelRead = 1
+		cfg.ParallelWrite = 1
+	}
+
+	return cfg
+}
+
+// dtRestoreConfig returns a restore config tuned for the given record size.
+// The batch size and the number of concurrent batches are scaled down for
+// large records: the defaults keep hundreds of megabytes in flight and the
+// server answers that with DEVICE_OVERLOAD.
+//
+// SendKey has to be enabled explicitly: when ConfigRestore.WritePolicy is nil
+// the library falls back to the Aerospike client default write policy, and that
+// default leaves SendKey off, so the user key carried by the backup file would
+// never make it back into the database.
+func dtRestoreConfig(client *a.Client, recordSize int) *ConfigRestore {
+	// Copy, do not mutate: GetDefaultWritePolicy hands out the client's own policy.
+	writePolicy := *client.GetDefaultWritePolicy()
+	writePolicy.SendKey = true
+	writePolicy.TotalTimeout = testTimeout
+	writePolicy.SocketTimeout = testTimeout
+
+	cfg := NewDefaultRestoreConfig()
+	cfg.WritePolicy = &writePolicy
+	cfg.RetryPolicy = models.NewDefaultRetryPolicy()
+
+	if recordSize >= dtLargeRecordThreshold {
+		cfg.BatchSize = max(1, dtInFlightBudget/recordSize)
+		cfg.MaxAsyncBatches = dtLargeMaxAsyncBatches
+	}
+
+	return cfg
+}
+
+// dtWritePolicy is the write policy used by every writer in this test. Records
+// are written one at a time with retries so that the large size buckets do not
+// overload the server write queue.
+func dtWritePolicy() *a.WritePolicy {
+	policy := a.NewWritePolicy(0, 0)
+	policy.SendKey = true
+	policy.TotalTimeout = testTimeout
+	policy.SocketTimeout = testTimeout
+	policy.MaxRetries = dtMaxRetries
+	policy.SleepBetweenRetries = dtSleepBetweenRetries
+
+	return policy
+}
+
+// dtGenKeys builds deterministic keys cycling through every user key type
+// Aerospike supports.
+func dtGenKeys(set string, count int) ([]*a.Key, error) {
+	keys := make([]*a.Key, count)
+
+	for i := range count {
+		var userKey any
+
+		switch i % dtUserKeyKinds {
+		case 0:
+			userKey = i
+		case 1:
+			userKey = fmt.Sprintf("%s%d", dtUserKeyPrefix, i)
+		default:
+			userKey = fmt.Appendf(nil, "%s%d", dtUserKeyPrefix, i)
+		}
+
+		key, err := a.NewKey(testASNamespace, set, userKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build key %d for set %s: %w", i, set, err)
+		}
+
+		keys[i] = key
+	}
+
+	return keys, nil
+}
+
+// dtGenWriter builds bin values on the client, which lets the test assert that
+// the database gives back exactly what the test produced.
+type dtGenWriter struct {
+	gen func(size, idx int) a.BinMap
+}
+
+func (w dtGenWriter) Write(client *a.Client, keys []*a.Key, size int) (map[digestT]a.BinMap, error) {
+	policy := dtWritePolicy()
+	written := make(map[digestT]a.BinMap, len(keys))
+
+	for i, key := range keys {
+		bins := w.gen(size, i)
+		if err := client.Put(policy, key, bins); err != nil {
+			return nil, fmt.Errorf("failed to write record %s: %w", key, err)
+		}
+
+		written[string(key.Digest())] = bins
+	}
+
+	return written, nil
+}
+
+// dtHLLWriter creates HLL bins through the server. An HLL particle is built by
+// the database and cannot be constructed on the client, so unlike every other
+// type the expected value has to be read back right after the write.
+type dtHLLWriter struct {
+	indexBits   int
+	minHashBits int
+}
+
+func (w dtHLLWriter) Write(client *a.Client, keys []*a.Key, _ int) (map[digestT]a.BinMap, error) {
+	policy := dtWritePolicy()
+	written := make(map[digestT]a.BinMap, len(keys))
+
+	for i, key := range keys {
+		// A distinct element per record so that no two HLL particles are equal.
+		op := a.HLLAddOp(
+			a.DefaultHLLPolicy(),
+			dtBinHLL,
+			[]a.Value{a.NewIntegerValue(i)},
+			w.indexBits,
+			w.minHashBits,
+		)
+
+		if _, err := client.Operate(policy, key, op); err != nil {
+			return nil, fmt.Errorf("failed to create HLL bin for %s: %w", key, err)
+		}
+
+		record, err := client.Get(nil, key)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read back HLL bin for %s: %w", key, err)
+		}
+
+		written[string(key.Digest())] = record.Bins
+	}
+
+	return written, nil
+}
+
+func dtGenInt(_, idx int) a.BinMap {
+	return a.BinMap{dtBinInt: dtIntValues[idx%len(dtIntValues)]}
+}
+
+func dtGenFloat(_, idx int) a.BinMap {
+	return a.BinMap{dtBinFloat: dtFloatValues[idx%len(dtFloatValues)]}
+}
+
+func dtGenBool(_, idx int) a.BinMap {
+	return a.BinMap{dtBinBool: idx%2 == 0}
+}
+
+func dtGenString(size, idx int) a.BinMap {
+	return a.BinMap{dtBinString: dtRandString(size, idx)}
+}
+
+func dtGenBlob(size, idx int) a.BinMap {
+	return a.BinMap{dtBinBlob: dtRandBytes(size, idx)}
+}
+
+// dtGenList builds a nested, mixed-type list. Everything but the trailing
+// filler is fixed, so the list exercises the same nesting at every size.
+func dtGenList(size, idx int) a.BinMap {
+	value := []any{
+		dtIntValues[idx%len(dtIntValues)],
+		dtFloatValues[idx%len(dtFloatValues)],
+		dtRandString(dtNestedSize, idx),
+		idx%2 == 0,
+		nil,
+		[]any{1, dtMapKeyNested, []byte(dtMapKeyNested), []any{1, 2, 3}},
+		map[any]any{
+			dtMapKeyIntValue: idx,
+			dtMapKeyString:   dtRandString(dtNestedSize, idx+1),
+			dtMapKeyNested:   []any{1, 2, 3},
+		},
+		dtRandBytes(dtPayloadSize(size), idx),
+	}
+
+	return a.BinMap{dtBinList: value}
+}
+
+// dtGenMap builds a nested map with both integer and string keys.
+func dtGenMap(size, idx int) a.BinMap {
+	value := map[any]any{
+		dtMapKeyIntValue: idx,
+		dtMapKeyInt:      dtIntValues[idx%len(dtIntValues)],
+		dtMapKeyFloat:    dtFloatValues[idx%len(dtFloatValues)],
+		dtMapKeyString:   dtRandString(dtNestedSize, idx),
+		dtMapKeyBool:     idx%2 == 0,
+		dtMapKeyNil:      nil,
+		dtMapKeyList:     []any{1, dtMapKeyNested, []byte(dtMapKeyNested), map[any]any{1: dtMapKeyInt}},
+		dtMapKeyNested:   map[any]any{1: 1, dtMapKeyString: []any{2, 2.5}},
+		dtMapKeyPayload:  dtRandBytes(dtPayloadSize(size), idx),
+	}
+
+	return a.BinMap{dtBinMap: value}
+}
+
+// dtGenGeoJSON builds a valid GeoJSON polygon of roughly the requested size.
+// The radius varies per record so that no two polygons are identical.
+func dtGenGeoJSON(size, idx int) a.BinMap {
+	vertices := max(dtGeoMinVertices, (size-len(dtGeoPrefix)-len(dtGeoSuffix))/dtGeoVertexLen)
+	radius := dtGeoBaseRadius + float64(idx)/dtGeoRadiusStepPD
+
+	var sb strings.Builder
+	sb.Grow(size)
+	sb.WriteString(dtGeoPrefix)
+
+	// The ring has to be closed, so vertex 0 is emitted twice.
+	for i := 0; i <= vertices; i++ {
+		if i > 0 {
+			sb.WriteByte(',')
+		}
+
+		angle := 2 * math.Pi * float64(i%vertices) / float64(vertices)
+		sb.WriteByte('[')
+		sb.WriteString(strconv.FormatFloat(radius*math.Cos(angle), 'f', dtGeoPrecision, 64))
+		sb.WriteByte(',')
+		sb.WriteString(strconv.FormatFloat(radius*math.Sin(angle), 'f', dtGeoPrecision, 64))
+		sb.WriteByte(']')
+	}
+
+	sb.WriteString(dtGeoSuffix)
+
+	return a.BinMap{dtBinGeoJSON: a.GeoJSONValue(sb.String())}
+}
+
+// dtPayloadSize returns how many filler bytes a structured value may carry so
+// that its total size lands close to size.
+func dtPayloadSize(size int) int {
+	return max(dtMinPayloadSize, size-dtStructureOverhead)
+}
+
+// dtRandString builds a deterministic string of exactly size bytes.
+func dtRandString(size, idx int) string {
+	rnd := rand.New(rand.NewPCG(dtSeed, uint64(idx)))
+
+	var sb strings.Builder
+	sb.Grow(size)
+
+	for sb.Len() < size {
+		r := dtStringAlphabet[rnd.IntN(len(dtStringAlphabet))]
+		if sb.Len()+utf8.RuneLen(r) > size {
+			// Pad the tail with single-byte runes to hit the target exactly.
+			sb.WriteByte(dtPadByte)
+			continue
+		}
+
+		sb.WriteRune(r)
+	}
+
+	return sb.String()
+}
+
+// dtRandBytes builds a deterministic blob of exactly size bytes. The first
+// 256 bytes are 0x00..0xFF so that every byte value, NUL and LF included, is
+// always present.
+func dtRandBytes(size, idx int) []byte {
+	rnd := rand.New(rand.NewPCG(dtSeed, uint64(idx)))
+	buf := make([]byte, size)
+
+	for i := range buf {
+		if i < math.MaxUint8+1 {
+			buf[i] = byte(i)
+			continue
+		}
+
+		buf[i] = byte(rnd.IntN(math.MaxUint8 + 1))
+	}
+
+	return buf
+}
+
+// dtRequireBinsEqual compares two bin maps field by field, nested values
+// included, without dumping megabytes of payload into the test log when they
+// differ.
+func dtRequireBinsEqual(t *testing.T, expected, actual a.BinMap, key *a.Key) {
+	t.Helper()
+
+	require.Equalf(t, dtBinNames(expected), dtBinNames(actual), "bin set mismatch: %v", key)
+
+	for name, want := range expected {
+		got := actual[name]
+		if reflect.DeepEqual(want, got) {
+			continue
+		}
+
+		t.Errorf("bin %q of %v does not match: expected %s, got %s",
+			name, key, dtDescribe(want), dtDescribe(got))
+	}
+}
+
+// dtBinNames returns the sorted bin names of a bin map.
+func dtBinNames(bins a.BinMap) []string {
+	names := make([]string, 0, len(bins))
+	for name := range bins {
+		names = append(names, name)
+	}
+
+	slices.Sort(names)
+
+	return names
+}
+
+// dtDescribe renders a bin value compactly: the large buckets would otherwise
+// print megabytes on a failed assertion.
+func dtDescribe(value any) string {
+	switch v := value.(type) {
+	case []byte:
+		return fmt.Sprintf("[]byte(len=%d)", len(v))
+	case string:
+		return fmt.Sprintf("string(len=%d)", len(v))
+	case a.HLLValue:
+		return fmt.Sprintf("a.HLLValue(len=%d)", len(v))
+	case a.GeoJSONValue:
+		return fmt.Sprintf("a.GeoJSONValue(len=%d)", len(v))
+	case []any:
+		return fmt.Sprintf("[]any(len=%d)", len(v))
+	case map[any]any:
+		return fmt.Sprintf("map[any]any(len=%d)", len(v))
+	default:
+		return fmt.Sprintf("%T(%v)", value, value)
+	}
+}
+
+// dtRaiseMaxRecordSize lifts the namespace record size limit to the 8 MiB
+// ceiling Aerospike allows, so that the 7 MiB bucket can be written at all.
+// max-record-size is a dynamic parameter, so no server restart is involved.
+// The returned function puts the original value back.
+func dtRaiseMaxRecordSize(t *testing.T, client *a.Client) func() {
+	t.Helper()
+
+	config, err := dtNamespaceConfig(client, testASNamespace)
+	require.NoError(t, err)
+
+	original, ok := config[dtMaxRecordSizeParam]
+	require.Truef(t, ok, "namespace %s does not report %s", testASNamespace, dtMaxRecordSizeParam)
+
+	require.NoError(t, dtSetNamespaceConfig(
+		client, testASNamespace, dtMaxRecordSizeParam, strconv.Itoa(dtMaxRecordSize),
+	))
+
+	return func() {
+		if err := dtSetNamespaceConfig(
+			client, testASNamespace, dtMaxRecordSizeParam, original,
+		); err != nil {
+			t.Logf("failed to restore %s to %s: %v", dtMaxRecordSizeParam, original, err)
+		}
+	}
+}
+
+// dtSetNamespaceConfig applies a dynamic namespace parameter on every node and
+// fails if any node rejects it.
+func dtSetNamespaceConfig(client *a.Client, namespace, param, value string) error {
+	command := fmt.Sprintf("set-config:context=namespace;id=%s;%s=%s", namespace, param, value)
+
+	for _, node := range client.GetNodes() {
+		response, err := node.RequestInfo(a.NewInfoPolicy(), command)
+		if err != nil {
+			return fmt.Errorf("node %s: failed to run %q: %w", node.GetName(), command, err)
+		}
+
+		if result := response[command]; !strings.EqualFold(result, dtInfoResponseOK) {
+			return fmt.Errorf("node %s: %q returned %q", node.GetName(), command, result)
+		}
+	}
+
+	return nil
+}
+
+// dtNamespaceConfig reads the namespace configuration from the first node.
+func dtNamespaceConfig(client *a.Client, namespace string) (map[string]string, error) {
+	nodes := client.GetNodes()
+	if len(nodes) == 0 {
+		return nil, errors.New("cluster reports no nodes")
+	}
+
+	command := fmt.Sprintf("get-config:context=namespace;id=%s", namespace)
+
+	response, err := nodes[0].RequestInfo(a.NewInfoPolicy(), command)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run %q: %w", command, err)
+	}
+
+	pairs := strings.Split(response[command], ";")
+	config := make(map[string]string, len(pairs))
+
+	for _, pair := range pairs {
+		name, value, ok := strings.Cut(pair, "=")
+		if !ok {
+			continue
+		}
+
+		config[name] = value
+	}
+
+	return config, nil
 }
 
 func TestBackupRestoreIndexUdf(t *testing.T) {

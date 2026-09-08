@@ -764,6 +764,10 @@ func (ic *Client) getNodesString() string {
 	var builder strings.Builder
 
 	for _, node := range nodes {
+		if !node.IsActive() {
+			continue
+		}
+
 		builder.WriteString(node.GetName())
 		builder.WriteByte(',')
 	}
@@ -781,6 +785,10 @@ func (ic *Client) GetBackupStatus(ctx context.Context, jobID string) (*infomodel
 		statuses := make([]*infomodels.ResponseBackupState, 0, len(nodes))
 
 		for _, node := range nodes {
+			if !node.IsActive() {
+				continue
+			}
+
 			resp, err := ic.getBackupStatusByNode(node, jobID)
 			if err != nil {
 				if strings.Contains(err.Error(), "no backup job") {
@@ -837,6 +845,10 @@ func (ic *Client) GetRestoreStatus(ctx context.Context, namespace string) (strin
 		seen := make(map[string]struct{}, len(nodes))
 
 		for _, node := range nodes {
+			if !node.IsActive() {
+				continue
+			}
+
 			resp, err := ic.getRestoreStatusByNode(node, namespace)
 			if err != nil {
 				return fmt.Errorf("failed to get restore status from node %s: %w", node.GetName(), err)

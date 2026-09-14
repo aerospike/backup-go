@@ -91,7 +91,7 @@ jobs:
           -e "MINIO_ACCESS_KEY=minioadmin" \
           -e "MINIO_SECRET_KEY=minioadminpassword" \
           -e "MINIO_BROWSER=off" \
-          minio/minio:RELEASE.2025-09-07T16-13-09Z server /data \
+          coollabsio/minio:RELEASE.2025-10-15T17-29-55Z server /data \
           && until (curl -I http://127.0.0.1:9000/minio/health/live | grep "OK"); do echo "Waiting for MinIO server to be ready..."; sleep 3; done \
           && docker exec minio sh -c "mc alias set myminio http://127.0.0.1:9000 minioadmin minioadminpassword && mc mb myminio/backup && mc mb myminio/asbackup \
           && mc anonymous set upload myminio/backup && mc anonymous set download myminio/backup && mc anonymous set public myminio/backup \

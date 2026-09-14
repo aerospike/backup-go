@@ -6,7 +6,9 @@ set -euo pipefail
 readonly AEROSPIKE_IMAGE="aerospike/aerospike-server-enterprise:8.1.2.4"
 readonly AZURITE_IMAGE="mcr.microsoft.com/azure-storage/azurite:3.35.0"
 readonly FAKE_GCS_IMAGE="fsouza/fake-gcs-server:1.52.2"
-readonly MINIO_IMAGE="minio/minio:RELEASE.2025-09-07T16-13-09Z"
+# minio/minio on Docker Hub is no longer publicly pullable; coollabsio builds
+# community images from upstream MinIO releases (drop-in replacement).
+readonly MINIO_IMAGE="coollabsio/minio:RELEASE.2025-10-15T17-29-55Z"
 
 readonly AEROSPIKE_NAME="backup-go-aerospike"
 readonly AZURITE_NAME="backup-go-azurite"

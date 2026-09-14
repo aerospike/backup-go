@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCalculateEstimatedEndTime(t *testing.T) {
+func TestRemainingTime(t *testing.T) {
 	t.Parallel()
 
 	// startTime is computed inside the subtest (not in the struct) to keep the
@@ -82,15 +82,20 @@ func TestCalculateEstimatedEndTime(t *testing.T) {
 			expected:  0,
 			tolerance: 100 * time.Millisecond,
 		},
+		{
+			name:      "zero ratio returns zero",
+			elapsed:   10 * time.Second,
+			ratio:     0,
+			expected:  0,
+			tolerance: 0,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			startTime := time.Now().Add(-tt.elapsed)
-
-			result := calculateEstimatedEndTime(startTime, tt.ratio)
+			result := RemainingTime(tt.elapsed, tt.ratio)
 
 			assert.InDelta(t, tt.expected.Milliseconds(), result.Milliseconds(), float64(tt.tolerance.Milliseconds()))
 		})
@@ -140,13 +145,19 @@ func TestProgressThreshold(t *testing.T) {
 			ratio:    0.02,
 			expected: maxThreshold,
 		},
+		{
+			name:     "zero ratio returns max threshold",
+			elapsed:  10 * time.Second,
+			ratio:    0,
+			expected: maxThreshold,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := progressThreshold(tt.elapsed, tt.ratio)
+			got := ProgressThreshold(tt.elapsed, tt.ratio)
 			assert.InDelta(t, tt.expected, got, 1e-9)
 		})
 	}

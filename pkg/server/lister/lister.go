@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -231,8 +232,8 @@ func (l *Lister) listSnapshotPrefixes(ctx context.Context) ([]string, error) {
 	return out, nil
 }
 
-func (l *Lister) fetchOne(ctx context.Context, path string) ([]byte, error) {
-	key := path + "/" + metadataFileName
+func (l *Lister) fetchOne(ctx context.Context, prefix string) ([]byte, error) {
+	key := objectKey(prefix, metadataFileName)
 
 	out, err := l.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(l.bucket),
@@ -254,6 +255,15 @@ func (l *Lister) fetchOne(ctx context.Context, path string) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+func objectKey(elems ...string) string {
+	key := path.Join(elems...)
+	if key == "." || key == "/" {
+		return ""
+	}
+
+	return strings.TrimPrefix(key, "/")
 }
 
 // parseCitrusleafTimestamp parses s as a Citrusleaf-epoch timestamp and reports

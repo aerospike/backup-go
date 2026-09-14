@@ -41,6 +41,11 @@ const (
 	ts400 = "400000000"
 )
 
+const (
+	testMetadataFile = "metadata.json"
+	testPrefix       = "backups/1758000000"
+)
+
 // listOutput builds a single-page ListObjectsV2 result from common prefixes.
 // The paginator stops after one page because NextContinuationToken is nil.
 func listOutput(commonPrefixes ...string) *s3.ListObjectsV2Output {
@@ -311,4 +316,68 @@ func TestNewLister_Options(t *testing.T) {
 	// Non-positive concurrency is ignored.
 	l2 := NewLister(m, "bucket", "", WithConcurrency(0))
 	assert.Equal(t, defaultConcurrency, l2.concurrency)
+}
+
+func TestObjectKey(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		elems []string
+		want  string
+	}{
+		{
+			name:  "dot prefix is dropped",
+			elems: []string{".", testMetadataFile},
+			want:  testMetadataFile,
+		},
+		{
+			name:  "empty prefix is dropped",
+			elems: []string{"", testMetadataFile},
+			want:  testMetadataFile,
+		},
+		{
+			name:  "root prefix is dropped",
+			elems: []string{"/", testMetadataFile},
+			want:  testMetadataFile,
+		},
+		{
+			name:  "dot slash prefix is dropped",
+			elems: []string{"./", testMetadataFile},
+			want:  testMetadataFile,
+		},
+		{
+			name:  "regular prefix is preserved",
+			elems: []string{testPrefix, testMetadataFile},
+			want:  testPrefix + "/" + testMetadataFile,
+		},
+		{
+			name:  "leading slash is stripped",
+			elems: []string{"/" + testPrefix, testMetadataFile},
+			want:  testPrefix + "/" + testMetadataFile,
+		},
+		{
+			name:  "duplicated slashes are collapsed",
+			elems: []string{testPrefix + "//", testMetadataFile},
+			want:  testPrefix + "/" + testMetadataFile,
+		},
+		{
+			name:  "parent traversal is resolved",
+			elems: []string{testPrefix + "/sub/..", testMetadataFile},
+			want:  testPrefix + "/" + testMetadataFile,
+		},
+		{
+			name:  "no elements",
+			elems: nil,
+			want:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, objectKey(tt.elems...))
+		})
+	}
 }

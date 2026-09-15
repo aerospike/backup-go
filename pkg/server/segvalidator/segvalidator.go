@@ -61,8 +61,10 @@ const segmentSizeLimit = segment.MaxRecordSize
 const defaultMaxIssues = 1000
 
 var (
-	// ErrNoSegments is returned when a run checked no segment at all, which
-	// also covers a backup id that does not exist.
+	// ErrNoSegments is returned when a run found nothing at all under the
+	// backup id: no namespace, no manifest and no segment, which is what a
+	// backup id that does not exist looks like. A backup that holds no segment
+	// because the namespace held no records is reported, not refused.
 	ErrNoSegments = fmt.Errorf("%w: no segments found for backup", errclass.ErrNotFound)
 	// ErrSegmentTooLarge is returned for a segment bigger than any record a
 	// flat header can describe.
@@ -209,11 +211,28 @@ func (v *SegValidator) Validate(ctx context.Context, sampleSize int) (*models.Va
 		return nil, err
 	}
 
-	if c.checkedSegments.Load() == 0 {
+	streamed := v.streamer.Stats()
+
+	// A run counting no segment is not a failure by itself: a namespace that
+	// held no records is backed up into manifests recording nothing, and such a
+	// backup reads back as well as any other. Only a run that came back having
+	// found nothing whatsoever has nothing to report on.
+	if foundNothing(c.checkedSegments.Load(), streamed) {
 		return nil, fmt.Errorf("%w: %s", ErrNoSegments, v.streamer.BackupID())
 	}
 
-	return c.report(v.streamer.BackupID(), v.streamer.Stats()), nil
+	return c.report(v.streamer.BackupID(), streamed), nil
+}
+
+// foundNothing reports whether a run found nothing at all in the storage: no
+// namespace, no manifest and no segment. That is what a backup id nothing was
+// ever written under looks like, and it is the one thing a report cannot
+// describe.
+func foundNothing(checked int64, streamed streamers.Stats) bool {
+	return checked == 0 &&
+		streamed.Namespaces == 0 &&
+		streamed.ManifestsFound == 0 &&
+		streamed.ManifestsFailed == 0
 }
 
 // checkSegment reads a single segment and records what it found. A segment that

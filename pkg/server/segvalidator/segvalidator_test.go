@@ -23,6 +23,8 @@ import (
 	"hash/crc32"
 	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"slices"
 	"sync/atomic"
 	"testing"
@@ -613,6 +615,119 @@ func TestSegValidator_NoSegments(t *testing.T) {
 	_, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
 	if !errors.Is(err, ErrNoSegments) {
 		t.Fatalf("Validate() error = %v, want ErrNoSegments", err)
+	}
+}
+
+func TestSegValidator_BackupOfANamespaceThatHeldNoRecords(t *testing.T) {
+	t.Parallel()
+
+	// The manifests of the backup were read and recorded no segment, which is
+	// what backing up an empty namespace writes. There is nothing wrong with
+	// it, and the run says so instead of refusing to report on it.
+	streamer := newStubStreamer(nil, 0)
+	streamer.stats = streamers.Stats{Namespaces: 1, ManifestsFound: 4096, ManifestsRead: 4096}
+
+	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), 10_000)
+	if err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+
+	if report.Failed() {
+		t.Errorf("Failed() = true, want a backup of an empty namespace to pass: %+v", report)
+	}
+
+	if report.CheckedSegments != 0 || report.Manifests.Checked != 4096 {
+		t.Errorf("report = %+v, want no segment checked and every manifest read", report)
+	}
+}
+
+// TestSegValidator_EmptyNamespaceOnDisk runs a validator over a whole backup of
+// a namespace that held no records, rather than over a stub: nothing was
+// written but the manifests, each of them recording no segment.
+func TestSegValidator_EmptyNamespaceOnDisk(t *testing.T) {
+	t.Parallel()
+
+	const (
+		backupID   = "527139336"
+		partitions = 8
+	)
+
+	root := t.TempDir()
+	manifests := filepath.Join(root, backupID, "ns", "test", "query-stream", "manifest")
+
+	if err := os.MkdirAll(manifests, 0o750); err != nil {
+		t.Fatalf("create manifest directory: %v", err)
+	}
+
+	for p := range partitions {
+		body := fmt.Sprintf(`{"backup_id":%q,"namespace":"test","partition_id":%d,"format_version":1,`+
+			`"checksum_algorithm":"crc32","entry_count":0,"segments":[],"partition_complete":true}`,
+			backupID, p)
+
+		name := filepath.Join(manifests, fmt.Sprintf("%d-7-0000181197010.json", p))
+		if err := os.WriteFile(name, []byte(body), 0o600); err != nil {
+			t.Fatalf("write manifest: %v", err)
+		}
+	}
+
+	streamer, err := streamers.NewLocal(root, backupID)
+	if err != nil {
+		t.Fatalf("NewLocal() error = %v", err)
+	}
+
+	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), 10_000)
+	if err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+
+	if report.Failed() || report.CheckedSegments != 0 {
+		t.Fatalf("report = %+v, want a backup holding no segment to pass", report)
+	}
+
+	if report.Manifests.Checked != partitions {
+		t.Errorf("manifest report = %+v, want the %d manifests read", report.Manifests, partitions)
+	}
+
+	// A backup id nothing was written under is still the one thing there is
+	// nothing to report about.
+	missing, err := streamers.NewLocal(root, "nosuchbackup")
+	if err != nil {
+		t.Fatalf("NewLocal() error = %v", err)
+	}
+
+	if _, err := newTestSegValidator(t, missing).Validate(t.Context(), 10_000); !errors.Is(err, ErrNoSegments) {
+		t.Errorf("Validate() error = %v, want ErrNoSegments", err)
+	}
+}
+
+func TestSegValidator_NoSegmentsButUnreadableManifests(t *testing.T) {
+	t.Parallel()
+
+	// A backup whose manifests are all unreadable and whose data directories
+	// hold nothing is a broken backup, not a missing one, and what the run
+	// found out about it must not be thrown away with an error.
+	streamer := newStubStreamer(nil, 0)
+	streamer.stats = streamers.Stats{
+		ManifestIssues: []streamers.ManifestIssue{{
+			Err:       streamers.ErrManifestUnusable,
+			Namespace: stubNS,
+			Path:      stubManifestPath(0),
+		}},
+		ManifestsFound:  1,
+		ManifestsFailed: 1,
+	}
+
+	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
+	if err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+
+	if report.CheckedSegments != 0 || report.Manifests.Problems != 1 {
+		t.Fatalf("report = %+v, want no segment checked and the unreadable manifest reported", report)
+	}
+
+	if !report.Failed() {
+		t.Error("Failed() = false, want a backup whose manifests cannot be read to fail")
 	}
 }
 

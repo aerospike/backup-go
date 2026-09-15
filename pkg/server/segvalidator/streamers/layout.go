@@ -153,26 +153,31 @@ func decodeManifest(r io.Reader, header *manifestHeader, fn func(manifestSegment
 
 		switch key {
 		case "namespace":
-			err = dec.Decode(&header.Namespace)
+			err = decodeValue(dec, &header.Namespace)
 		case "partition_id":
 			err = decodePartition(dec, &header.Partition)
 		case "checksum_algorithm":
-			err = dec.Decode(&header.Algorithm)
+			err = decodeValue(dec, &header.Algorithm)
 		case "segments":
 			err = decodeSegments(dec, fn)
 		default:
 			// A manifest describes more than the segments it holds, and the
 			// rest of it changes without this package caring.
 			var skipped json.RawMessage
-			err = dec.Decode(&skipped)
+			err = decodeValue(dec, &skipped)
 		}
 
 		if err != nil {
-			return fmt.Errorf("%w: field %q: %w", ErrManifestUnusable, key, err)
+			return fmt.Errorf("field %q: %w", key, err)
 		}
 	}
 
-	return nil
+	// A manifest has to end where an object ends. A decoder walking the fields
+	// of one stops at the end of what it was given, so without this a manifest
+	// whose upload was interrupted halfway would read as a complete manifest
+	// that simply recorded fewer segments, which is the one thing a validator
+	// must not conclude on its own.
+	return expectDelim(dec, '}')
 }
 
 // decodeSegments walks the segment array of a manifest.
@@ -184,10 +189,12 @@ func decodeSegments(dec *json.Decoder, fn func(manifestSegment) error) error {
 	for dec.More() {
 		var seg manifestSegment
 
-		if err := dec.Decode(&seg); err != nil {
+		if err := decodeValue(dec, &seg); err != nil {
 			return err
 		}
 
+		// The error of the caller belongs to the caller, and is handed back as
+		// it is rather than as something wrong with the manifest.
 		if err := fn(seg); err != nil {
 			return err
 		}
@@ -198,12 +205,24 @@ func decodeSegments(dec *json.Decoder, fn func(manifestSegment) error) error {
 	return expectDelim(dec, ']')
 }
 
+// decodeValue reads one value of a manifest. A manifest that does not hold what
+// it says it holds cannot be turned into a list of segments, whichever of its
+// fields it broke on, so every way of failing to read one is reported as the
+// same thing.
+func decodeValue(dec *json.Decoder, v any) error {
+	if err := dec.Decode(v); err != nil {
+		return fmt.Errorf("%w: %w", ErrManifestUnusable, err)
+	}
+
+	return nil
+}
+
 // decodePartition reads the partition a manifest belongs to, which it writes as
 // a number, into the name of the directory holding that partition.
 func decodePartition(dec *json.Decoder, out *string) error {
 	var raw json.RawMessage
 
-	if err := dec.Decode(&raw); err != nil {
+	if err := decodeValue(dec, &raw); err != nil {
 		return err
 	}
 
@@ -215,14 +234,18 @@ func decodePartition(dec *json.Decoder, out *string) error {
 	}
 
 	// A manifest that names its partition directly is taken at its word.
-	return json.Unmarshal(raw, out)
+	if err := json.Unmarshal(raw, out); err != nil {
+		return fmt.Errorf("%w: %w", ErrManifestUnusable, err)
+	}
+
+	return nil
 }
 
 // readKey reads the name of the next field of an object.
 func readKey(dec *json.Decoder) (string, error) {
 	tok, err := dec.Token()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("%w: %w", ErrManifestUnusable, err)
 	}
 
 	key, ok := tok.(string)
@@ -238,7 +261,7 @@ func readKey(dec *json.Decoder) (string, error) {
 func expectDelim(dec *json.Decoder, want json.Delim) error {
 	tok, err := dec.Token()
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: expected %q: %w", ErrManifestUnusable, want, err)
 	}
 
 	if got, ok := tok.(json.Delim); !ok || got != want {

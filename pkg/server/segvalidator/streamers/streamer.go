@@ -278,7 +278,7 @@ func (s *Streamer) streamUnit(ctx context.Context, u *unit, out chan<- Segment) 
 		return s.streamUnrecorded(ctx, u, rec, out)
 	}
 
-	s.logger.WarnContext(ctx, "no manifest of the stream could be read, falling back to its data",
+	s.logger.WarnContext(ctx, "the manifests of the stream recorded no segment, falling back to its data",
 		slog.String("namespace", u.namespace),
 		slog.String("stream", string(u.stream)),
 		slog.String("manifests", u.manifests()),
@@ -577,13 +577,10 @@ func (s *Streamer) streamUnits(ctx context.Context, namespace string, stream Str
 		return nil, err
 	}
 
+	// A stream holding its data directory itself is one unit, whatever else it
+	// holds beside it.
 	if slices.Contains(children, dataDir) {
-		u, err := s.newUnit(ctx, namespace, stream, root)
-		if err != nil {
-			return nil, err
-		}
-
-		return []unit{u}, nil
+		return s.rootUnit(ctx, namespace, stream, root)
 	}
 
 	units := make([]unit, 0, len(children))
@@ -602,7 +599,7 @@ func (s *Streamer) streamUnits(ctx context.Context, namespace string, stream Str
 
 		// Anything else a stream directory may hold is not a unit and is left
 		// alone rather than guessed at.
-		if !slices.Contains(grandChildren, dataDir) {
+		if !isUnit(grandChildren) {
 			continue
 		}
 
@@ -614,7 +611,35 @@ func (s *Streamer) streamUnits(ctx context.Context, namespace string, stream Str
 		units = append(units, u)
 	}
 
+	// A stream that holds manifests and nothing a unit could be made of is one
+	// itself. That is what a namespace holding no records is backed up into,
+	// and it is also what is left of a stream whose data was lost: its
+	// manifests are then the only place the segments that are gone can still
+	// be found, so they are read rather than passed over. A stream whose nodes
+	// are the units is not one itself, whatever sits beside them.
+	if len(units) == 0 && slices.Contains(children, manifestDir) {
+		return s.rootUnit(ctx, namespace, stream, root)
+	}
+
 	return units, nil
+}
+
+// rootUnit is the single unit a stream that holds no directory per node is made
+// of.
+func (s *Streamer) rootUnit(ctx context.Context, namespace string, stream Stream, root string) ([]unit, error) {
+	u, err := s.newUnit(ctx, namespace, stream, root)
+	if err != nil {
+		return nil, err
+	}
+
+	return []unit{u}, nil
+}
+
+// isUnit reports whether a directory holding these is a unit of a backup: one
+// holding the segments of a stream, or the manifests describing segments that
+// are gone or were never written.
+func isUnit(children []string) bool {
+	return slices.Contains(children, dataDir) || slices.Contains(children, manifestDir)
 }
 
 // newUnit reads one level of the data directory of a unit, which tells how its

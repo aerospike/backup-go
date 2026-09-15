@@ -57,6 +57,12 @@ func (s *Streamer) StreamSample(ctx context.Context, n int, out chan<- Segment) 
 		return err
 	}
 
+	// A backup of a namespace that held no records has no unit to draw from,
+	// and a sample of nothing is nothing rather than a share of it.
+	if len(units) == 0 {
+		return nil
+	}
+
 	// The units are visited in a random order, so that a sample smaller than
 	// the backup is not always drawn from the same corner of it, and the
 	// widest of them is visited last, because it is the one able to make up

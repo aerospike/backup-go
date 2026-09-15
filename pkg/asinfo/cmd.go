@@ -61,7 +61,7 @@ const (
 
 	cmdServerBackup = "backup:namespace=%s;job-id=%s;object_storage_type=%s;s3-bucket=%s;" +
 		"s3-region=%s;s3-profile=%s;access-key=%s;secret-key=%s;s3-endpoint=%s;" +
-		"modified-before=%s;modified-after=%s;set=%s;no-indexes=%t;no-udfs=%t;enable-change-stream=%t"
+		"modified-before=%s;modified-after=%s;set-list=%s;no-indexes=%t;no-udfs=%t;enable-change-stream=%t"
 	cmdServerRestore = "restore:namespace=%s;job-id=%s;object_storage_type=%s;s3-bucket=%s;" +
 		"s3-region=%s;s3-profile=%s;access-key=%s;secret-key=%s;s3-endpoint=%s;fuzzy-restore=%t;path=%s"
 	cmdServerPrepareRestore = "prepare-restore:namespace=%s;job-id=%s;nodes=%s"

@@ -145,18 +145,32 @@ func TestDecodeManifest_Rejects(t *testing.T) {
 		name string
 		body string
 	}{
+		{name: "nothing at all", body: ""},
 		{name: "not json", body: "not a manifest"},
 		{name: "not an object", body: `["segments"]`},
 		{name: "truncated", body: `{"segments":[{"segment_name":"a.seg"`},
 		{name: "segments not an array", body: `{"segments":{"segment_name":"a.seg"}}`},
+		{
+			// A manifest whose upload was interrupted records segments that
+			// parse, and must not be read as one that recorded only those.
+			name: "unfinished past the segments",
+			body: `{"namespace":"ns1","segments":[{"segment_name":"a.seg","size":1}]`,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			if _, _, err := decodeAll(t, tt.body); err == nil {
+			_, _, err := decodeAll(t, tt.body)
+			if err == nil {
 				t.Fatal("decodeManifest() succeeded, want an error")
+			}
+
+			// A run reports an unusable manifest and carries on; anything else
+			// it takes for a storage that stopped answering and gives up on.
+			if !errors.Is(err, ErrManifestUnusable) {
+				t.Errorf("decodeManifest() error = %v, want ErrManifestUnusable", err)
 			}
 		})
 	}
@@ -175,6 +189,13 @@ func TestDecodeManifest_StopsOnTheCaller(t *testing.T) {
 
 	if !errors.Is(err, errStop) {
 		t.Fatalf("decodeManifest() error = %v, want the error of the caller", err)
+	}
+
+	// The error of the caller is not the manifest failing to be read: a run
+	// stopped by a canceled context must not come out of it holding a report
+	// of a corrupt backup.
+	if errors.Is(err, ErrManifestUnusable) {
+		t.Errorf("decodeManifest() error = %v, want the error of the caller alone", err)
 	}
 }
 
@@ -418,6 +439,7 @@ func TestDecodeManifest_RejectsBrokenFields(t *testing.T) {
 	}{
 		{name: "field name is not a string", body: `{1:2}`},
 		{name: "partition is unreadable", body: `{"partition_id":tru}`},
+		{name: "partition is neither a number nor a name", body: `{"partition_id":[935]}`},
 		{name: "field the manifest does not finish", body: `{"trailing":{"nested":`},
 	}
 
@@ -425,8 +447,13 @@ func TestDecodeManifest_RejectsBrokenFields(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			if _, _, err := decodeAll(t, tt.body); err == nil {
+			_, _, err := decodeAll(t, tt.body)
+			if err == nil {
 				t.Fatal("decodeManifest() succeeded, want an error")
+			}
+
+			if !errors.Is(err, ErrManifestUnusable) {
+				t.Errorf("decodeManifest() error = %v, want ErrManifestUnusable", err)
 			}
 		})
 	}

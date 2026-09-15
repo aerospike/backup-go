@@ -883,6 +883,90 @@ func TestStreamSample_NothingIsAskedFor(t *testing.T) {
 	}
 }
 
+// TestStreaming_StreamWithoutADataDirectory covers the two backups whose
+// streams hold manifests and no data: one of a namespace that held no records,
+// which recorded nothing, and one whose segments are gone, whose manifests
+// still promise them. A stream is not passed over for having no data
+// directory, because its manifests are the only place a segment that is no
+// longer there can still be found.
+func TestStreaming_StreamWithoutADataDirectory(t *testing.T) {
+	t.Parallel()
+
+	empty := newTestBackupTree(t, 0, 0, 0, 0)
+	for p := range 3 {
+		empty.queryPartition(testNS, p, 0)
+	}
+
+	lost := newTestBackupTree(t, 3, 2, 0, 0)
+	for _, seg := range lost.segments() {
+		lost.remove(seg)
+	}
+
+	// A change stream keeps a directory per node, so the same stream with no
+	// data hangs one level deeper.
+	lostNode := newTestBackupTree(t, 0, 0, 1, 2)
+	for _, seg := range lostNode.segments() {
+		lostNode.remove(seg)
+	}
+
+	tests := []struct {
+		backup    *testBackup
+		name      string
+		want      []string
+		manifests int64
+	}{
+		{name: "recorded nothing", backup: empty, want: nil, manifests: 3},
+		{name: "data is gone", backup: lost, want: lost.recordedSegments(), manifests: 3},
+		{name: "data of a node is gone", backup: lostNode, want: lostNode.recordedSegments(), manifests: 1},
+	}
+
+	for _, tt := range tests {
+		for _, tc := range storesOf(t, tt.backup) {
+			t.Run(tt.name+"/"+tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				s := newTestStreamer(t, tc.store)
+
+				segments := collect(t, func(out chan<- Segment) error {
+					return s.StreamAll(t.Context(), out)
+				})
+
+				if got := paths(segments); !slices.Equal(got, tt.want) {
+					t.Fatalf("streamed %v, want the segments the manifests name %v", got, tt.want)
+				}
+
+				// The manifests were read, whether or not they led anywhere,
+				// which is what tells a backup holding nothing from a backup
+				// id nothing was written under.
+				if stats := s.Stats(); stats.ManifestsRead != tt.manifests || stats.Namespaces != 1 {
+					t.Errorf("stats = %+v, want the %d manifests of the one namespace read",
+						stats, tt.manifests)
+				}
+			})
+		}
+	}
+}
+
+func TestStreamSample_BackupHoldingNothing(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range storesOf(t, newTestBackupTree(t, 0, 0, 0, 0)) {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			s := newTestStreamer(t, tc.store)
+
+			segments := collect(t, func(out chan<- Segment) error {
+				return s.StreamSample(t.Context(), 10_000, out)
+			})
+
+			if len(segments) != 0 {
+				t.Fatalf("a backup holding nothing sampled %d segments", len(segments))
+			}
+		})
+	}
+}
+
 func TestStreamSample_FallsBackToTheDataOfAStreamWithoutManifests(t *testing.T) {
 	t.Parallel()
 
@@ -961,6 +1045,55 @@ func TestStreamSample_UnusableManifestIsReported(t *testing.T) {
 				t.Errorf("issue error = %v, want ErrManifestUnusable", issue.Err)
 			}
 		})
+	}
+}
+
+// TestStreaming_EmptyManifestIsReported covers the manifest an interrupted
+// flush leaves behind: a zero sized object where a manifest should be. Reading
+// one fails on the very first token, which is the failure furthest from
+// anything a manifest says, and it still has to be a finding about the backup
+// rather than the end of the run.
+func TestStreaming_EmptyManifestIsReported(t *testing.T) {
+	t.Parallel()
+
+	b := newTestBackupTree(t, 2, 2, 0, 0)
+	b.put(b.manifestPath(0), nil)
+
+	runs := map[string]func(*Streamer, chan<- Segment) error{
+		"sample": func(s *Streamer, out chan<- Segment) error {
+			return s.StreamSample(t.Context(), 4, out)
+		},
+		"all": func(s *Streamer, out chan<- Segment) error {
+			return s.StreamAll(t.Context(), out)
+		},
+	}
+
+	for _, tc := range storesOf(t, b) {
+		for name, run := range runs {
+			t.Run(tc.name+"/"+name, func(t *testing.T) {
+				t.Parallel()
+
+				s := newTestStreamer(t, tc.store)
+
+				segments := collect(t, func(out chan<- Segment) error {
+					return run(s, out)
+				})
+
+				if len(segments) == 0 {
+					t.Fatal("an empty manifest left the run with nothing, want the rest of the backup")
+				}
+
+				stats := s.Stats()
+
+				if stats.ManifestsFailed != 1 || len(stats.ManifestIssues) != 1 {
+					t.Fatalf("stats = %+v, want the empty manifest to be reported", stats)
+				}
+
+				if !errors.Is(stats.ManifestIssues[0].Err, ErrManifestUnusable) {
+					t.Errorf("issue error = %v, want ErrManifestUnusable", stats.ManifestIssues[0].Err)
+				}
+			})
+		}
 	}
 }
 

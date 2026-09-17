@@ -41,9 +41,10 @@ type ClusterInfo interface {
 
 // ServerBackupInfo provides server-side backup and restore job control.
 type ServerBackupInfo interface {
-	StartServerBackup(ctx context.Context, request *infomodels.RequestBackup) (string, error)
-	StartServerRestore(ctx context.Context, request *infomodels.RequestRestore) error
-	PrepareServerRestore(ctx context.Context, jobID, namespace string) error
+	StartBackup(ctx context.Context, request *infomodels.RequestBackup) (string, error)
+	StartRestore(ctx context.Context, request *infomodels.RequestRestore) error
+	PrepareRestore(ctx context.Context, jobID, namespace string) error
 	GetBackupStatus(ctx context.Context, jobID string) (*infomodels.ResponseBackupState, error)
 	GetRestoreStatus(ctx context.Context, namespace string) (string, error)
+	AbortBackup(ctx context.Context, backupID string) error
 }

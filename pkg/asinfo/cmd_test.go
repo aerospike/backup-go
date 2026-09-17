@@ -33,7 +33,7 @@ func TestNewCmdDict(t *testing.T) {
 		{
 			name:           "version less than versionLast uses deprecated commands",
 			version:        infomodels.AerospikeVersionSupportsSIndexContext,
-			expectedLength: commandsNumber - 5, // @ new commands are for new version only
+			expectedLength: commandsNumber - 6, // @ new commands are for new version only
 			expectedCmds: map[int]string{
 				cmdIDBuild:           cmdBuild,
 				cmdIDStatus:          cmdStatus,
@@ -78,6 +78,7 @@ func TestNewCmdDict(t *testing.T) {
 				cmdIDServerPrepareRestore: cmdServerPrepareRestore,
 				cmdIDRestoreStatus:        cmdRestoreStatus,
 				cmdIDBackupStatus:         cmdBackupStatus,
+				cmdIDBackupAbort:          cmdBackupAbort,
 			},
 		},
 	}

@@ -258,7 +258,7 @@ func Test_StartServer_DoesNotLeakSecretKey(t *testing.T) {
 			logger: slog.Default(),
 			buf:    &defaultBuf,
 			run: func(ic *Client) error {
-				_, err := ic.StartServerBackup(t.Context(), &infomodels.RequestBackup{RequestCommon: common})
+				_, err := ic.StartBackup(t.Context(), &infomodels.RequestBackup{RequestCommon: common})
 				return err
 			},
 		},
@@ -267,7 +267,7 @@ func Test_StartServer_DoesNotLeakSecretKey(t *testing.T) {
 			logger: slog.New(slog.NewTextHandler(&infoBuf, &slog.HandlerOptions{Level: slog.LevelInfo})),
 			buf:    &infoBuf,
 			run: func(ic *Client) error {
-				_, err := ic.StartServerBackup(t.Context(), &infomodels.RequestBackup{RequestCommon: common})
+				_, err := ic.StartBackup(t.Context(), &infomodels.RequestBackup{RequestCommon: common})
 				return err
 			},
 		},
@@ -276,7 +276,7 @@ func Test_StartServer_DoesNotLeakSecretKey(t *testing.T) {
 			logger: slog.New(slog.NewTextHandler(&debugBuf, &slog.HandlerOptions{Level: slog.LevelDebug})),
 			buf:    &debugBuf,
 			run: func(ic *Client) error {
-				return ic.StartServerRestore(t.Context(), &infomodels.RequestRestore{
+				return ic.StartRestore(t.Context(), &infomodels.RequestRestore{
 					RequestCommon: common,
 					JobID:         testRedactJobID,
 				})

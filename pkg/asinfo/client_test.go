@@ -1910,6 +1910,31 @@ func TestClient_GetBackupStatus(t *testing.T) {
 	require.ErrorIs(t, err, ErrNotFound)
 }
 
+func TestClient_AbortServerBackup(t *testing.T) {
+	t.Parallel()
+
+	const testBackupID = "523607479"
+
+	// The command sent to the principal must carry the job being aborted.
+	ic := newClient(mocks.NewMockNodeGetter(t), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	require.Equal(t,
+		"backup-abort:job-id="+testBackupID,
+		fmt.Sprintf(ic.cmdDict[cmdIDBackupAbort], testBackupID),
+	)
+
+	// The principal is needed before the abort can be sent, so a cluster that
+	// hands out no node must surface as an Aerospike-class error.
+	mockNodeGetter := mocks.NewMockNodeGetter(t)
+	mockNodeGetter.EXPECT().GetRandomNode().Return(nil, a.ErrInvalidParam).Maybe()
+
+	ic = newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewRetryPolicy(0, 1, 1))
+
+	err := ic.AbortBackup(t.Context(), testBackupID)
+
+	require.ErrorIs(t, err, errclass.ErrAerospike)
+	require.ErrorContains(t, err, "failed to get cluster principal")
+}
+
 // backupJob builds a minimal InfoMap representing a backup job.
 func backupJob(trid, timeSinceDone, progress, pids string) infomodels.InfoMap {
 	return infomodels.InfoMap{

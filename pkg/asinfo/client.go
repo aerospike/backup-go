@@ -655,8 +655,8 @@ func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
 	return bitMapToIntSlice(bitMap), nil
 }
 
-// StartServerBackup starts a backup job on the server.
-func (ic *Client) StartServerBackup(ctx context.Context, request *infomodels.RequestBackup) (string, error) {
+// StartBackup starts a backup job on the server.
+func (ic *Client) StartBackup(ctx context.Context, request *infomodels.RequestBackup) (string, error) {
 	cNow := cltime.Now()
 	jobID := cNow.String()
 
@@ -699,8 +699,31 @@ func (ic *Client) StartServerBackup(ctx context.Context, request *infomodels.Req
 	return jobID, err
 }
 
-// StartServerRestore starts a restore job on the server.
-func (ic *Client) StartServerRestore(ctx context.Context, request *infomodels.RequestRestore) error {
+// BackupAbort aborts the backup job identified by backupID on the server.
+func (ic *Client) AbortBackup(ctx context.Context, backupID string) error {
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDBackupAbort], backupID)
+
+	return executeWithRetry(ctx, ic.retryPolicy, func() error {
+		principal, err := ic.getPrincipal(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get cluster principal: %w", err)
+		}
+
+		resp, err := ic.requestByNode(principal, cmd)
+		if err != nil {
+			return fmt.Errorf("failed abort backup: %w", err)
+		}
+
+		if _, err = parseResultResponse(cmd, resp); err != nil {
+			return fmt.Errorf("failed to parse abort backup response: %w", err)
+		}
+
+		return nil
+	})
+}
+
+// StartRestore starts a restore job on the server.
+func (ic *Client) StartRestore(ctx context.Context, request *infomodels.RequestRestore) error {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerRestore],
 		request.Namespace,
 		request.JobID,
@@ -736,8 +759,8 @@ func (ic *Client) StartServerRestore(ctx context.Context, request *infomodels.Re
 	return err
 }
 
-// PrepareServerRestore starts a restore preparation on the server.
-func (ic *Client) PrepareServerRestore(ctx context.Context, jobID, namespace string) error {
+// PrepareRestore starts a restore preparation on the server.
+func (ic *Client) PrepareRestore(ctx context.Context, jobID, namespace string) error {
 	allNodes := ic.getNodesString()
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerPrepareRestore], namespace, jobID, allNodes)
 

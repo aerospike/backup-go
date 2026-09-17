@@ -39,6 +39,63 @@ func (_m *MockInfoGetter) EXPECT() *MockInfoGetter_Expecter {
 	return &MockInfoGetter_Expecter{mock: &_m.Mock}
 }
 
+// AbortBackup provides a mock function for the type MockInfoGetter
+func (_mock *MockInfoGetter) AbortBackup(ctx context.Context, backupID string) error {
+	ret := _mock.Called(ctx, backupID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AbortBackup")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = returnFunc(ctx, backupID)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockInfoGetter_AbortBackup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AbortBackup'
+type MockInfoGetter_AbortBackup_Call struct {
+	*mock.Call
+}
+
+// AbortBackup is a helper method to define mock.On call
+//   - ctx context.Context
+//   - backupID string
+func (_e *MockInfoGetter_Expecter) AbortBackup(ctx any, backupID any) *MockInfoGetter_AbortBackup_Call {
+	return &MockInfoGetter_AbortBackup_Call{Call: _e.mock.On("AbortBackup", ctx, backupID)}
+}
+
+func (_c *MockInfoGetter_AbortBackup_Call) Run(run func(ctx context.Context, backupID string)) *MockInfoGetter_AbortBackup_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockInfoGetter_AbortBackup_Call) Return(err error) *MockInfoGetter_AbortBackup_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockInfoGetter_AbortBackup_Call) RunAndReturn(run func(ctx context.Context, backupID string) error) *MockInfoGetter_AbortBackup_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetBackupStatus provides a mock function for the type MockInfoGetter
 func (_mock *MockInfoGetter) GetBackupStatus(ctx context.Context, jobID string) (*models.ResponseBackupState, error) {
 	ret := _mock.Called(ctx, jobID)
@@ -1031,12 +1088,12 @@ func (_c *MockInfoGetter_GetVersion_Call) RunAndReturn(run func(ctx context.Cont
 	return _c
 }
 
-// PrepareServerRestore provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) PrepareServerRestore(ctx context.Context, jobID string, namespace string) error {
+// PrepareRestore provides a mock function for the type MockInfoGetter
+func (_mock *MockInfoGetter) PrepareRestore(ctx context.Context, jobID string, namespace string) error {
 	ret := _mock.Called(ctx, jobID, namespace)
 
 	if len(ret) == 0 {
-		panic("no return value specified for PrepareServerRestore")
+		panic("no return value specified for PrepareRestore")
 	}
 
 	var r0 error
@@ -1048,20 +1105,20 @@ func (_mock *MockInfoGetter) PrepareServerRestore(ctx context.Context, jobID str
 	return r0
 }
 
-// MockInfoGetter_PrepareServerRestore_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PrepareServerRestore'
-type MockInfoGetter_PrepareServerRestore_Call struct {
+// MockInfoGetter_PrepareRestore_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PrepareRestore'
+type MockInfoGetter_PrepareRestore_Call struct {
 	*mock.Call
 }
 
-// PrepareServerRestore is a helper method to define mock.On call
+// PrepareRestore is a helper method to define mock.On call
 //   - ctx context.Context
 //   - jobID string
 //   - namespace string
-func (_e *MockInfoGetter_Expecter) PrepareServerRestore(ctx any, jobID any, namespace any) *MockInfoGetter_PrepareServerRestore_Call {
-	return &MockInfoGetter_PrepareServerRestore_Call{Call: _e.mock.On("PrepareServerRestore", ctx, jobID, namespace)}
+func (_e *MockInfoGetter_Expecter) PrepareRestore(ctx any, jobID any, namespace any) *MockInfoGetter_PrepareRestore_Call {
+	return &MockInfoGetter_PrepareRestore_Call{Call: _e.mock.On("PrepareRestore", ctx, jobID, namespace)}
 }
 
-func (_c *MockInfoGetter_PrepareServerRestore_Call) Run(run func(ctx context.Context, jobID string, namespace string)) *MockInfoGetter_PrepareServerRestore_Call {
+func (_c *MockInfoGetter_PrepareRestore_Call) Run(run func(ctx context.Context, jobID string, namespace string)) *MockInfoGetter_PrepareRestore_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1084,22 +1141,22 @@ func (_c *MockInfoGetter_PrepareServerRestore_Call) Run(run func(ctx context.Con
 	return _c
 }
 
-func (_c *MockInfoGetter_PrepareServerRestore_Call) Return(err error) *MockInfoGetter_PrepareServerRestore_Call {
+func (_c *MockInfoGetter_PrepareRestore_Call) Return(err error) *MockInfoGetter_PrepareRestore_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockInfoGetter_PrepareServerRestore_Call) RunAndReturn(run func(ctx context.Context, jobID string, namespace string) error) *MockInfoGetter_PrepareServerRestore_Call {
+func (_c *MockInfoGetter_PrepareRestore_Call) RunAndReturn(run func(ctx context.Context, jobID string, namespace string) error) *MockInfoGetter_PrepareRestore_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// StartServerBackup provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) StartServerBackup(ctx context.Context, request *models.RequestBackup) (string, error) {
+// StartBackup provides a mock function for the type MockInfoGetter
+func (_mock *MockInfoGetter) StartBackup(ctx context.Context, request *models.RequestBackup) (string, error) {
 	ret := _mock.Called(ctx, request)
 
 	if len(ret) == 0 {
-		panic("no return value specified for StartServerBackup")
+		panic("no return value specified for StartBackup")
 	}
 
 	var r0 string
@@ -1120,19 +1177,19 @@ func (_mock *MockInfoGetter) StartServerBackup(ctx context.Context, request *mod
 	return r0, r1
 }
 
-// MockInfoGetter_StartServerBackup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StartServerBackup'
-type MockInfoGetter_StartServerBackup_Call struct {
+// MockInfoGetter_StartBackup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StartBackup'
+type MockInfoGetter_StartBackup_Call struct {
 	*mock.Call
 }
 
-// StartServerBackup is a helper method to define mock.On call
+// StartBackup is a helper method to define mock.On call
 //   - ctx context.Context
 //   - request *models.RequestBackup
-func (_e *MockInfoGetter_Expecter) StartServerBackup(ctx any, request any) *MockInfoGetter_StartServerBackup_Call {
-	return &MockInfoGetter_StartServerBackup_Call{Call: _e.mock.On("StartServerBackup", ctx, request)}
+func (_e *MockInfoGetter_Expecter) StartBackup(ctx any, request any) *MockInfoGetter_StartBackup_Call {
+	return &MockInfoGetter_StartBackup_Call{Call: _e.mock.On("StartBackup", ctx, request)}
 }
 
-func (_c *MockInfoGetter_StartServerBackup_Call) Run(run func(ctx context.Context, request *models.RequestBackup)) *MockInfoGetter_StartServerBackup_Call {
+func (_c *MockInfoGetter_StartBackup_Call) Run(run func(ctx context.Context, request *models.RequestBackup)) *MockInfoGetter_StartBackup_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1150,22 +1207,22 @@ func (_c *MockInfoGetter_StartServerBackup_Call) Run(run func(ctx context.Contex
 	return _c
 }
 
-func (_c *MockInfoGetter_StartServerBackup_Call) Return(s string, err error) *MockInfoGetter_StartServerBackup_Call {
+func (_c *MockInfoGetter_StartBackup_Call) Return(s string, err error) *MockInfoGetter_StartBackup_Call {
 	_c.Call.Return(s, err)
 	return _c
 }
 
-func (_c *MockInfoGetter_StartServerBackup_Call) RunAndReturn(run func(ctx context.Context, request *models.RequestBackup) (string, error)) *MockInfoGetter_StartServerBackup_Call {
+func (_c *MockInfoGetter_StartBackup_Call) RunAndReturn(run func(ctx context.Context, request *models.RequestBackup) (string, error)) *MockInfoGetter_StartBackup_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// StartServerRestore provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) StartServerRestore(ctx context.Context, request *models.RequestRestore) error {
+// StartRestore provides a mock function for the type MockInfoGetter
+func (_mock *MockInfoGetter) StartRestore(ctx context.Context, request *models.RequestRestore) error {
 	ret := _mock.Called(ctx, request)
 
 	if len(ret) == 0 {
-		panic("no return value specified for StartServerRestore")
+		panic("no return value specified for StartRestore")
 	}
 
 	var r0 error
@@ -1177,19 +1234,19 @@ func (_mock *MockInfoGetter) StartServerRestore(ctx context.Context, request *mo
 	return r0
 }
 
-// MockInfoGetter_StartServerRestore_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StartServerRestore'
-type MockInfoGetter_StartServerRestore_Call struct {
+// MockInfoGetter_StartRestore_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StartRestore'
+type MockInfoGetter_StartRestore_Call struct {
 	*mock.Call
 }
 
-// StartServerRestore is a helper method to define mock.On call
+// StartRestore is a helper method to define mock.On call
 //   - ctx context.Context
 //   - request *models.RequestRestore
-func (_e *MockInfoGetter_Expecter) StartServerRestore(ctx any, request any) *MockInfoGetter_StartServerRestore_Call {
-	return &MockInfoGetter_StartServerRestore_Call{Call: _e.mock.On("StartServerRestore", ctx, request)}
+func (_e *MockInfoGetter_Expecter) StartRestore(ctx any, request any) *MockInfoGetter_StartRestore_Call {
+	return &MockInfoGetter_StartRestore_Call{Call: _e.mock.On("StartRestore", ctx, request)}
 }
 
-func (_c *MockInfoGetter_StartServerRestore_Call) Run(run func(ctx context.Context, request *models.RequestRestore)) *MockInfoGetter_StartServerRestore_Call {
+func (_c *MockInfoGetter_StartRestore_Call) Run(run func(ctx context.Context, request *models.RequestRestore)) *MockInfoGetter_StartRestore_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1207,12 +1264,12 @@ func (_c *MockInfoGetter_StartServerRestore_Call) Run(run func(ctx context.Conte
 	return _c
 }
 
-func (_c *MockInfoGetter_StartServerRestore_Call) Return(err error) *MockInfoGetter_StartServerRestore_Call {
+func (_c *MockInfoGetter_StartRestore_Call) Return(err error) *MockInfoGetter_StartRestore_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockInfoGetter_StartServerRestore_Call) RunAndReturn(run func(ctx context.Context, request *models.RequestRestore) error) *MockInfoGetter_StartServerRestore_Call {
+func (_c *MockInfoGetter_StartRestore_Call) RunAndReturn(run func(ctx context.Context, request *models.RequestRestore) error) *MockInfoGetter_StartRestore_Call {
 	_c.Call.Return(run)
 	return _c
 }

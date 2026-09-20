@@ -18,10 +18,8 @@ import (
 	"context"
 	"errors"
 	"io"
-	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/aerospike/backup-go/pkg/server/lister/mocks"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -33,17 +31,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Folder names used across tests. All are valid Citrusleaf timestamps:
-// > minCitrusleafTS and comfortably below the "now" upper bound for years.
+// Snapshot folder names used across tests. All have the job id form.
 const (
-	ts200 = "200000000"
-	ts300 = "300000000"
-	ts400 = "400000000"
+	jobID1 = "260316T142035-k3f9"
+	jobID2 = "260316T142036-a001"
+	jobID3 = "260317T090000-zzzz"
 )
 
 const (
 	testMetadataFile = "metadata.json"
-	testPrefix       = "backups/1758000000"
+	testPrefix       = "backups/" + jobID1
+	testBackupID     = "b1"
 )
 
 // listOutput builds a single-page ListObjectsV2 result from common prefixes.
@@ -70,18 +68,18 @@ func TestLister_FetchAllMetadata_SortedByBackupID(t *testing.T) {
 	m := mocks.NewMockS3API(t)
 
 	m.EXPECT().ListObjectsV2(mock.Anything, mock.Anything, mock.Anything).
-		Return(listOutput(ts200+"/", ts300+"/", ts400+"/"), nil)
+		Return(listOutput(jobID1+"/", jobID2+"/", jobID3+"/"), nil)
 
 	// BackupID order is deliberately unrelated to folder order, so the assertion
 	// can only pass if the final slice is sorted by BackupID.
 	m.EXPECT().GetObject(mock.Anything, mock.Anything).RunAndReturn(
 		func(_ context.Context, in *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
 			switch *in.Key {
-			case ts200 + "/metadata.json":
+			case jobID1 + "/metadata.json":
 				return objectBody(metadataJSON("b3")), nil
-			case ts300 + "/metadata.json":
+			case jobID2 + "/metadata.json":
 				return objectBody(metadataJSON("b1")), nil
-			case ts400 + "/metadata.json":
+			case jobID3 + "/metadata.json":
 				return objectBody(metadataJSON("b2")), nil
 			default:
 				return nil, &types.NoSuchKey{}
@@ -102,14 +100,14 @@ func TestLister_FetchAllMetadata_SkipsUnfinishedBackup(t *testing.T) {
 	m := mocks.NewMockS3API(t)
 
 	m.EXPECT().ListObjectsV2(mock.Anything, mock.Anything, mock.Anything).
-		Return(listOutput(ts200+"/", ts300+"/"), nil)
+		Return(listOutput(jobID1+"/", jobID2+"/"), nil)
 
 	m.EXPECT().GetObject(mock.Anything, mock.Anything).RunAndReturn(
 		func(_ context.Context, in *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
-			if *in.Key == ts200+"/metadata.json" {
-				return objectBody(metadataJSON("b200")), nil
+			if *in.Key == jobID1+"/metadata.json" {
+				return objectBody(metadataJSON(testBackupID)), nil
 			}
-			// ts300 has no metadata.json -> unfinished backup, must be skipped.
+			// jobID2 has no metadata.json -> unfinished backup, must be skipped.
 			return nil, &types.NoSuchKey{}
 		})
 
@@ -118,19 +116,19 @@ func TestLister_FetchAllMetadata_SkipsUnfinishedBackup(t *testing.T) {
 	got, err := l.FetchAllMetadata(t.Context())
 	require.NoError(t, err)
 	require.Len(t, got, 1)
-	assert.Equal(t, "b200", got[0].BackupID)
+	assert.Equal(t, testBackupID, got[0].BackupID)
 }
 
 func TestLister_FetchAllMetadata_SkipsUnparseableMetadata(t *testing.T) {
 	m := mocks.NewMockS3API(t)
 
 	m.EXPECT().ListObjectsV2(mock.Anything, mock.Anything, mock.Anything).
-		Return(listOutput(ts200+"/", ts300+"/"), nil)
+		Return(listOutput(jobID1+"/", jobID2+"/"), nil)
 
 	m.EXPECT().GetObject(mock.Anything, mock.Anything).RunAndReturn(
 		func(_ context.Context, in *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
-			if *in.Key == ts200+"/metadata.json" {
-				return objectBody(metadataJSON("b200")), nil
+			if *in.Key == jobID1+"/metadata.json" {
+				return objectBody(metadataJSON(testBackupID)), nil
 			}
 			// Corrupt JSON -> logged at WARN and skipped, never fails the listing.
 			return objectBody("{not valid json"), nil
@@ -141,23 +139,23 @@ func TestLister_FetchAllMetadata_SkipsUnparseableMetadata(t *testing.T) {
 	got, err := l.FetchAllMetadata(t.Context())
 	require.NoError(t, err)
 	require.Len(t, got, 1)
-	assert.Equal(t, "b200", got[0].BackupID)
+	assert.Equal(t, testBackupID, got[0].BackupID)
 }
 
 func TestLister_FetchAllMetadata_FiltersNonSnapshotPrefixes(t *testing.T) {
 	m := mocks.NewMockS3API(t)
 
-	// "logs/" and "100/" (below minCitrusleafTS) are not snapshots and must be
-	// filtered out before any GetObject call.
+	// "logs/" and "100/" do not have the job id form, so they are not snapshots and
+	// must be filtered out before any GetObject call.
 	m.EXPECT().ListObjectsV2(mock.Anything, mock.Anything, mock.Anything).
-		Return(listOutput("logs/", "100/", ts200+"/"), nil)
+		Return(listOutput("logs/", "100/", jobID1+"/"), nil)
 
 	m.EXPECT().GetObject(mock.Anything, mock.Anything).RunAndReturn(
 		func(_ context.Context, in *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
-			if !strings.HasPrefix(*in.Key, ts200) {
+			if !strings.HasPrefix(*in.Key, jobID1) {
 				t.Errorf("unexpected fetch of non-snapshot prefix: %q", *in.Key)
 			}
-			return objectBody(metadataJSON("b200")), nil
+			return objectBody(metadataJSON(testBackupID)), nil
 		})
 
 	l := NewLister(m, "bucket", "")
@@ -165,7 +163,7 @@ func TestLister_FetchAllMetadata_FiltersNonSnapshotPrefixes(t *testing.T) {
 	got, err := l.FetchAllMetadata(t.Context())
 	require.NoError(t, err)
 	require.Len(t, got, 1)
-	assert.Equal(t, "b200", got[0].BackupID)
+	assert.Equal(t, testBackupID, got[0].BackupID)
 }
 
 func TestLister_FetchAllMetadata_EmptyListing(t *testing.T) {
@@ -201,7 +199,7 @@ func TestLister_FetchAllMetadata_CancellationReturnsError(t *testing.T) {
 
 	m := mocks.NewMockS3API(t)
 	m.EXPECT().ListObjectsV2(mock.Anything, mock.Anything, mock.Anything).
-		Return(listOutput(ts200+"/"), nil)
+		Return(listOutput(jobID1+"/"), nil)
 
 	// Cancel mid-fetch: the operation must abort with an error, not return a
 	// partial (possibly empty) slice and a nil error.
@@ -224,17 +222,17 @@ func TestLister_GetMetadata(t *testing.T) {
 
 	m.EXPECT().GetObject(mock.Anything, mock.Anything).RunAndReturn(
 		func(_ context.Context, in *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
-			if *in.Key == ts200+"/metadata.json" {
-				return objectBody(metadataJSON("b200")), nil
+			if *in.Key == jobID1+"/metadata.json" {
+				return objectBody(metadataJSON(testBackupID)), nil
 			}
 			return nil, &types.NoSuchKey{}
 		})
 
 	l := NewLister(m, "bucket", "")
 
-	md, err := l.GetMetadata(t.Context(), ts200)
+	md, err := l.GetMetadata(t.Context(), jobID1)
 	require.NoError(t, err)
-	assert.Equal(t, "b200", md.BackupID)
+	assert.Equal(t, testBackupID, md.BackupID)
 
 	_, err = l.GetMetadata(t.Context(), "missing")
 	require.Error(t, err)
@@ -265,28 +263,57 @@ func TestIsNotFound(t *testing.T) {
 	}
 }
 
-func TestParseCitrusleafTimestamp(t *testing.T) {
-	upper := (time.Now().Unix() - citrusleafEpoch) + clockSkewSeconds
+func TestLister_listSnapshotPrefixes(t *testing.T) {
+	t.Parallel()
+
+	const listerPrefix = "backups/"
 
 	tests := []struct {
-		name string
-		in   string
-		want int64
-		ok   bool
+		name           string
+		prefix         string
+		commonPrefixes []string
+		want           []string
 	}{
-		{"non-numeric", "abc", 0, false},
-		{"below min", "100", 0, false},
-		{"exactly min", strconv.FormatInt(minCitrusleafTS, 10), minCitrusleafTS, true},
-		{"mid range", ts300, 300000000, true},
-		{"exactly upper", strconv.FormatInt(upper, 10), upper, true},
-		{"above upper", strconv.FormatInt(upper+1, 10), 0, false},
-		{"empty", "", 0, false},
+		{
+			name:           "job id folders are kept",
+			commonPrefixes: []string{jobID1 + "/", jobID2 + "/", jobID3 + "/"},
+			want:           []string{jobID1, jobID2, jobID3},
+		},
+		{
+			name:           "citrusleaf timestamp folders are skipped",
+			commonPrefixes: []string{"200000000/", "1758000000/"},
+			want:           nil,
+		},
+		{
+			name:           "malformed job ids are skipped",
+			commonPrefixes: []string{"260316T142035/", "260316T142035-K3F9/", "260316T142035-k3f/", "logs/"},
+			want:           nil,
+		},
+		{
+			name:           "lister prefix is stripped before matching and kept in the result",
+			prefix:         listerPrefix,
+			commonPrefixes: []string{listerPrefix + jobID1 + "/", listerPrefix + "logs/"},
+			want:           []string{listerPrefix + jobID1},
+		},
+		{
+			name:           "empty listing",
+			commonPrefixes: nil,
+			want:           nil,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, ok := parseCitrusleafTimestamp(tt.in)
-			assert.Equal(t, tt.ok, ok)
+			t.Parallel()
+
+			m := mocks.NewMockS3API(t)
+			m.EXPECT().ListObjectsV2(mock.Anything, mock.Anything, mock.Anything).
+				Return(listOutput(tt.commonPrefixes...), nil)
+
+			l := NewLister(m, "bucket", tt.prefix)
+
+			got, err := l.listSnapshotPrefixes(t.Context())
+			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})
 	}

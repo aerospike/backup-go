@@ -15,6 +15,7 @@
 package asinfo
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -2126,4 +2127,87 @@ func TestClient_getBackupStatusByNode_RequestInfoError(t *testing.T) {
 	require.Error(t, err)
 
 	assert.Contains(t, err.Error(), "failed to get backup status")
+}
+
+// TestClient_RetriesAreNotNested guards the commands that look the cluster principal
+// up before sending their own command. Both the lookup and the command used to be
+// retried separately, which multiplied the attempts and the total backoff.
+func TestClient_RetriesAreNotNested(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testMaxRetries = 3
+		testJobID      = "523607479"
+		testNamespace  = "test"
+	)
+
+	tests := []struct {
+		name string
+		call func(ctx context.Context, ic *Client) error
+	}{
+		{
+			name: "StartBackup",
+			call: func(ctx context.Context, ic *Client) error {
+				_, err := ic.StartBackup(ctx, &infomodels.RequestBackup{
+					RequestCommon: infomodels.RequestCommon{Namespace: testNamespace},
+				})
+
+				return err
+			},
+		},
+		{
+			name: "StartRestore",
+			call: func(ctx context.Context, ic *Client) error {
+				return ic.StartRestore(ctx, &infomodels.RequestRestore{
+					RequestCommon: infomodels.RequestCommon{Namespace: testNamespace},
+					JobID:         testJobID,
+				})
+			},
+		},
+		{
+			name: "PrepareRestore",
+			call: func(ctx context.Context, ic *Client) error {
+				return ic.PrepareRestore(ctx, testJobID, testNamespace)
+			},
+		},
+		{
+			name: "AbortBackup",
+			call: func(ctx context.Context, ic *Client) error {
+				return ic.AbortBackup(ctx, testJobID)
+			},
+		},
+		{
+			name: "GetClusterStable",
+			call: func(ctx context.Context, ic *Client) error {
+				_, err := ic.GetClusterStable(ctx, testNamespace)
+
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var attempts int
+
+			mockNodeGetter := mocks.NewMockNodeGetter(t)
+			mockNodeGetter.EXPECT().GetRandomNode().RunAndReturn(func() (*a.Node, a.Error) {
+				attempts++
+
+				return nil, a.ErrInvalidParam
+			})
+			// PrepareRestore and GetClusterStable read the node list before asking
+			// for the principal. A single inactive node keeps them going.
+			mockNodeGetter.EXPECT().GetNodes().Return([]*a.Node{{}}).Maybe()
+
+			ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewRetryPolicy(0, 1, testMaxRetries))
+
+			err := tt.call(t.Context(), ic)
+
+			require.ErrorIs(t, err, errclass.ErrAerospike)
+			require.Equal(t, testMaxRetries, attempts)
+		})
+	}
 }

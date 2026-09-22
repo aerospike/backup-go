@@ -218,9 +218,7 @@ func TestClient_getClusterStable(t *testing.T) {
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
 
-	ctx := t.Context()
-
-	_, err = ic.getClusterStable(ctx, testASNamespace)
+	_, err = ic.getClusterStable(testASNamespace)
 	require.NoError(t, err)
 }
 
@@ -233,9 +231,7 @@ func TestClient_getStatistics(t *testing.T) {
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
 
-	ctx := t.Context()
-
-	_, err = ic.getStatistics(ctx)
+	_, err = ic.getStatistics()
 	require.NoError(t, err)
 }
 
@@ -248,8 +244,6 @@ func TestClient_getPrincipal(t *testing.T) {
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
 
-	ctx := t.Context()
-
-	_, err = ic.getPrincipal(ctx)
+	_, err = ic.getPrincipal()
 	require.NoError(t, err)
 }

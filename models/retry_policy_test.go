@@ -341,6 +341,21 @@ func TestRetryPolicy_Do(t *testing.T) {
 			wantErr:       true,
 			wantCallCount: 1,
 		},
+		{
+			// A zero base timeout is valid and means immediate retries. It must
+			// still go through the backoff sleep without panicking.
+			name:   "zero base timeout retries immediately",
+			policy: NewRetryPolicy(0, 1.0, testMaxRetries),
+			operation: func() (callCount *int, operation func() error) {
+				count := 0
+				return &count, func() error {
+					count++
+					return errors.New("persistent error")
+				}
+			},
+			wantErr:       true,
+			wantCallCount: testMaxRetries,
+		},
 	}
 
 	for _, tt := range tests {
@@ -365,6 +380,78 @@ func TestRetryPolicy_Do(t *testing.T) {
 			if *callCount != tt.wantCallCount {
 				t.Errorf("Do() callCount = %v, want %v", *callCount, tt.wantCallCount)
 			}
+		})
+	}
+}
+
+func TestRetryPolicy_calculateDelay(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		baseTimeout time.Duration
+		multiplier  float64
+		attempt     uint
+		wantMin     time.Duration
+		wantMax     time.Duration
+	}{
+		{
+			name:        "zero base timeout yields no delay and no jitter",
+			baseTimeout: 0,
+			multiplier:  testMultiplier,
+			attempt:     0,
+			wantMin:     0,
+			wantMax:     0,
+		},
+		{
+			name:        "zero base timeout on a later attempt",
+			baseTimeout: 0,
+			multiplier:  testMultiplier,
+			attempt:     testMaxRetries,
+			wantMin:     0,
+			wantMax:     0,
+		},
+		{
+			// 10% of 5ns truncates to 0, so there is no jitter to apply.
+			name:        "base delay too small to carry jitter",
+			baseTimeout: 5 * time.Nanosecond,
+			multiplier:  1.0,
+			attempt:     0,
+			wantMin:     5 * time.Nanosecond,
+			wantMax:     5 * time.Nanosecond,
+		},
+		{
+			name:        "first attempt stays within the jitter band",
+			baseTimeout: testBaseTimeout,
+			multiplier:  testMultiplier,
+			attempt:     0,
+			wantMin:     90 * time.Millisecond,
+			wantMax:     110 * time.Millisecond,
+		},
+		{
+			name:        "delay grows with the multiplier",
+			baseTimeout: testBaseTimeout,
+			multiplier:  testMultiplier,
+			attempt:     2,
+			wantMin:     360 * time.Millisecond,
+			wantMax:     440 * time.Millisecond,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			policy := NewRetryPolicy(tt.baseTimeout, tt.multiplier, testMaxRetries)
+
+			var delay time.Duration
+
+			require.NotPanics(t, func() {
+				delay = policy.calculateDelay(tt.attempt)
+			})
+
+			require.GreaterOrEqual(t, delay, tt.wantMin)
+			require.LessOrEqual(t, delay, tt.wantMax)
 		})
 	}
 }

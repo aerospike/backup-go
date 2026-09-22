@@ -24,12 +24,11 @@ import (
 	"log/slog"
 	"path"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/aerospike/backup-go/errclass"
+	"github.com/aerospike/backup-go/pkg/asinfo"
 	"github.com/aerospike/backup-go/pkg/server/lister/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -41,10 +40,6 @@ import (
 const (
 	metadataFileName = "metadata.json"
 	maxMetadataSize  = 16 << 20
-
-	minCitrusleafTS  int64 = 157_766_400
-	clockSkewSeconds int64 = 24 * 60 * 60
-	citrusleafEpoch  int64 = 1262304000
 
 	// defaultConcurrency is tuned for network-bound S3 fetches, not CPU.
 	// Callers fetching large lists should raise it via WithConcurrency.
@@ -124,7 +119,7 @@ func NewLister(client S3API, bucket, prefix string, opts ...Option) *Lister {
 }
 
 // FetchAllMetadata lists and parses all metadata files under the prefix,
-// sorted by backup id (Citrusleaf timestamp) ascending.
+// sorted by backup id ascending.
 func (l *Lister) FetchAllMetadata(ctx context.Context) ([]models.Metadata, error) {
 	snapshots, err := l.listSnapshotPrefixes(ctx)
 	if err != nil {
@@ -219,8 +214,7 @@ func (l *Lister) listSnapshotPrefixes(ctx context.Context) ([]string, error) {
 
 			name := strings.TrimSuffix(strings.TrimPrefix(*cp.Prefix, l.prefix), "/")
 
-			_, ok := parseCitrusleafTimestamp(name)
-			if !ok {
+			if !asinfo.IsJobID(name) {
 				l.logger.DebugContext(ctx, "skipping non-snapshot prefix", slog.String("prefix", name))
 				continue
 			}
@@ -264,21 +258,6 @@ func objectKey(elems ...string) string {
 	}
 
 	return strings.TrimPrefix(key, "/")
-}
-
-// parseCitrusleafTimestamp parses s as a Citrusleaf-epoch timestamp and reports
-// whether it falls within the plausible range for a snapshot folder.
-func parseCitrusleafTimestamp(s string) (int64, bool) {
-	ts, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		return 0, false
-	}
-
-	if ts < minCitrusleafTS || ts > (time.Now().Unix()-citrusleafEpoch)+clockSkewSeconds {
-		return 0, false
-	}
-
-	return ts, true
 }
 
 // isNotFound reports whether err is an S3 "not found" error.

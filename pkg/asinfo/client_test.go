@@ -2039,14 +2039,22 @@ func newTestClient(t *testing.T) *Client {
 func TestClient_getBackupStatusByNode(t *testing.T) {
 	t.Parallel()
 
-	const testJobID = "523607479"
+	const (
+		testJobID     = "260922T103653-5xsr"
+		testNamespace = "source-ns1"
+	)
 
 	backupStatusCmd := fmt.Sprintf(cmdBackupStatus, testJobID)
 
-	const completeStatus = "change-stream-active=false:finish-time=20260805T063131.077Z:" +
-		"job-id=523607479:ns=source-ns1:partitions-flushed=4096:partitions-owned=4096:" +
-		"partitions-scanned=4096:progress-pct=100.00:recs-backed-up=985:recs-change=0:" +
-		"recs-scan=985:start-time=20260805T063119.905Z:state=COMPLETE"
+	const runningStatus = "job-id=260922T103653-5xsr:ns=source-ns1:state=INCR_SCAN_ACTIVE:" +
+		"recs-base=515423:recs-incr=0:recs-change=0:recs-filtered=0:recs-skipped-xdr-tomb=0:" +
+		"recs-read-failed=0:partitions-flushed=1365:partitions-owned=1365:partitions-scanned=1365:" +
+		"progress-pct=95.00:change-stream-active=true:start-time=20260922T103653.415Z:finish-time=-:" +
+		"partitions-count-pending=0:count-read-failures=0"
+
+	const failedStatus = "job-id=260922T103653-5xsr:ns=source-ns1:state=FAILED:recs-backed-up=12:" +
+		"recs-base=10:recs-incr=1:recs-change=1:error-reason=storage unreachable:" +
+		"start-time=20260922T103653.415Z:finish-time=20260922T104120.077Z"
 
 	tests := []struct {
 		name     string
@@ -2056,17 +2064,36 @@ func TestClient_getBackupStatusByNode(t *testing.T) {
 		check    func(t *testing.T, resp []infomodels.InfoMap)
 	}{
 		{
-			name:     "parses backup status response",
-			response: completeStatus,
+			name:     "parses running backup status response",
+			response: runningStatus,
 			check: func(t *testing.T, resp []infomodels.InfoMap) {
 				t.Helper()
 
 				status := infomodels.NewResponseBackupState(resp)
 				require.NotNil(t, status)
-				assert.Equal(t, infomodels.BackupStateComplete, status.State)
+				assert.Equal(t, infomodels.BackupStateIncrScanActive, status.State)
 				assert.Equal(t, testJobID, status.JobID)
-				assert.Equal(t, "source-ns1", status.Namespace)
-				assert.InEpsilon(t, 100.0, status.ProgressPct, 0.01)
+				assert.Equal(t, testNamespace, status.Namespace)
+				assert.Equal(t, uint64(515423), status.RecsBase)
+				assert.Equal(t, uint32(1365), status.PartitionsOwned)
+				assert.InEpsilon(t, 95.0, status.ProgressPct, 0.01)
+				assert.True(t, status.ChangeStreamActive)
+				assert.False(t, status.StartTime.IsZero())
+				assert.True(t, status.FinishTime.IsZero())
+			},
+		},
+		{
+			name:     "parses conditional error-reason field",
+			response: failedStatus,
+			check: func(t *testing.T, resp []infomodels.InfoMap) {
+				t.Helper()
+
+				status := infomodels.NewResponseBackupState(resp)
+				require.NotNil(t, status)
+				assert.Equal(t, infomodels.BackupStateFailed, status.State)
+				assert.Equal(t, "storage unreachable", status.ErrorReason)
+				assert.Equal(t, uint64(12), status.RecsBackedUp)
+				assert.False(t, status.FinishTime.IsZero())
 			},
 		},
 		{

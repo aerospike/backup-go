@@ -17,8 +17,8 @@ package asinfo
 import (
 	"crypto/rand"
 	"encoding/binary"
-	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -40,6 +40,12 @@ const (
 	jobIDMaxLen = 19
 
 	base36Digits = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+	// charClassMeta lists the characters that carry meaning inside a regular
+	// expression character class: the closing bracket, the negation mark, the range
+	// mark, the escape itself and the bracket that opens a POSIX class such as
+	// [:digit:].
+	charClassMeta = `]^-\[`
 )
 
 // jobIDRegexp matches the shape of an id built by newJobIDForTime. It is compiled
@@ -66,7 +72,32 @@ func jobIDPattern() string {
 	}
 
 	b.WriteString(regexp.QuoteMeta(string(jobIDSeparator)))
-	fmt.Fprintf(&b, "[%s]{%d}$", regexp.QuoteMeta(base36Digits), jobIDSaltLen)
+	b.WriteByte('[')
+	b.WriteString(quoteCharClass(base36Digits))
+	b.WriteString("]{")
+	b.WriteString(strconv.Itoa(jobIDSaltLen))
+	b.WriteString("}$")
+
+	return b.String()
+}
+
+// quoteCharClass escapes s so that each of its characters stands for itself inside a
+// regular expression character class. regexp.QuoteMeta cannot be used here: it leaves
+// '-' and '^' alone, because they are literal outside a class, so a salt alphabet that
+// gained a '-' would silently turn into a range instead of failing to compile.
+func quoteCharClass(s string) string {
+	var b strings.Builder
+
+	b.Grow(len(s))
+
+	for i := range len(s) {
+		c := s[i]
+		if strings.ContainsRune(charClassMeta, rune(c)) {
+			b.WriteByte('\\')
+		}
+
+		b.WriteByte(c)
+	}
 
 	return b.String()
 }

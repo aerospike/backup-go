@@ -15,7 +15,9 @@
 package asinfo
 
 import (
+	"regexp"
 	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -29,6 +31,11 @@ const (
 	testSameSecondIDs  = 10000
 
 	testGeneratedIDsPerMoment = 100
+
+	// testConcurrentIDsPerGoroutine keeps every concurrent case well inside
+	// jobIDSaltSpace, so that a duplicate can only come from a broken counter and
+	// never from the salt legitimately wrapping around.
+	testConcurrentIDsPerGoroutine = 1000
 )
 
 func TestNewJobID_TimestampPart(t *testing.T) {
@@ -139,6 +146,148 @@ func TestNewJobID_SameSecondUniqueness(t *testing.T) {
 		require.False(t, duplicate, "duplicate id generated: %s", id)
 
 		seen[id] = struct{}{}
+	}
+}
+
+// TestNewJobID_ConcurrentUniqueness covers the same guarantee under load: the salt
+// counter is shared package state, so ids must stay unique when several goroutines
+// ask for one at the same instant. Run it with -race to also catch unsynchronized
+// access to the counter.
+func TestNewJobID_ConcurrentUniqueness(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 3, 16, 14, 20, 35, 0, time.UTC)
+
+	tests := []struct {
+		name       string
+		goroutines int
+		perRoutine int
+	}{
+		{
+			name:       "one id per goroutine",
+			goroutines: 128,
+			perRoutine: 1,
+		},
+		{
+			name:       "two goroutines in a tight loop",
+			goroutines: 2,
+			perRoutine: testConcurrentIDsPerGoroutine,
+		},
+		{
+			name:       "many goroutines in a tight loop",
+			goroutines: 32,
+			perRoutine: testConcurrentIDsPerGoroutine,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var (
+				wg sync.WaitGroup
+				mu sync.Mutex
+			)
+
+			want := tt.goroutines * tt.perRoutine
+			seen := make(map[string]struct{}, want)
+
+			wg.Add(tt.goroutines)
+
+			for range tt.goroutines {
+				go func() {
+					defer wg.Done()
+
+					// Collect locally and merge once, so the lock does not serialize
+					// the generator the test is meant to hammer.
+					ids := make([]string, 0, tt.perRoutine)
+					for range tt.perRoutine {
+						ids = append(ids, newJobIDForTime(now))
+					}
+
+					mu.Lock()
+					defer mu.Unlock()
+
+					for _, id := range ids {
+						seen[id] = struct{}{}
+					}
+				}()
+			}
+
+			wg.Wait()
+
+			require.Len(t, seen, want, "duplicate ids generated concurrently")
+		})
+	}
+}
+
+// TestQuoteCharClass guards the matcher against a change of base36Digits: every
+// character must end up literal inside the class, with no range and no POSIX class
+// forming by accident.
+func TestQuoteCharClass(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		in      string
+		want    string
+		rejects []string
+	}{
+		{
+			name:    "salt alphabet needs no escaping",
+			in:      base36Digits,
+			want:    base36Digits,
+			rejects: []string{"-", "A", "_"},
+		},
+		{
+			name:    "range mark is escaped",
+			in:      "a-z",
+			want:    `a\-z`,
+			rejects: []string{"m"},
+		},
+		{
+			name:    "negation mark is escaped",
+			in:      "^a",
+			want:    `\^a`,
+			rejects: []string{"b"},
+		},
+		{
+			name:    "closing bracket is escaped",
+			in:      "a]b",
+			want:    `a\]b`,
+			rejects: []string{"c"},
+		},
+		{
+			name:    "backslash is escaped",
+			in:      `a\b`,
+			want:    `a\\b`,
+			rejects: []string{"c"},
+		},
+		{
+			name:    "posix class opener is escaped",
+			in:      "[:digit:]",
+			want:    `\[:digit:\]`,
+			rejects: []string{"5"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := quoteCharClass(tt.in)
+			require.Equal(t, tt.want, got)
+
+			re := regexp.MustCompile("^[" + got + "]$")
+
+			for _, c := range tt.in {
+				require.True(t, re.MatchString(string(c)), "class does not match %q", c)
+			}
+
+			for _, r := range tt.rejects {
+				require.False(t, re.MatchString(r), "class unexpectedly matches %q", r)
+			}
+		})
 	}
 }
 

@@ -37,7 +37,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const recordsRecountInterval = 10 * time.Minute
+const RecordsRecountInterval = 10 * time.Minute
 
 // Writer defines an interface for writing backup data to a storage provider.
 // Implementations, handling different storage types, are located within the io.storage package.
@@ -454,7 +454,7 @@ func (bh *backupHandler) startRecordCounting(ctx context.Context) {
 	// Run immediately on startup.
 	bh.updateRecordCount(ctx)
 
-	ticker := time.NewTicker(recordsRecountInterval)
+	ticker := time.NewTicker(RecordsRecountInterval)
 	defer ticker.Stop()
 
 	for {

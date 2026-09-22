@@ -134,35 +134,63 @@ func NewClient(
 }
 
 // GetInfo runs the given info commands against a random cluster node with retries.
+//
+// It must not be called from inside an already retried operation: use [Client.getInfo]
+// there, so that the retry counts of the two levels are not multiplied.
 func (ic *Client) GetInfo(ctx context.Context, names ...string) (map[string]string, error) {
-	// Check if any info commands are provided or command is not supported.
-	if len(names) == 0 || names[0] == "" {
-		return nil, errNoInfoCommands
+	// The commands are checked before the retry loop, because an unsupported
+	// command will not become supported on the next attempt.
+	if err := validateInfoCommands(names); err != nil {
+		return nil, err
 	}
 
 	var result map[string]string
 
-	// The class is attached here, inside the retried command, so that a context
-	// error returned by the retry policy itself is not reported as a cluster
-	// failure.
 	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
-		node, err := ic.cluster.GetRandomNode()
-		if err != nil {
-			return fmt.Errorf("%w: %w", errclass.ErrAerospike, err)
-		}
+		var err error
 
-		result, err = node.RequestInfo(ic.policy, names...)
-		if err != nil {
-			return fmt.Errorf("%w: %w", errclass.ErrAerospike, err)
-		}
+		result, err = ic.getInfo(names...)
 
-		return nil
+		return err
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	return result, nil
+}
+
+// getInfo runs the given info commands against a random cluster node once, without
+// retrying. Callers that are themselves retried use it instead of [Client.GetInfo].
+func (ic *Client) getInfo(names ...string) (map[string]string, error) {
+	if err := validateInfoCommands(names); err != nil {
+		return nil, err
+	}
+
+	// The class is attached here, inside the retried command, so that a context
+	// error returned by the retry policy itself is not reported as a cluster
+	// failure.
+	node, err := ic.cluster.GetRandomNode()
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errclass.ErrAerospike, err)
+	}
+
+	result, err := node.RequestInfo(ic.policy, names...)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errclass.ErrAerospike, err)
+	}
+
+	return result, nil
+}
+
+// validateInfoCommands reports whether any info command was provided. An empty
+// command means the command dictionary holds no entry for the server version.
+func validateInfoCommands(names []string) error {
+	if len(names) == 0 || names[0] == "" {
+		return errNoInfoCommands
+	}
+
+	return nil
 }
 
 func (ic *Client) requestByNode(nodeName string, names ...string) (map[string]string, error) {
@@ -679,7 +707,7 @@ func (ic *Client) StartBackup(ctx context.Context, request *infomodels.RequestBa
 	)
 
 	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
-		principal, err := ic.getPrincipal(ctx)
+		principal, err := ic.getPrincipal()
 		if err != nil {
 			return fmt.Errorf("failed to get cluster principal: %w", err)
 		}
@@ -699,12 +727,12 @@ func (ic *Client) StartBackup(ctx context.Context, request *infomodels.RequestBa
 	return jobID, err
 }
 
-// BackupAbort aborts the backup job identified by backupID on the server.
+// AbortBackup aborts the backup job identified by backupID on the server.
 func (ic *Client) AbortBackup(ctx context.Context, backupID string) error {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDBackupAbort], backupID)
 
 	return executeWithRetry(ctx, ic.retryPolicy, func() error {
-		principal, err := ic.getPrincipal(ctx)
+		principal, err := ic.getPrincipal()
 		if err != nil {
 			return fmt.Errorf("failed to get cluster principal: %w", err)
 		}
@@ -739,7 +767,7 @@ func (ic *Client) StartRestore(ctx context.Context, request *infomodels.RequestR
 	)
 
 	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
-		principal, err := ic.getPrincipal(ctx)
+		principal, err := ic.getPrincipal()
 		if err != nil {
 			return fmt.Errorf("failed to get cluster principal: %w", err)
 		}
@@ -761,28 +789,40 @@ func (ic *Client) StartRestore(ctx context.Context, request *infomodels.RequestR
 
 // PrepareRestore starts a restore preparation on the server.
 func (ic *Client) PrepareRestore(ctx context.Context, jobID, namespace string) error {
-	allNodes := ic.getNodesString()
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerPrepareRestore], namespace, jobID, allNodes)
+	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
+		allNodes, err := ic.getNodesString()
+		if err != nil {
+			return fmt.Errorf("failed to get nodes string: %w", err)
+		}
 
-	principal, err := ic.getPrincipal(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get cluster principal: %w", err)
-	}
+		cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerPrepareRestore], namespace, jobID, allNodes)
 
-	resp, err := ic.requestByNode(principal, cmd)
-	if err != nil {
-		return fmt.Errorf("failed prepare restore: %w", err)
-	}
+		principal, err := ic.getPrincipal()
+		if err != nil {
+			return fmt.Errorf("failed to get cluster principal: %w", err)
+		}
 
-	if _, err = parseResultResponse(cmd, resp); err != nil {
-		return fmt.Errorf("failed to parse prepare restore response: %w", err)
-	}
+		resp, err := ic.requestByNode(principal, cmd)
+		if err != nil {
+			return fmt.Errorf("failed prepare restore: %w", err)
+		}
 
-	return nil
+		if _, err = parseResultResponse(cmd, resp); err != nil {
+			return fmt.Errorf("failed to parse prepare restore response: %w", err)
+		}
+
+		return nil
+	})
+
+	return err
 }
 
-func (ic *Client) getNodesString() string {
+func (ic *Client) getNodesString() (string, error) {
 	nodes := ic.cluster.GetNodes()
+
+	if len(nodes) == 0 {
+		return "", fmt.Errorf("%w: no nodes available in cluster", errclass.ErrAerospike)
+	}
 
 	var builder strings.Builder
 
@@ -795,7 +835,7 @@ func (ic *Client) getNodesString() string {
 		builder.WriteByte(',')
 	}
 
-	return builder.String()
+	return builder.String(), nil
 }
 
 // GetBackupStatus aggregates server-side backup status across all nodes.
@@ -1088,7 +1128,7 @@ func (ic *Client) GetClusterStable(ctx context.Context, namespace string) (bool,
 	var result bool
 
 	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
-		res, err := ic.getClusterStable(ctx, namespace)
+		res, err := ic.getClusterStable(namespace)
 		if err != nil {
 			return err
 		}
@@ -1101,11 +1141,11 @@ func (ic *Client) GetClusterStable(ctx context.Context, namespace string) (bool,
 	return result, err
 }
 
-func (ic *Client) getClusterStable(ctx context.Context, namespace string) (bool, error) {
+func (ic *Client) getClusterStable(namespace string) (bool, error) {
 	nodes := ic.cluster.GetNodes()
 	nodesNum := len(nodes)
 
-	stats, err := ic.getStatistics(ctx)
+	stats, err := ic.getStatistics()
 	if err != nil {
 		return false, fmt.Errorf("failed to get cluster statistics: %w", err)
 	}
@@ -1118,7 +1158,7 @@ func (ic *Client) getClusterStable(ctx context.Context, namespace string) (bool,
 	for _, node := range nodes {
 		cmd := fmt.Sprintf(ic.cmdDict[cmdIDClusterStable], nodesNum, namespace)
 
-		resp, err := ic.GetInfo(ctx, cmd)
+		resp, err := ic.getInfo(cmd)
 		if err != nil {
 			return false, fmt.Errorf("failed to get node %s stable status: %w", node.GetName(), err)
 		}
@@ -1136,11 +1176,12 @@ func (ic *Client) getClusterStable(ctx context.Context, namespace string) (bool,
 	return true, nil
 }
 
-// GetStatistics returns cluster statistics.
-func (ic *Client) getStatistics(ctx context.Context) ([]infomodels.InfoMap, error) {
+// getStatistics returns cluster statistics. Every caller runs inside a retried
+// operation, so a single info request is made here.
+func (ic *Client) getStatistics() ([]infomodels.InfoMap, error) {
 	cmd := ic.cmdDict[cmdIDStatistics]
 
-	resp, err := ic.GetInfo(ctx, cmd)
+	resp, err := ic.getInfo(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cluster statistics: %w", err)
 	}
@@ -1158,8 +1199,10 @@ func (ic *Client) getStatistics(ctx context.Context) ([]infomodels.InfoMap, erro
 	return infoResponse, nil
 }
 
-func (ic *Client) getPrincipal(ctx context.Context) (string, error) {
-	stats, err := ic.getStatistics(ctx)
+// getPrincipal returns the name of the cluster principal node. Every caller runs
+// inside a retried operation, so no retrying is done here.
+func (ic *Client) getPrincipal() (string, error) {
+	stats, err := ic.getStatistics()
 	if err != nil {
 		return "", fmt.Errorf("failed to get cluster statistics: %w", err)
 	}

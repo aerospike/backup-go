@@ -25,6 +25,9 @@ import (
 	"github.com/aerospike/backup-go/errclass"
 )
 
+// jitterPercent is the fraction of the calculated delay used as +-jitter.
+const jitterPercent = 0.1
+
 // RetryPolicy defines the configuration for retry attempts in case of failures.
 type RetryPolicy struct {
 	// BaseTimeout is the initial delay between retry attempts.
@@ -112,9 +115,14 @@ func (p *RetryPolicy) calculateDelay(attempt uint) time.Duration {
 
 // calculateJitter computes the jitter to prevent thundering herd.
 func (p *RetryPolicy) calculateJitter(baseDelay time.Duration) time.Duration {
-	// Add +-10% jitter.
-	jitterPercent := 0.1
 	jitterAmount := time.Duration(float64(baseDelay) * jitterPercent)
+
+	// A base delay of zero means the caller asked for immediate retries, so there
+	// is nothing to spread out. Jitter is skipped here also because rand.Int64N
+	// panics on a non-positive bound.
+	if jitterAmount <= 0 {
+		return 0
+	}
 
 	//nolint:gosec // rand is used for jitter, not critical for security.
 	jitter := time.Duration(rand.Int64N(int64(jitterAmount*2))) - jitterAmount

@@ -41,6 +41,22 @@ func (m InfoMap) ParseUint64(key string) (result uint64, ok bool, err error) {
 	return v, true, nil
 }
 
+// ParseUint32 returns the parsed uint32 value from the map for the given key if found.
+// ok = true if the key was found.
+func (m InfoMap) ParseUint32(key string) (result uint32, ok bool, err error) {
+	val, ok := m[key]
+	if !ok {
+		return 0, false, nil
+	}
+
+	v, err := strconv.ParseUint(val, 10, 32)
+	if err != nil {
+		return 0, true, fmt.Errorf("%w: failed to parse %s=%q: %w", errclass.ErrAerospike, key, val, err)
+	}
+
+	return uint32(v), true, nil
+}
+
 // ParseInt64 returns the parsed int64 value from the map for the given key if found.
 // ok = true if the key was found.
 func (m InfoMap) ParseInt64(key string) (result int64, ok bool, err error) {

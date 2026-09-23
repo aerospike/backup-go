@@ -32,6 +32,18 @@ request links for the full detail of any change.
   their metadata from S3. ([#470](https://github.com/aerospike/backup-go/pull/470), SERVER-898)
 - Fuzzy restore for server-integrated backups: `RequestRestore` accepts `FuzzyRestore` and `Path`.
   ([#483](https://github.com/aerospike/backup-go/pull/483), BKRS-255)
+- `ServerBackupInfo.AbortBackup`, which stops a running server-integrated backup job.
+  ([#529](https://github.com/aerospike/backup-go/pull/529), BKRS-431)
+- `asinfo.IsJobID`, which reports whether a string has the shape of a server-integrated backup
+  job id. It lets a storage listing tell backup folders apart from any other prefix.
+  ([#530](https://github.com/aerospike/backup-go/pull/530), BKRS-433)
+- Exported progress helpers in `pkg/estimates`, so a server-integrated backup can report progress
+  the same way a client-side one does: `TargetPrintInterval`, `EstimateWarmup`, `ProgressThreshold`
+  and `RemainingTime`. ([#525](https://github.com/aerospike/backup-go/pull/525), BKRS-332)
+- `backup.RecordsRecountInterval`, the interval at which a running backup refreshes its record
+  count. ([#533](https://github.com/aerospike/backup-go/pull/533), BKRS-434)
+- `models.InfoMap.ParseUint32`, alongside the existing `ParseUint64` and `ParseInt64`.
+  ([#534](https://github.com/aerospike/backup-go/pull/534), BKRS-440)
 - `SecretAgentConfig.MinTLSVersion`, for deployments that still need a TLS version below the new
   1.2 floor. ([#516](https://github.com/aerospike/backup-go/pull/516), BKRS-361)
 - Repository documentation and process files: a security policy, a code of conduct, issue and
@@ -56,6 +68,34 @@ request links for the full detail of any change.
   ([#484](https://github.com/aerospike/backup-go/pull/484))
 - **Breaking.** `asb.NewEncoderConfig` takes a `models.SIndexInfo` instead of a single
   `hasExpressionSIndex` flag. ([#501](https://github.com/aerospike/backup-go/pull/501), BKRS-334)
+- **Breaking.** `Encoder.EncodeToken` appends to a caller-owned `[]byte` and returns it, instead of
+  writing into a `*bytes.Buffer`: `EncodeToken(token *models.Token, dst []byte) ([]byte, error)`.
+  A caller reuses the backing slice across records. The record encoder behind it was rewritten
+  around a flat append chain with single-pass escaping and a namespace/set line cache, which
+  encodes a metadata-heavy record about twice as fast with no allocation on the hot path.
+  ([#498](https://github.com/aerospike/backup-go/pull/498))
+- **Breaking.** The `ServerBackupInfo` methods dropped the `Server` infix, to match the rest of the
+  interface: `StartServerBackup`, `StartServerRestore` and `PrepareServerRestore` are now
+  `StartBackup`, `StartRestore` and `PrepareRestore`.
+  ([#529](https://github.com/aerospike/backup-go/pull/529), BKRS-431)
+- **Breaking.** `infomodels.ResponseBackupState` was reshaped to carry everything the
+  `backup-status` info command reports. `RecsScan` is gone, split into `RecsBase` and `RecsIncr`,
+  and the counters are now `uint64` and `uint32` rather than `int`. New fields: `RecsFiltered`,
+  `RecsDegenerate`, `RecsSkippedXDRTomb`, `RecsReadFailed`, `PartitionsCountPending`,
+  `DrainBlockedMigrations`, `CountReadFailures` and `ErrorReason`. The response is read by key
+  rather than by position, because the server omits the optional fields, and the new job states
+  `COMMITTING`, `ABORTING` and `ABORTED` are recognised.
+  ([#534](https://github.com/aerospike/backup-go/pull/534), BKRS-440)
+- **Breaking.** The job id of a server-integrated backup is no longer a Citrusleaf timestamp but a
+  UTC timestamp with a random base36 salt, shaped as `260316T142035-k3f9`, so that two jobs started
+  in the same second cannot collide. The backup lister recognises only this shape, so it no longer
+  lists snapshots written by an earlier release.
+  ([#530](https://github.com/aerospike/backup-go/pull/530), BKRS-433)
+- Info commands that look the cluster principal up before sending their own command no longer retry
+  the two separately. The nested retries multiplied the number of attempts and the total backoff.
+  ([#533](https://github.com/aerospike/backup-go/pull/533), BKRS-434)
+- `Client.Estimate` rejects a config with `StateFile` set, because an estimate never reads or writes
+  backup state. ([#520](https://github.com/aerospike/backup-go/pull/520), BKRS-386)
 - Error messages are now prefixed with the class they belong to, for example
   `storage error: failed to open root /backups: permission denied`. Code that matches on message
   text should move to `errors.Is`. (BKRS-364)
@@ -74,10 +114,14 @@ request links for the full detail of any change.
   misleading chunk size error for a non-zero file limit.
   ([#513](https://github.com/aerospike/backup-go/pull/513), BKRS-359)
 - The test suite is split into hermetic unit tests and Docker-backed integration tests behind the
-  `integration` build tag, with CI, linting and `make test-unit` aligned with that split. Go is
+  `integration` build tag, with CI, linting and `make test-unit` aligned with that split. An
+  integration test covering a backup and restore of every Aerospike data type was added. Go is
   now 1.25.13 and the Aerospike client v8.8.0.
   ([#517](https://github.com/aerospike/backup-go/pull/517),
-  [#482](https://github.com/aerospike/backup-go/pull/482), BKRS-362)
+  [#482](https://github.com/aerospike/backup-go/pull/482),
+  [#522](https://github.com/aerospike/backup-go/pull/522), BKRS-362, BKRS-387)
+- Uber's NilAway runs in CI over the production code, and is available locally as `make nilaway`.
+  ([#520](https://github.com/aerospike/backup-go/pull/520), BKRS-386)
 - CI workflows also run for the `dev` branch, and the pinned GitHub actions were updated.
   ([#486](https://github.com/aerospike/backup-go/pull/486),
   [#474](https://github.com/aerospike/backup-go/pull/474),
@@ -97,6 +141,28 @@ request links for the full detail of any change.
 - Backup state is flushed and its files closed before the handler shuts down, so a continuation
   can no longer read a half-written state file and fail with `EOF`.
   ([#489](https://github.com/aerospike/backup-go/pull/489), BKRS-324)
+- A `RetryPolicy` with a `BaseTimeout` of zero, which asks for immediate retries, panicked on the
+  first backoff: the jitter was drawn from a non-positive range.
+  ([#533](https://github.com/aerospike/backup-go/pull/533), BKRS-434)
+- A record whose ASB token did not fit the 1 MB decoder buffer failed to restore. Tokens now span
+  several buffer fills, so records of at least 8 MB decode correctly.
+  ([#520](https://github.com/aerospike/backup-go/pull/520), BKRS-386)
+- The estimate printer goroutine outlived the job it reported on, ticking until the context was
+  cancelled, because the `break` meant to end it only left the enclosing `select`.
+  ([#525](https://github.com/aerospike/backup-go/pull/525), BKRS-332)
+- Server-integrated backup and restore status was requested from inactive nodes, which failed the
+  whole status call. Only live nodes are asked now, and the same applies to the node list sent with
+  a restore preparation. ([#523](https://github.com/aerospike/backup-go/pull/523), BKRS-332)
+- The backup lister built the metadata object key by concatenating strings, so a prefix with a
+  trailing slash produced a key the bucket did not hold. The key is now assembled with `path.Join`.
+  ([#526](https://github.com/aerospike/backup-go/pull/526), BKRS-395)
+- The server-integrated backup command passed the set filter under the wrong parameter name,
+  `set=` instead of `set-list=`, so the server did not apply it.
+  ([#527](https://github.com/aerospike/backup-go/pull/527), BKRS-422)
+- Segment validation reported `ErrNoSegments` for a backup of a namespace that held no records.
+  Such a backup is valid: it has manifests recording nothing, and it is now validated and reported
+  instead of refused. A stream whose data was lost but whose manifests survived is read from the
+  manifests too. ([#527](https://github.com/aerospike/backup-go/pull/527), BKRS-422)
 
 ### Removed
 

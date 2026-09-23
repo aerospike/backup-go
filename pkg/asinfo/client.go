@@ -748,6 +748,29 @@ func (ic *Client) AbortBackup(ctx context.Context, backupID string) error {
 	})
 }
 
+// AbortRestore aborts the restore job identified by backupID and namespace on the server.
+func (ic *Client) AbortRestore(ctx context.Context, namespace, backupID string) error {
+	cmd := fmt.Sprintf(ic.cmdDict[cmdIDRestoreAbort], namespace, backupID)
+
+	return executeWithRetry(ctx, ic.retryPolicy, func() error {
+		principal, err := ic.getPrincipal()
+		if err != nil {
+			return fmt.Errorf("failed to get cluster principal: %w", err)
+		}
+
+		resp, err := ic.requestByNode(principal, cmd)
+		if err != nil {
+			return fmt.Errorf("failed abort restore: %w", err)
+		}
+
+		if _, err = parseResultResponse(cmd, resp); err != nil {
+			return fmt.Errorf("failed to parse abort restore response: %w", err)
+		}
+
+		return nil
+	})
+}
+
 // StartRestore starts a restore job on the server.
 func (ic *Client) StartRestore(ctx context.Context, request *infomodels.RequestRestore) error {
 	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerRestore],

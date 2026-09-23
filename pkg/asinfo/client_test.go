@@ -21,6 +21,7 @@ import (
 	"log/slog"
 	"reflect"
 	"testing"
+	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/errclass"
@@ -1936,6 +1937,137 @@ func TestClient_AbortServerBackup(t *testing.T) {
 	require.ErrorContains(t, err, "failed to get cluster principal")
 }
 
+// Shared by the AbortRestore tests below.
+const (
+	testAbortRestoreNamespace = "source-ns1"
+	testAbortRestoreJobID     = "260922T103653-5xsr"
+)
+
+// TestClient_AbortRestore_Command pins the wire format of the restore abort command.
+// Unlike the backup abort, it is namespace scoped, and the namespace is the first
+// positional argument, so swapping the arguments must not go unnoticed.
+func TestClient_AbortRestore_Command(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		namespace string
+		jobID     string
+		want      string
+	}{
+		{
+			name:      "namespace and job id",
+			namespace: testAbortRestoreNamespace,
+			jobID:     testAbortRestoreJobID,
+			want:      "restore-stop:namespace=source-ns1;job-id=260922T103653-5xsr",
+		},
+		{
+			name:      "numeric job id",
+			namespace: "test",
+			jobID:     "523607479",
+			want:      "restore-stop:namespace=test;job-id=523607479",
+		},
+		{
+			name:      "empty arguments keep their positions",
+			namespace: "",
+			jobID:     "",
+			want:      "restore-stop:namespace=;job-id=",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ic := newClient(mocks.NewMockNodeGetter(t), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+
+			got := fmt.Sprintf(ic.cmdDict[cmdIDRestoreAbort], tt.namespace, tt.jobID)
+
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// TestClient_AbortRestore covers the failure paths reachable without a live cluster.
+// The abort is sent to the cluster principal, so everything that happens before the
+// command reaches a node is observable here.
+func TestClient_AbortRestore(t *testing.T) {
+	t.Parallel()
+
+	const testMaxRetries = 2
+
+	tests := []struct {
+		setup      func(t *testing.T) (*Client, context.Context)
+		wantErrIs  error
+		name       string
+		wantErrMsg string
+	}{
+		{
+			name: "principal is unreachable",
+			setup: func(t *testing.T) (*Client, context.Context) {
+				t.Helper()
+
+				mockNodeGetter := mocks.NewMockNodeGetter(t)
+				mockNodeGetter.EXPECT().GetRandomNode().Return(nil, a.ErrInvalidParam)
+
+				ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewRetryPolicy(0, 1, testMaxRetries))
+
+				return ic, t.Context()
+			},
+			wantErrIs:  errclass.ErrAerospike,
+			wantErrMsg: "failed to get cluster principal",
+		},
+		{
+			name: "canceled context stops the retries",
+			setup: func(t *testing.T) (*Client, context.Context) {
+				t.Helper()
+
+				mockNodeGetter := mocks.NewMockNodeGetter(t)
+				mockNodeGetter.EXPECT().GetRandomNode().Return(nil, a.ErrInvalidParam)
+
+				// The backoff must be long enough for the canceled context, and not
+				// the elapsed delay, to end the wait between the attempts.
+				ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewRetryPolicy(time.Hour, 1, testMaxRetries))
+
+				ctx, cancel := context.WithCancel(t.Context())
+				cancel()
+
+				return ic, ctx
+			},
+			wantErrIs: context.Canceled,
+		},
+		{
+			name: "nil retry policy is rejected before any request",
+			setup: func(t *testing.T) (*Client, context.Context) {
+				t.Helper()
+
+				ic := newClient(mocks.NewMockNodeGetter(t), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+				ic.retryPolicy = nil
+
+				return ic, t.Context()
+			},
+			wantErrIs:  errclass.ErrInvalidConfig,
+			wantErrMsg: "retry policy cannot be nil",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ic, ctx := tt.setup(t)
+
+			err := ic.AbortRestore(ctx, testAbortRestoreNamespace, testAbortRestoreJobID)
+
+			require.ErrorIs(t, err, tt.wantErrIs)
+
+			if tt.wantErrMsg != "" {
+				require.ErrorContains(t, err, tt.wantErrMsg)
+			}
+		})
+	}
+}
+
 // backupJob builds a minimal InfoMap representing a backup job.
 func backupJob(trid, timeSinceDone, progress, pids string) infomodels.InfoMap {
 	return infomodels.InfoMap{
@@ -2201,6 +2333,12 @@ func TestClient_RetriesAreNotNested(t *testing.T) {
 			name: "AbortBackup",
 			call: func(ctx context.Context, ic *Client) error {
 				return ic.AbortBackup(ctx, testJobID)
+			},
+		},
+		{
+			name: "AbortRestore",
+			call: func(ctx context.Context, ic *Client) error {
+				return ic.AbortRestore(ctx, testNamespace, testJobID)
 			},
 		},
 		{

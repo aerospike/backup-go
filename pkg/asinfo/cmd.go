@@ -38,10 +38,11 @@ const (
 	cmdIDRestoreStatus
 	cmdIDBackupStatus
 	cmdIDBackupAbort
+	cmdIDRestoreAbort
 )
 
 // commandsNumber shows how many commands we have, if you add new command, increase this number.
-const commandsNumber = 21
+const commandsNumber = 22
 
 // Old commands for db version < AerospikeVersionRecentInfoCommands
 const (
@@ -72,6 +73,7 @@ const (
 	cmdRestoreStatus = "restore-status:namespace=%s;"
 	cmdBackupStatus  = "backup-status:job-id=%s;"
 	cmdBackupAbort   = "backup-abort:job-id=%s"
+	cmdRestoreAbort  = "restore-stop:namespace=%s;job-id=%s"
 
 	// Deprecated commands:
 
@@ -113,6 +115,7 @@ func newCmdDict(version infomodels.AerospikeVersion) map[int]string {
 		cmds[cmdIDRestoreStatus] = cmdRestoreStatus
 		cmds[cmdIDBackupStatus] = cmdBackupStatus
 		cmds[cmdIDBackupAbort] = cmdBackupAbort
+		cmds[cmdIDRestoreAbort] = cmdRestoreAbort
 	}
 
 	return cmds

@@ -96,6 +96,69 @@ func (_c *MockInfoGetter_AbortBackup_Call) RunAndReturn(run func(ctx context.Con
 	return _c
 }
 
+// AbortRestore provides a mock function for the type MockInfoGetter
+func (_mock *MockInfoGetter) AbortRestore(ctx context.Context, namespace string, backupID string) error {
+	ret := _mock.Called(ctx, namespace, backupID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AbortRestore")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = returnFunc(ctx, namespace, backupID)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockInfoGetter_AbortRestore_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AbortRestore'
+type MockInfoGetter_AbortRestore_Call struct {
+	*mock.Call
+}
+
+// AbortRestore is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+//   - backupID string
+func (_e *MockInfoGetter_Expecter) AbortRestore(ctx any, namespace any, backupID any) *MockInfoGetter_AbortRestore_Call {
+	return &MockInfoGetter_AbortRestore_Call{Call: _e.mock.On("AbortRestore", ctx, namespace, backupID)}
+}
+
+func (_c *MockInfoGetter_AbortRestore_Call) Run(run func(ctx context.Context, namespace string, backupID string)) *MockInfoGetter_AbortRestore_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockInfoGetter_AbortRestore_Call) Return(err error) *MockInfoGetter_AbortRestore_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockInfoGetter_AbortRestore_Call) RunAndReturn(run func(ctx context.Context, namespace string, backupID string) error) *MockInfoGetter_AbortRestore_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetBackupStatus provides a mock function for the type MockInfoGetter
 func (_mock *MockInfoGetter) GetBackupStatus(ctx context.Context, jobID string) (*models.ResponseBackupState, error) {
 	ret := _mock.Called(ctx, jobID)

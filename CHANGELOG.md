@@ -30,6 +30,11 @@ request links for the full detail of any change.
 - `ClusterInfo.GetClusterStable`, which reports whether the cluster key is the same on every
   node, and a lister for server-integrated backups in `pkg/server/lister` that reads and sorts
   their metadata from S3. ([#470](https://github.com/aerospike/backup-go/pull/470), SERVER-898)
+- `models.MetadataStatus` in `pkg/server/lister`, the state a server-integrated backup was left in,
+  with the values it can hold: `MetadataStatusComplete` for a backup that ran to the end and
+  `MetadataStatusAborted` for one that was stopped before it finished. `Metadata.Status` now has
+  this type instead of `string`, so a listing can tell the two apart without matching literals.
+  (BKRS-446)
 - Fuzzy restore for server-integrated backups: `RequestRestore` accepts `FuzzyRestore` and `Path`.
   ([#483](https://github.com/aerospike/backup-go/pull/483), BKRS-255)
 - `ServerBackupInfo.AbortBackup`, which stops a running server-integrated backup job.

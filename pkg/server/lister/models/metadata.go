@@ -14,9 +14,20 @@
 
 package models
 
+// MetadataStatus is the state a backup was left in, as recorded by the server
+// that wrote it.
+type MetadataStatus string
+
+const (
+	// MetadataStatusComplete means the backup ran to the end.
+	MetadataStatusComplete MetadataStatus = "complete"
+	// MetadataStatusAborted means the backup was stopped before it finished.
+	MetadataStatusAborted MetadataStatus = "aborted"
+)
+
 // Metadata is the metadata for a backup.
 type Metadata struct {
-	BackupID  string `json:"backup_id"`
-	Namespace string `json:"namespace"`
-	Status    string `json:"status"`
+	BackupID  string         `json:"backup_id"`
+	Namespace string         `json:"namespace"`
+	Status    MetadataStatus `json:"status"`
 }

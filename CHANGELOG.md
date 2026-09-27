@@ -136,6 +136,10 @@ request links for the full detail of any change.
 - Package documentation and the README were rewritten, including the supported import paths.
   ([#515](https://github.com/aerospike/backup-go/pull/515),
   [#518](https://github.com/aerospike/backup-go/pull/518), BKRS-357, BKRS-363)
+- The asinfo client was reorganised into `client.go`, `client_cluster.go` and `client_backup.go`,
+  and its duplicated request and retry paths were folded into a few helpers. The change is
+  internal: no exported behaviour depends on it.
+  ([#538](https://github.com/aerospike/backup-go/pull/538), BKRS-445)
 
 ### Fixed
 
@@ -168,12 +172,24 @@ request links for the full detail of any change.
   Such a backup is valid: it has manifests recording nothing, and it is now validated and reported
   instead of refused. A stream whose data was lost but whose manifests survived is read from the
   manifests too. ([#527](https://github.com/aerospike/backup-go/pull/527), BKRS-422)
+- A server-integrated backup or restore was reported as failed when its start command timed out
+  after the server had already accepted the job. `StartBackup` and `StartRestore` now look the job
+  state up before giving up and report success if the server holds one. The backup is looked up by
+  the job id they generate and the restore is matched by job id within the namespace, so state left
+  by an earlier job of the same namespace is not taken for the current one. Whether the job then
+  succeeds or fails is still reported by `GetBackupStatus` and `GetRestoreStatus`.
+  ([#538](https://github.com/aerospike/backup-go/pull/538), BKRS-445)
+- `GetSIndexes`, `GetSIndexInfo` and `GetUDFs` reported `%!w(<nil>)` in place of the Aerospike
+  error when no cluster node was available, because a client error that wraps nothing was unwrapped
+  before being formatted. ([#538](https://github.com/aerospike/backup-go/pull/538), BKRS-445)
 
 ### Removed
 
 - **Breaking.** XDR backup support. `Client.BackupXDR`, `ConfigBackupXDR`, `HandlerBackupXDR`,
   the `XDRInfo` interface and the `io/aerospike/xdr` and `io/encoding/asbx` packages are gone,
   along with the ASBX format. ([#495](https://github.com/aerospike/backup-go/pull/495), BKRS-326)
+- **Breaking.** `asinfo.Stats`, an exported struct that nothing in the library filled or returned.
+  ([#538](https://github.com/aerospike/backup-go/pull/538), BKRS-445)
 
 ### Security
 

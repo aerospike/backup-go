@@ -213,7 +213,7 @@ func Test_parseResultResponse_RedactsCredentials(t *testing.T) {
 	}
 }
 
-func Test_getByNode_RedactsCredentials(t *testing.T) {
+func Test_requestByNodeName_RedactsCredentials(t *testing.T) {
 	t.Parallel()
 
 	mockNodeGetter := mocks.NewMockNodeGetter(t)
@@ -222,9 +222,9 @@ func Test_getByNode_RedactsCredentials(t *testing.T) {
 		Return(nil, &a.AerospikeError{ResultCode: atypes.INVALID_NODE_ERROR}).
 		Maybe()
 
-	ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
 
-	_, err := ic.getByNode(testRedactNode, testBackupCmd())
+	_, err := ic.requestByNodeName(testRedactNode, testBackupCmd())
 
 	require.Error(t, err)
 	require.NotContains(t, err.Error(), testRedactSensitiveVal)
@@ -292,7 +292,7 @@ func Test_StartServer_DoesNotLeakSecretKey(t *testing.T) {
 				Return(nil, &a.AerospikeError{ResultCode: atypes.INVALID_NODE_ERROR}).
 				Maybe()
 
-			ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewRetryPolicy(0, 1, 1))
+			ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, 1))
 			ic.logger = tt.logger
 
 			err := tt.run(ic)

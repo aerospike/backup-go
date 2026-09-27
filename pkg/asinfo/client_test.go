@@ -33,6 +33,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// testInfoPolicy is the info policy every test client is built with. Mocked
+// infoGetter expectations must match it, because the client passes its own
+// policy to RequestInfo instead of taking one per call.
+var testInfoPolicy = a.NewInfoPolicy()
+
 // newClient for testing purposes.
 // We can't mock version check for dict load,
 func newClient(
@@ -327,7 +332,7 @@ func Test_buildSindexCmd(t *testing.T) {
 	mockNodeGetter := mocks.NewMockNodeGetter(t)
 	mockNodeGetter.EXPECT().GetRandomNode().Return(&a.Node{}, nil).Maybe()
 
-	ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1024,7 +1029,7 @@ func Test_parseInfoResponse(t *testing.T) {
 func newMockInfoGetter(t *testing.T, arg string, resp map[string]string, err a.Error) infoGetter {
 	t.Helper()
 	mockInfoGetter := mocks.NewMockinfoGetter(t)
-	mockInfoGetter.On("RequestInfo", (*a.InfoPolicy)(nil), []string{arg}).Return(resp, err)
+	mockInfoGetter.On("RequestInfo", testInfoPolicy, []string{arg}).Return(resp, err)
 	return mockInfoGetter
 }
 
@@ -1032,8 +1037,7 @@ func Test_getAerospikeVersion(t *testing.T) {
 	t.Parallel()
 
 	type args struct {
-		node   infoGetter
-		policy *a.InfoPolicy
+		node infoGetter
 	}
 	tests := []struct {
 		args    args
@@ -1044,7 +1048,7 @@ func Test_getAerospikeVersion(t *testing.T) {
 		{
 			name: "positive simple",
 			args: args{
-				node: newMockInfoGetter(t, "build", map[string]string{"build": "5.6.0.0"}, nil),
+				node: newMockInfoGetter(t, cmdBuild, map[string]string{cmdBuild: "5.6.0.0"}, nil),
 			},
 			want: infomodels.AerospikeVersion{
 				Major: 5,
@@ -1055,7 +1059,7 @@ func Test_getAerospikeVersion(t *testing.T) {
 		{
 			name: "positive dev build",
 			args: args{
-				node: newMockInfoGetter(t, "build", map[string]string{"build": "7.6.1.0-rc2-ghasd"}, nil),
+				node: newMockInfoGetter(t, cmdBuild, map[string]string{cmdBuild: "7.6.1.0-rc2-ghasd"}, nil),
 			},
 			want: infomodels.AerospikeVersion{
 				Major: 7,
@@ -1066,7 +1070,14 @@ func Test_getAerospikeVersion(t *testing.T) {
 		{
 			name: "negative request info fails",
 			args: args{
-				node: newMockInfoGetter(t, "build", nil, a.ErrNetTimeout),
+				node: newMockInfoGetter(t, cmdBuild, nil, a.ErrNetTimeout),
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative command response reports an error",
+			args: args{
+				node: newMockInfoGetter(t, cmdBuild, map[string]string{cmdBuild: errCmdRespPrefix + ": unknown command"}, nil),
 			},
 			wantErr: true,
 		},
@@ -1079,9 +1090,9 @@ func Test_getAerospikeVersion(t *testing.T) {
 			mockNodeGetter := mocks.NewMockNodeGetter(t)
 			mockNodeGetter.EXPECT().GetRandomNode().Return(&a.Node{}, nil).Maybe()
 
-			ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+			ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
 
-			got, err := ic.getAerospikeVersion(tt.args.node, tt.args.policy)
+			got, err := ic.getAerospikeVersion(tt.args.node)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getAerospikeVersion() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1093,33 +1104,142 @@ func Test_getAerospikeVersion(t *testing.T) {
 	}
 }
 
+// Test_getAerospikeVersion_errorMessage covers every way the build request can
+// fail. All of them are reported by the same message, which must name the
+// operation and must not claim the response was parsed.
+func Test_getAerospikeVersion_errorMessage(t *testing.T) {
+	t.Parallel()
+
+	const wantMsg = "failed to get build version"
+
+	tests := []struct {
+		resp   map[string]string
+		reqErr a.Error
+		name   string
+	}{
+		{
+			name:   "request fails",
+			reqErr: a.ErrNetTimeout,
+		},
+		{
+			name: "command response reports an error",
+			resp: map[string]string{cmdBuild: errCmdRespPrefix + ": unknown command"},
+		},
+		{
+			name: "response misses the command key",
+			resp: map[string]string{"bad-key": "7.1.0.0"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			node := newMockInfoGetter(t, cmdBuild, tt.resp, tt.reqErr)
+			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
+
+			_, err := ic.getAerospikeVersion(node)
+			require.Error(t, err)
+			require.ErrorIs(t, err, errclass.ErrAerospike)
+			assert.Contains(t, err.Error(), wantMsg)
+		})
+	}
+}
+
+// TestClient_randomNodeErrorIsPreserved guards the report of a failed cluster
+// node lookup. A const aerospike error wraps nothing, so unwrapping it before
+// reporting dropped the message and left a formatting placeholder instead.
+func TestClient_randomNodeErrorIsPreserved(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testNamespace = "source-ns1"
+		wantMsg       = "cluster is empty"
+	)
+
+	tests := []struct {
+		run  func(ctx context.Context, ic *Client) error
+		name string
+	}{
+		{
+			name: "GetSIndexes",
+			run: func(ctx context.Context, ic *Client) error {
+				_, err := ic.GetSIndexes(ctx, testNamespace)
+
+				return err
+			},
+		},
+		{
+			name: "GetUDFs",
+			run: func(ctx context.Context, ic *Client) error {
+				_, err := ic.GetUDFs(ctx)
+
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockNodeGetter := mocks.NewMockNodeGetter(t)
+			mockNodeGetter.EXPECT().GetRandomNode().Return(nil, a.ErrClusterIsEmpty)
+
+			ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, 1))
+
+			err := tt.run(t.Context(), ic)
+			require.Error(t, err)
+			require.ErrorIs(t, err, errclass.ErrAerospike)
+			assert.Contains(t, err.Error(), wantMsg)
+		})
+	}
+}
+
 func Test_getSIndexes(t *testing.T) {
 	t.Parallel()
+
+	const (
+		testNamespace   = "test"
+		testBuildNoCtx  = "5.6.0.0"
+		testBuildCtx    = "7.1.0.0"
+		testSIndexB64   = "AAAAAA=="
+		testSIndexNoCtx = "ns=test:set=testset:indexname=testindex:bin=testbin:" +
+			"type=numeric:indextype=default:context=null:state=RW"
+		testSIndexWithCtx = "ns=test:set=testset:indexname=testindex:bin=testbin:" +
+			"type=numeric:indextype=default:context=" + testSIndexB64 + ":state=RW"
+	)
+
+	cmdSIndexNoCtx := fmt.Sprintf(cmdSindexList, testNamespace)
+	cmdSIndexWithCtx := cmdSIndexNoCtx + ";b64=true"
+
 	mockInfoGetterNoCtx := mocks.NewMockinfoGetter(t)
-	mockInfoGetterNoCtx.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"build"}).Return(
-		map[string]string{"build": "5.6.0.0"},
+	mockInfoGetterNoCtx.EXPECT().RequestInfo(testInfoPolicy, []string{cmdBuild}).Return(
+		map[string]string{cmdBuild: testBuildNoCtx},
 		nil,
 	)
-	mockInfoGetterNoCtx.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"sindex-list:namespace=test"}).Return(map[string]string{
-		"sindex-list:namespace=test": "ns=test:set=testset:indexname=testindex:bin=testbin:type=numeric:indextype=default:context=null:state=RW",
+	mockInfoGetterNoCtx.EXPECT().RequestInfo(testInfoPolicy, []string{cmdSIndexNoCtx}).Return(map[string]string{
+		cmdSIndexNoCtx: testSIndexNoCtx,
 	}, nil)
 
 	mockInfoGetterCtx := mocks.NewMockinfoGetter(t)
-	mockInfoGetterCtx.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"build"}).Return(map[string]string{"build": "7.1.0.0"}, nil)
-	mockInfoGetterCtx.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"sindex-list:namespace=test;b64=true"}).Return(map[string]string{
-		"sindex-list:namespace=test;b64=true": "ns=test:set=testset:indexname=testindex:bin=testbin:type=numeric:indextype=default:context=AAAAAA==:state=RW",
+	mockInfoGetterCtx.EXPECT().RequestInfo(testInfoPolicy, []string{cmdBuild}).
+		Return(map[string]string{cmdBuild: testBuildCtx}, nil)
+	mockInfoGetterCtx.EXPECT().RequestInfo(testInfoPolicy, []string{cmdSIndexWithCtx}).Return(map[string]string{
+		cmdSIndexWithCtx: testSIndexWithCtx,
 	}, nil)
 
 	mockInfoGetterGetBuildFailed := mocks.NewMockinfoGetter(t)
-	mockInfoGetterGetBuildFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"build"}).Return(nil, a.ErrNetTimeout)
+	mockInfoGetterGetBuildFailed.EXPECT().RequestInfo(testInfoPolicy, []string{cmdBuild}).Return(nil, a.ErrNetTimeout)
 
 	mockInfoGetterGetSIndexesFailed := mocks.NewMockinfoGetter(t)
-	mockInfoGetterGetSIndexesFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"build"}).Return(map[string]string{"build": "7.1.0.0"}, nil)
-	mockInfoGetterGetSIndexesFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"sindex-list:namespace=test;b64=true"}).Return(nil, a.ErrNetwork)
+	mockInfoGetterGetSIndexesFailed.EXPECT().RequestInfo(testInfoPolicy, []string{cmdBuild}).
+		Return(map[string]string{cmdBuild: testBuildCtx}, nil)
+	mockInfoGetterGetSIndexesFailed.EXPECT().RequestInfo(testInfoPolicy, []string{cmdSIndexWithCtx}).
+		Return(nil, a.ErrNetwork)
 
 	type args struct {
 		conn      infoGetter
-		policy    *a.InfoPolicy
 		namespace string
 	}
 	tests := []struct {
@@ -1132,11 +1252,11 @@ func Test_getSIndexes(t *testing.T) {
 			name: "positive no ctx",
 			args: args{
 				conn:      mockInfoGetterNoCtx,
-				namespace: "test",
+				namespace: testNamespace,
 			},
 			want: []*models.SIndex{
 				{
-					Namespace: "test",
+					Namespace: testNamespace,
 					Name:      "testindex",
 					Set:       "testset",
 					Path: models.SIndexPath{
@@ -1151,17 +1271,17 @@ func Test_getSIndexes(t *testing.T) {
 			name: "positive with ctx",
 			args: args{
 				conn:      mockInfoGetterCtx,
-				namespace: "test",
+				namespace: testNamespace,
 			},
 			want: []*models.SIndex{
 				{
-					Namespace: "test",
+					Namespace: testNamespace,
 					Name:      "testindex",
 					Set:       "testset",
 					Path: models.SIndexPath{
 						BinName:    "testbin",
 						BinType:    models.NumericSIDataType,
-						B64Context: "AAAAAA==",
+						B64Context: testSIndexB64,
 					},
 					IndexType: models.BinSIndex,
 				},
@@ -1171,7 +1291,7 @@ func Test_getSIndexes(t *testing.T) {
 			name: "negative get build fails",
 			args: args{
 				conn:      mockInfoGetterGetBuildFailed,
-				namespace: "test",
+				namespace: testNamespace,
 			},
 			wantErr: true,
 		},
@@ -1179,7 +1299,7 @@ func Test_getSIndexes(t *testing.T) {
 			name: "negative get sindex fails",
 			args: args{
 				conn:      mockInfoGetterGetSIndexesFailed,
-				namespace: "test",
+				namespace: testNamespace,
 			},
 			wantErr: true,
 		},
@@ -1188,12 +1308,13 @@ func Test_getSIndexes(t *testing.T) {
 	mockNodeGetter := mocks.NewMockNodeGetter(t)
 	mockNodeGetter.EXPECT().GetRandomNode().Return(&a.Node{}, nil).Maybe()
 
-	ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := ic.requestSIndexes(tt.args.conn, tt.args.namespace, tt.args.policy, false)
+
+			ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
+
+			got, err := ic.requestSIndexes(tt.args.conn, tt.args.namespace, false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getSIndexes() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1321,7 +1442,7 @@ func Test_parseSIndexResponse(t *testing.T) {
 		},
 	}
 	mockNodeGetter := mocks.NewMockNodeGetter(t)
-	ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1567,10 +1688,18 @@ func Test_parseUDFResponse(t *testing.T) {
 
 func Test_getUDF(t *testing.T) {
 	t.Parallel()
+
+	const (
+		testUDFName    = "test.lua"
+		testUDFContent = "function test()\n return 1\n end\n"
+	)
+
+	testUDFCmd := fmt.Sprintf(cmdUdfGetFilename, testUDFName)
+	testUDFResp := "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte(testUDFContent))
+
 	type args struct {
-		node   infoGetter
-		policy *a.InfoPolicy
-		name   string
+		node infoGetter
+		name string
 	}
 	tests := []struct {
 		args    args
@@ -1581,32 +1710,42 @@ func Test_getUDF(t *testing.T) {
 		{
 			name: "positive simple",
 			args: args{
-				node: newMockInfoGetter(t, "udf-get:filename=test.lua", map[string]string{
-					"udf-get:filename=test.lua": "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
+				node: newMockInfoGetter(t, testUDFCmd, map[string]string{
+					testUDFCmd: testUDFResp,
 				}, nil),
-				name: "test.lua",
+				name: testUDFName,
 			},
 			want: &models.UDF{
 				UDFType: models.UDFTypeLUA,
-				Content: []byte("function test()\n return 1\n end\n"),
-				Name:    "test.lua",
+				Content: []byte(testUDFContent),
+				Name:    testUDFName,
 			},
 		},
 		{
 			name: "negative response has wrong command key",
 			args: args{
-				node: newMockInfoGetter(t, "udf-get:filename=test.lua", map[string]string{
-					"bad-key": "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
+				node: newMockInfoGetter(t, testUDFCmd, map[string]string{
+					"bad-key": testUDFResp,
 				}, nil),
-				name: "test.lua",
+				name: testUDFName,
 			},
 			wantErr: true,
 		},
 		{
 			name: "negative infoGetter returned an error",
 			args: args{
-				node: newMockInfoGetter(t, "udf-get:filename=test.lua", nil, a.ErrConnectionPoolEmpty),
-				name: "test.lua",
+				node: newMockInfoGetter(t, testUDFCmd, nil, a.ErrConnectionPoolEmpty),
+				name: testUDFName,
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative command response reports an error",
+			args: args{
+				node: newMockInfoGetter(t, testUDFCmd, map[string]string{
+					testUDFCmd: errCmdRespPrefix + ": file not found",
+				}, nil),
+				name: testUDFName,
 			},
 			wantErr: true,
 		},
@@ -1615,12 +1754,12 @@ func Test_getUDF(t *testing.T) {
 	mockNodeGetter := mocks.NewMockNodeGetter(t)
 	mockNodeGetter.EXPECT().GetRandomNode().Return(&a.Node{}, nil).Maybe()
 
-	ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := ic.getUDF(tt.args.node, tt.args.name, tt.args.policy)
+			got, err := ic.getUDF(tt.args.node, tt.args.name)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getUDF() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1634,34 +1773,54 @@ func Test_getUDF(t *testing.T) {
 
 func Test_getUDFs(t *testing.T) {
 	t.Parallel()
+
+	const (
+		testUDF1Name    = "test1.lua"
+		testUDF2Name    = "test2.lua"
+		testUDF1Content = "function test()\n return 1\n end\n"
+		testUDF2Content = "function test()\n return 2\n end\n"
+	)
+
+	var (
+		testUDF1Cmd = fmt.Sprintf(cmdUdfGetFilename, testUDF1Name)
+		testUDF2Cmd = fmt.Sprintf(cmdUdfGetFilename, testUDF2Name)
+
+		testUDF1Resp = "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte(testUDF1Content))
+		testUDF2Resp = "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte(testUDF2Content))
+	)
+
 	mockInfoGetter := mocks.NewMockinfoGetter(t)
-	mockInfoGetter.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"udf-list"}).Return(map[string]string{
-		"udf-list": "filename=test1.lua;filename=test2.lua;",
+	mockInfoGetter.EXPECT().RequestInfo(testInfoPolicy, []string{cmdUdfList}).Return(map[string]string{
+		cmdUdfList: "filename=" + testUDF1Name + ";filename=" + testUDF2Name + ";",
 	}, nil)
-	mockInfoGetter.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"udf-get:filename=test1.lua"}).Return(map[string]string{
-		"udf-get:filename=test1.lua": "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
+	mockInfoGetter.EXPECT().RequestInfo(testInfoPolicy, []string{testUDF1Cmd}).Return(map[string]string{
+		testUDF1Cmd: testUDF1Resp,
 	}, nil)
-	mockInfoGetter.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"udf-get:filename=test2.lua"}).Return(map[string]string{
-		"udf-get:filename=test2.lua": "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte("function test()\n return 2\n end\n")),
+	mockInfoGetter.EXPECT().RequestInfo(testInfoPolicy, []string{testUDF2Cmd}).Return(map[string]string{
+		testUDF2Cmd: testUDF2Resp,
 	}, nil)
 
 	mockInfoGetterNoUDFs := mocks.NewMockinfoGetter(t)
-	mockInfoGetterNoUDFs.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"udf-list"}).Return(map[string]string{
-		"udf-list": "",
+	mockInfoGetterNoUDFs.EXPECT().RequestInfo(testInfoPolicy, []string{cmdUdfList}).Return(map[string]string{
+		cmdUdfList: "",
 	}, nil)
 
 	mockInfoGetterListUDFsFailed := mocks.NewMockinfoGetter(t)
-	mockInfoGetterListUDFsFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"udf-list"}).Return(nil, a.ErrNetTimeout)
+	mockInfoGetterListUDFsFailed.EXPECT().RequestInfo(testInfoPolicy, []string{cmdUdfList}).Return(nil, a.ErrNetTimeout)
+
+	mockInfoGetterListUDFsRespErr := mocks.NewMockinfoGetter(t)
+	mockInfoGetterListUDFsRespErr.EXPECT().RequestInfo(testInfoPolicy, []string{cmdUdfList}).Return(map[string]string{
+		cmdUdfList: errCmdRespPrefix + ": not authenticated",
+	}, nil)
 
 	mockInfoGetterGetUDFFailed := mocks.NewMockinfoGetter(t)
-	mockInfoGetterGetUDFFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"udf-list"}).Return(map[string]string{
-		"udf-list": "filename=test1.lua;",
+	mockInfoGetterGetUDFFailed.EXPECT().RequestInfo(testInfoPolicy, []string{cmdUdfList}).Return(map[string]string{
+		cmdUdfList: "filename=" + testUDF1Name + ";",
 	}, nil)
-	mockInfoGetterGetUDFFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"udf-get:filename=test1.lua"}).Return(nil, a.ErrNetwork)
+	mockInfoGetterGetUDFFailed.EXPECT().RequestInfo(testInfoPolicy, []string{testUDF1Cmd}).Return(nil, a.ErrNetwork)
 
 	type args struct {
-		node   infoGetter
-		policy *a.InfoPolicy
+		node infoGetter
 	}
 	tests := []struct {
 		name    string
@@ -1677,13 +1836,13 @@ func Test_getUDFs(t *testing.T) {
 			want: []*models.UDF{
 				{
 					UDFType: models.UDFTypeLUA,
-					Content: []byte("function test()\n return 1\n end\n"),
-					Name:    "test1.lua",
+					Content: []byte(testUDF1Content),
+					Name:    testUDF1Name,
 				},
 				{
 					UDFType: models.UDFTypeLUA,
-					Content: []byte("function test()\n return 2\n end\n"),
-					Name:    "test2.lua",
+					Content: []byte(testUDF2Content),
+					Name:    testUDF2Name,
 				},
 			},
 		},
@@ -1702,6 +1861,13 @@ func Test_getUDFs(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "negative udf-list response reports an error",
+			args: args{
+				node: mockInfoGetterListUDFsRespErr,
+			},
+			wantErr: true,
+		},
+		{
 			name: "negative getting a UDF failed",
 			args: args{
 				node: mockInfoGetterGetUDFFailed,
@@ -1713,12 +1879,12 @@ func Test_getUDFs(t *testing.T) {
 	mockNodeGetter := mocks.NewMockNodeGetter(t)
 	mockNodeGetter.EXPECT().GetRandomNode().Return(&a.Node{}, nil).Maybe()
 
-	ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := ic.getUDFs(tt.args.node, tt.args.policy)
+			got, err := ic.getUDFs(tt.args.node)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getUDFs() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1732,71 +1898,78 @@ func Test_getUDFs(t *testing.T) {
 
 func TestGetRecordCount(t *testing.T) {
 	t.Parallel()
+
+	const (
+		testNamespace = "myNamespace"
+		testSet       = "mySet"
+	)
+
+	testSetsCmd := fmt.Sprintf(cmdSetsOfNamespace, testNamespace)
+
 	mockInfoGetter := mocks.NewMockinfoGetter(t)
-	mockInfoGetter.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"sets/myNamespace"}).Return(map[string]string{
-		"sets/myNamespace": "set=mySet:objects=2",
+	mockInfoGetter.EXPECT().RequestInfo(testInfoPolicy, []string{testSetsCmd}).Return(map[string]string{
+		testSetsCmd: "set=" + testSet + ":objects=2",
 	}, nil)
 
 	mockInfoGetterNoSets := mocks.NewMockinfoGetter(t)
-	mockInfoGetterNoSets.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"sets/myNamespace"}).Return(map[string]string{
-		"sets/myNamespace": "",
+	mockInfoGetterNoSets.EXPECT().RequestInfo(testInfoPolicy, []string{testSetsCmd}).Return(map[string]string{
+		testSetsCmd: "",
 	}, nil)
 
 	mockInfoGetterReqFail := mocks.NewMockinfoGetter(t)
-	mockInfoGetterReqFail.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"sets/myNamespace"}).Return(nil, a.ErrNetTimeout)
+	mockInfoGetterReqFail.EXPECT().RequestInfo(testInfoPolicy, []string{testSetsCmd}).Return(nil, a.ErrNetTimeout)
 
+	mockInfoGetterRespErr := mocks.NewMockinfoGetter(t)
+	mockInfoGetterRespErr.EXPECT().RequestInfo(testInfoPolicy, []string{testSetsCmd}).Return(map[string]string{
+		testSetsCmd: errCmdRespPrefix + ": unknown namespace",
+	}, nil)
+
+	type args struct {
+		node infoGetter
+		sets []string
+	}
 	tests := []struct {
 		err  error
 		name string
-		args struct {
-			node infoGetter
-			sets []string
-		}
+		args args
 		want uint64
 	}{
 		{
 			name: "positive with specified sets",
-			args: struct {
-				node infoGetter
-				sets []string
-			}{node: mockInfoGetter, sets: []string{"mySet"}},
+			args: args{node: mockInfoGetter, sets: []string{testSet}},
 			want: 2,
 		},
 		{
 			name: "positive with no sets specified",
-			args: struct {
-				node infoGetter
-				sets []string
-			}{node: mockInfoGetter, sets: nil},
+			args: args{node: mockInfoGetter, sets: nil},
 			want: 2,
 		},
 		{
 			name: "positive with no sets found",
-			args: struct {
-				node infoGetter
-				sets []string
-			}{node: mockInfoGetterNoSets, sets: nil},
+			args: args{node: mockInfoGetterNoSets, sets: nil},
 			want: 0,
 		},
 		{
 			name: "negative request failed",
-			args: struct {
-				node infoGetter
-				sets []string
-			}{node: mockInfoGetterReqFail, sets: nil},
-			err: a.ErrNetTimeout,
+			args: args{node: mockInfoGetterReqFail, sets: nil},
+			err:  a.ErrNetTimeout,
+		},
+		{
+			name: "negative command response reports an error",
+			args: args{node: mockInfoGetterRespErr, sets: nil},
+			err:  errclass.ErrAerospike,
 		},
 	}
 
 	mockNodeGetter := mocks.NewMockNodeGetter(t)
 	mockNodeGetter.EXPECT().GetRandomNode().Return(&a.Node{}, nil).Maybe()
 
-	ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := ic.getRecordCountForNode(tt.args.node, nil, "myNamespace", tt.args.sets)
+			got, err := ic.getRecordCountForNode(tt.args.node, testNamespace, tt.args.sets)
 			if err != nil && !errors.Is(err, tt.err) {
 				t.Errorf("GetRecordCount() error = %v, wantErr %v", err, tt.err)
 				return
@@ -1904,7 +2077,7 @@ func TestClient_GetBackupStatus(t *testing.T) {
 	mockNodeGetter := mocks.NewMockNodeGetter(t)
 	mockNodeGetter.EXPECT().GetNodes().Return([]*a.Node{})
 
-	ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
 
 	ctx := t.Context()
 
@@ -1918,7 +2091,7 @@ func TestClient_AbortServerBackup(t *testing.T) {
 	const testBackupID = "523607479"
 
 	// The command sent to the principal must carry the job being aborted.
-	ic := newClient(mocks.NewMockNodeGetter(t), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
 	require.Equal(t,
 		"backup-abort:job-id="+testBackupID,
 		fmt.Sprintf(ic.cmdDict[cmdIDBackupAbort], testBackupID),
@@ -1929,7 +2102,7 @@ func TestClient_AbortServerBackup(t *testing.T) {
 	mockNodeGetter := mocks.NewMockNodeGetter(t)
 	mockNodeGetter.EXPECT().GetRandomNode().Return(nil, a.ErrInvalidParam).Maybe()
 
-	ic = newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewRetryPolicy(0, 1, 1))
+	ic = newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, 1))
 
 	err := ic.AbortBackup(t.Context(), testBackupID)
 
@@ -1979,7 +2152,7 @@ func TestClient_AbortRestore_Command(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ic := newClient(mocks.NewMockNodeGetter(t), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
 
 			got := fmt.Sprintf(ic.cmdDict[cmdIDRestoreAbort], tt.namespace, tt.jobID)
 
@@ -2010,7 +2183,7 @@ func TestClient_AbortRestore(t *testing.T) {
 				mockNodeGetter := mocks.NewMockNodeGetter(t)
 				mockNodeGetter.EXPECT().GetRandomNode().Return(nil, a.ErrInvalidParam)
 
-				ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewRetryPolicy(0, 1, testMaxRetries))
+				ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, testMaxRetries))
 
 				return ic, t.Context()
 			},
@@ -2027,7 +2200,7 @@ func TestClient_AbortRestore(t *testing.T) {
 
 				// The backoff must be long enough for the canceled context, and not
 				// the elapsed delay, to end the wait between the attempts.
-				ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewRetryPolicy(time.Hour, 1, testMaxRetries))
+				ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(time.Hour, 1, testMaxRetries))
 
 				ctx, cancel := context.WithCancel(t.Context())
 				cancel()
@@ -2041,7 +2214,7 @@ func TestClient_AbortRestore(t *testing.T) {
 			setup: func(t *testing.T) (*Client, context.Context) {
 				t.Helper()
 
-				ic := newClient(mocks.NewMockNodeGetter(t), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+				ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
 				ic.retryPolicy = nil
 
 				return ic, t.Context()
@@ -2160,7 +2333,7 @@ func TestFilterBackupsSortedByTimeSinceDone(t *testing.T) {
 func newTestClient(t *testing.T) *Client {
 	t.Helper()
 	return &Client{
-		policy:      nil,
+		policy:      testInfoPolicy,
 		retryPolicy: models.NewDefaultRetryPolicy(),
 		cmdDict: map[int]string{
 			cmdIDBackupStatus: cmdBackupStatus,
@@ -2285,7 +2458,8 @@ func TestClient_getBackupStatusByNode_RequestInfoError(t *testing.T) {
 	_, err := ic.getBackupStatusByNode(node, testJobID)
 	require.Error(t, err)
 
-	assert.Contains(t, err.Error(), "failed to get backup status")
+	assert.Contains(t, err.Error(), "failed to request backup status")
+	assert.ErrorIs(t, err, errclass.ErrAerospike)
 }
 
 // TestClient_RetriesAreNotNested guards the commands that look the cluster principal
@@ -2367,12 +2541,252 @@ func TestClient_RetriesAreNotNested(t *testing.T) {
 			// for the principal. A single inactive node keeps them going.
 			mockNodeGetter.EXPECT().GetNodes().Return([]*a.Node{{}}).Maybe()
 
-			ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewRetryPolicy(0, 1, testMaxRetries))
+			ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, testMaxRetries))
 
 			err := tt.call(t.Context(), ic)
 
 			require.ErrorIs(t, err, errclass.ErrAerospike)
 			require.Equal(t, testMaxRetries, attempts)
+		})
+	}
+}
+
+// Test_isRestoreStarted covers the state and job id matrix that decides whether
+// the server accepted a restore start command. Only RESTORING and FAILED belong
+// to a started job, and only for the job id that was asked for: restore-status
+// is keyed by namespace, so a state left by an earlier restore of the same
+// namespace must not be taken for the current one.
+func Test_isRestoreStarted(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testJobID   = "260922T103653-5xsr"
+		testOtherID = "260922T090000-abcd"
+	)
+
+	tests := []struct {
+		name string
+		give []infomodels.InfoMap
+		want bool
+	}{
+		{
+			name: "restoring for this job",
+			give: []infomodels.InfoMap{{fieldJobID: testJobID, fieldState: infomodels.RestoreStateRestoring}},
+			want: true,
+		},
+		{
+			name: "failed for this job",
+			give: []infomodels.InfoMap{{fieldJobID: testJobID, fieldState: infomodels.RestoreStateFailed}},
+			want: true,
+		},
+		{
+			name: "preparing is not a started job",
+			give: []infomodels.InfoMap{{fieldJobID: testJobID, fieldState: infomodels.RestoreStatePreparing}},
+			want: false,
+		},
+		{
+			name: "ready is not a started job",
+			give: []infomodels.InfoMap{{fieldJobID: testJobID, fieldState: infomodels.RestoreStateReady}},
+			want: false,
+		},
+		{
+			name: "none is not a started job",
+			give: []infomodels.InfoMap{{fieldJobID: testJobID, fieldState: infomodels.RestoreStateNone}},
+			want: false,
+		},
+		{
+			name: "restoring left by another job",
+			give: []infomodels.InfoMap{{fieldJobID: testOtherID, fieldState: infomodels.RestoreStateRestoring}},
+			want: false,
+		},
+		{
+			name: "response carries no job id",
+			give: []infomodels.InfoMap{{fieldState: infomodels.RestoreStateRestoring}},
+			want: false,
+		},
+		{
+			name: "response carries no state",
+			give: []infomodels.InfoMap{{fieldJobID: testJobID}},
+			want: false,
+		},
+		{
+			name: "this job found among several",
+			give: []infomodels.InfoMap{
+				{fieldJobID: testOtherID, fieldState: infomodels.RestoreStateReady},
+				{fieldJobID: testJobID, fieldState: infomodels.RestoreStateRestoring},
+			},
+			want: true,
+		},
+		{
+			name: "empty response",
+			give: nil,
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, isRestoreStarted(tt.give, testJobID))
+		})
+	}
+}
+
+// TestClient_sendStartBackup checks the error plumbing of the backup start. A
+// start that failed must either be confirmed by the state of its own job id or
+// be reported with its original cause: the cause used to be replaced by the
+// status lookup error, or lost entirely when that lookup succeeded.
+func TestClient_sendStartBackup(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testJobID     = "260922T103653-5xsr"
+		testNamespace = "source-ns1"
+		testStartCmd  = "backup:namespace=" + testNamespace + ";job-id=" + testJobID
+		testAccepted  = "ok"
+	)
+
+	runningStatus := fmt.Sprintf("job-id=%s:ns=%s:state=INCR_SCAN_ACTIVE", testJobID, testNamespace)
+	failedStatus := fmt.Sprintf("job-id=%s:ns=%s:state=FAILED", testJobID, testNamespace)
+	statusCmd := fmt.Sprintf(cmdBackupStatus, testJobID)
+
+	tests := []struct {
+		startErr   a.Error
+		statusErr  a.Error
+		wantErrIs  error
+		name       string
+		startResp  string
+		statusResp string
+	}{
+		{
+			name:      "start accepted",
+			startResp: testAccepted,
+		},
+		{
+			name:       "start failed but the job is running",
+			startErr:   a.ErrNetTimeout,
+			statusResp: runningStatus,
+		},
+		{
+			name:       "start failed and the job already failed on the server",
+			startErr:   a.ErrNetTimeout,
+			statusResp: failedStatus,
+		},
+		{
+			name:      "start failed and the server holds no state for the job",
+			startErr:  a.ErrNetTimeout,
+			wantErrIs: a.ErrNetTimeout,
+		},
+		{
+			name:      "start failed and the status is unavailable",
+			startErr:  a.ErrNetTimeout,
+			statusErr: a.ErrNetwork,
+			wantErrIs: a.ErrNetTimeout,
+		},
+		{
+			name:      "start response reports an error",
+			startResp: errCmdRespPrefix + ": backup already running",
+			wantErrIs: errclass.ErrAerospike,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			node := mocks.NewMockinfoGetter(t)
+			node.EXPECT().RequestInfo(testInfoPolicy, []string{testStartCmd}).
+				Return(map[string]string{testStartCmd: tt.startResp}, tt.startErr).Once()
+			// Registered for the job id command only: a lookup by namespace, as the
+			// code used to do, has no matching expectation and fails the test.
+			node.EXPECT().RequestInfo(testInfoPolicy, []string{statusCmd}).
+				Return(map[string]string{statusCmd: tt.statusResp}, tt.statusErr).Maybe()
+
+			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
+
+			err := ic.sendStartBackup(node, testStartCmd, testJobID)
+			if tt.wantErrIs != nil {
+				require.ErrorIs(t, err, tt.wantErrIs)
+
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+// TestClient_sendStartRestore checks the error plumbing of the restore start.
+// See TestClient_sendStartBackup for the cause that used to be lost, and
+// Test_isRestoreStarted for the state matrix behind the confirmation.
+func TestClient_sendStartRestore(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testJobID     = "260922T103653-5xsr"
+		testNamespace = "source-ns1"
+		testStartCmd  = "restore:namespace=" + testNamespace + ";job-id=" + testJobID
+		testAccepted  = "ok"
+	)
+
+	restoringStatus := fmt.Sprintf("job-id=%s:ns=%s:state=%s",
+		testJobID, testNamespace, infomodels.RestoreStateRestoring)
+	otherJobStatus := fmt.Sprintf("job-id=%s:ns=%s:state=%s",
+		"260922T090000-abcd", testNamespace, infomodels.RestoreStateRestoring)
+	statusCmd := fmt.Sprintf(cmdRestoreStatus, testNamespace)
+
+	tests := []struct {
+		startErr   a.Error
+		statusErr  a.Error
+		wantErrIs  error
+		name       string
+		startResp  string
+		statusResp string
+	}{
+		{
+			name:      "start accepted",
+			startResp: testAccepted,
+		},
+		{
+			name:       "start failed but the restore is running",
+			startErr:   a.ErrNetTimeout,
+			statusResp: restoringStatus,
+		},
+		{
+			name:       "start failed and the running restore belongs to another job",
+			startErr:   a.ErrNetTimeout,
+			statusResp: otherJobStatus,
+			wantErrIs:  a.ErrNetTimeout,
+		},
+		{
+			name:      "start failed and the status is unavailable",
+			startErr:  a.ErrNetTimeout,
+			statusErr: a.ErrNetwork,
+			wantErrIs: a.ErrNetTimeout,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			node := mocks.NewMockinfoGetter(t)
+			node.EXPECT().RequestInfo(testInfoPolicy, []string{testStartCmd}).
+				Return(map[string]string{testStartCmd: tt.startResp}, tt.startErr).Once()
+			node.EXPECT().RequestInfo(testInfoPolicy, []string{statusCmd}).
+				Return(map[string]string{statusCmd: tt.statusResp}, tt.statusErr).Maybe()
+
+			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
+
+			err := ic.sendStartRestore(node, testStartCmd, testNamespace, testJobID)
+			if tt.wantErrIs != nil {
+				require.ErrorIs(t, err, tt.wantErrIs)
+
+				return
+			}
+
+			require.NoError(t, err)
 		})
 	}
 }

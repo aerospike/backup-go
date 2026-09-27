@@ -25,11 +25,33 @@ import (
 	"strconv"
 	"strings"
 
-	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/models"
 	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
 )
+
+// Separators of the info response format. Most commands separate objects with
+// ";", the key-value pairs inside an object with ":", and a key from its value
+// with "="; the commands that deviate are parsed by their own wrapper below.
+const (
+	infoObjSep     = ";"
+	infoPairSep    = ":"
+	infoKVSep      = "="
+	infoUDFPairSep = ","
+)
+
+// parseStdInfoResponse parses an info response in the format used by most
+// commands. See [parseInfoResponse] for the format itself.
+func parseStdInfoResponse(resp string) ([]infomodels.InfoMap, error) {
+	return parseInfoResponse(resp, infoObjSep, infoPairSep, infoKVSep)
+}
+
+// parseStatisticsResponse parses a statistics info response, which is a single
+// object whose key-value pairs are separated by ";" instead of ":".
+// example resp: cluster_size=1;cluster_key=E0DB3E5C2DB6;cluster_principal=BB9020011AC4202
+func parseStatisticsResponse(resp string) ([]infomodels.InfoMap, error) {
+	return parseInfoResponse(resp, infoObjSep, infoObjSep, infoKVSep)
+}
 
 func parseUDFResponse(udfGetInfoResp string) (*models.UDF, error) {
 	udfInfo, err := parseUDFGetResponse(udfGetInfoResp)
@@ -58,11 +80,11 @@ func parseResultResponse(cmd string, result map[string]string) (string, error) {
 	return v, nil
 }
 
-func (ic *Client) requestSIndexes(node infoGetter, namespace string, policy *a.InfoPolicy, noWarn bool,
+func (ic *Client) requestSIndexes(node infoGetter, namespace string, noWarn bool,
 ) ([]*models.SIndex, error) {
 	supportsSIndexCTX := infomodels.AerospikeVersionSupportsSIndexContext
 
-	version, err := ic.getAerospikeVersion(node, policy)
+	version, err := ic.getAerospikeVersion(node)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get aerospike version: %w", err)
 	}
@@ -70,14 +92,9 @@ func (ic *Client) requestSIndexes(node infoGetter, namespace string, policy *a.I
 	getCtx := version.IsGreaterOrEqual(supportsSIndexCTX)
 	cmd := ic.buildSindexCmd(namespace, getCtx)
 
-	response, err := node.RequestInfo(policy, cmd)
+	cmdResp, err := ic.requestByNode(node, cmd)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sindexes: %w", err)
-	}
-
-	cmdResp, err := parseResultResponse(cmd, response)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse sindexes response: %w", err)
+		return nil, fmt.Errorf("failed to request sindexes response: %w", err)
 	}
 
 	return ic.parseSIndexes(cmdResp, noWarn)
@@ -95,19 +112,13 @@ func (ic *Client) buildSindexCmd(namespace string, getCtx bool) string {
 	return cmd
 }
 
-func (ic *Client) getAerospikeVersion(conn infoGetter, policy *a.InfoPolicy) (infomodels.AerospikeVersion, error) {
+func (ic *Client) getAerospikeVersion(node infoGetter) (infomodels.AerospikeVersion, error) {
 	// As we need to check version before we form dict, this command will be loaded directly.
 	cmd := cmdBuild
 
-	versionResp, aErr := conn.RequestInfo(policy, cmd)
-	if aErr != nil {
-		return infomodels.AerospikeVersion{}, fmt.Errorf("%w: failed to get build version: %w",
-			errclass.ErrAerospike, aErr)
-	}
-
-	versionStr, err := parseResultResponse(cmd, versionResp)
+	versionStr, err := ic.requestByNode(node, cmd)
 	if err != nil {
-		return infomodels.AerospikeVersion{}, fmt.Errorf("failed to parse get version response: %s: %w", versionResp, err)
+		return infomodels.AerospikeVersion{}, fmt.Errorf("failed to get build version: %w", err)
 	}
 
 	return parseAerospikeVersion(versionStr)
@@ -447,19 +458,19 @@ func parseInfoKVPair(pair, kvSep string) (key, val string, err error) {
 // parseSindexListResponse parses a sindex-list info response
 // example resp: ns=source-ns1:indexname=idx_timestamp:set=metrics:bin=timestamp:type=numeric:indextype=default
 func parseSindexListResponse(resp string) ([]infomodels.InfoMap, error) {
-	return parseInfoResponse(resp, ";", ":", "=")
+	return parseStdInfoResponse(resp)
 }
 
 // parseUDFListResponse parses a udf-list info response
 // example resp: filename=basic_udf.lua,hash=706c57cb29e027221560a3cb4b693573ada98bf2,type=LUA;...
 func parseUDFListResponse(resp string) ([]infomodels.InfoMap, error) {
-	return parseInfoResponse(resp, ";", ",", "=")
+	return parseInfoResponse(resp, infoObjSep, infoUDFPairSep, infoKVSep)
 }
 
 // parseUDFGetResponse parses a udf-get info response
 // example resp: type=LUA;content=LS0gQSB2ZXJ5IHNpbXBsZSBhcml0
 func parseUDFGetResponse(resp string) (infomodels.InfoMap, error) {
-	return parseInfoObject(resp, ";", "=")
+	return parseInfoObject(resp, infoObjSep, infoKVSep)
 }
 
 func executeWithRetry(ctx context.Context, policy *models.RetryPolicy, command func() error) error {
@@ -468,6 +479,22 @@ func executeWithRetry(ctx context.Context, policy *models.RetryPolicy, command f
 	}
 
 	return policy.Do(ctx, command)
+}
+
+// retryValue runs command under the retry policy and returns the value of its
+// last attempt. It spares the callers the result variable that a plain
+// [executeWithRetry] closure has to capture and assign.
+func retryValue[T any](ctx context.Context, policy *models.RetryPolicy, command func() (T, error)) (T, error) {
+	var result T
+
+	err := executeWithRetry(ctx, policy, func() error {
+		var cmdErr error
+		result, cmdErr = command()
+
+		return cmdErr
+	})
+
+	return result, err
 }
 
 // base64StringToBitArray decodes a base64 string and converts the result to a bitarray (slice of booleans).

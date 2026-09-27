@@ -19,7 +19,6 @@ import (
 	"log/slog"
 	"testing"
 
-	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/asinfo/mocks"
 	"github.com/stretchr/testify/require"
@@ -88,7 +87,7 @@ func TestClient_parseSIndexes_skipsInvalidIndexType(t *testing.T) {
 			t.Parallel()
 
 			mockNodeGetter := mocks.NewMockNodeGetter(t)
-			ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+			ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
 
 			got, err := ic.parseSIndexes(tt.resp, tt.noWarn)
 			if tt.wantErr {
@@ -113,7 +112,7 @@ func TestClient_parseSIndexes_logsSkippedInvalidIndexType(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelWarn}))
 
 	mockNodeGetter := mocks.NewMockNodeGetter(t)
-	ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
 	ic.logger = logger
 
 	got, err := ic.parseSIndexes(invalidSIndexType, false)

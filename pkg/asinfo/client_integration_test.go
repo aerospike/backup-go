@@ -140,7 +140,7 @@ func TestClient_getService(t *testing.T) {
 
 	nodes := ic.GetNodesNames()
 
-	_, err = ic.getByNode(nodes[0], cmdServiceTLSStd)
+	_, err = ic.requestByNodeName(nodes[0], cmdServiceTLSStd)
 	require.NoError(t, err)
 }
 
@@ -244,6 +244,6 @@ func TestClient_getPrincipal(t *testing.T) {
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
 
-	_, err = ic.getPrincipal()
+	_, err = ic.getPrincipalName()
 	require.NoError(t, err)
 }

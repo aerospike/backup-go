@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/aerospike/backup-go/pkg/asinfo/models"
+	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
 )
 
 func TestNewCmdDict(t *testing.T) {
@@ -26,79 +26,60 @@ func TestNewCmdDict(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		version        models.AerospikeVersion
+		version        infomodels.AerospikeVersion
 		expectedCmds   map[int]string
 		expectedLength int
 	}{
 		{
 			name:           "version less than versionLast uses deprecated commands",
-			version:        models.AerospikeVersionSupportsSIndexContext,
-			expectedLength: commandsNumber - 4, // @ new commands are for new version only
+			version:        infomodels.AerospikeVersionSupportsSIndexContext,
+			expectedLength: commandsNumber - 7, // @ new commands are for new version only
 			expectedCmds: map[int]string{
-				cmdIDBuild:               cmdBuild,
-				cmdIDStatus:              cmdStatus,
-				cmdIDNamespaces:          cmdNamespaces,
-				cmdIDSetsOfNamespace:     cmdSetsOfNamespace,
-				cmdIDNamespaceInfo:       cmdNamespaceInfo,
-				cmdIDRack:                cmdRack,
-				cmdIDServiceClearStd:     cmdServiceClearStd,
-				cmdIDServiceTLSStd:       cmdServiceTLSStd,
-				cmdIDSindexList:          cmdSindexListDeprecated, // Deprecated version.
-				cmdIDUdfList:             cmdUdfList,
-				cmdIDUdfGetFilename:      cmdUdfGetFilename,
-				cmdIDCreateXDRDC:         cmdCreateXDRDC,
-				cmdIDCreateConnector:     cmdCreateConnector,
-				cmdIDCreateXDRNode:       cmdCreateXDRNode,
-				cmdIDCreateXDRNamespace:  cmdCreateXDRNamespace,
-				cmdIDDeleteXDRDC:         cmdDeleteXDRDC,
-				cmdIDGetXDRStats:         cmdGetXDRStats,
-				cmdIDBlockMRTWrites:      cmdBlockMRTWrites,
-				cmdIDUnBlockMRTWrites:    cmdUnBlockMRTWrites,
-				cmdIDSetXDRMaxThroughput: cmdSetXDRMaxThroughput,
-				cmdIDSetXDRForward:       cmdSetXDRForward,
-				cmdIDGetConfigXDR:        cmdGetConfigXDR,
-				cmdIDReplicas:            cmdReplicas,
-				cmdIDShowJobsQueries:     cmdShowJobsQueries,
-				cmdIDClusterStable:       cmdClusterStable,
-				cmdIDStatistics:          cmdStatistics,
+				cmdIDBuild:           cmdBuild,
+				cmdIDStatus:          cmdStatus,
+				cmdIDNamespaces:      cmdNamespaces,
+				cmdIDSetsOfNamespace: cmdSetsOfNamespace,
+				cmdIDNamespaceInfo:   cmdNamespaceInfo,
+				cmdIDRack:            cmdRack,
+				cmdIDServiceClearStd: cmdServiceClearStd,
+				cmdIDServiceTLSStd:   cmdServiceTLSStd,
+				cmdIDSindexList:      cmdSindexListDeprecated, // Deprecated version.
+				cmdIDUdfList:         cmdUdfList,
+				cmdIDUdfGetFilename:  cmdUdfGetFilename,
+				cmdIDReplicas:        cmdReplicas,
+				cmdIDShowJobsQueries: cmdShowJobsQueries,
+				cmdIDClusterStable:   cmdClusterStable,
+				cmdIDStatistics:      cmdStatistics,
 			},
 		},
 		{
 			name:           "version greater or equal to versionLast uses new commands",
-			version:        models.AerospikeVersionRecentInfoCommands,
+			version:        infomodels.AerospikeVersionRecentInfoCommands,
 			expectedLength: commandsNumber,
 			expectedCmds: map[int]string{
-				cmdIDBuild:               cmdBuild,
-				cmdIDStatus:              cmdStatus,
-				cmdIDNamespaces:          cmdNamespaces,
-				cmdIDSetsOfNamespace:     cmdSetsOfNamespace,
-				cmdIDNamespaceInfo:       cmdNamespaceInfo,
-				cmdIDRack:                cmdRack,
-				cmdIDServiceClearStd:     cmdServiceClearStd,
-				cmdIDServiceTLSStd:       cmdServiceTLSStd,
-				cmdIDSindexList:          cmdSindexList, // New version.
-				cmdIDUdfList:             cmdUdfList,
-				cmdIDUdfGetFilename:      cmdUdfGetFilename,
-				cmdIDCreateXDRDC:         cmdCreateXDRDC,
-				cmdIDCreateConnector:     cmdCreateConnector,
-				cmdIDCreateXDRNode:       cmdCreateXDRNode,
-				cmdIDCreateXDRNamespace:  cmdCreateXDRNamespace,
-				cmdIDDeleteXDRDC:         cmdDeleteXDRDC,
-				cmdIDGetXDRStats:         cmdGetXDRStats,
-				cmdIDBlockMRTWrites:      cmdBlockMRTWrites,
-				cmdIDUnBlockMRTWrites:    cmdUnBlockMRTWrites,
-				cmdIDSetXDRMaxThroughput: cmdSetXDRMaxThroughput,
-				cmdIDSetXDRForward:       cmdSetXDRForward,
-				cmdIDGetConfigXDR:        cmdGetConfigXDR,
-				cmdIDReplicas:            cmdReplicas,
-				cmdIDShowJobsQueries:     cmdShowJobsQueries,
-				cmdIDClusterStable:       cmdClusterStable,
-				cmdIDStatistics:          cmdStatistics,
+				cmdIDBuild:           cmdBuild,
+				cmdIDStatus:          cmdStatus,
+				cmdIDNamespaces:      cmdNamespaces,
+				cmdIDSetsOfNamespace: cmdSetsOfNamespace,
+				cmdIDNamespaceInfo:   cmdNamespaceInfo,
+				cmdIDRack:            cmdRack,
+				cmdIDServiceClearStd: cmdServiceClearStd,
+				cmdIDServiceTLSStd:   cmdServiceTLSStd,
+				cmdIDSindexList:      cmdSindexList, // New version.
+				cmdIDUdfList:         cmdUdfList,
+				cmdIDUdfGetFilename:  cmdUdfGetFilename,
+				cmdIDReplicas:        cmdReplicas,
+				cmdIDShowJobsQueries: cmdShowJobsQueries,
+				cmdIDClusterStable:   cmdClusterStable,
+				cmdIDStatistics:      cmdStatistics,
 
 				cmdIDServerBackup:         cmdServerBackup,
 				cmdIDServerRestore:        cmdServerRestore,
 				cmdIDServerPrepareRestore: cmdServerPrepareRestore,
 				cmdIDRestoreStatus:        cmdRestoreStatus,
+				cmdIDBackupStatus:         cmdBackupStatus,
+				cmdIDBackupAbort:          cmdBackupAbort,
+				cmdIDRestoreAbort:         cmdRestoreAbort,
 			},
 		},
 	}

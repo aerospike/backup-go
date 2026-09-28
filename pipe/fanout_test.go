@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,43 +20,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/models"
-	"github.com/segmentio/asm/base64"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 const (
 	testBuffer = 100
-	testIndex  = 0
 )
-
-const (
-	testNamespace  = "source-ns1"
-	testSetName    = "set1"
-	testDigestB64  = "/+Ptyjj06wW9zx0AnxOmq45xJzs="
-	testPayloadB64 = "FhABEAAAAAAAAgAnjQAAAAAAAAUAAQAAAAsAc291cmNlLW5zMQAAABUE/+Ptyjj06wW9zx0AnxOmq45xJzsAAAAFAXNldDEAAAAKAgEAAAAAAAADCQAAAAkOAAAAbcndaZgAAAAUAgMAAWF6enp6enp6enp6enp6eno="
-)
-
-func testASBXToken() (*models.ASBXToken, error) {
-	digest, err := base64.StdEncoding.DecodeString(testDigestB64)
-	if err != nil {
-		return nil, err
-	}
-
-	payload, err := base64.StdEncoding.DecodeString(testPayloadB64)
-	if err != nil {
-		return nil, err
-	}
-
-	k, err := aerospike.NewKeyWithDigest(testNamespace, testSetName, "", digest)
-	if err != nil {
-		return nil, err
-	}
-
-	return models.NewASBXToken(k, payload), nil
-}
 
 func TestFanout_Validation(t *testing.T) {
 	t.Parallel()
@@ -64,17 +34,9 @@ func TestFanout_Validation(t *testing.T) {
 	inputs := make([]chan *models.Token, testParallel)
 	outputs := make([]chan *models.Token, testParallel*2)
 
-	fan, err := NewFanout[*models.Token](inputs, outputs, Fixed)
+	fan, err := NewFanout(inputs, outputs, Fixed)
 	require.Nil(t, fan)
 	require.ErrorContains(t, err, "number for Fixed strategy")
-
-	fan, err = NewFanout[*models.Token](inputs, nil, Split)
-	require.Nil(t, fan)
-	require.ErrorContains(t, err, "no outputs provided")
-
-	fan, err = NewFanout[*models.Token](nil, outputs, Split)
-	require.Nil(t, fan)
-	require.ErrorContains(t, err, "no inputs provided")
 }
 
 func TestFanout_RunDefault(t *testing.T) {
@@ -91,7 +53,7 @@ func TestFanout_RunDefault(t *testing.T) {
 		outputs[i] = make(chan *models.Token, testBuffer)
 	}
 
-	fan, err := NewFanout[*models.Token](inputs, outputs, RoundRobin)
+	fan, err := NewFanout(inputs, outputs, RoundRobin)
 	require.NoError(t, err)
 
 	// Generate data.
@@ -141,7 +103,7 @@ func TestFanout_RunStraight(t *testing.T) {
 		outputs[i] = make(chan *models.Token, testBuffer)
 	}
 
-	fan, err := NewFanout[*models.Token](inputs, outputs, Fixed)
+	fan, err := NewFanout(inputs, outputs, Fixed)
 	require.NoError(t, err)
 
 	// Generate data.
@@ -179,56 +141,6 @@ func TestFanout_RunStraight(t *testing.T) {
 	require.Equal(t, testCount*testParallel, counter)
 }
 
-func TestFanout_RunSplit(t *testing.T) {
-	t.Parallel()
-
-	inputs := make([]chan *models.ASBXToken, testParallel)
-	outputs := make([]chan *models.ASBXToken, testParallel)
-
-	for i := range testParallel {
-		inputs[i] = make(chan *models.ASBXToken, testBuffer)
-		outputs[i] = make(chan *models.ASBXToken, testBuffer)
-	}
-
-	fan, err := NewFanout[*models.ASBXToken](inputs, outputs, Split)
-	require.NoError(t, err)
-
-	// Generate data.
-	for i := range inputs {
-		go func(n int) {
-			defer close(inputs[n])
-			for range testCount {
-				time.Sleep(testDelay)
-				token, err := testASBXToken()
-				assert.NoError(t, err)
-				inputs[n] <- token
-			}
-		}(i)
-	}
-
-	// Consume data.
-	var (
-		counter      int
-		counterMutex sync.Mutex
-		wg           sync.WaitGroup
-	)
-	// Count only first output.
-	wg.Go(func() {
-		// For testASBXToken() index will be 2.
-		for range outputs[2] {
-			counterMutex.Lock()
-			counter++
-			counterMutex.Unlock()
-		}
-	})
-
-	fan.Run(t.Context())
-
-	wg.Wait()
-	// Compare results, after all our calculating routines are finished.
-	require.Equal(t, testCount*testParallel, counter)
-}
-
 func TestFanout_RunDefaultContextCancel(t *testing.T) {
 	t.Parallel()
 
@@ -243,7 +155,7 @@ func TestFanout_RunDefaultContextCancel(t *testing.T) {
 		outputs[i] = make(chan *models.Token, testBuffer)
 	}
 
-	fan, err := NewFanout[*models.Token](inputs, outputs, RoundRobin)
+	fan, err := NewFanout(inputs, outputs, RoundRobin)
 	require.NoError(t, err)
 
 	// Generate data.
@@ -299,7 +211,7 @@ func TestFanout_RunStraightContextCancel(t *testing.T) {
 		outputs[i] = make(chan *models.Token, testBuffer)
 	}
 
-	fan, err := NewFanout[*models.Token](inputs, outputs, Fixed)
+	fan, err := NewFanout(inputs, outputs, Fixed)
 	require.NoError(t, err)
 
 	// Generate data.
@@ -329,62 +241,6 @@ func TestFanout_RunStraightContextCancel(t *testing.T) {
 			}
 		})
 	}
-
-	ctx, cancel := context.WithCancel(t.Context())
-	go func() {
-		time.Sleep(testLongDelay)
-		cancel()
-	}()
-
-	fan.Run(ctx)
-
-	wg.Wait()
-	// Compare results, after all our calculating routines are finished.
-	require.Less(t, counter, testCount*testParallel)
-	require.Greater(t, counter, testCount)
-}
-
-func TestFanout_RunSplitContextCancel(t *testing.T) {
-	t.Parallel()
-
-	inputs := make([]chan *models.Token, testParallel)
-	outputs := make([]chan *models.Token, testParallel)
-
-	for i := range testParallel {
-		inputs[i] = make(chan *models.Token, testBuffer)
-		outputs[i] = make(chan *models.Token, testBuffer)
-	}
-
-	fan, err := NewFanout[*models.Token](inputs, outputs, Split)
-	require.NoError(t, err)
-
-	// Generate data.
-	for i := range inputs {
-		go func(n int) {
-			defer close(inputs[n])
-			for j := range testCount {
-				time.Sleep(testDelay)
-				token := testToken()
-				token.Size = uint64(j + n)
-				inputs[n] <- token
-			}
-		}(i)
-	}
-
-	// Consume data.
-	var (
-		counter      int
-		counterMutex sync.Mutex
-		wg           sync.WaitGroup
-	)
-	// Count only first output.
-	wg.Go(func() {
-		for range outputs[testIndex] {
-			counterMutex.Lock()
-			counter++
-			counterMutex.Unlock()
-		}
-	})
 
 	ctx, cancel := context.WithCancel(t.Context())
 	go func() {

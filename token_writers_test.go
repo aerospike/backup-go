@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -75,24 +75,21 @@ func TestTokenWriter(t *testing.T) {
 
 	invalidToken := &models.Token{Type: models.TokenTypeInvalid}
 
-	mockEncoder := mocks.NewMockEncoder[*models.Token](t)
-	mockEncoder.EXPECT().EncodeToken(recToken, mock.Anything).RunAndReturn(func(_ *models.Token, w *bytes.Buffer) error {
-		_, _ = w.WriteString("encoded rec ")
-		return nil
+	mockEncoder := mocks.NewMockEncoder(t)
+	mockEncoder.EXPECT().EncodeToken(recToken, mock.Anything).RunAndReturn(func(_ *models.Token, dst []byte) ([]byte, error) {
+		return append(dst, "encoded rec "...), nil
 	})
-	mockEncoder.EXPECT().EncodeToken(SIndexToken, mock.Anything).RunAndReturn(func(_ *models.Token, w *bytes.Buffer) error {
-		_, _ = w.WriteString("encoded sindex ")
-		return nil
+	mockEncoder.EXPECT().EncodeToken(SIndexToken, mock.Anything).RunAndReturn(func(_ *models.Token, dst []byte) ([]byte, error) {
+		return append(dst, "encoded sindex "...), nil
 	})
-	mockEncoder.EXPECT().EncodeToken(UDFToken, mock.Anything).RunAndReturn(func(_ *models.Token, w *bytes.Buffer) error {
-		_, _ = w.WriteString("encoded UDF ")
-		return nil
+	mockEncoder.EXPECT().EncodeToken(UDFToken, mock.Anything).RunAndReturn(func(_ *models.Token, dst []byte) ([]byte, error) {
+		return append(dst, "encoded UDF "...), nil
 	})
-	mockEncoder.EXPECT().EncodeToken(invalidToken, mock.Anything).Return(errors.New("error"))
+	mockEncoder.EXPECT().EncodeToken(invalidToken, mock.Anything).Return(nil, errors.New("error"))
 
 	b := bytes.Buffer{}
 	dst := newBufferWriteCloser(&b)
-	writer := newTokenWriter[*models.Token](mockEncoder, dst, slog.Default(), nil)
+	writer := newTokenWriter(mockEncoder, dst, slog.Default(), nil)
 	require.NotNil(t, writer)
 
 	_, err := writer.Write(recToken)
@@ -115,7 +112,7 @@ func TestTokenWriter(t *testing.T) {
 		Record: &a.Record{},
 	}
 	failRecToken := models.NewRecordToken(failRec, 0, nil)
-	mockEncoder.EXPECT().EncodeToken(failRecToken, mock.Anything).Return(errors.New("error"))
+	mockEncoder.EXPECT().EncodeToken(failRecToken, mock.Anything).Return(nil, errors.New("error"))
 	_, err = writer.Write(failRecToken)
 	require.Error(t, err)
 
@@ -126,7 +123,7 @@ func TestTokenWriter(t *testing.T) {
 func TestTokenStatsWriter(t *testing.T) {
 	t.Parallel()
 
-	mockWriter := pipemocks.NewMockWriter[*models.Token](t)
+	mockWriter := pipemocks.NewMockWriter(t)
 
 	mockWriter.EXPECT().Write(models.NewRecordToken(&models.Record{}, 0, nil)).Return(1, nil)
 	mockWriter.EXPECT().Write(models.NewSIndexToken(&models.SIndex{}, 0)).Return(1, nil)
@@ -138,7 +135,7 @@ func TestTokenStatsWriter(t *testing.T) {
 	mockStats.EXPECT().AddUDFs(uint32(1))
 	mockStats.EXPECT().AddSIndexes(uint32(1))
 
-	writer := newWriterWithTokenStats[*models.Token](mockWriter, mockStats, slog.Default())
+	writer := newWriterWithTokenStats(mockWriter, mockStats, slog.Default())
 	require.NotNil(t, writer)
 
 	_, err := writer.Write(models.NewRecordToken(&models.Record{}, 0, nil))
@@ -160,13 +157,13 @@ func TestTokenStatsWriter(t *testing.T) {
 func TestTokenStatsWriterWriterFailed(t *testing.T) {
 	t.Parallel()
 
-	mockWriter := pipemocks.NewMockWriter[*models.Token](t)
+	mockWriter := pipemocks.NewMockWriter(t)
 
 	mockWriter.EXPECT().Write(models.NewSIndexToken(&models.SIndex{}, 0)).Return(0, errors.New("error"))
 
 	mockStats := mocks.NewMockstatsSetterToken(t)
 
-	writer := newWriterWithTokenStats[*models.Token](mockWriter, mockStats, slog.Default())
+	writer := newWriterWithTokenStats(mockWriter, mockStats, slog.Default())
 	require.NotNil(t, writer)
 
 	_, err := writer.Write(models.NewSIndexToken(&models.SIndex{}, 0))

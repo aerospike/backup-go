@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,11 +19,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"strconv"
-	"strings"
 
 	"github.com/aerospike/backup-go/internal/metrics"
-	"github.com/aerospike/backup-go/io/encoding/asbx"
 	"github.com/aerospike/backup-go/io/encryption"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pipe"
@@ -31,7 +28,7 @@ import (
 )
 
 // fileReaderProcessor configures and creates file readers pipelines for restoring data.
-type fileReaderProcessor[T models.TokenConstraint] struct {
+type fileReaderProcessor struct {
 	reader StreamingReader
 	config *ConfigRestore
 
@@ -49,7 +46,7 @@ type fileReaderProcessor[T models.TokenConstraint] struct {
 
 // newFileReaderProcessor returns a new file reader processor.
 // encryptionKey is the key for decryption; pass nil when encryption is disabled.
-func newFileReaderProcessor[T models.TokenConstraint](
+func newFileReaderProcessor(
 	reader StreamingReader,
 	config *ConfigRestore,
 	encryptionKey []byte,
@@ -57,10 +54,10 @@ func newFileReaderProcessor[T models.TokenConstraint](
 	readersCh chan models.File,
 	errorsCh chan error,
 	logger *slog.Logger,
-) *fileReaderProcessor[T] {
+) *fileReaderProcessor {
 	logger.Debug("created file reader processor")
 
-	return &fileReaderProcessor[T]{
+	return &fileReaderProcessor{
 		reader:        reader,
 		config:        config,
 		encryptionKey: encryptionKey,
@@ -73,7 +70,7 @@ func newFileReaderProcessor[T models.TokenConstraint](
 }
 
 // newDataReaders creates the data readers for restoring data.
-func (fr *fileReaderProcessor[T]) newDataReaders(ctx context.Context) []pipe.Reader[T] {
+func (fr *fileReaderProcessor) newDataReaders(ctx context.Context) []pipe.Reader {
 	var skipPrefixes []string
 	if fr.config.ApplyMetadataLast {
 		skipPrefixes = []string{metadataFileNamePrefix}
@@ -82,30 +79,17 @@ func (fr *fileReaderProcessor[T]) newDataReaders(ctx context.Context) []pipe.Rea
 	// Start lazy file reading.
 	go fr.reader.StreamFiles(ctx, fr.readersCh, fr.errorsCh, skipPrefixes)
 
-	readWorkers := make([]pipe.Reader[T], fr.parallel)
+	readWorkers := make([]pipe.Reader, fr.parallel)
 
-	switch fr.config.EncoderType {
-	case EncoderTypeASB:
-		for i := 0; i < fr.parallel; i++ {
-			readWorkers[i] = newTokenReader(fr.readersCh, fr.logger, fr.initDecoder)
-		}
-	case EncoderTypeASBX:
-		workersReadChans := make([]chan models.File, fr.parallel)
-
-		for i := 0; i < fr.parallel; i++ {
-			rCh := make(chan models.File)
-			workersReadChans[i] = rCh
-			readWorkers[i] = newTokenReader(rCh, fr.logger, fr.initDecoder)
-		}
-
-		go distributeFiles(fr.readersCh, workersReadChans, fr.errorsCh)
+	for i := 0; i < fr.parallel; i++ {
+		readWorkers[i] = newTokenReader(fr.readersCh, fr.logger, fr.initDecoder)
 	}
 
 	return readWorkers
 }
 
 // initDecoder initializes the decoder for the given reader.
-func (fr *fileReaderProcessor[T]) initDecoder(r io.ReadCloser, fileNumber uint64, fileName string) (Decoder[T], error) {
+func (fr *fileReaderProcessor) initDecoder(r io.ReadCloser, fileName string) (Decoder, error) {
 	reader, err := fr.wrapReader(r)
 	if err != nil {
 		return nil, err
@@ -113,10 +97,8 @@ func (fr *fileReaderProcessor[T]) initDecoder(r io.ReadCloser, fileNumber uint64
 
 	reader = metrics.NewReader(reader, fr.kbpsCollector)
 
-	d, err := NewDecoder[T](
-		fr.config.EncoderType,
+	d, err := NewDecoder(
 		reader,
-		fileNumber,
 		fileName,
 		fr.config.IgnoreUnknownFields,
 		fr.logger,
@@ -129,7 +111,7 @@ func (fr *fileReaderProcessor[T]) initDecoder(r io.ReadCloser, fileNumber uint64
 }
 
 // newMetadataReaders creates the metadata readers for restoring metadata.
-func (fr *fileReaderProcessor[T]) newMetadataReaders(ctx context.Context) []pipe.Reader[T] {
+func (fr *fileReaderProcessor) newMetadataReaders(ctx context.Context) []pipe.Reader {
 	mdFiles := fr.reader.GetSkipped()
 
 	if len(mdFiles) == 0 {
@@ -146,7 +128,7 @@ func (fr *fileReaderProcessor[T]) newMetadataReaders(ctx context.Context) []pipe
 		close(mdReadersCh)
 	}()
 
-	readWorkers := make([]pipe.Reader[T], fr.parallel)
+	readWorkers := make([]pipe.Reader, fr.parallel)
 	for i := 0; i < fr.parallel; i++ {
 		readWorkers[i] = newTokenReader(mdReadersCh, fr.logger, fr.initDecoder)
 	}
@@ -155,7 +137,7 @@ func (fr *fileReaderProcessor[T]) newMetadataReaders(ctx context.Context) []pipe
 }
 
 // wrapReader applies encryption and compression wrappers to the reader based on the configuration.
-func (fr *fileReaderProcessor[T]) wrapReader(reader io.ReadCloser) (io.ReadCloser, error) {
+func (fr *fileReaderProcessor) wrapReader(reader io.ReadCloser) (io.ReadCloser, error) {
 	r, err := newEncryptionReader(fr.encryptionKey, reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create encryption reader: %w", err)
@@ -198,49 +180,4 @@ func newEncryptionReader(encryptionKey []byte, reader io.ReadCloser) (io.ReadClo
 	}
 
 	return encryptedReader, nil
-}
-
-// distributeFiles is only used for asbx restore, to follow the order of files.
-// To maintain XDR event order, files must be pre-sorted using util.SortBackupFiles.
-// Then they will be distributed to workers based on their prefixes, in suffix order.
-// Valid file name:
-//
-//	<prefix>_<namespace>_<suffix>.asbx
-//
-// Example:
-//
-//	4_source-ns1_47.asbx
-func distributeFiles(input chan models.File, output []chan models.File, errors chan<- error) {
-	if len(output) == 0 {
-		errors <- fmt.Errorf("failed to distibute files to 0 channels")
-		return
-	}
-
-	validator := asbx.NewValidator()
-
-	for file := range input {
-		// Skip non asbx files.
-		if err := validator.Run(file.Name); err != nil {
-			continue
-		}
-
-		parts := strings.SplitN(file.Name, "_", 2)
-
-		num, err := strconv.Atoi(parts[0])
-		if err != nil {
-			errors <- fmt.Errorf("failed to parse distibution file number for file %s: %w", file.Name, err)
-			return
-		}
-
-		if num > len(output)-1 {
-			num = (len(output) - 1) % num
-		}
-
-		output[num] <- file
-	}
-
-	// Close channels at the end.
-	for i := range output {
-		close(output[i])
-	}
 }

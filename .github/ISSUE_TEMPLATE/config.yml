@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://aerospike.com/security/vulnerability-disclosure-policy/
+    about: Do not open a public issue. Email prodsec@aerospike.com instead.

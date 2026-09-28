@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+
+	"github.com/aerospike/backup-go/errclass"
 )
 
 type writer struct {
@@ -33,7 +35,7 @@ type writer struct {
 func NewWriter(w io.WriteCloser, key []byte) (io.WriteCloser, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create new cipher.Block: %w", err)
+		return nil, fmt.Errorf("%w: failed to create new cipher.Block: %w", errclass.ErrInvalidConfig, err)
 	}
 
 	// Create a random Initialization Vector

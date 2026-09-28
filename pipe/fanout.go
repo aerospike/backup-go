@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -36,17 +37,13 @@ const (
 	// RoundRobin distributes incoming tokens between available output channels in a
 	// fair, rotating manner.
 	RoundRobin
-	// Split routes incoming tokens to output channels using a custom routing function.
-	// The routing function determines the destination channel for each token based on
-	// its partition id.
-	Split
 )
 
 // Fanout routes messages between chain pools.
 // FanoutStrategy controls the distribution of messages to output channels.
-type Fanout[T models.TokenConstraint] struct {
-	Inputs  []chan T
-	Outputs []chan T
+type Fanout struct {
+	Inputs  []chan *models.Token
+	Outputs []chan *models.Token
 
 	strategy FanoutStrategy
 	// for RoundRobin
@@ -54,12 +51,12 @@ type Fanout[T models.TokenConstraint] struct {
 }
 
 // NewFanout returns a new Fanout.
-func NewFanout[T models.TokenConstraint](
-	inputs []chan T,
-	outputs []chan T,
+func NewFanout(
+	inputs []chan *models.Token,
+	outputs []chan *models.Token,
 	strategy FanoutStrategy,
-) (*Fanout[T], error) {
-	f := &Fanout[T]{
+) (*Fanout, error) {
+	f := &Fanout{
 		Inputs:   inputs,
 		Outputs:  outputs,
 		strategy: strategy,
@@ -67,27 +64,27 @@ func NewFanout[T models.TokenConstraint](
 
 	// Validations.
 	if len(f.Outputs) == 0 {
-		return nil, fmt.Errorf("no outputs provided")
+		return nil, fmt.Errorf("%w: no outputs provided", errclass.ErrInvalidConfig)
 	}
 
 	if len(f.Inputs) == 0 {
-		return nil, fmt.Errorf("no inputs provided")
+		return nil, fmt.Errorf("%w: no inputs provided", errclass.ErrInvalidConfig)
 	}
 
 	if f.strategy == Fixed && len(f.Inputs) != len(f.Outputs) {
-		return nil, fmt.Errorf("invalid inputs %d and outputs %d number for Fixed strategy",
+		return nil, fmt.Errorf("%w: invalid inputs %d and outputs %d number for Fixed strategy", errclass.ErrInvalidConfig,
 			len(f.Inputs), len(f.Outputs))
 	}
 
-	if f.strategy != Fixed && f.strategy != RoundRobin && f.strategy != Split {
-		return nil, fmt.Errorf("unsupported fanout strategy: %d", f.strategy)
+	if f.strategy != Fixed && f.strategy != RoundRobin {
+		return nil, fmt.Errorf("%w: unsupported fanout strategy: %d", errclass.ErrUnsupported, f.strategy)
 	}
 
 	return f, nil
 }
 
 // Run starts routing messages in separate goroutines based on the defined fanout strategy.
-func (f *Fanout[T]) Run(ctx context.Context) {
+func (f *Fanout) Run(ctx context.Context) {
 	var wg sync.WaitGroup
 
 	for i, input := range f.Inputs {
@@ -101,7 +98,7 @@ func (f *Fanout[T]) Run(ctx context.Context) {
 }
 
 // Close closes all output channels.
-func (f *Fanout[T]) Close() {
+func (f *Fanout) Close() {
 	for _, output := range f.Outputs {
 		close(output)
 	}
@@ -109,7 +106,7 @@ func (f *Fanout[T]) Close() {
 
 // processInput listens for incoming data on the input channel
 // and routes it based on the fanout strategy or context state.
-func (f *Fanout[T]) processInput(ctx context.Context, index int, input <-chan T) {
+func (f *Fanout) processInput(ctx context.Context, index int, input <-chan *models.Token) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -125,13 +122,11 @@ func (f *Fanout[T]) processInput(ctx context.Context, index int, input <-chan T)
 }
 
 // routeData routes a given piece of data based on the current fanout strategy (Fixed, RoundRobin, or Split).
-func (f *Fanout[T]) routeData(ctx context.Context, index int, data T) {
+func (f *Fanout) routeData(ctx context.Context, index int, data *models.Token) {
 	switch f.strategy {
 	case Fixed: // Send it to the current index.
 	case RoundRobin:
 		index = f.roundRobin(data)
-	case Split:
-		index = f.splitFunc(data)
 	}
 
 	select {
@@ -142,35 +137,14 @@ func (f *Fanout[T]) routeData(ctx context.Context, index int, data T) {
 }
 
 // roundRobin returns the next output chain index, distributing tokens in a fair, rotating manner.
-func (f *Fanout[T]) roundRobin(_ T) int {
+func (f *Fanout) roundRobin(_ *models.Token) int {
 	index := f.currentIndex.Add(1) % uint64(len(f.Outputs))
 
 	return int(index)
 }
 
-// splitFunc determines an output chain for the token based on its partition id.
-func (f *Fanout[T]) splitFunc(token T) int {
-	t, ok := any(token).(*models.ASBXToken)
-	if !ok {
-		return 0
-	}
-
-	partPerWorker := 4096 / len(f.Outputs)
-
-	var id int
-	if partPerWorker > 0 {
-		id = t.Key.PartitionId() / partPerWorker
-	}
-
-	if id >= len(f.Outputs) {
-		return id - 1
-	}
-
-	return id
-}
-
 // GetMetrics returns the accumulated length for input and output channels.
-func (f *Fanout[T]) GetMetrics() (in, out int) {
+func (f *Fanout) GetMetrics() (in, out int) {
 	if f.Inputs != nil {
 		for _, input := range f.Inputs {
 			in += len(input)

@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 
 package models
 
+// RequestBackup represents a request to start a backup job on the server.
 type RequestBackup struct {
 	RequestCommon
 	ModifiedBefore     string
@@ -24,6 +25,7 @@ type RequestBackup struct {
 	EnableChangeStream bool
 }
 
+// RequestRestore represents a request to start a restore job on the server.
 type RequestRestore struct {
 	RequestCommon
 	JobID        string
@@ -31,6 +33,7 @@ type RequestRestore struct {
 	FuzzyRestore bool
 }
 
+// RequestCommon represents common fields for backup and restore requests.
 type RequestCommon struct {
 	Namespace string
 	Storage   string

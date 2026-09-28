@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,27 +20,26 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/aerospike/backup-go/internal/util/files"
 	"github.com/aerospike/backup-go/models"
 )
 
 // tokenReader satisfies the DataReader interface.
 // It reads data as tokens using a Decoder.
-type tokenReader[T models.TokenConstraint] struct {
+type tokenReader struct {
 	readersCh     <-chan models.File
-	decoder       Decoder[T]
+	decoder       Decoder
 	logger        *slog.Logger
-	newDecoderFn  func(io.ReadCloser, uint64, string) (Decoder[T], error)
+	newDecoderFn  func(io.ReadCloser, string) (Decoder, error)
 	currentReader io.Closer
 }
 
 // newTokenReader creates a new tokenReader.
-func newTokenReader[T models.TokenConstraint](
+func newTokenReader(
 	readersCh <-chan models.File,
 	logger *slog.Logger,
-	newDecoderFn func(io.ReadCloser, uint64, string) (Decoder[T], error),
-) *tokenReader[T] {
-	return &tokenReader[T]{
+	newDecoderFn func(io.ReadCloser, string) (Decoder, error),
+) *tokenReader {
+	return &tokenReader{
 		readersCh:    readersCh,
 		newDecoderFn: newDecoderFn,
 		logger:       logger,
@@ -48,7 +47,7 @@ func newTokenReader[T models.TokenConstraint](
 }
 
 // Read reads the next token from the token reader.
-func (tr *tokenReader[T]) Read(ctx context.Context) (T, error) {
+func (tr *tokenReader) Read(ctx context.Context) (*models.Token, error) {
 	for {
 		if tr.decoder != nil {
 			token, err := tr.decoder.NextToken()
@@ -80,19 +79,13 @@ func (tr *tokenReader[T]) Read(ctx context.Context) (T, error) {
 			}
 
 			var (
-				num uint64
 				err error
 			)
-			// Validate only .asbx files.
-			num, err = files.GetFileNumber(file.Name)
-			if err != nil {
-				return nil, err
-			}
 
 			// Assign the new reader
 			tr.currentReader = file.Reader
 
-			tr.decoder, err = tr.newDecoderFn(file.Reader, num, file.Name)
+			tr.decoder, err = tr.newDecoderFn(file.Reader, file.Name)
 			if err != nil {
 				return nil, err
 			}
@@ -102,6 +95,6 @@ func (tr *tokenReader[T]) Read(ctx context.Context) (T, error) {
 
 // Close satisfies the pipe.Reader interface.
 // It is a no-op for tokenReader.
-func (tr *tokenReader[T]) Close() {
+func (tr *tokenReader) Close() {
 	tr.logger.Debug("closed token reader")
 }

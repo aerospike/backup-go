@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"sync/atomic"
 
 	"cloud.google.com/go/storage"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
@@ -40,11 +41,6 @@ type Reader struct {
 
 	// bucketName contains name of the bucket to read from.
 	bucketName string
-
-	// objectsToStream is used to predefine a list of objects that must be read from storage.
-	// If objectsToStream is not set, we iterate through objects in storage and load them.
-	// If set, we load objects from this slice directly.
-	objectsToStream []string
 
 	// total size of all objects in a path.
 	totalSize atomic.Int64
@@ -71,28 +67,23 @@ func NewReader(
 	}
 
 	if len(r.PathList) == 0 {
-		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
+		return nil, fmt.Errorf("%w: path is required, use WithDir(path string) or WithFile(path string) to set",
+			errclass.ErrInvalidConfig)
 	}
 
 	bucket := client.Bucket(bucketName)
 	// Check if bucket exists, to avoid errors.
 	_, err := bucket.Attrs(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get bucket %s attributes: %w", bucketName, err)
+		return nil, fmt.Errorf("%w: failed to get bucket %s attributes: %w", errclass.ErrNotFound, bucketName, err)
 	}
 
 	r.bucketHandle = bucket
 	r.bucketName = bucketName
 
 	if r.IsDir && !r.SkipDirCheck {
-		if err = r.checkRestoreDirectory(ctx, r.PathList[0]); err != nil {
-			return nil, fmt.Errorf("%w: %w", common.ErrEmptyStorage, err)
-		}
-	}
-
-	if r.IsDir && r.SortFiles && len(r.PathList) == 1 {
-		if err := common.PreSort(ctx, r, r.PathList[0]); err != nil {
-			return nil, fmt.Errorf("failed to pre sort: %w", err)
+		if err := r.checkRestoreDirectory(ctx, r.PathList[0]); err != nil {
+			return nil, err
 		}
 	}
 
@@ -104,18 +95,12 @@ func NewReader(
 	return r, nil
 }
 
-// StreamFiles streams file/directory form GCP cloud storage to `readersCh`.
+// StreamFiles streams file/directory from GCP cloud storage to `readersCh`.
 // If an error occurs, it will be sent to `errorsCh.`
 func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error, skipPrefixes []string,
 ) {
 	defer close(readersCh)
-
-	// If objects were preloaded, we stream them.
-	if len(r.objectsToStream) > 0 {
-		r.streamSetObjects(ctx, readersCh, errorsCh)
-		return
-	}
 	// Init file skipper when skipPrefix is set.
 	if len(skipPrefixes) > 0 {
 		r.skipped = common.NewSkippedFiles(skipPrefixes)
@@ -158,7 +143,8 @@ func (r *Reader) streamDirectory(
 		objAttrs, err := it.Next()
 		if err != nil {
 			if !errors.Is(err, iterator.Done) {
-				common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to read object attributes from bucket %s: %w",
+				common.ErrToChan(ctx, errorsCh, fmt.Errorf(
+					"%w: failed to read object attributes from bucket %s: %w", errclass.ErrStorage,
 					r.bucketName, err))
 			}
 			// If the previous call to Next returned an error other than iterator.Done, all
@@ -203,7 +189,9 @@ func (r *Reader) openObject(
 ) {
 	rReader, err := newRangeReader(ctx, newGcpStorageClient(r.bucketHandle), r.bucketName, path)
 	if err != nil {
-		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to prepare rangeReader %s: %w", path, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to prepare rangeReader %s: %w",
+			errclass.ErrStorage, path, err))
+
 		return
 	}
 
@@ -214,7 +202,8 @@ func (r *Reader) openObject(
 			return
 		}
 
-		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open directory file %s: %w", path, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to open directory file %s: %w",
+			errclass.ErrStorage, path, err))
 
 		return
 	}
@@ -248,7 +237,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 		objAttrs, err := it.Next()
 		if err != nil {
 			if !errors.Is(err, iterator.Done) {
-				return fmt.Errorf("failed to read object attributes from bucket %s: %w",
+				return fmt.Errorf("%w: failed to read object attributes from bucket %s: %w", errclass.ErrStorage,
 					r.bucketName, err)
 			}
 			// If the previous call to Next returned an error other than iterator.Done, all
@@ -276,7 +265,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 		}
 	}
 
-	return fmt.Errorf("%s is empty", path)
+	return fmt.Errorf("%w: %s", common.ErrEmptyStorage, path)
 }
 
 // ListObjects list all objects in the path.
@@ -297,7 +286,7 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 		objAttrs, err := it.Next()
 		if err != nil {
 			if !errors.Is(err, iterator.Done) {
-				return nil, fmt.Errorf("failed to read object attributes from bucket %s: %w",
+				return nil, fmt.Errorf("%w: failed to read object attributes from bucket %s: %w", errclass.ErrStorage,
 					r.bucketName, err)
 			}
 
@@ -321,18 +310,6 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 	}
 
 	return result, nil
-}
-
-// SetObjectsToStream sets the objects to stream.
-func (r *Reader) SetObjectsToStream(list []string) {
-	r.objectsToStream = list
-}
-
-// streamSetObjects streams preloaded objects.
-func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error) {
-	for i := range r.objectsToStream {
-		r.openObject(ctx, r.objectsToStream[i], readersCh, errorsCh, true)
-	}
 }
 
 // shouldSkip determines whether the file should be skipped.
@@ -379,7 +356,11 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 	if !r.IsDir {
 		objAttrs, err := r.bucketHandle.Object(path).Attrs(ctx)
 		if err != nil {
-			return 0, 0, fmt.Errorf("failed to get object attributes for %s: %w", path, err)
+			return 0, 0, fmt.Errorf("%w: failed to get object attributes for %s: %w", errclass.ErrStorage, path, err)
+		}
+
+		if objAttrs == nil {
+			return 0, 0, fmt.Errorf("%w: nil object attributes for %s", errclass.ErrStorage, path)
 		}
 
 		return objAttrs.Size, 1, nil
@@ -395,7 +376,7 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 		objAttrs, err := it.Next()
 		if err != nil {
 			if !errors.Is(err, iterator.Done) {
-				return 0, 0, fmt.Errorf("failed to read object attributes from bucket %s: %w",
+				return 0, 0, fmt.Errorf("%w: failed to read object attributes from bucket %s: %w", errclass.ErrStorage,
 					r.bucketName, err)
 			}
 
@@ -418,17 +399,17 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 	return totalSize, totalNum, nil
 }
 
-// GetSize returns the size of asb/asbx file/dir that was initialized.
+// GetSize returns the size of asb file/dir that was initialized.
 func (r *Reader) GetSize() int64 {
 	return r.totalSize.Load()
 }
 
-// GetNumber returns the number of asb/asbx files/dirs that was initialized.
+// GetNumber returns the number of asb files/dirs that was initialized.
 func (r *Reader) GetNumber() int64 {
 	return r.totalNumber.Load()
 }
 
-// GetSkipped returns a list of file paths that were skipped during the `StreamFlies` with skipPrefix.
+// GetSkipped returns a list of file paths that were skipped during the `StreamFiles` with skipPrefix.
 func (r *Reader) GetSkipped() []string {
 	return r.skipped.GetSkipped()
 }

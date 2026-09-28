@@ -14,10 +14,19 @@ func NewMockvalidator(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *Mockvalidator {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &Mockvalidator{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -59,7 +68,7 @@ type Mockvalidator_Run_Call struct {
 
 // Run is a helper method to define mock.On call
 //   - fileName string
-func (_e *Mockvalidator_Expecter) Run(fileName interface{}) *Mockvalidator_Run_Call {
+func (_e *Mockvalidator_Expecter) Run(fileName any) *Mockvalidator_Run_Call {
 	return &Mockvalidator_Run_Call{Call: _e.mock.On("Run", fileName)}
 }
 

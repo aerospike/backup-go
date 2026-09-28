@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,72 +15,36 @@
 package backup
 
 import (
-	"bytes"
 	"io"
 	"log/slog"
 
 	"github.com/aerospike/backup-go/io/encoding/asb"
-	"github.com/aerospike/backup-go/io/encoding/asbx"
 	"github.com/aerospike/backup-go/models"
-)
-
-// EncoderType custom type for Encoder types enum.
-type EncoderType int
-
-const (
-	// EncoderTypeASB matches ASB Encoder with id 0.
-	EncoderTypeASB EncoderType = iota
-	EncoderTypeASBX
 )
 
 // Encoder is an interface for encoding the types from the models package.
 // It is used to support different data formats.
 //
 //go:generate mockery --name Encoder
-type Encoder[T models.TokenConstraint] interface {
-	EncodeToken(T, *bytes.Buffer) error
-	GetHeader(uint64, bool) []byte
+type Encoder interface {
+	EncodeToken(*models.Token, []byte) ([]byte, error)
+	GetHeader(bool) []byte
 	GenerateFilename(prefix, suffix string) string
 }
 
-// NewEncoder returns a new Encoder according to `EncoderType`.
-func NewEncoder[T models.TokenConstraint](eType EncoderType, namespace string, compact, hasExprSindex bool,
-) Encoder[T] {
-	switch eType {
-	// As at the moment only one `ASB` Encoder supported, we use such construction.
-	case EncoderTypeASB:
-		cfg := asb.NewEncoderConfig(namespace, compact, hasExprSindex)
-		return asb.NewEncoder[T](cfg)
-	case EncoderTypeASBX:
-		return asbx.NewEncoder[T](namespace)
-	default:
-		cfg := asb.NewEncoderConfig(namespace, compact, hasExprSindex)
-		return asb.NewEncoder[T](cfg)
-	}
+// NewEncoder returns a new ASB encoder.
+func NewEncoder(namespace string, compact bool, sIndexInfo models.SIndexInfo) Encoder {
+	cfg := asb.NewEncoderConfig(namespace, compact, sIndexInfo)
+	return asb.NewEncoder(cfg)
 }
 
 // Decoder is an interface for reading backup data as tokens.
-// It is used to support different data formats.
-// While the return type is `any`, the actual types returned should
-// only be the types exposed by the models package.
-// e.g. *models.Record, *models.UDF and *models.SecondaryIndex
-//
-//go:generate mockery --name Decoder
-type Decoder[T models.TokenConstraint] interface {
-	NextToken() (T, error)
+type Decoder interface {
+	NextToken() (*models.Token, error)
 }
 
-// NewDecoder returns a new Decoder according to `EncoderType`.
-func NewDecoder[T models.TokenConstraint](
-	eType EncoderType, src io.Reader, fileNumber uint64, fileName string, ignoreUnknownFields bool, logger *slog.Logger,
-) (Decoder[T], error) {
-	switch eType {
-	// As at the moment only one `ASB` Decoder supported, we use such construction.
-	case EncoderTypeASB:
-		return asb.NewDecoder[T](src, fileName, ignoreUnknownFields, logger)
-	case EncoderTypeASBX:
-		return asbx.NewDecoder[T](src, fileNumber, fileName)
-	default:
-		return asb.NewDecoder[T](src, fileName, ignoreUnknownFields, logger)
-	}
+// NewDecoder returns a new ASB decoder.
+func NewDecoder(src io.Reader, fileName string, ignoreUnknownFields bool, logger *slog.Logger,
+) (Decoder, error) {
+	return asb.NewDecoder(src, fileName, ignoreUnknownFields, logger)
 }

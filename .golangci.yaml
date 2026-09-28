@@ -9,6 +9,7 @@ linters:
     - dogsled
     - dupl
     - errcheck
+    - errname
     - errorlint
     - goconst
     - gocritic

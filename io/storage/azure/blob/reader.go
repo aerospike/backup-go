@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 	"github.com/aerospike/backup-go/models"
@@ -52,11 +53,6 @@ type Reader struct {
 
 	// containerName contains name of the container to read from.
 	containerName string
-
-	// objectsToStream is used to predefine a list of objects that must be read from storage.
-	// If objectsToStream is not set, we iterate through objects in storage and load them.
-	// If set, we load objects from this slice directly.
-	objectsToStream []string
 
 	// objectsToWarm is used to track the current number of restoring objects.
 	objectsToWarm []string
@@ -93,26 +89,21 @@ func NewReader(
 	}
 
 	if len(r.PathList) == 0 {
-		return nil, fmt.Errorf("path is required, use WithDir(path string) or WithFile(path string) to set")
+		return nil, fmt.Errorf("%w: path is required, use WithDir(path string) or WithFile(path string) to set",
+			errclass.ErrInvalidConfig)
 	}
 
 	// Check if a container exists.
 	r.containerClient = client.ServiceClient().NewContainerClient(containerName)
 	if _, err := r.containerClient.GetProperties(ctx, nil); err != nil {
-		return nil, fmt.Errorf("failed to get container properties: %w", err)
+		return nil, fmt.Errorf("%w: failed to get container properties: %w", errclass.ErrNotFound, err)
 	}
 
 	r.containerName = containerName
 
 	if r.IsDir && !r.SkipDirCheck {
 		if err := r.checkRestoreDirectory(ctx, r.PathList[0]); err != nil {
-			return nil, fmt.Errorf("%w: %w", common.ErrEmptyStorage, err)
-		}
-	}
-
-	if r.IsDir && r.SortFiles && len(r.PathList) == 1 {
-		if err := common.PreSort(ctx, r, r.PathList[0]); err != nil {
-			return nil, fmt.Errorf("failed to pre sort: %w", err)
+			return nil, err
 		}
 	}
 
@@ -123,13 +114,13 @@ func NewReader(
 
 		tier, err := parseAccessTier(r.AccessTier)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse restore tier: %w", err)
+			return nil, fmt.Errorf("%w: failed to parse restore tier: %w", errclass.ErrInvalidConfig, err)
 		}
 
 		r.Logger.Debug("parsed tier", slog.String("value", string(tier)))
 
 		if err := r.warmStorage(ctx, tier); err != nil {
-			return nil, fmt.Errorf("failed to warm storage: %w", err)
+			return nil, fmt.Errorf("%w: failed to warm storage: %w", errclass.ErrStorage, err)
 		}
 
 		r.Logger.Debug("finish warming storage")
@@ -143,18 +134,12 @@ func NewReader(
 	return r, nil
 }
 
-// StreamFiles streams file/directory form Azure cloud storage to `readersCh`.
+// StreamFiles streams file/directory from Azure cloud storage to `readersCh`.
 // If an error occurs, it will be sent to `errorsCh.`
 func (r *Reader) StreamFiles(
 	ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error, skipPrefixes []string,
 ) {
 	defer close(readersCh)
-
-	// If objects were preloaded, we stream them.
-	if len(r.objectsToStream) > 0 {
-		r.streamSetObjects(ctx, readersCh, errorsCh)
-		return
-	}
 	// Init file skipper when skipPrefix is set.
 	if len(skipPrefixes) > 0 {
 		r.skipped = common.NewSkippedFiles(skipPrefixes)
@@ -194,7 +179,7 @@ func (r *Reader) streamDirectory(
 	for pager.More() {
 		page, err := pager.NextPage(ctx)
 		if err != nil {
-			common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get next page: %w", err))
+			common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to get next page: %w", errclass.ErrStorage, err))
 
 			return
 		}
@@ -202,7 +187,7 @@ func (r *Reader) streamDirectory(
 		// Iterate over the blobs in the page.
 		for _, blobItem := range page.Segment.BlobItems {
 			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
-				common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to get object attributes for %s", path))
+				common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to get object attributes for %s", errclass.ErrStorage, path))
 
 				return
 			}
@@ -243,7 +228,7 @@ func (r *Reader) openObject(
 ) {
 	state, err := r.checkObjectAvailability(ctx, path)
 	if err != nil {
-		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to check object availability: %w", err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to check object availability: %w", errclass.ErrStorage, err))
 		return
 	}
 
@@ -254,7 +239,9 @@ func (r *Reader) openObject(
 
 	rReader, err := newRangeReader(ctx, newAzureBlobClient(r.client, r.containerClient), r.containerName, path)
 	if err != nil {
-		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to prepare rangeReader %s: %w", path, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to prepare rangeReader %s: %w",
+			errclass.ErrStorage, path, err))
+
 		return
 	}
 
@@ -266,7 +253,7 @@ func (r *Reader) openObject(
 			return
 		}
 
-		common.ErrToChan(ctx, errorsCh, fmt.Errorf("failed to open file %s: %w", path, err))
+		common.ErrToChan(ctx, errorsCh, fmt.Errorf("%w: failed to open file %s: %w", errclass.ErrStorage, path, err))
 
 		return
 	}
@@ -306,12 +293,12 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 	for pager.More() {
 		page, err := pager.NextPage(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to get next page: %w", err)
+			return fmt.Errorf("%w: failed to get next page: %w", errclass.ErrStorage, err)
 		}
 
 		for _, blobItem := range page.Segment.BlobItems {
 			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
-				return fmt.Errorf("failed to get object attributes for %s", path)
+				return fmt.Errorf("%w: failed to get object attributes for %s", errclass.ErrStorage, path)
 			}
 
 			// Skip files in folders.
@@ -334,7 +321,7 @@ func (r *Reader) checkRestoreDirectory(ctx context.Context, path string) error {
 		}
 	}
 
-	return fmt.Errorf("%s is empty", path)
+	return fmt.Errorf("%w: %s", common.ErrEmptyStorage, path)
 }
 
 // ListObjects list all object in the path.
@@ -352,12 +339,12 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 	for pager.More() {
 		page, err := pager.NextPage(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get next page: %w", err)
+			return nil, fmt.Errorf("%w: failed to get next page: %w", errclass.ErrStorage, err)
 		}
 
 		for _, blobItem := range page.Segment.BlobItems {
 			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
-				return nil, fmt.Errorf("failed to get object attributes for %s", path)
+				return nil, fmt.Errorf("%w: failed to get object attributes for %s", errclass.ErrStorage, path)
 			}
 
 			// Skip files in folders.
@@ -380,18 +367,6 @@ func (r *Reader) ListObjects(ctx context.Context, path string) ([]string, error)
 	return result, nil
 }
 
-// SetObjectsToStream set objects to stream.
-func (r *Reader) SetObjectsToStream(list []string) {
-	r.objectsToStream = list
-}
-
-// streamSetObjects streams preloaded objects.
-func (r *Reader) streamSetObjects(ctx context.Context, readersCh chan<- models.File, errorsCh chan<- error) {
-	for i := range r.objectsToStream {
-		r.openObject(ctx, r.objectsToStream[i], readersCh, errorsCh, true)
-	}
-}
-
 func (r *Reader) rehydrateObject(ctx context.Context, path string, tier blob.AccessTier) error {
 	r.Logger.Debug("starting rehydration", slog.String("path", path))
 	bClient := r.containerClient.
@@ -406,7 +381,7 @@ func (r *Reader) rehydrateObject(ctx context.Context, path string, tier blob.Acc
 			RehydratePriority: &priority,
 		})
 	if err != nil {
-		return fmt.Errorf("failed to set tier: %w", err)
+		return fmt.Errorf("%w: failed to set tier: %w", errclass.ErrStorage, err)
 	}
 
 	return nil
@@ -419,7 +394,7 @@ func (r *Reader) checkObjectAvailability(ctx context.Context, path string) (int,
 
 	objProps, err := bClient.GetProperties(ctx, nil)
 	if err != nil {
-		return objStatusArchived, fmt.Errorf("failed to get container properties: %w", err)
+		return objStatusArchived, fmt.Errorf("%w: failed to get container properties: %w", errclass.ErrStorage, err)
 	}
 
 	if objProps.AccessTier != nil && *objProps.AccessTier == string(blob.AccessTierArchive) {
@@ -438,7 +413,7 @@ func (r *Reader) checkObjectAvailability(ctx context.Context, path string) (int,
 func (r *Reader) warmStorage(ctx context.Context, tier blob.AccessTier) error {
 	for _, path := range r.PathList {
 		if err := r.warmDirectory(ctx, path, tier); err != nil {
-			return fmt.Errorf("failed to warm directory %s: %w", path, err)
+			return fmt.Errorf("%w: failed to warm directory %s: %w", errclass.ErrStorage, path, err)
 		}
 	}
 
@@ -446,7 +421,7 @@ func (r *Reader) warmStorage(ctx context.Context, tier blob.AccessTier) error {
 
 	// Start polling objects.
 	if err := r.checkWarm(ctx); err != nil {
-		return fmt.Errorf("failed to check directory warming status: %w", err)
+		return fmt.Errorf("%w: failed to check directory warming status: %w", errclass.ErrStorage, err)
 	}
 
 	r.Logger.Info("storage warm up finished")
@@ -470,7 +445,7 @@ func (r *Reader) warmDirectory(ctx context.Context, path string, tier blob.Acces
 		switch state {
 		case objStatusArchived:
 			if err = r.rehydrateObject(ctx, object, tier); err != nil {
-				return fmt.Errorf("failed to rehydrate object: %w", err)
+				return fmt.Errorf("%w: failed to rehydrate object: %w", errclass.ErrStorage, err)
 			}
 
 			r.objectsToWarm = append(r.objectsToWarm, object)
@@ -494,7 +469,7 @@ func (r *Reader) checkWarm(ctx context.Context) error {
 
 	for i := range r.objectsToWarm {
 		if err := r.pollWarmDirStatus(ctx, r.objectsToWarm[i]); err != nil {
-			return fmt.Errorf("failed to poll dir status %s: %w", r.objectsToWarm[i], err)
+			return fmt.Errorf("%w: failed to poll dir status %s: %w", errclass.ErrStorage, r.objectsToWarm[i], err)
 		}
 	}
 
@@ -550,9 +525,9 @@ func parseAccessTier(tier string) (blob.AccessTier, error) {
 
 	switch result {
 	case blob.AccessTierArchive:
-		return "", fmt.Errorf("archive tier is not allowed")
+		return "", fmt.Errorf("%w: archive tier is not allowed", errclass.ErrInvalidConfig)
 	case "":
-		return "", fmt.Errorf("invalid access tier %s", tier)
+		return "", fmt.Errorf("%w: invalid access tier %s", errclass.ErrInvalidConfig, tier)
 	default:
 		return result, nil
 	}
@@ -610,11 +585,11 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 		objProps, err := r.containerClient.
 			NewBlobClient(path).GetProperties(ctx, nil)
 		if err != nil {
-			return 0, 0, fmt.Errorf("failed to get object properties: %s: %w", path, err)
+			return 0, 0, fmt.Errorf("%w: failed to get object properties: %s: %w", errclass.ErrStorage, path, err)
 		}
 
 		if objProps.ContentLength == nil {
-			return 0, 0, fmt.Errorf("failed to get length of object %s", path)
+			return 0, 0, fmt.Errorf("%w: failed to get length of object %s", errclass.ErrStorage, path)
 		}
 
 		return *objProps.ContentLength, 1, nil
@@ -627,12 +602,12 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 	for pager.More() {
 		page, err := pager.NextPage(ctx)
 		if err != nil {
-			return 0, 0, fmt.Errorf("failed to get next page: %w", err)
+			return 0, 0, fmt.Errorf("%w: failed to get next page: %w", errclass.ErrStorage, err)
 		}
 
 		for _, blobItem := range page.Segment.BlobItems {
 			if blobItem.Name == nil || blobItem.Properties == nil || blobItem.Properties.ContentLength == nil {
-				return 0, 0, fmt.Errorf("failed to get object attributes for %s", path)
+				return 0, 0, fmt.Errorf("%w: failed to get object attributes for %s", errclass.ErrStorage, path)
 			}
 
 			// Skip files in folders.
@@ -652,17 +627,17 @@ func (r *Reader) calculateTotalSizeForPath(ctx context.Context, path string) (to
 	return totalSize, totalNum, nil
 }
 
-// GetSize returns the size of asb/asbx file/dir that was initialized.
+// GetSize returns the size of asb file/dir that was initialized.
 func (r *Reader) GetSize() int64 {
 	return r.totalSize.Load()
 }
 
-// GetNumber returns the number of asb/asbx files/dirs that was initialized.
+// GetNumber returns the number of asb files/dirs that was initialized.
 func (r *Reader) GetNumber() int64 {
 	return r.totalNumber.Load()
 }
 
-// GetSkipped returns a list of file paths that were skipped during the `StreamFlies` with skipPrefix.
+// GetSkipped returns a list of file paths that were skipped during the `StreamFiles` with skipPrefix.
 func (r *Reader) GetSkipped() []string {
 	return r.skipped.GetSkipped()
 }

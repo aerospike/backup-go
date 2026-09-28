@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ package backup
 import (
 	"testing"
 
-	saClient "github.com/aerospike/backup-go/pkg/secret-agent"
+	saClient "github.com/aerospike/backup-go/pkg/secretagent"
 	"github.com/stretchr/testify/require"
 )
 

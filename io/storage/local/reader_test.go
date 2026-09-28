@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/aerospike/backup-go/internal/util/files"
+	"github.com/aerospike/backup-go/io/encoding/asb"
+	"github.com/aerospike/backup-go/io/storage/common"
 	"github.com/aerospike/backup-go/io/storage/options"
 	optMocks "github.com/aerospike/backup-go/io/storage/options/mocks"
 	"github.com/aerospike/backup-go/models"
@@ -39,7 +40,7 @@ func TestCheckRestoreDirectory_Negative_EmptyDir(t *testing.T) {
 
 	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == files.ExtensionASB {
+		if filepath.Ext(fileName) == asb.Extension {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -53,7 +54,7 @@ func TestCheckRestoreDirectory_Negative_EmptyDir(t *testing.T) {
 	)
 	require.NoError(t, err)
 	err = reader.checkRestoreDirectory(dir)
-	require.ErrorContains(t, err, "is empty")
+	require.ErrorIs(t, err, common.ErrEmptyStorage)
 }
 
 func TestDirectoryReader_StreamFiles_OK(t *testing.T) {
@@ -71,7 +72,7 @@ func TestDirectoryReader_StreamFiles_OK(t *testing.T) {
 
 	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == files.ExtensionASB {
+		if filepath.Ext(fileName) == asb.Extension {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -115,7 +116,7 @@ func TestDirectoryReader_StreamFiles_OneFile(t *testing.T) {
 
 	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == files.ExtensionASB {
+		if filepath.Ext(fileName) == asb.Extension {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -152,14 +153,14 @@ func TestDirectoryReader_StreamFiles_ErrEmptyDir(t *testing.T) {
 
 	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == files.ExtensionASB {
+		if filepath.Ext(fileName) == asb.Extension {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
 	})
 	ctx := t.Context()
 	_, err = NewReader(ctx, options.WithValidator(mockValidator), options.WithDir(dir))
-	require.ErrorContains(t, err, "is empty")
+	require.ErrorIs(t, err, common.ErrEmptyStorage)
 }
 
 func TestDirectoryReader_StreamFiles_ErrNoSuchFile(t *testing.T) {
@@ -172,7 +173,7 @@ func TestDirectoryReader_StreamFiles_ErrNoSuchFile(t *testing.T) {
 
 	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == files.ExtensionASB {
+		if filepath.Ext(fileName) == asb.Extension {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -214,7 +215,7 @@ func TestDirectoryReader_GetType(t *testing.T) {
 	require.NoError(t, err)
 	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == files.ExtensionASB {
+		if filepath.Ext(fileName) == asb.Extension {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -344,7 +345,7 @@ func TestDirectoryReader_StreamFiles_Nested_OK(t *testing.T) {
 
 	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == files.ExtensionASB {
+		if filepath.Ext(fileName) == asb.Extension {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -397,7 +398,7 @@ func TestDirectoryReader_StreamFilesList(t *testing.T) {
 
 	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == files.ExtensionASB {
+		if filepath.Ext(fileName) == asb.Extension {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -454,7 +455,7 @@ func TestDirectoryReader_StreamPathList(t *testing.T) {
 
 	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == files.ExtensionASB {
+		if filepath.Ext(fileName) == asb.Extension {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -492,114 +493,6 @@ func TestDirectoryReader_StreamPathList(t *testing.T) {
 			require.NoError(t, err)
 		}
 	}
-}
-
-func TestReader_WithSorting(t *testing.T) {
-	t.Parallel()
-	dir := path.Join(t.TempDir(), "TestReader_WithSorting")
-	err := os.MkdirAll(dir, os.ModePerm)
-	require.NoError(t, err)
-
-	expResult := []string{"0_file_1.asbx", "0_file_2.asbx", "0_file_3.asbx"}
-
-	err = createTmpFile(dir, "0_file_3.asbx")
-	require.NoError(t, err)
-	err = createTmpFile(dir, "0_file_1.asbx")
-	require.NoError(t, err)
-	err = createTmpFile(dir, "0_file_2.asbx")
-	require.NoError(t, err)
-	ctx := t.Context()
-	r, err := NewReader(
-		ctx,
-		options.WithDir(dir),
-		options.WithSorting(),
-	)
-	require.NoError(t, err)
-
-	readerChan := make(chan models.File)
-	errorChan := make(chan error)
-	go r.StreamFiles(t.Context(), readerChan, errorChan, nil)
-
-	result := make([]string, 0, 3)
-	for {
-		select {
-		case f, ok := <-readerChan:
-			// if chan closed, we're done.
-			if !ok {
-				require.Equal(t, expResult, result)
-				return
-			}
-			result = append(result, f.Name)
-		case err = <-errorChan:
-			require.NoError(t, err)
-		}
-	}
-}
-
-func TestReader_StreamFilesPreloaded(t *testing.T) {
-	t.Parallel()
-	dir := path.Join(t.TempDir(), "TestReader_StreamFilesPreloaded")
-	err := os.MkdirAll(dir, os.ModePerm)
-	require.NoError(t, err)
-	ctx := t.Context()
-
-	expResult := []string{"file3.asb", "0_file_2.asbx", "file1.asb", "file2.asb", "0_file_1.asbx"}
-
-	for i := range expResult {
-		err := createTmpFile(dir, expResult[i])
-		require.NoError(t, err)
-	}
-
-	mockValidator := new(optMocks.Mockvalidator)
-	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == files.ExtensionASBX {
-			return nil
-		}
-		return fmt.Errorf("invalid file extension")
-	})
-
-	r, err := NewReader(
-		ctx,
-		options.WithDir(dir),
-		options.WithValidator(mockValidator),
-	)
-	require.NoError(t, err)
-
-	list, err := r.ListObjects(ctx, dir)
-	require.NoError(t, err)
-	_, asbxList := filterList(list)
-	r.SetObjectsToStream(asbxList)
-
-	readerChan := make(chan models.File)
-	errorChan := make(chan error)
-	go r.StreamFiles(t.Context(), readerChan, errorChan, nil)
-
-	var counter int
-	for {
-		select {
-		case _, ok := <-readerChan:
-			// if chan closed, we're done.
-			if !ok {
-				require.Equal(t, 2, counter)
-				return
-			}
-			counter++
-		case err = <-errorChan:
-			require.NoError(t, err)
-		}
-	}
-}
-
-func filterList(list []string) (asbList, asbxList []string) {
-	for i := range list {
-		switch filepath.Ext(list[i]) {
-		case files.ExtensionASB:
-			asbList = append(asbList, list[i])
-		case files.ExtensionASBX:
-			asbxList = append(asbxList, list[i])
-		}
-	}
-	return asbList, asbxList
 }
 
 func TestReader_ListObjectsWithNestedDir(t *testing.T) {
@@ -669,7 +562,7 @@ func TestReader_StreamFiles_Skipped(t *testing.T) {
 
 	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == files.ExtensionASB {
+		if filepath.Ext(fileName) == asb.Extension {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")
@@ -739,7 +632,7 @@ func TestReader_calculateTotalSizeForPath(t *testing.T) {
 
 	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == files.ExtensionASB {
+		if filepath.Ext(fileName) == asb.Extension {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")

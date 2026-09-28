@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -95,6 +95,7 @@ const (
 	sindexTypeList   byte = 'L'
 	sindexTypeMapKey byte = 'K'
 	sindexTypeMapVal byte = 'V'
+	sindexTypeSet    byte = 'S'
 )
 
 // sindex bin types
@@ -103,6 +104,7 @@ const (
 	sindexBinTypeNumeric byte = 'N'
 	sindexBinTypeGEO2D   byte = 'G'
 	sindexBinTypeBlob    byte = 'B'
+	sindexBinTypeEmpty   byte = 'E'
 )
 
 // literal asb tokens
@@ -132,9 +134,9 @@ const (
 )
 
 var (
-	space                     = []byte(" ")
-	newLine                   = []byte("\n")
-	delimsSpaceOrNewline      = []byte{' ', asbNewLine}
+	space                = []byte(" ")
+	delimsSpaceOrNewline = []byte{' ', asbNewLine}
+
 	binBoolTypePrefix         = []byte("- Z ")
 	binIntTypePrefix          = []byte("- I ")
 	binFloatTypePrefix        = []byte("- D ")
@@ -149,21 +151,17 @@ var (
 	binMapTypeCompactPrefix   = []byte("- M! ")
 	binListTypePrefix         = []byte("- L ")
 	binListTypeCompactPrefix  = []byte("- L! ")
-	trueBytes                 = []byte{boolTrueByte}
-	falseBytes                = []byte{boolFalseByte}
 	namespacePrefix           = []byte("+ n ")
 	setPrefix                 = []byte("+ s ")
 	digestPrefix              = []byte("+ d ")
 	headerGeneration          = []byte("+ g ")
 	headerExpiration          = []byte("+ t ")
 	headerBinCount            = []byte("+ b ")
-
-	recordHeader     = []byte{markerRecordHeader}
-	recordHeaderType = []byte{recordHeaderTypeKey}
-	headerTypeInt    = []byte{keyTypeInt}
-	headerTypeFloat  = []byte{keyTypeFloat}
-	headerTypeString = []byte{keyTypeString}
-	headerTypeBytes  = []byte{keyTypeBytes}
+	userKeyIntPrefix          = []byte("+ k I ")
+	userKeyFloatPrefix        = []byte("+ k D ")
+	userKeyStringPrefix       = []byte("+ k S ")
+	userKeyBytesPrefix        = []byte("+ k B ")
+	sindexSizeOne             = []byte("1")
 
 	globalSection          = []byte{markerGlobalSection}
 	globalSIndex           = []byte{globalTypeSIndex}

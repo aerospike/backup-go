@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,8 +18,6 @@ import "github.com/aerospike/aerospike-client-go/v8"
 
 // dbWriter is an interface for writing data to an Aerospike cluster.
 // The Aerospike Go client satisfies this interface.
-//
-//go:generate mockery --name dbWriter
 type dbWriter interface {
 	Put(policy *aerospike.WritePolicy, key *aerospike.Key, bins aerospike.BinMap) aerospike.Error
 

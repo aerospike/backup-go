@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,8 +25,6 @@ import (
 )
 
 // sindexGetter is an interface for getting secondary indexes.
-//
-//go:generate mockery --name sindexGetter
 type sindexGetter interface {
 	GetSIndexes(ctx context.Context, namespace string) ([]*models.SIndex, error)
 }

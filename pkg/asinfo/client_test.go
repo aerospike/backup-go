@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,42 +15,28 @@
 package asinfo
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"reflect"
 	"testing"
+	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/asinfo/mocks"
-	models2 "github.com/aerospike/backup-go/pkg/asinfo/models"
+	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
 	"github.com/segmentio/asm/base64"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	testASLoginPassword = "admin"
-	testASNamespace     = "test"
-	testASDC            = "DC1"
-	testASHost          = "127.0.0.1"
-	testASPort          = 3000
-	testASRewind        = "all"
-	testXDRHostPort     = "127.0.0.1:3003"
-	testSetInfo         = "info_set"
-	testShowJobsCmd     = "show-jobs:module=query"
-)
-
-// errParseGeneric — sentinel only used to mark "any parse error is acceptable" in table.
-var errParseGeneric = errors.New("parse error sentinel")
-
-func newAerospikeClient() (*a.Client, a.Error) {
-	asPolicy := a.NewClientPolicy()
-	asPolicy.User = testASLoginPassword
-	asPolicy.Password = testASLoginPassword
-
-	return a.NewClientWithPolicy(asPolicy, testASHost, testASPort)
-}
+// testInfoPolicy is the info policy every test client is built with. Mocked
+// infoGetter expectations must match it, because the client passes its own
+// policy to RequestInfo instead of taking one per call.
+var testInfoPolicy = a.NewInfoPolicy()
 
 // newClient for testing purposes.
 // We can't mock version check for dict load,
@@ -67,9 +53,10 @@ func newClient(
 		cluster:     cluster,
 		policy:      policy,
 		retryPolicy: retryPolicy,
+		logger:      slog.Default(),
 	}
 
-	ic.cmdDict = newCmdDict(models2.AerospikeVersionRecentInfoCommands)
+	ic.cmdDict = newCmdDict(infomodels.AerospikeVersionRecentInfoCommands)
 
 	return ic
 }
@@ -82,7 +69,7 @@ func Test_parseAerospikeVersion(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    models2.AerospikeVersion
+		want    infomodels.AerospikeVersion
 		wantErr bool
 	}{
 		{
@@ -90,7 +77,7 @@ func Test_parseAerospikeVersion(t *testing.T) {
 			args: args{
 				versionStr: "5.6.0.0",
 			},
-			want: models2.AerospikeVersion{
+			want: infomodels.AerospikeVersion{
 				Major: 5,
 				Minor: 6,
 				Patch: 0,
@@ -101,7 +88,7 @@ func Test_parseAerospikeVersion(t *testing.T) {
 			args: args{
 				versionStr: "1829.123.0.33333",
 			},
-			want: models2.AerospikeVersion{
+			want: infomodels.AerospikeVersion{
 				Major: 1829,
 				Minor: 123,
 				Patch: 0,
@@ -112,7 +99,7 @@ func Test_parseAerospikeVersion(t *testing.T) {
 			args: args{
 				versionStr: "7.1.0.0-rc1-g1234",
 			},
-			want: models2.AerospikeVersion{
+			want: infomodels.AerospikeVersion{
 				Major: 7,
 				Minor: 1,
 				Patch: 0,
@@ -177,7 +164,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 		Patch int
 	}
 	type args struct {
-		other models2.AerospikeVersion
+		other infomodels.AerospikeVersion
 	}
 	tests := []struct {
 		name   string
@@ -193,7 +180,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: models2.AerospikeVersion{
+				other: infomodels.AerospikeVersion{
 					Major: 4,
 					Minor: 1,
 					Patch: 0,
@@ -209,7 +196,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: models2.AerospikeVersion{
+				other: infomodels.AerospikeVersion{
 					Major: 5,
 					Minor: 5,
 					Patch: 0,
@@ -225,7 +212,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Patch: 1,
 			},
 			args: args{
-				other: models2.AerospikeVersion{
+				other: infomodels.AerospikeVersion{
 					Major: 5,
 					Minor: 6,
 					Patch: 0,
@@ -241,7 +228,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: models2.AerospikeVersion{
+				other: infomodels.AerospikeVersion{
 					Major: 5,
 					Minor: 6,
 					Patch: 0,
@@ -257,7 +244,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: models2.AerospikeVersion{
+				other: infomodels.AerospikeVersion{
 					Major: 5,
 					Minor: 6,
 					Patch: 0,
@@ -273,7 +260,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: models2.AerospikeVersion{
+				other: infomodels.AerospikeVersion{
 					Major: 5,
 					Minor: 6,
 					Patch: 0,
@@ -289,7 +276,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: models2.AerospikeVersion{
+				other: infomodels.AerospikeVersion{
 					Major: 5,
 					Minor: 6,
 					Patch: 1,
@@ -301,7 +288,7 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			av := models2.AerospikeVersion{
+			av := infomodels.AerospikeVersion{
 				Major: tt.fields.Major,
 				Minor: tt.fields.Minor,
 				Patch: tt.fields.Patch,
@@ -345,7 +332,7 @@ func Test_buildSindexCmd(t *testing.T) {
 	mockNodeGetter := mocks.NewMockNodeGetter(t)
 	mockNodeGetter.EXPECT().GetRandomNode().Return(&a.Node{}, nil).Maybe()
 
-	ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -365,7 +352,7 @@ func Test_parseSIndex(t *testing.T) {
 	}
 
 	type args struct {
-		sindexMap models2.InfoMap
+		sindexMap infomodels.InfoMap
 	}
 	tests := []struct {
 		args    args
@@ -376,7 +363,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive bin (default) sindex",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -401,7 +388,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive bin (none) sindex",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -426,7 +413,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive list elements sindex",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -451,7 +438,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive map keys sindex",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -476,7 +463,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive map values sindex",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -501,7 +488,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive ctx",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -527,7 +514,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive null set",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "null",
@@ -552,7 +539,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive numeric bin",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -577,7 +564,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive numeric (int signed) bin",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -602,7 +589,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive string bin",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -627,7 +614,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive string (text) bin",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -652,7 +639,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive blob bin",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -677,7 +664,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive geojson (geo2dsphere) bin",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -702,7 +689,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "positive geojson bin",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -727,7 +714,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "negative response missing namespace",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"indexname": "testindex",
 					"set":       "testset",
 					"bin":       "testbin",
@@ -742,7 +729,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "negative response missing indexname",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"set":       "testset",
 					"bin":       "testbin",
@@ -757,7 +744,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "negative response missing indextype",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -772,7 +759,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "negative response missing bin",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -787,7 +774,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "negative response missing type",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -802,7 +789,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "negative invalid indextype",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -818,7 +805,7 @@ func Test_parseSIndex(t *testing.T) {
 		{
 			name: "negative invalid type",
 			args: args{
-				sindexMap: models2.InfoMap{
+				sindexMap: infomodels.InfoMap{
 					"ns":        "test",
 					"indexname": "testindex",
 					"set":       "testset",
@@ -831,6 +818,25 @@ func Test_parseSIndex(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "set index type",
+			args: args{
+				// map[indexname:set_idx indextype:set ns:source-ns1 set:testRacks]]
+				sindexMap: infomodels.InfoMap{
+					"ns":        "test",
+					"indexname": "testindex",
+					"set":       "testset",
+					"indextype": indexTypeSet,
+				},
+			},
+			want: &models.SIndex{
+				Namespace: "test",
+				Name:      "testindex",
+				Set:       "testset",
+				IndexType: models.SetSIndex,
+				Path:      models.NewEmptySIndexPath(),
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -839,6 +845,9 @@ func Test_parseSIndex(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseSIndex() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			if tt.name == "negative invalid indextype" {
+				require.ErrorIs(t, err, ErrInvalidSIndexType)
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("parseSIndex() = %v, want %v", got, tt.want)
@@ -858,7 +867,7 @@ func Test_parseInfoResponse(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    []models2.InfoMap
+		want    []infomodels.InfoMap
 		wantErr bool
 	}{
 		{
@@ -869,7 +878,7 @@ func Test_parseInfoResponse(t *testing.T) {
 				pairSep: ":",
 				kvSep:   "=",
 			},
-			want: []models2.InfoMap{
+			want: []infomodels.InfoMap{
 				{
 					"foo": "bar",
 				},
@@ -903,7 +912,7 @@ func Test_parseInfoResponse(t *testing.T) {
 				pairSep: ":",
 				kvSep:   "=",
 			},
-			want: []models2.InfoMap{
+			want: []infomodels.InfoMap{
 				{
 					"foo": "bar=as",
 				},
@@ -917,7 +926,7 @@ func Test_parseInfoResponse(t *testing.T) {
 				pairSep: ":",
 				kvSep:   "=",
 			},
-			want: []models2.InfoMap{
+			want: []infomodels.InfoMap{
 				{
 					"foo": "bar",
 					"baz": "qux",
@@ -932,7 +941,7 @@ func Test_parseInfoResponse(t *testing.T) {
 				pairSep: ":",
 				kvSep:   "=",
 			},
-			want: []models2.InfoMap{
+			want: []infomodels.InfoMap{
 				{
 					"foo": "bar",
 					"baz": "qux",
@@ -951,7 +960,7 @@ func Test_parseInfoResponse(t *testing.T) {
 				pairSep: ":",
 				kvSep:   "=",
 			},
-			want: []models2.InfoMap{
+			want: []infomodels.InfoMap{
 				{
 					"foo": "bar",
 					"baz": "qux",
@@ -970,7 +979,7 @@ func Test_parseInfoResponse(t *testing.T) {
 				pairSep: ",",
 				kvSep:   ".",
 			},
-			want: []models2.InfoMap{
+			want: []infomodels.InfoMap{
 				{
 					"foo": "bar",
 					"baz": "qux",
@@ -1020,7 +1029,7 @@ func Test_parseInfoResponse(t *testing.T) {
 func newMockInfoGetter(t *testing.T, arg string, resp map[string]string, err a.Error) infoGetter {
 	t.Helper()
 	mockInfoGetter := mocks.NewMockinfoGetter(t)
-	mockInfoGetter.On("RequestInfo", (*a.InfoPolicy)(nil), []string{arg}).Return(resp, err)
+	mockInfoGetter.On("RequestInfo", testInfoPolicy, []string{arg}).Return(resp, err)
 	return mockInfoGetter
 }
 
@@ -1028,21 +1037,20 @@ func Test_getAerospikeVersion(t *testing.T) {
 	t.Parallel()
 
 	type args struct {
-		node   infoGetter
-		policy *a.InfoPolicy
+		node infoGetter
 	}
 	tests := []struct {
 		args    args
 		name    string
-		want    models2.AerospikeVersion
+		want    infomodels.AerospikeVersion
 		wantErr bool
 	}{
 		{
 			name: "positive simple",
 			args: args{
-				node: newMockInfoGetter(t, "build", map[string]string{"build": "5.6.0.0"}, nil),
+				node: newMockInfoGetter(t, cmdBuild, map[string]string{cmdBuild: "5.6.0.0"}, nil),
 			},
-			want: models2.AerospikeVersion{
+			want: infomodels.AerospikeVersion{
 				Major: 5,
 				Minor: 6,
 				Patch: 0,
@@ -1051,9 +1059,9 @@ func Test_getAerospikeVersion(t *testing.T) {
 		{
 			name: "positive dev build",
 			args: args{
-				node: newMockInfoGetter(t, "build", map[string]string{"build": "7.6.1.0-rc2-ghasd"}, nil),
+				node: newMockInfoGetter(t, cmdBuild, map[string]string{cmdBuild: "7.6.1.0-rc2-ghasd"}, nil),
 			},
-			want: models2.AerospikeVersion{
+			want: infomodels.AerospikeVersion{
 				Major: 7,
 				Minor: 6,
 				Patch: 1,
@@ -1062,7 +1070,14 @@ func Test_getAerospikeVersion(t *testing.T) {
 		{
 			name: "negative request info fails",
 			args: args{
-				node: newMockInfoGetter(t, "build", nil, a.ErrNetTimeout),
+				node: newMockInfoGetter(t, cmdBuild, nil, a.ErrNetTimeout),
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative command response reports an error",
+			args: args{
+				node: newMockInfoGetter(t, cmdBuild, map[string]string{cmdBuild: errCmdRespPrefix + ": unknown command"}, nil),
 			},
 			wantErr: true,
 		},
@@ -1075,9 +1090,9 @@ func Test_getAerospikeVersion(t *testing.T) {
 			mockNodeGetter := mocks.NewMockNodeGetter(t)
 			mockNodeGetter.EXPECT().GetRandomNode().Return(&a.Node{}, nil).Maybe()
 
-			ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+			ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
 
-			got, err := ic.getAerospikeVersion(tt.args.node, tt.args.policy)
+			got, err := ic.getAerospikeVersion(tt.args.node)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getAerospikeVersion() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1089,33 +1104,142 @@ func Test_getAerospikeVersion(t *testing.T) {
 	}
 }
 
+// Test_getAerospikeVersion_errorMessage covers every way the build request can
+// fail. All of them are reported by the same message, which must name the
+// operation and must not claim the response was parsed.
+func Test_getAerospikeVersion_errorMessage(t *testing.T) {
+	t.Parallel()
+
+	const wantMsg = "failed to get build version"
+
+	tests := []struct {
+		resp   map[string]string
+		reqErr a.Error
+		name   string
+	}{
+		{
+			name:   "request fails",
+			reqErr: a.ErrNetTimeout,
+		},
+		{
+			name: "command response reports an error",
+			resp: map[string]string{cmdBuild: errCmdRespPrefix + ": unknown command"},
+		},
+		{
+			name: "response misses the command key",
+			resp: map[string]string{"bad-key": "7.1.0.0"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			node := newMockInfoGetter(t, cmdBuild, tt.resp, tt.reqErr)
+			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
+
+			_, err := ic.getAerospikeVersion(node)
+			require.Error(t, err)
+			require.ErrorIs(t, err, errclass.ErrAerospike)
+			assert.Contains(t, err.Error(), wantMsg)
+		})
+	}
+}
+
+// TestClient_randomNodeErrorIsPreserved guards the report of a failed cluster
+// node lookup. A const aerospike error wraps nothing, so unwrapping it before
+// reporting dropped the message and left a formatting placeholder instead.
+func TestClient_randomNodeErrorIsPreserved(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testNamespace = "source-ns1"
+		wantMsg       = "cluster is empty"
+	)
+
+	tests := []struct {
+		run  func(ctx context.Context, ic *Client) error
+		name string
+	}{
+		{
+			name: "GetSIndexes",
+			run: func(ctx context.Context, ic *Client) error {
+				_, err := ic.GetSIndexes(ctx, testNamespace)
+
+				return err
+			},
+		},
+		{
+			name: "GetUDFs",
+			run: func(ctx context.Context, ic *Client) error {
+				_, err := ic.GetUDFs(ctx)
+
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockNodeGetter := mocks.NewMockNodeGetter(t)
+			mockNodeGetter.EXPECT().GetRandomNode().Return(nil, a.ErrClusterIsEmpty)
+
+			ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, 1))
+
+			err := tt.run(t.Context(), ic)
+			require.Error(t, err)
+			require.ErrorIs(t, err, errclass.ErrAerospike)
+			assert.Contains(t, err.Error(), wantMsg)
+		})
+	}
+}
+
 func Test_getSIndexes(t *testing.T) {
 	t.Parallel()
+
+	const (
+		testNamespace   = "test"
+		testBuildNoCtx  = "5.6.0.0"
+		testBuildCtx    = "7.1.0.0"
+		testSIndexB64   = "AAAAAA=="
+		testSIndexNoCtx = "ns=test:set=testset:indexname=testindex:bin=testbin:" +
+			"type=numeric:indextype=default:context=null:state=RW"
+		testSIndexWithCtx = "ns=test:set=testset:indexname=testindex:bin=testbin:" +
+			"type=numeric:indextype=default:context=" + testSIndexB64 + ":state=RW"
+	)
+
+	cmdSIndexNoCtx := fmt.Sprintf(cmdSindexList, testNamespace)
+	cmdSIndexWithCtx := cmdSIndexNoCtx + ";b64=true"
+
 	mockInfoGetterNoCtx := mocks.NewMockinfoGetter(t)
-	mockInfoGetterNoCtx.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"build"}).Return(
-		map[string]string{"build": "5.6.0.0"},
+	mockInfoGetterNoCtx.EXPECT().RequestInfo(testInfoPolicy, []string{cmdBuild}).Return(
+		map[string]string{cmdBuild: testBuildNoCtx},
 		nil,
 	)
-	mockInfoGetterNoCtx.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"sindex-list:namespace=test"}).Return(map[string]string{
-		"sindex-list:namespace=test": "ns=test:set=testset:indexname=testindex:bin=testbin:type=numeric:indextype=default:context=null:state=RW",
+	mockInfoGetterNoCtx.EXPECT().RequestInfo(testInfoPolicy, []string{cmdSIndexNoCtx}).Return(map[string]string{
+		cmdSIndexNoCtx: testSIndexNoCtx,
 	}, nil)
 
 	mockInfoGetterCtx := mocks.NewMockinfoGetter(t)
-	mockInfoGetterCtx.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"build"}).Return(map[string]string{"build": "7.1.0.0"}, nil)
-	mockInfoGetterCtx.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"sindex-list:namespace=test;b64=true"}).Return(map[string]string{
-		"sindex-list:namespace=test;b64=true": "ns=test:set=testset:indexname=testindex:bin=testbin:type=numeric:indextype=default:context=AAAAAA==:state=RW",
+	mockInfoGetterCtx.EXPECT().RequestInfo(testInfoPolicy, []string{cmdBuild}).
+		Return(map[string]string{cmdBuild: testBuildCtx}, nil)
+	mockInfoGetterCtx.EXPECT().RequestInfo(testInfoPolicy, []string{cmdSIndexWithCtx}).Return(map[string]string{
+		cmdSIndexWithCtx: testSIndexWithCtx,
 	}, nil)
 
 	mockInfoGetterGetBuildFailed := mocks.NewMockinfoGetter(t)
-	mockInfoGetterGetBuildFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"build"}).Return(nil, a.ErrNetTimeout)
+	mockInfoGetterGetBuildFailed.EXPECT().RequestInfo(testInfoPolicy, []string{cmdBuild}).Return(nil, a.ErrNetTimeout)
 
 	mockInfoGetterGetSIndexesFailed := mocks.NewMockinfoGetter(t)
-	mockInfoGetterGetSIndexesFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"build"}).Return(map[string]string{"build": "7.1.0.0"}, nil)
-	mockInfoGetterGetSIndexesFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"sindex-list:namespace=test;b64=true"}).Return(nil, a.ErrNetwork)
+	mockInfoGetterGetSIndexesFailed.EXPECT().RequestInfo(testInfoPolicy, []string{cmdBuild}).
+		Return(map[string]string{cmdBuild: testBuildCtx}, nil)
+	mockInfoGetterGetSIndexesFailed.EXPECT().RequestInfo(testInfoPolicy, []string{cmdSIndexWithCtx}).
+		Return(nil, a.ErrNetwork)
 
 	type args struct {
 		conn      infoGetter
-		policy    *a.InfoPolicy
 		namespace string
 	}
 	tests := []struct {
@@ -1128,11 +1252,11 @@ func Test_getSIndexes(t *testing.T) {
 			name: "positive no ctx",
 			args: args{
 				conn:      mockInfoGetterNoCtx,
-				namespace: "test",
+				namespace: testNamespace,
 			},
 			want: []*models.SIndex{
 				{
-					Namespace: "test",
+					Namespace: testNamespace,
 					Name:      "testindex",
 					Set:       "testset",
 					Path: models.SIndexPath{
@@ -1147,17 +1271,17 @@ func Test_getSIndexes(t *testing.T) {
 			name: "positive with ctx",
 			args: args{
 				conn:      mockInfoGetterCtx,
-				namespace: "test",
+				namespace: testNamespace,
 			},
 			want: []*models.SIndex{
 				{
-					Namespace: "test",
+					Namespace: testNamespace,
 					Name:      "testindex",
 					Set:       "testset",
 					Path: models.SIndexPath{
 						BinName:    "testbin",
 						BinType:    models.NumericSIDataType,
-						B64Context: "AAAAAA==",
+						B64Context: testSIndexB64,
 					},
 					IndexType: models.BinSIndex,
 				},
@@ -1167,7 +1291,7 @@ func Test_getSIndexes(t *testing.T) {
 			name: "negative get build fails",
 			args: args{
 				conn:      mockInfoGetterGetBuildFailed,
-				namespace: "test",
+				namespace: testNamespace,
 			},
 			wantErr: true,
 		},
@@ -1175,7 +1299,7 @@ func Test_getSIndexes(t *testing.T) {
 			name: "negative get sindex fails",
 			args: args{
 				conn:      mockInfoGetterGetSIndexesFailed,
-				namespace: "test",
+				namespace: testNamespace,
 			},
 			wantErr: true,
 		},
@@ -1184,12 +1308,13 @@ func Test_getSIndexes(t *testing.T) {
 	mockNodeGetter := mocks.NewMockNodeGetter(t)
 	mockNodeGetter.EXPECT().GetRandomNode().Return(&a.Node{}, nil).Maybe()
 
-	ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := ic.getSIndexes(tt.args.conn, tt.args.namespace, tt.args.policy)
+
+			ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
+
+			got, err := ic.requestSIndexes(tt.args.conn, tt.args.namespace, false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getSIndexes() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1291,17 +1416,38 @@ func Test_parseSIndexResponse(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "negative bad sindex",
+			name: "negative bad sindex bin type",
 			args: args{
 				sindexInfoResp: "ns=test:set=testset:indexname=testindex:bin=testbin:type=BADTYPE:indextype=default:context=null:state=RW",
 			},
 			wantErr: true,
 		},
+		{
+			name: "positive skips invalid indextype",
+			args: args{
+				sindexInfoResp: "ns=test:set=testset:indexname=validindex:bin=testbin:type=numeric:indextype=default:context=null:state=RW;ns=test:set=testset:indexname=badindex:bin=testbin:type=numeric:indextype=badtype:context=null:state=RW",
+			},
+			want: []*models.SIndex{
+				{
+					Namespace: "test",
+					Name:      "validindex",
+					Set:       "testset",
+					Path: models.SIndexPath{
+						BinName: "testbin",
+						BinType: models.NumericSIDataType,
+					},
+					IndexType: models.BinSIndex,
+				},
+			},
+		},
 	}
+	mockNodeGetter := mocks.NewMockNodeGetter(t)
+	ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := parseSIndexes(tt.args.sindexInfoResp)
+			got, err := ic.parseSIndexes(tt.args.sindexInfoResp, false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseSIndexResponse() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1321,7 +1467,7 @@ func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
 		Patch int
 	}
 	type args struct {
-		other models2.AerospikeVersion
+		other infomodels.AerospikeVersion
 	}
 	tests := []struct {
 		name   string
@@ -1337,7 +1483,7 @@ func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: models2.AerospikeVersion{
+				other: infomodels.AerospikeVersion{
 					Major: 4,
 					Minor: 1,
 					Patch: 0,
@@ -1353,7 +1499,7 @@ func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: models2.AerospikeVersion{
+				other: infomodels.AerospikeVersion{
 					Major: 5,
 					Minor: 6,
 					Patch: 0,
@@ -1369,7 +1515,7 @@ func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
 				Patch: 0,
 			},
 			args: args{
-				other: models2.AerospikeVersion{
+				other: infomodels.AerospikeVersion{
 					Major: 4,
 					Minor: 1,
 					Patch: 0,
@@ -1381,7 +1527,7 @@ func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			av := models2.AerospikeVersion{
+			av := infomodels.AerospikeVersion{
 				Major: tt.fields.Major,
 				Minor: tt.fields.Minor,
 				Patch: tt.fields.Patch,
@@ -1396,7 +1542,7 @@ func TestAerospikeVersion_IsGreaterOrEqual(t *testing.T) {
 func Test_parseUDF(t *testing.T) {
 	t.Parallel()
 	type args struct {
-		udfMap models2.InfoMap
+		udfMap infomodels.InfoMap
 	}
 	tests := []struct {
 		args    args
@@ -1407,7 +1553,7 @@ func Test_parseUDF(t *testing.T) {
 		{
 			name: "positive simple",
 			args: args{
-				udfMap: models2.InfoMap{
+				udfMap: infomodels.InfoMap{
 					"type":    "LUA",
 					"content": base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
 				},
@@ -1420,7 +1566,7 @@ func Test_parseUDF(t *testing.T) {
 		{
 			name: "negative missing type",
 			args: args{
-				udfMap: models2.InfoMap{
+				udfMap: infomodels.InfoMap{
 					"content": base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
 				},
 			},
@@ -1429,7 +1575,7 @@ func Test_parseUDF(t *testing.T) {
 		{
 			name: "negative bad language type",
 			args: args{
-				udfMap: models2.InfoMap{
+				udfMap: infomodels.InfoMap{
 					"type":    "BADTYPE",
 					"content": base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
 				},
@@ -1439,7 +1585,7 @@ func Test_parseUDF(t *testing.T) {
 		{
 			name: "negative missing content",
 			args: args{
-				udfMap: models2.InfoMap{
+				udfMap: infomodels.InfoMap{
 					"type": "LUA",
 				},
 			},
@@ -1448,7 +1594,7 @@ func Test_parseUDF(t *testing.T) {
 		{
 			name: "negative content is not base64 encoded",
 			args: args{
-				udfMap: models2.InfoMap{
+				udfMap: infomodels.InfoMap{
 					"type":    "LUA",
 					"content": "function test()\n return 1\n end\n",
 				},
@@ -1458,7 +1604,7 @@ func Test_parseUDF(t *testing.T) {
 		{
 			name: "negative wrong number of info elements",
 			args: args{
-				udfMap: models2.InfoMap{
+				udfMap: infomodels.InfoMap{
 					"type":     "LUA",
 					"content":  "function test()\n return 1\n end\n",
 					"too many": "elements",
@@ -1542,10 +1688,18 @@ func Test_parseUDFResponse(t *testing.T) {
 
 func Test_getUDF(t *testing.T) {
 	t.Parallel()
+
+	const (
+		testUDFName    = "test.lua"
+		testUDFContent = "function test()\n return 1\n end\n"
+	)
+
+	testUDFCmd := fmt.Sprintf(cmdUdfGetFilename, testUDFName)
+	testUDFResp := "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte(testUDFContent))
+
 	type args struct {
-		node   infoGetter
-		policy *a.InfoPolicy
-		name   string
+		node infoGetter
+		name string
 	}
 	tests := []struct {
 		args    args
@@ -1556,32 +1710,42 @@ func Test_getUDF(t *testing.T) {
 		{
 			name: "positive simple",
 			args: args{
-				node: newMockInfoGetter(t, "udf-get:filename=test.lua", map[string]string{
-					"udf-get:filename=test.lua": "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
+				node: newMockInfoGetter(t, testUDFCmd, map[string]string{
+					testUDFCmd: testUDFResp,
 				}, nil),
-				name: "test.lua",
+				name: testUDFName,
 			},
 			want: &models.UDF{
 				UDFType: models.UDFTypeLUA,
-				Content: []byte("function test()\n return 1\n end\n"),
-				Name:    "test.lua",
+				Content: []byte(testUDFContent),
+				Name:    testUDFName,
 			},
 		},
 		{
 			name: "negative response has wrong command key",
 			args: args{
-				node: newMockInfoGetter(t, "udf-get:filename=test.lua", map[string]string{
-					"bad-key": "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
+				node: newMockInfoGetter(t, testUDFCmd, map[string]string{
+					"bad-key": testUDFResp,
 				}, nil),
-				name: "test.lua",
+				name: testUDFName,
 			},
 			wantErr: true,
 		},
 		{
 			name: "negative infoGetter returned an error",
 			args: args{
-				node: newMockInfoGetter(t, "udf-get:filename=test.lua", nil, a.ErrConnectionPoolEmpty),
-				name: "test.lua",
+				node: newMockInfoGetter(t, testUDFCmd, nil, a.ErrConnectionPoolEmpty),
+				name: testUDFName,
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative command response reports an error",
+			args: args{
+				node: newMockInfoGetter(t, testUDFCmd, map[string]string{
+					testUDFCmd: errCmdRespPrefix + ": file not found",
+				}, nil),
+				name: testUDFName,
 			},
 			wantErr: true,
 		},
@@ -1590,12 +1754,12 @@ func Test_getUDF(t *testing.T) {
 	mockNodeGetter := mocks.NewMockNodeGetter(t)
 	mockNodeGetter.EXPECT().GetRandomNode().Return(&a.Node{}, nil).Maybe()
 
-	ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := ic.getUDF(tt.args.node, tt.args.name, tt.args.policy)
+			got, err := ic.getUDF(tt.args.node, tt.args.name)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getUDF() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1609,34 +1773,54 @@ func Test_getUDF(t *testing.T) {
 
 func Test_getUDFs(t *testing.T) {
 	t.Parallel()
+
+	const (
+		testUDF1Name    = "test1.lua"
+		testUDF2Name    = "test2.lua"
+		testUDF1Content = "function test()\n return 1\n end\n"
+		testUDF2Content = "function test()\n return 2\n end\n"
+	)
+
+	var (
+		testUDF1Cmd = fmt.Sprintf(cmdUdfGetFilename, testUDF1Name)
+		testUDF2Cmd = fmt.Sprintf(cmdUdfGetFilename, testUDF2Name)
+
+		testUDF1Resp = "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte(testUDF1Content))
+		testUDF2Resp = "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte(testUDF2Content))
+	)
+
 	mockInfoGetter := mocks.NewMockinfoGetter(t)
-	mockInfoGetter.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"udf-list"}).Return(map[string]string{
-		"udf-list": "filename=test1.lua;filename=test2.lua;",
+	mockInfoGetter.EXPECT().RequestInfo(testInfoPolicy, []string{cmdUdfList}).Return(map[string]string{
+		cmdUdfList: "filename=" + testUDF1Name + ";filename=" + testUDF2Name + ";",
 	}, nil)
-	mockInfoGetter.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"udf-get:filename=test1.lua"}).Return(map[string]string{
-		"udf-get:filename=test1.lua": "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte("function test()\n return 1\n end\n")),
+	mockInfoGetter.EXPECT().RequestInfo(testInfoPolicy, []string{testUDF1Cmd}).Return(map[string]string{
+		testUDF1Cmd: testUDF1Resp,
 	}, nil)
-	mockInfoGetter.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"udf-get:filename=test2.lua"}).Return(map[string]string{
-		"udf-get:filename=test2.lua": "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte("function test()\n return 2\n end\n")),
+	mockInfoGetter.EXPECT().RequestInfo(testInfoPolicy, []string{testUDF2Cmd}).Return(map[string]string{
+		testUDF2Cmd: testUDF2Resp,
 	}, nil)
 
 	mockInfoGetterNoUDFs := mocks.NewMockinfoGetter(t)
-	mockInfoGetterNoUDFs.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"udf-list"}).Return(map[string]string{
-		"udf-list": "",
+	mockInfoGetterNoUDFs.EXPECT().RequestInfo(testInfoPolicy, []string{cmdUdfList}).Return(map[string]string{
+		cmdUdfList: "",
 	}, nil)
 
 	mockInfoGetterListUDFsFailed := mocks.NewMockinfoGetter(t)
-	mockInfoGetterListUDFsFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"udf-list"}).Return(nil, a.ErrNetTimeout)
+	mockInfoGetterListUDFsFailed.EXPECT().RequestInfo(testInfoPolicy, []string{cmdUdfList}).Return(nil, a.ErrNetTimeout)
+
+	mockInfoGetterListUDFsRespErr := mocks.NewMockinfoGetter(t)
+	mockInfoGetterListUDFsRespErr.EXPECT().RequestInfo(testInfoPolicy, []string{cmdUdfList}).Return(map[string]string{
+		cmdUdfList: errCmdRespPrefix + ": not authenticated",
+	}, nil)
 
 	mockInfoGetterGetUDFFailed := mocks.NewMockinfoGetter(t)
-	mockInfoGetterGetUDFFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"udf-list"}).Return(map[string]string{
-		"udf-list": "filename=test1.lua;",
+	mockInfoGetterGetUDFFailed.EXPECT().RequestInfo(testInfoPolicy, []string{cmdUdfList}).Return(map[string]string{
+		cmdUdfList: "filename=" + testUDF1Name + ";",
 	}, nil)
-	mockInfoGetterGetUDFFailed.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"udf-get:filename=test1.lua"}).Return(nil, a.ErrNetwork)
+	mockInfoGetterGetUDFFailed.EXPECT().RequestInfo(testInfoPolicy, []string{testUDF1Cmd}).Return(nil, a.ErrNetwork)
 
 	type args struct {
-		node   infoGetter
-		policy *a.InfoPolicy
+		node infoGetter
 	}
 	tests := []struct {
 		name    string
@@ -1652,13 +1836,13 @@ func Test_getUDFs(t *testing.T) {
 			want: []*models.UDF{
 				{
 					UDFType: models.UDFTypeLUA,
-					Content: []byte("function test()\n return 1\n end\n"),
-					Name:    "test1.lua",
+					Content: []byte(testUDF1Content),
+					Name:    testUDF1Name,
 				},
 				{
 					UDFType: models.UDFTypeLUA,
-					Content: []byte("function test()\n return 2\n end\n"),
-					Name:    "test2.lua",
+					Content: []byte(testUDF2Content),
+					Name:    testUDF2Name,
 				},
 			},
 		},
@@ -1677,6 +1861,13 @@ func Test_getUDFs(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "negative udf-list response reports an error",
+			args: args{
+				node: mockInfoGetterListUDFsRespErr,
+			},
+			wantErr: true,
+		},
+		{
 			name: "negative getting a UDF failed",
 			args: args{
 				node: mockInfoGetterGetUDFFailed,
@@ -1688,12 +1879,12 @@ func Test_getUDFs(t *testing.T) {
 	mockNodeGetter := mocks.NewMockNodeGetter(t)
 	mockNodeGetter.EXPECT().GetRandomNode().Return(&a.Node{}, nil).Maybe()
 
-	ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := ic.getUDFs(tt.args.node, tt.args.policy)
+			got, err := ic.getUDFs(tt.args.node)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getUDFs() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1707,71 +1898,78 @@ func Test_getUDFs(t *testing.T) {
 
 func TestGetRecordCount(t *testing.T) {
 	t.Parallel()
+
+	const (
+		testNamespace = "myNamespace"
+		testSet       = "mySet"
+	)
+
+	testSetsCmd := fmt.Sprintf(cmdSetsOfNamespace, testNamespace)
+
 	mockInfoGetter := mocks.NewMockinfoGetter(t)
-	mockInfoGetter.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"sets/myNamespace"}).Return(map[string]string{
-		"sets/myNamespace": "set=mySet:objects=2",
+	mockInfoGetter.EXPECT().RequestInfo(testInfoPolicy, []string{testSetsCmd}).Return(map[string]string{
+		testSetsCmd: "set=" + testSet + ":objects=2",
 	}, nil)
 
 	mockInfoGetterNoSets := mocks.NewMockinfoGetter(t)
-	mockInfoGetterNoSets.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"sets/myNamespace"}).Return(map[string]string{
-		"sets/myNamespace": "",
+	mockInfoGetterNoSets.EXPECT().RequestInfo(testInfoPolicy, []string{testSetsCmd}).Return(map[string]string{
+		testSetsCmd: "",
 	}, nil)
 
 	mockInfoGetterReqFail := mocks.NewMockinfoGetter(t)
-	mockInfoGetterReqFail.EXPECT().RequestInfo((*a.InfoPolicy)(nil), []string{"sets/myNamespace"}).Return(nil, a.ErrNetTimeout)
+	mockInfoGetterReqFail.EXPECT().RequestInfo(testInfoPolicy, []string{testSetsCmd}).Return(nil, a.ErrNetTimeout)
 
+	mockInfoGetterRespErr := mocks.NewMockinfoGetter(t)
+	mockInfoGetterRespErr.EXPECT().RequestInfo(testInfoPolicy, []string{testSetsCmd}).Return(map[string]string{
+		testSetsCmd: errCmdRespPrefix + ": unknown namespace",
+	}, nil)
+
+	type args struct {
+		node infoGetter
+		sets []string
+	}
 	tests := []struct {
 		err  error
 		name string
-		args struct {
-			node infoGetter
-			sets []string
-		}
+		args args
 		want uint64
 	}{
 		{
 			name: "positive with specified sets",
-			args: struct {
-				node infoGetter
-				sets []string
-			}{node: mockInfoGetter, sets: []string{"mySet"}},
+			args: args{node: mockInfoGetter, sets: []string{testSet}},
 			want: 2,
 		},
 		{
 			name: "positive with no sets specified",
-			args: struct {
-				node infoGetter
-				sets []string
-			}{node: mockInfoGetter, sets: nil},
+			args: args{node: mockInfoGetter, sets: nil},
 			want: 2,
 		},
 		{
 			name: "positive with no sets found",
-			args: struct {
-				node infoGetter
-				sets []string
-			}{node: mockInfoGetterNoSets, sets: nil},
+			args: args{node: mockInfoGetterNoSets, sets: nil},
 			want: 0,
 		},
 		{
 			name: "negative request failed",
-			args: struct {
-				node infoGetter
-				sets []string
-			}{node: mockInfoGetterReqFail, sets: nil},
-			err: a.ErrNetTimeout,
+			args: args{node: mockInfoGetterReqFail, sets: nil},
+			err:  a.ErrNetTimeout,
+		},
+		{
+			name: "negative command response reports an error",
+			args: args{node: mockInfoGetterRespErr, sets: nil},
+			err:  errclass.ErrAerospike,
 		},
 	}
 
 	mockNodeGetter := mocks.NewMockNodeGetter(t)
 	mockNodeGetter.EXPECT().GetRandomNode().Return(&a.Node{}, nil).Maybe()
 
-	ic := newClient(mockNodeGetter, a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
+	ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := ic.getRecordCountForNode(tt.args.node, nil, "myNamespace", tt.args.sets)
+			got, err := ic.getRecordCountForNode(tt.args.node, testNamespace, tt.args.sets)
 			if err != nil && !errors.Is(err, tt.err) {
 				t.Errorf("GetRecordCount() error = %v, wantErr %v", err, tt.err)
 				return
@@ -1787,7 +1985,7 @@ func Test_parseInfoObject(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		obj    string
-		result models2.InfoMap
+		result infomodels.InfoMap
 		err    error
 	}{
 		{
@@ -1812,40 +2010,6 @@ func Test_parseInfoObject(t *testing.T) {
 		require.Equal(t, tt.result, result)
 		require.Equal(t, tt.err, err)
 	}
-}
-
-func TestClient_EnableDisableXDR(t *testing.T) {
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	nodes := ic.GetNodesNames()
-	err = ic.StartXDR(t.Context(), nodes[0], testASDC, testXDRHostPort, testASNamespace, testASRewind, 0, true)
-	require.NoError(t, err)
-
-	_, err = ic.GetStats(t.Context(), nodes[0], testASDC, testASNamespace)
-	require.NoError(t, err)
-
-	err = ic.StopXDR(t.Context(), nodes[0], testASDC)
-	require.NoError(t, err)
-}
-
-func TestClient_BlockUnblockMRTWrites(t *testing.T) {
-	t.Parallel()
-
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	nodes := ic.GetNodesNames()
-
-	_ = ic.BlockMRTWrites(t.Context(), nodes[0], testASNamespace)
-
-	_ = ic.UnBlockMRTWrites(t.Context(), nodes[0], testASNamespace)
 }
 
 func TestClient_parseResultResponse(t *testing.T) {
@@ -1891,247 +2055,195 @@ func TestClient_parseResultResponse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			result, err := parseResultResponse(tt.cmd, tt.input)
-			if result != tt.expected {
-				t.Errorf("expected result %v, got %v", tt.expected, result)
+
+			if tt.errMsg == "" {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+
+				return
 			}
-			if err != nil {
-				if err.Error() != tt.errMsg {
-					t.Errorf("expected error message %v, got %v", tt.errMsg, err)
-				}
-			} else if tt.errMsg != "" {
-				t.Errorf("expected error message %v, got nil", tt.errMsg)
+
+			// The class is the contract, the message text is not.
+			require.ErrorIs(t, err, errclass.ErrAerospike)
+			require.ErrorContains(t, err, tt.errMsg)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestClient_GetBackupStatus(t *testing.T) {
+	t.Parallel()
+
+	mockNodeGetter := mocks.NewMockNodeGetter(t)
+	mockNodeGetter.EXPECT().GetNodes().Return([]*a.Node{})
+
+	ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
+
+	ctx := t.Context()
+
+	_, err := ic.GetBackupStatus(ctx, "523607479")
+	require.ErrorIs(t, err, ErrNotFound)
+}
+
+func TestClient_AbortServerBackup(t *testing.T) {
+	t.Parallel()
+
+	const testBackupID = "523607479"
+
+	// The command sent to the principal must carry the job being aborted.
+	ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
+	require.Equal(t,
+		"backup-abort:job-id="+testBackupID,
+		fmt.Sprintf(ic.cmdDict[cmdIDBackupAbort], testBackupID),
+	)
+
+	// The principal is needed before the abort can be sent, so a cluster that
+	// hands out no node must surface as an Aerospike-class error.
+	mockNodeGetter := mocks.NewMockNodeGetter(t)
+	mockNodeGetter.EXPECT().GetRandomNode().Return(nil, a.ErrInvalidParam).Maybe()
+
+	ic = newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, 1))
+
+	err := ic.AbortBackup(t.Context(), testBackupID)
+
+	require.ErrorIs(t, err, errclass.ErrAerospike)
+	require.ErrorContains(t, err, "failed to get cluster principal")
+}
+
+// Shared by the AbortRestore tests below.
+const (
+	testAbortRestoreNamespace = "source-ns1"
+	testAbortRestoreJobID     = "260922T103653-5xsr"
+)
+
+// TestClient_AbortRestore_Command pins the wire format of the restore abort command.
+// Unlike the backup abort, it is namespace scoped, and the namespace is the first
+// positional argument, so swapping the arguments must not go unnoticed.
+func TestClient_AbortRestore_Command(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		namespace string
+		jobID     string
+		want      string
+	}{
+		{
+			name:      "namespace and job id",
+			namespace: testAbortRestoreNamespace,
+			jobID:     testAbortRestoreJobID,
+			want:      "restore-stop:namespace=source-ns1;job-id=260922T103653-5xsr",
+		},
+		{
+			name:      "numeric job id",
+			namespace: "test",
+			jobID:     "523607479",
+			want:      "restore-stop:namespace=test;job-id=523607479",
+		},
+		{
+			name:      "empty arguments keep their positions",
+			namespace: "",
+			jobID:     "",
+			want:      "restore-stop:namespace=;job-id=",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
+
+			got := fmt.Sprintf(ic.cmdDict[cmdIDRestoreAbort], tt.namespace, tt.jobID)
+
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// TestClient_AbortRestore covers the failure paths reachable without a live cluster.
+// The abort is sent to the cluster principal, so everything that happens before the
+// command reaches a node is observable here.
+func TestClient_AbortRestore(t *testing.T) {
+	t.Parallel()
+
+	const testMaxRetries = 2
+
+	tests := []struct {
+		setup      func(t *testing.T) (*Client, context.Context)
+		wantErrIs  error
+		name       string
+		wantErrMsg string
+	}{
+		{
+			name: "principal is unreachable",
+			setup: func(t *testing.T) (*Client, context.Context) {
+				t.Helper()
+
+				mockNodeGetter := mocks.NewMockNodeGetter(t)
+				mockNodeGetter.EXPECT().GetRandomNode().Return(nil, a.ErrInvalidParam)
+
+				ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, testMaxRetries))
+
+				return ic, t.Context()
+			},
+			wantErrIs:  errclass.ErrAerospike,
+			wantErrMsg: "failed to get cluster principal",
+		},
+		{
+			name: "canceled context stops the retries",
+			setup: func(t *testing.T) (*Client, context.Context) {
+				t.Helper()
+
+				mockNodeGetter := mocks.NewMockNodeGetter(t)
+				mockNodeGetter.EXPECT().GetRandomNode().Return(nil, a.ErrInvalidParam)
+
+				// The backoff must be long enough for the canceled context, and not
+				// the elapsed delay, to end the wait between the attempts.
+				ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(time.Hour, 1, testMaxRetries))
+
+				ctx, cancel := context.WithCancel(t.Context())
+				cancel()
+
+				return ic, ctx
+			},
+			wantErrIs: context.Canceled,
+		},
+		{
+			name: "nil retry policy is rejected before any request",
+			setup: func(t *testing.T) (*Client, context.Context) {
+				t.Helper()
+
+				ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
+				ic.retryPolicy = nil
+
+				return ic, t.Context()
+			},
+			wantErrIs:  errclass.ErrInvalidConfig,
+			wantErrMsg: "retry policy cannot be nil",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ic, ctx := tt.setup(t)
+
+			err := ic.AbortRestore(ctx, testAbortRestoreNamespace, testAbortRestoreJobID)
+
+			require.ErrorIs(t, err, tt.wantErrIs)
+
+			if tt.wantErrMsg != "" {
+				require.ErrorContains(t, err, tt.wantErrMsg)
 			}
 		})
 	}
 }
 
-func TestClient_GetSIndexes(t *testing.T) {
-	t.Parallel()
-
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	_, err = ic.GetSIndexes(ctx, testASNamespace)
-	require.NoError(t, err)
-}
-
-func TestClient_GetUDFs(t *testing.T) {
-	t.Parallel()
-
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	_, err = ic.GetUDFs(ctx)
-	require.NoError(t, err)
-}
-
-func TestClient_GetRecordCount(t *testing.T) {
-	t.Parallel()
-
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	_, err = ic.GetRecordCount(ctx, testASNamespace, nil)
-	require.NoError(t, err)
-}
-
-func TestClient_XDR(t *testing.T) {
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	nodes := ic.GetNodesNames()
-
-	ctx := t.Context()
-
-	err = ic.StartXDR(ctx, nodes[0], testASDC, testXDRHostPort, testASNamespace, testASRewind, 0, false)
-	require.NoError(t, err)
-
-	_, err = ic.GetStats(ctx, nodes[0], testASDC, testASNamespace)
-	require.NoError(t, err)
-
-	err = ic.StopXDR(ctx, nodes[0], testASDC)
-	require.NoError(t, err)
-}
-
-func TestClient_GetSets(t *testing.T) {
-	t.Parallel()
-
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	wp := a.NewWritePolicy(0, 0)
-	k, aerr := a.NewKey(testASNamespace, testSetInfo, "get-sets")
-	require.NoError(t, aerr)
-	b := a.NewBin("bin", "value")
-	aerr = client.PutBins(wp, k, b)
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	result, err := ic.GetSetsList(ctx, testASNamespace)
-	require.NoError(t, err)
-
-	require.Greater(t, len(result), 1)
-}
-
-func TestClient_getRackNodes(t *testing.T) {
-	t.Parallel()
-
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	res, err := ic.GetRackNodes(ctx, 0)
-	require.NoError(t, err)
-
-	fmt.Println(res)
-}
-
-func TestClient_getService(t *testing.T) {
-	t.Parallel()
-
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	nodes := ic.GetNodesNames()
-
-	_, err = ic.getByNode(nodes[0], cmdServiceTLSStd)
-	require.NoError(t, err)
-}
-
-func TestClient_GetNamespacesList(t *testing.T) {
-	t.Parallel()
-
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	result, err := ic.GetNamespacesList(ctx)
-	require.NoError(t, err)
-
-	require.Equal(t, []string{testASNamespace}, result)
-}
-
-func TestClient_GetStatus(t *testing.T) {
-	t.Parallel()
-
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	result, err := ic.GetStatus(ctx)
-	require.NoError(t, err)
-
-	require.Equal(t, "ok", result)
-}
-
-func TestClient_GetDCsList(t *testing.T) {
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	node, err := ic.cluster.GetRandomNode()
-	require.NoError(t, err)
-
-	err = ic.createXDRDC(node.GetName(), testASDC)
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	result, err := ic.GetDCsList(ctx)
-	require.NoError(t, err)
-
-	err = ic.deleteXDRDC(node.GetName(), testASDC)
-	require.NoError(t, err)
-
-	require.Equal(t, []string{testASDC}, result)
-}
-
-func TestClient_GetReplicas(t *testing.T) {
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	node, err := ic.cluster.GetRandomNode()
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	b, err := ic.GetPrimaryPartitions(ctx, node.GetName(), testASNamespace)
-	require.NoError(t, err)
-	require.NotNil(t, b)
-}
-
-func TestClient_GetPendingMigrations(t *testing.T) {
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	result, err := ic.GetPendingMigrations(ctx, testASNamespace)
-	require.NoError(t, err)
-	require.Equal(t, uint64(0), result)
-}
-
-func TestClient_GetBackupStatus(t *testing.T) {
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
-
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
-
-	ctx := t.Context()
-
-	_, err = ic.GetBackupStatus(ctx)
-	require.ErrorIs(t, err, ErrNotFound)
-}
-
 // backupJob builds a minimal InfoMap representing a backup job.
-func backupJob(trid, timeSinceDone, progress, pids string) models2.InfoMap {
-	return models2.InfoMap{
+func backupJob(trid, timeSinceDone, progress, pids string) infomodels.InfoMap {
+	return infomodels.InfoMap{
 		"trid":             trid,
 		"ns":               "test-ns",
 		"job-type":         jobTypeBackup,
@@ -2146,7 +2258,7 @@ func TestFilterBackupsSortedByTimeSinceDone(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		input     []models2.InfoMap
+		input     []infomodels.InfoMap
 		wantTRIDs []string
 		wantErr   bool
 	}{
@@ -2157,7 +2269,7 @@ func TestFilterBackupsSortedByTimeSinceDone(t *testing.T) {
 		},
 		{
 			name: "filters out non-backup jobs",
-			input: []models2.InfoMap{
+			input: []infomodels.InfoMap{
 				{"trid": "1", "job-type": "scan", "time-since-done": "100"},
 				{"trid": "2", "job-type": "query", "time-since-done": "50"},
 				backupJob("3", "200", "100", "2048"),
@@ -2166,7 +2278,7 @@ func TestFilterBackupsSortedByTimeSinceDone(t *testing.T) {
 		},
 		{
 			name: "ascending by time-since-done",
-			input: []models2.InfoMap{
+			input: []infomodels.InfoMap{
 				backupJob("1", "300", "20", "1024"),
 				backupJob("2", "100", "40", "2048"),
 				backupJob("3", "200", "100", "4096"),
@@ -2175,7 +2287,7 @@ func TestFilterBackupsSortedByTimeSinceDone(t *testing.T) {
 		},
 		{
 			name: "missing time-since-done goes to the end",
-			input: []models2.InfoMap{
+			input: []infomodels.InfoMap{
 				backupJob("1", "300", "50", "2048"),
 				{"trid": "2", "job-type": jobTypeBackup},
 				backupJob("3", "100", "100", "4096"),
@@ -2184,14 +2296,14 @@ func TestFilterBackupsSortedByTimeSinceDone(t *testing.T) {
 		},
 		{
 			name: "all jobs filtered out",
-			input: []models2.InfoMap{
+			input: []infomodels.InfoMap{
 				{"trid": "1", "job-type": "scan", "time-since-done": "100"},
 			},
 			wantTRIDs: []string{},
 		},
 		{
 			name: "malformed time-since-done returns error",
-			input: []models2.InfoMap{
+			input: []infomodels.InfoMap{
 				backupJob("1", "not-a-number", "100", "4096"),
 			},
 			wantErr: true,
@@ -2221,10 +2333,10 @@ func TestFilterBackupsSortedByTimeSinceDone(t *testing.T) {
 func newTestClient(t *testing.T) *Client {
 	t.Helper()
 	return &Client{
-		policy:      nil,
+		policy:      testInfoPolicy,
 		retryPolicy: models.NewDefaultRetryPolicy(),
 		cmdDict: map[int]string{
-			cmdIDShowJobsQueries: testShowJobsCmd,
+			cmdIDBackupStatus: cmdBackupStatus,
 		},
 	}
 }
@@ -2233,48 +2345,76 @@ func TestClient_getBackupStatusByNode(t *testing.T) {
 	t.Parallel()
 
 	const (
-		// Two backup jobs: trid=2 finished more recently (smaller time-since-done),
-		// so it must be picked.
-		twoBackups = "trid=2:ns=test-ns:job-type=backup:job-progress=75.00:" +
-			"n-pids-requested=4096:time-since-done=100;" +
-			"trid=1:ns=test-ns:job-type=backup:job-progress=100.00:" +
-			"n-pids-requested=4096:time-since-done=999"
-
-		noBackupsJustScan = "trid=5:ns=test-ns:job-type=scan:time-since-done=10"
-
-		malformedProgress = "trid=2:ns=test-ns:job-type=backup:" +
-			"job-progress=oops:n-pids-requested=4096:time-since-done=100"
+		testJobID     = "260922T103653-5xsr"
+		testNamespace = "source-ns1"
 	)
+
+	backupStatusCmd := fmt.Sprintf(cmdBackupStatus, testJobID)
+
+	const runningStatus = "job-id=260922T103653-5xsr:ns=source-ns1:state=INCR_SCAN_ACTIVE:" +
+		"recs-base=515423:recs-incr=0:recs-change=0:recs-filtered=0:recs-skipped-xdr-tomb=0:" +
+		"recs-read-failed=0:partitions-flushed=1365:partitions-owned=1365:partitions-scanned=1365:" +
+		"progress-pct=95.00:change-stream-active=true:start-time=20260922T103653.415Z:finish-time=-:" +
+		"partitions-count-pending=0:count-read-failures=0"
+
+	const failedStatus = "job-id=260922T103653-5xsr:ns=source-ns1:state=FAILED:recs-backed-up=12:" +
+		"recs-base=10:recs-incr=1:recs-change=1:error-reason=storage unreachable:" +
+		"start-time=20260922T103653.415Z:finish-time=20260922T104120.077Z"
 
 	tests := []struct {
 		name     string
 		response string
 		reqErr   a.Error
-		wantVal  float64
-		wantTRID int64
-		wantErr  error
+		wantErr  bool
+		check    func(t *testing.T, resp []infomodels.InfoMap)
 	}{
 		{
-			name:     "picks the most recently finished backup",
-			response: twoBackups,
-			// progress=75% of 4096 partitions = 3072
-			wantVal:  3072,
-			wantTRID: 2,
+			name:     "parses running backup status response",
+			response: runningStatus,
+			check: func(t *testing.T, resp []infomodels.InfoMap) {
+				t.Helper()
+
+				status := infomodels.NewResponseBackupState(resp)
+				require.NotNil(t, status)
+				assert.Equal(t, infomodels.BackupStateIncrScanActive, status.State)
+				assert.Equal(t, testJobID, status.JobID)
+				assert.Equal(t, testNamespace, status.Namespace)
+				assert.Equal(t, uint64(515423), status.RecsBase)
+				assert.Equal(t, uint32(1365), status.PartitionsOwned)
+				assert.InEpsilon(t, 95.0, status.ProgressPct, 0.01)
+				assert.True(t, status.ChangeStreamActive)
+				assert.False(t, status.StartTime.IsZero())
+				assert.True(t, status.FinishTime.IsZero())
+			},
 		},
 		{
-			name:     "no backup jobs returns ErrNotFound",
-			response: noBackupsJustScan,
-			wantErr:  ErrNotFound,
+			name:     "parses conditional error-reason field",
+			response: failedStatus,
+			check: func(t *testing.T, resp []infomodels.InfoMap) {
+				t.Helper()
+
+				status := infomodels.NewResponseBackupState(resp)
+				require.NotNil(t, status)
+				assert.Equal(t, infomodels.BackupStateFailed, status.State)
+				assert.Equal(t, "storage unreachable", status.ErrorReason)
+				assert.Equal(t, uint64(12), status.RecsBackedUp)
+				assert.False(t, status.FinishTime.IsZero())
+			},
 		},
 		{
-			name:     "empty response returns ErrNotFound",
+			name:     "empty response",
 			response: "",
-			wantErr:  ErrNotFound,
+			check: func(t *testing.T, resp []infomodels.InfoMap) {
+				t.Helper()
+
+				assert.Nil(t, resp)
+				assert.Nil(t, infomodels.NewResponseBackupState(resp))
+			},
 		},
 		{
-			name:     "malformed numeric field returns parse error",
-			response: malformedProgress,
-			wantErr:  errParseGeneric, // sentinel matched by errors.As below
+			name:    "request info error",
+			reqErr:  a.ErrInvalidParam,
+			wantErr: true,
 		},
 	}
 
@@ -2282,20 +2422,25 @@ func TestClient_getBackupStatusByNode(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			node := newMockInfoGetter(t, testShowJobsCmd, map[string]string{testShowJobsCmd: tt.response}, nil)
+			node := newMockInfoGetter(
+				t,
+				backupStatusCmd,
+				map[string]string{backupStatusCmd: tt.response},
+				tt.reqErr,
+			)
 
 			ic := newTestClient(t)
-			val, trID, err := ic.getBackupStatusByNode(node)
+			resp, err := ic.getBackupStatusByNode(node, testJobID)
 
-			switch {
-			case errors.Is(tt.wantErr, errParseGeneric):
+			if tt.wantErr {
 				require.Error(t, err)
-			case tt.wantErr != nil:
-				require.ErrorIs(t, err, tt.wantErr)
-			default:
-				require.NoError(t, err)
-				assert.InEpsilon(t, tt.wantVal, val, 0.1)
-				assert.Equal(t, tt.wantTRID, trID)
+				return
+			}
+
+			require.NoError(t, err)
+
+			if tt.check != nil {
+				tt.check(t, resp)
 			}
 		})
 	}
@@ -2304,55 +2449,344 @@ func TestClient_getBackupStatusByNode(t *testing.T) {
 func TestClient_getBackupStatusByNode_RequestInfoError(t *testing.T) {
 	t.Parallel()
 
-	node := newMockInfoGetter(t, testShowJobsCmd, nil, a.ErrInvalidParam)
+	const testJobID = "523607479"
+
+	backupStatusCmd := fmt.Sprintf(cmdBackupStatus, testJobID)
+	node := newMockInfoGetter(t, backupStatusCmd, nil, a.ErrInvalidParam)
 
 	ic := newTestClient(t)
-	_, _, err := ic.getBackupStatusByNode(node)
+	_, err := ic.getBackupStatusByNode(node, testJobID)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to show job queries")
+
+	assert.Contains(t, err.Error(), "failed to request backup status")
+	assert.ErrorIs(t, err, errclass.ErrAerospike)
 }
 
-func TestClient_getClusterStable(t *testing.T) {
+// TestClient_RetriesAreNotNested guards the commands that look the cluster principal
+// up before sending their own command. Both the lookup and the command used to be
+// retried separately, which multiplied the attempts and the total backoff.
+func TestClient_RetriesAreNotNested(t *testing.T) {
 	t.Parallel()
 
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
+	const (
+		testMaxRetries = 3
+		testJobID      = "523607479"
+		testNamespace  = "test"
+	)
 
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
+	tests := []struct {
+		name string
+		call func(ctx context.Context, ic *Client) error
+	}{
+		{
+			name: "StartBackup",
+			call: func(ctx context.Context, ic *Client) error {
+				_, err := ic.StartBackup(ctx, &infomodels.RequestBackup{
+					RequestCommon: infomodels.RequestCommon{Namespace: testNamespace},
+				})
 
-	ctx := t.Context()
+				return err
+			},
+		},
+		{
+			name: "StartRestore",
+			call: func(ctx context.Context, ic *Client) error {
+				return ic.StartRestore(ctx, &infomodels.RequestRestore{
+					RequestCommon: infomodels.RequestCommon{Namespace: testNamespace},
+					JobID:         testJobID,
+				})
+			},
+		},
+		{
+			name: "PrepareRestore",
+			call: func(ctx context.Context, ic *Client) error {
+				return ic.PrepareRestore(ctx, testJobID, testNamespace)
+			},
+		},
+		{
+			name: "AbortBackup",
+			call: func(ctx context.Context, ic *Client) error {
+				return ic.AbortBackup(ctx, testJobID)
+			},
+		},
+		{
+			name: "AbortRestore",
+			call: func(ctx context.Context, ic *Client) error {
+				return ic.AbortRestore(ctx, testNamespace, testJobID)
+			},
+		},
+		{
+			name: "GetClusterStable",
+			call: func(ctx context.Context, ic *Client) error {
+				_, err := ic.GetClusterStable(ctx, testNamespace)
 
-	_, err = ic.getClusterStable(ctx, testASNamespace)
-	require.NoError(t, err)
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var attempts int
+
+			mockNodeGetter := mocks.NewMockNodeGetter(t)
+			mockNodeGetter.EXPECT().GetRandomNode().RunAndReturn(func() (*a.Node, a.Error) {
+				attempts++
+
+				return nil, a.ErrInvalidParam
+			})
+			// PrepareRestore and GetClusterStable read the node list before asking
+			// for the principal. A single inactive node keeps them going.
+			mockNodeGetter.EXPECT().GetNodes().Return([]*a.Node{{}}).Maybe()
+
+			ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, testMaxRetries))
+
+			err := tt.call(t.Context(), ic)
+
+			require.ErrorIs(t, err, errclass.ErrAerospike)
+			require.Equal(t, testMaxRetries, attempts)
+		})
+	}
 }
 
-func TestClient_getStatistics(t *testing.T) {
+// Test_isRestoreStarted covers the state and job id matrix that decides whether
+// the server accepted a restore start command. Only RESTORING and FAILED belong
+// to a started job, and only for the job id that was asked for: restore-status
+// is keyed by namespace, so a state left by an earlier restore of the same
+// namespace must not be taken for the current one.
+func Test_isRestoreStarted(t *testing.T) {
 	t.Parallel()
 
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
+	const (
+		testJobID   = "260922T103653-5xsr"
+		testOtherID = "260922T090000-abcd"
+	)
 
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
+	tests := []struct {
+		name string
+		give []infomodels.InfoMap
+		want bool
+	}{
+		{
+			name: "restoring for this job",
+			give: []infomodels.InfoMap{{fieldJobID: testJobID, fieldState: infomodels.RestoreStateRestoring}},
+			want: true,
+		},
+		{
+			name: "failed for this job",
+			give: []infomodels.InfoMap{{fieldJobID: testJobID, fieldState: infomodels.RestoreStateFailed}},
+			want: true,
+		},
+		{
+			name: "preparing is not a started job",
+			give: []infomodels.InfoMap{{fieldJobID: testJobID, fieldState: infomodels.RestoreStatePreparing}},
+			want: false,
+		},
+		{
+			name: "ready is not a started job",
+			give: []infomodels.InfoMap{{fieldJobID: testJobID, fieldState: infomodels.RestoreStateReady}},
+			want: false,
+		},
+		{
+			name: "none is not a started job",
+			give: []infomodels.InfoMap{{fieldJobID: testJobID, fieldState: infomodels.RestoreStateNone}},
+			want: false,
+		},
+		{
+			name: "restoring left by another job",
+			give: []infomodels.InfoMap{{fieldJobID: testOtherID, fieldState: infomodels.RestoreStateRestoring}},
+			want: false,
+		},
+		{
+			name: "response carries no job id",
+			give: []infomodels.InfoMap{{fieldState: infomodels.RestoreStateRestoring}},
+			want: false,
+		},
+		{
+			name: "response carries no state",
+			give: []infomodels.InfoMap{{fieldJobID: testJobID}},
+			want: false,
+		},
+		{
+			name: "this job found among several",
+			give: []infomodels.InfoMap{
+				{fieldJobID: testOtherID, fieldState: infomodels.RestoreStateReady},
+				{fieldJobID: testJobID, fieldState: infomodels.RestoreStateRestoring},
+			},
+			want: true,
+		},
+		{
+			name: "empty response",
+			give: nil,
+			want: false,
+		},
+	}
 
-	ctx := t.Context()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	_, err = ic.getStatistics(ctx)
-	require.NoError(t, err)
+			assert.Equal(t, tt.want, isRestoreStarted(tt.give, testJobID))
+		})
+	}
 }
 
-func TestClient_getPrincipal(t *testing.T) {
+// TestClient_sendStartBackup checks the error plumbing of the backup start. A
+// start that failed must either be confirmed by the state of its own job id or
+// be reported with its original cause: the cause used to be replaced by the
+// status lookup error, or lost entirely when that lookup succeeded.
+func TestClient_sendStartBackup(t *testing.T) {
 	t.Parallel()
 
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
+	const (
+		testJobID     = "260922T103653-5xsr"
+		testNamespace = "source-ns1"
+		testStartCmd  = "backup:namespace=" + testNamespace + ";job-id=" + testJobID
+		testAccepted  = "ok"
+	)
 
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy())
-	require.NoError(t, err)
+	runningStatus := fmt.Sprintf("job-id=%s:ns=%s:state=INCR_SCAN_ACTIVE", testJobID, testNamespace)
+	failedStatus := fmt.Sprintf("job-id=%s:ns=%s:state=FAILED", testJobID, testNamespace)
+	statusCmd := fmt.Sprintf(cmdBackupStatus, testJobID)
 
-	ctx := t.Context()
+	tests := []struct {
+		startErr   a.Error
+		statusErr  a.Error
+		wantErrIs  error
+		name       string
+		startResp  string
+		statusResp string
+	}{
+		{
+			name:      "start accepted",
+			startResp: testAccepted,
+		},
+		{
+			name:       "start failed but the job is running",
+			startErr:   a.ErrNetTimeout,
+			statusResp: runningStatus,
+		},
+		{
+			name:       "start failed and the job already failed on the server",
+			startErr:   a.ErrNetTimeout,
+			statusResp: failedStatus,
+		},
+		{
+			name:      "start failed and the server holds no state for the job",
+			startErr:  a.ErrNetTimeout,
+			wantErrIs: a.ErrNetTimeout,
+		},
+		{
+			name:      "start failed and the status is unavailable",
+			startErr:  a.ErrNetTimeout,
+			statusErr: a.ErrNetwork,
+			wantErrIs: a.ErrNetTimeout,
+		},
+		{
+			name:      "start response reports an error",
+			startResp: errCmdRespPrefix + ": backup already running",
+			wantErrIs: errclass.ErrAerospike,
+		},
+	}
 
-	_, err = ic.getPrincipal(ctx)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			node := mocks.NewMockinfoGetter(t)
+			node.EXPECT().RequestInfo(testInfoPolicy, []string{testStartCmd}).
+				Return(map[string]string{testStartCmd: tt.startResp}, tt.startErr).Once()
+			// Registered for the job id command only: a lookup by namespace, as the
+			// code used to do, has no matching expectation and fails the test.
+			node.EXPECT().RequestInfo(testInfoPolicy, []string{statusCmd}).
+				Return(map[string]string{statusCmd: tt.statusResp}, tt.statusErr).Maybe()
+
+			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
+
+			err := ic.sendStartBackup(node, testStartCmd, testJobID)
+			if tt.wantErrIs != nil {
+				require.ErrorIs(t, err, tt.wantErrIs)
+
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+// TestClient_sendStartRestore checks the error plumbing of the restore start.
+// See TestClient_sendStartBackup for the cause that used to be lost, and
+// Test_isRestoreStarted for the state matrix behind the confirmation.
+func TestClient_sendStartRestore(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testJobID     = "260922T103653-5xsr"
+		testNamespace = "source-ns1"
+		testStartCmd  = "restore:namespace=" + testNamespace + ";job-id=" + testJobID
+		testAccepted  = "ok"
+	)
+
+	restoringStatus := fmt.Sprintf("job-id=%s:ns=%s:state=%s",
+		testJobID, testNamespace, infomodels.RestoreStateRestoring)
+	otherJobStatus := fmt.Sprintf("job-id=%s:ns=%s:state=%s",
+		"260922T090000-abcd", testNamespace, infomodels.RestoreStateRestoring)
+	statusCmd := fmt.Sprintf(cmdRestoreStatus, testNamespace)
+
+	tests := []struct {
+		startErr   a.Error
+		statusErr  a.Error
+		wantErrIs  error
+		name       string
+		startResp  string
+		statusResp string
+	}{
+		{
+			name:      "start accepted",
+			startResp: testAccepted,
+		},
+		{
+			name:       "start failed but the restore is running",
+			startErr:   a.ErrNetTimeout,
+			statusResp: restoringStatus,
+		},
+		{
+			name:       "start failed and the running restore belongs to another job",
+			startErr:   a.ErrNetTimeout,
+			statusResp: otherJobStatus,
+			wantErrIs:  a.ErrNetTimeout,
+		},
+		{
+			name:      "start failed and the status is unavailable",
+			startErr:  a.ErrNetTimeout,
+			statusErr: a.ErrNetwork,
+			wantErrIs: a.ErrNetTimeout,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			node := mocks.NewMockinfoGetter(t)
+			node.EXPECT().RequestInfo(testInfoPolicy, []string{testStartCmd}).
+				Return(map[string]string{testStartCmd: tt.startResp}, tt.startErr).Once()
+			node.EXPECT().RequestInfo(testInfoPolicy, []string{statusCmd}).
+				Return(map[string]string{statusCmd: tt.statusResp}, tt.statusErr).Maybe()
+
+			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
+
+			err := ic.sendStartRestore(node, testStartCmd, testNamespace, testJobID)
+			if tt.wantErrIs != nil {
+				require.ErrorIs(t, err, tt.wantErrIs)
+
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
 }

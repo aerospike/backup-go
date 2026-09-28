@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,50 +18,34 @@ import (
 	"context"
 
 	"github.com/aerospike/backup-go/models"
-	"github.com/aerospike/backup-go/pkg/asinfo"
-	infoModels "github.com/aerospike/backup-go/pkg/asinfo/models"
+	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
 )
 
 // ClusterInfo provides cluster metadata and introspection for client-side backup and restore.
-//
-//go:generate mockery --name ClusterInfo
 type ClusterInfo interface {
 	GetRecordCount(ctx context.Context, namespace string, sets []string) (uint64, error)
 	GetRackNodes(ctx context.Context, rackID int) ([]string, error)
 	GetService(ctx context.Context, node string) (string, error)
-	GetVersion(ctx context.Context) (infoModels.AerospikeVersion, error)
+	GetVersion(ctx context.Context) (infomodels.AerospikeVersion, error)
 	GetSIndexes(ctx context.Context, namespace string) ([]*models.SIndex, error)
 	GetUDFs(ctx context.Context) ([]*models.UDF, error)
 	SupportsBatchWrite(ctx context.Context) (bool, error)
 	GetSetsList(ctx context.Context, namespace string) ([]string, error)
 	GetNamespacesList(ctx context.Context) ([]string, error)
 	GetStatus(ctx context.Context) (string, error)
-	HasExpressionSIndex(ctx context.Context, namespace string) (bool, error)
+	GetSIndexInfo(ctx context.Context, namespace string) (models.SIndexInfo, error)
 	GetPrimaryPartitions(ctx context.Context, node, namespace string) ([]int, error)
 	GetPendingMigrations(ctx context.Context, namespace string) (uint64, error)
 	GetClusterStable(ctx context.Context, namespace string) (bool, error)
 }
 
-// XDRInfo provides XDR replication control and monitoring.
-//
-//go:generate mockery --name XDRInfo
-type XDRInfo interface {
-	StartXDR(ctx context.Context, nodeName, dc, hostPort, namespace, rewind string, throughput int, forward bool) error
-	StopXDR(ctx context.Context, nodeName, dc string) error
-	GetStats(ctx context.Context, nodeName, dc, namespace string) (asinfo.Stats, error)
-	GetDCsList(ctx context.Context) ([]string, error)
-	BlockMRTWrites(ctx context.Context, nodeName, namespace string) error
-	UnBlockMRTWrites(ctx context.Context, nodeName, namespace string) error
-	GetNodesNames() []string
-}
-
 // ServerBackupInfo provides server-side backup and restore job control.
-//
-//go:generate mockery --name BackupInfo
 type ServerBackupInfo interface {
-	StartServerBackup(ctx context.Context, request *infoModels.RequestBackup) (string, error)
-	StartServerRestore(ctx context.Context, request *infoModels.RequestRestore) error
-	PrepareServerRestore(ctx context.Context, jobID, namespace string) error
-	GetBackupStatus(ctx context.Context) (float64, error)
+	StartBackup(ctx context.Context, request *infomodels.RequestBackup) (string, error)
+	StartRestore(ctx context.Context, request *infomodels.RequestRestore) error
+	PrepareRestore(ctx context.Context, jobID, namespace string) error
+	GetBackupStatus(ctx context.Context, jobID string) (*infomodels.ResponseBackupState, error)
 	GetRestoreStatus(ctx context.Context, namespace string) (string, error)
+	AbortBackup(ctx context.Context, backupID string) error
+	AbortRestore(ctx context.Context, namespace, backupID string) error
 }

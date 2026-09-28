@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,12 @@ import (
 	"math"
 	"math/rand/v2"
 	"time"
+
+	"github.com/aerospike/backup-go/errclass"
 )
+
+// jitterPercent is the fraction of the calculated delay used as +-jitter.
+const jitterPercent = 0.1
 
 // RetryPolicy defines the configuration for retry attempts in case of failures.
 type RetryPolicy struct {
@@ -58,11 +63,11 @@ func (p *RetryPolicy) Validate() error {
 	}
 
 	if p.BaseTimeout < 0 {
-		return fmt.Errorf("base timeout must be non-negative")
+		return fmt.Errorf("%w: base timeout must be non-negative", errclass.ErrInvalidConfig)
 	}
 
 	if p.Multiplier < 1 {
-		return fmt.Errorf("multiplier must be greater than 0")
+		return fmt.Errorf("%w: multiplier must be greater than or equal to 1", errclass.ErrInvalidConfig)
 	}
 
 	// MaxRetries validation removed - 0 is valid (means no retries)
@@ -110,9 +115,14 @@ func (p *RetryPolicy) calculateDelay(attempt uint) time.Duration {
 
 // calculateJitter computes the jitter to prevent thundering herd.
 func (p *RetryPolicy) calculateJitter(baseDelay time.Duration) time.Duration {
-	// Add +-10% jitter.
-	jitterPercent := 0.1
 	jitterAmount := time.Duration(float64(baseDelay) * jitterPercent)
+
+	// A base delay of zero means the caller asked for immediate retries, so there
+	// is nothing to spread out. Jitter is skipped here also because rand.Int64N
+	// panics on a non-positive bound.
+	if jitterAmount <= 0 {
+		return 0
+	}
 
 	//nolint:gosec // rand is used for jitter, not critical for security.
 	jitter := time.Duration(rand.Int64N(int64(jitterAmount*2))) - jitterAmount

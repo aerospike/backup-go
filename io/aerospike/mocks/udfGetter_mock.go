@@ -17,10 +17,19 @@ func NewMockudfGetter(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockudfGetter {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockudfGetter{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -73,7 +82,7 @@ type MockudfGetter_GetUDFs_Call struct {
 
 // GetUDFs is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockudfGetter_Expecter) GetUDFs(ctx interface{}) *MockudfGetter_GetUDFs_Call {
+func (_e *MockudfGetter_Expecter) GetUDFs(ctx any) *MockudfGetter_GetUDFs_Call {
 	return &MockudfGetter_GetUDFs_Call{Call: _e.mock.On("GetUDFs", ctx)}
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,14 +20,14 @@ import (
 )
 
 // dataProcessor is a processor that executes a list of processors in sequence.
-type dataProcessor[T models.TokenConstraint] struct {
-	execs []pipe.Processor[T]
+type dataProcessor struct {
+	execs []pipe.Processor
 }
 
 // newDataProcessor returns a new data processor.
-func newDataProcessor[T models.TokenConstraint](execs ...pipe.Processor[T]) pipe.ProcessorCreator[T] {
-	return func() pipe.Processor[T] {
-		return &dataProcessor[T]{
+func newDataProcessor(execs ...pipe.Processor) pipe.ProcessorCreator {
+	return func() pipe.Processor {
+		return &dataProcessor{
 			execs: execs,
 		}
 	}
@@ -35,7 +35,7 @@ func newDataProcessor[T models.TokenConstraint](execs ...pipe.Processor[T]) pipe
 
 // Process executes the list of processors in sequence and returns the result
 // of the last processor. If any processor returns an error, the error is returned.
-func (p *dataProcessor[T]) Process(data T) (T, error) {
+func (p *dataProcessor) Process(data *models.Token) (*models.Token, error) {
 	var err error
 	for _, processor := range p.execs {
 		data, err = processor.Process(data)

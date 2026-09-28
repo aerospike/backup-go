@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/aerospike/backup-go/internal/util/files"
+	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/storage/options"
 	optMocks "github.com/aerospike/backup-go/io/storage/options/mocks"
 	"github.com/stretchr/testify/mock"
@@ -80,6 +80,18 @@ func TestDirectoryWriter_GetType(t *testing.T) {
 	require.Equal(t, TypeLocal, w.GetType())
 }
 
+func TestDirectoryWriter_GetOptions_NoChunkLimit(t *testing.T) {
+	t.Parallel()
+	tmpDir := path.Join(t.TempDir(), "TestDirectoryWriter_GetOptions_NoChunkLimit")
+	ctx := t.Context()
+	w, err := NewWriter(ctx, options.WithDir(tmpDir))
+	require.NoError(t, err)
+
+	// The local file system has no chunk count restriction, so the file limit
+	// validation must be skipped for it.
+	require.True(t, w.GetOptions().NoChunkLimit)
+}
+
 func TestNewWriter_NoPath(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
@@ -134,6 +146,54 @@ func TestWriter_NewWriter_WithDir_DevNull(t *testing.T) {
 
 	err = writer.Close()
 	require.NoError(t, err)
+}
+
+func TestWriter_NewWriter_RejectsPathTraversal(t *testing.T) {
+	t.Parallel()
+	tmpDir := filepath.Join(t.TempDir(), "not-yet-created")
+	w := &Writer{Options: options.Options{
+		PathList: []string{tmpDir},
+		IsDir:    true,
+	}}
+
+	for _, filename := range []string{
+		"../outside.asb",
+		"/absolute.asb",
+		"nested/file.asb",
+		".",
+		"..",
+		"invalid\x00.asb",
+	} {
+		_, err := w.NewWriter(t.Context(), filename)
+		require.Error(t, err, filename)
+	}
+
+	require.NoDirExists(t, tmpDir)
+	require.NoFileExists(t, filepath.Join(filepath.Dir(tmpDir), "outside.asb"))
+}
+
+func TestWriter_NewWriter_TruncatesAndUsesRestrictiveFileMode(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, testFileName)
+	require.NoError(t, os.WriteFile(filePath, []byte("old content that is longer"), 0o600))
+
+	w := &Writer{Options: options.Options{
+		PathList: []string{tmpDir},
+		IsDir:    true,
+	}}
+	writer, err := w.NewWriter(t.Context(), testFileName)
+	require.NoError(t, err)
+	_, err = writer.Write([]byte("new"))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	content, err := os.ReadFile(filePath)
+	require.NoError(t, err)
+	require.Equal(t, "new", string(content))
+	info, err := os.Stat(filePath)
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 }
 
 func TestWriter_NewWriter_WithFile_DevNull(t *testing.T) {
@@ -400,7 +460,7 @@ func TestWriter_RemoveFiles_Dir_WithValidator(t *testing.T) {
 
 	mockValidator := new(optMocks.Mockvalidator)
 	mockValidator.On("Run", mock.AnythingOfType("string")).Return(func(fileName string) error {
-		if filepath.Ext(fileName) == files.ExtensionASB {
+		if filepath.Ext(fileName) == asb.Extension {
 			return nil
 		}
 		return fmt.Errorf("invalid file extension")

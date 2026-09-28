@@ -18,10 +18,19 @@ func NewMockWriter(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockWriter {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockWriter{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -163,7 +172,7 @@ type MockWriter_NewWriter_Call struct {
 // NewWriter is a helper method to define mock.On call
 //   - ctx context.Context
 //   - filename string
-func (_e *MockWriter_Expecter) NewWriter(ctx interface{}, filename interface{}) *MockWriter_NewWriter_Call {
+func (_e *MockWriter_Expecter) NewWriter(ctx any, filename any) *MockWriter_NewWriter_Call {
 	return &MockWriter_NewWriter_Call{Call: _e.mock.On("NewWriter", ctx, filename)}
 }
 
@@ -220,7 +229,7 @@ type MockWriter_Remove_Call struct {
 // Remove is a helper method to define mock.On call
 //   - ctx context.Context
 //   - path string
-func (_e *MockWriter_Expecter) Remove(ctx interface{}, path interface{}) *MockWriter_Remove_Call {
+func (_e *MockWriter_Expecter) Remove(ctx any, path any) *MockWriter_Remove_Call {
 	return &MockWriter_Remove_Call{Call: _e.mock.On("Remove", ctx, path)}
 }
 
@@ -276,7 +285,7 @@ type MockWriter_RemoveFiles_Call struct {
 
 // RemoveFiles is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockWriter_Expecter) RemoveFiles(ctx interface{}) *MockWriter_RemoveFiles_Call {
+func (_e *MockWriter_Expecter) RemoveFiles(ctx any) *MockWriter_RemoveFiles_Call {
 	return &MockWriter_RemoveFiles_Call{Call: _e.mock.On("RemoveFiles", ctx)}
 }
 

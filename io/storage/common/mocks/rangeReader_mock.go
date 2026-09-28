@@ -17,10 +17,19 @@ func NewMockrangeReader(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockrangeReader {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockrangeReader{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -163,7 +172,7 @@ type MockrangeReader_OpenRange_Call struct {
 //   - ctx context.Context
 //   - offset int64
 //   - count int64
-func (_e *MockrangeReader_Expecter) OpenRange(ctx interface{}, offset interface{}, count interface{}) *MockrangeReader_OpenRange_Call {
+func (_e *MockrangeReader_Expecter) OpenRange(ctx any, offset any, count any) *MockrangeReader_OpenRange_Call {
 	return &MockrangeReader_OpenRange_Call{Call: _e.mock.On("OpenRange", ctx, offset, count)}
 }
 

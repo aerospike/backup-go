@@ -12,3 +12,4 @@ repos:
     rev: v2.12.2
     hooks:
       - id: golangci-lint
+        args: [--build-tags=integration]

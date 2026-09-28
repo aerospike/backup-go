@@ -15,10 +15,19 @@ func NewMockClient(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockClient {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockClient{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -62,7 +71,7 @@ type MockClient_Bucket_Call struct {
 
 // Bucket is a helper method to define mock.On call
 //   - name string
-func (_e *MockClient_Expecter) Bucket(name interface{}) *MockClient_Bucket_Call {
+func (_e *MockClient_Expecter) Bucket(name any) *MockClient_Bucket_Call {
 	return &MockClient_Bucket_Call{Call: _e.mock.On("Bucket", name)}
 }
 

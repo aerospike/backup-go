@@ -1,0 +1,94 @@
+name: Bug report
+description: Something in the library does not behave as documented.
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not report security vulnerabilities here. See [SECURITY.md](https://github.com/aerospike/backup-go/blob/main/SECURITY.md).
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what happened instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: >
+        The smallest program that shows the problem, and the steps to run it. Include the
+        backup or restore config you passed, with credentials removed.
+      render: go
+    validations:
+      required: true
+
+  - type: input
+    id: module-version
+    attributes:
+      label: backup-go version
+      description: The tag or pseudo-version from your go.mod, for example v0.11.1.
+    validations:
+      required: true
+
+  - type: input
+    id: go-version
+    attributes:
+      label: Go version
+      description: Output of `go version`.
+    validations:
+      required: true
+
+  - type: input
+    id: server-version
+    attributes:
+      label: Aerospike Database version and edition
+      description: For example, 8.0.0.7 Enterprise. Write "not applicable" if the cluster is not involved.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: storage
+    attributes:
+      label: Storage backend
+      options:
+        - Local directory or file
+        - AWS S3
+        - S3-compatible (MinIO or other)
+        - Google Cloud Storage
+        - Azure Blob Storage
+        - Stdin or stdout
+        - Not applicable
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system and architecture
+      description: For example, linux/amd64 or darwin/arm64.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: >
+        Relevant log output, ideally at debug level. Remove hostnames, credentials and
+        record data. This is rendered as a code block, so no backticks are needed.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: Data volume, parallelism settings, whether it reproduces consistently.
+    validations:
+      required: false

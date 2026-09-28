@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"sync/atomic"
 	"syscall"
 
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/models"
 	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/smithy-go"
@@ -94,7 +95,7 @@ func NewRetryableReader(
 // openStream opens a new stream with offset if needed.
 func (r *RetryableReader) openStream() error {
 	if r.closed.Load() {
-		return fmt.Errorf("reader is closed")
+		return fmt.Errorf("%w: reader is closed", errclass.ErrStorage)
 	}
 
 	if r.offset > 0 {
@@ -135,7 +136,7 @@ func (r *RetryableReader) setReader(body io.ReadCloser) {
 // Read reads from the stream.
 func (r *RetryableReader) Read(p []byte) (int, error) {
 	if r.closed.Load() {
-		return 0, fmt.Errorf("reader is closed")
+		return 0, fmt.Errorf("%w: reader is closed", errclass.ErrStorage)
 	}
 	// If we reached end of file, return EOF.
 	if r.offset >= r.totalSize {

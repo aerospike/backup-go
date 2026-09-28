@@ -17,10 +17,19 @@ func NewMockRecordReader(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockRecordReader {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockRecordReader{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -106,7 +115,7 @@ type MockRecordReader_Read_Call struct {
 
 // Read is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockRecordReader_Expecter) Read(ctx interface{}) *MockRecordReader_Read_Call {
+func (_e *MockRecordReader_Expecter) Read(ctx any) *MockRecordReader_Read_Call {
 	return &MockRecordReader_Read_Call{Call: _e.mock.On("Read", ctx)}
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 package asb
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -29,6 +30,7 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/segmentio/asm/base64"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const testFileName = "test_backup.asb"
@@ -88,7 +90,7 @@ func TestASBReader_readHeader(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -202,7 +204,7 @@ func TestASBReader_readMetadata(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -340,6 +342,20 @@ func TestASBReader_readSIndex(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "set index",
+			fields: fields{
+				reader: newTestCountingReader(" userdata1 testSet1 sindex1 S 1  E\n"),
+			},
+			want: &models.SIndex{
+				Namespace: "userdata1",
+				Set:       "testSet1",
+				Name:      "sindex1",
+				IndexType: models.SetSIndex,
+				Path:      models.NewEmptySIndexPath(),
+			},
+			wantErr: false,
+		},
+		{
 			name: "negative missing first space",
 			fields: fields{
 				reader: newTestCountingReader("userdata1 testSet1 sindex1 V 1 bin1 B\n"),
@@ -444,7 +460,7 @@ func TestASBReader_readSIndex(t *testing.T) {
 			if tt.name == "positive random 48" {
 				fmt.Println("test")
 			}
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -596,7 +612,7 @@ func TestASBReader_readUDF(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -1076,7 +1092,7 @@ func TestASBReader_readBin(t *testing.T) {
 			if tt.name == "positive random 10" {
 				fmt.Println("test")
 			}
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -1283,7 +1299,7 @@ func TestASBReader_readKey(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -1800,7 +1816,7 @@ func TestASBReader_readRecord(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:              tt.fields.reader,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
@@ -1875,7 +1891,7 @@ func TestASBReader_readBinCount(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -1941,7 +1957,7 @@ func TestASBReader_readExpiration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -2015,7 +2031,7 @@ func TestASBReader_readGeneration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -2073,7 +2089,7 @@ func TestASBReader_readSet(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -2134,7 +2150,7 @@ func TestASBReader_readDigest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -2652,19 +2668,90 @@ func TestReadUntil(t *testing.T) {
 	})
 }
 
-func TestReadUntilAny(t *testing.T) {
+func TestReadUntilByte(t *testing.T) {
+	t.Parallel()
+
+	t.Run("leaves delimiter unread and tracks column", func(t *testing.T) {
+		t.Parallel()
+
+		src := newTestCountingReader("hello\nworld")
+
+		got, err := readUntilByte(src, asbNewLine)
+		require.NoError(t, err)
+		assert.Equal(t, []byte("hello"), got)
+		assert.Equal(t, uint64(5), src.tracker.offset)
+		assert.Equal(t, int64(1), src.tracker.line)
+		assert.Equal(t, int64(5), src.tracker.column)
+
+		b, err := src.ReadByte()
+		require.NoError(t, err)
+		assert.Equal(t, byte(asbNewLine), b)
+		assert.Equal(t, uint64(6), src.tracker.offset)
+		assert.Equal(t, int64(2), src.tracker.line)
+		assert.Equal(t, int64(0), src.tracker.column)
+	})
+
+	t.Run("assembles token across buffer fills", func(t *testing.T) {
+		t.Parallel()
+
+		const token = "abcdefghijklmnop"
+		src := &countingReader{
+			Reader:  bufio.NewReaderSize(strings.NewReader(token+"\n"), 8),
+			tracker: &positionTracker{line: 1},
+		}
+
+		got, err := readUntilByte(src, asbNewLine)
+		require.NoError(t, err)
+		assert.Equal(t, []byte(token), got)
+		assert.Equal(t, uint64(len(token)), src.tracker.offset)
+		assert.Equal(t, int64(len(token)), src.tracker.column)
+
+		b, err := src.ReadByte()
+		require.NoError(t, err)
+		assert.Equal(t, byte(asbNewLine), b)
+		assert.Equal(t, int64(2), src.tracker.line)
+	})
+
+	t.Run("skipToNextLine consumes newline via ReadByte", func(t *testing.T) {
+		t.Parallel()
+
+		dec := &Decoder{reader: newTestCountingReader("junk\nnext")}
+		require.NoError(t, dec.skipToNextLine())
+		assert.Equal(t, int64(2), dec.reader.tracker.line)
+		assert.Equal(t, int64(0), dec.reader.tracker.column)
+
+		b, err := dec.reader.ReadByte()
+		require.NoError(t, err)
+		assert.Equal(t, byte('n'), b)
+	})
+}
+
+func TestReadUntilWhitespace(t *testing.T) {
 	t.Parallel()
 
 	t.Run("positive simple", func(t *testing.T) {
 		t.Parallel()
 		src := newTestCountingReader("string\n")
-		got, err := readUntilAny(src, []byte{'\n'})
+		got, err := readUntilWhitespace(src)
 		if err != nil {
-			t.Errorf("readUntilAny() error = %v", err)
+			t.Errorf("readUntilWhitespace() error = %v", err)
 			return
 		}
 		if !reflect.DeepEqual(got, []byte("string")) {
-			t.Errorf("readUntilAny() = %v, want %v", got, []byte("string"))
+			t.Errorf("readUntilWhitespace() = %v, want %v", got, []byte("string"))
+		}
+	})
+
+	t.Run("positive stop at space", func(t *testing.T) {
+		t.Parallel()
+		src := newTestCountingReader("namespace test\n")
+		got, err := readUntilWhitespace(src)
+		if err != nil {
+			t.Errorf("readUntilWhitespace() error = %v", err)
+			return
+		}
+		if !reflect.DeepEqual(got, []byte("namespace")) {
+			t.Errorf("readUntilWhitespace() = %v, want %v", got, []byte("namespace"))
 		}
 	})
 
@@ -2694,19 +2781,6 @@ func TestReadUntilAny(t *testing.T) {
 		}
 	})
 
-	t.Run("positive multiple delimiters", func(t *testing.T) {
-		t.Parallel()
-		src := newTestCountingReader("strHing\n")
-		got, err := readUntilAny(src, []byte{'\n', 'H'})
-		if err != nil {
-			t.Errorf("readUntilAny() error = %v", err)
-			return
-		}
-		if !reflect.DeepEqual(got, []byte("str")) {
-			t.Errorf("readUntilAny() = %v, want %v", got, []byte("str"))
-		}
-	})
-
 	t.Run("positive multiple escaped delimiters", func(t *testing.T) {
 		t.Parallel()
 		src := newTestCountingReader("str\\Hing\n")
@@ -2720,34 +2794,12 @@ func TestReadUntilAny(t *testing.T) {
 		}
 	})
 
-	t.Run("positive unescaped delimiter mid input", func(t *testing.T) {
-		t.Parallel()
-		src := newTestCountingReader("strHing\n")
-		got, err := readUntilAny(src, []byte{'H'})
-		if err != nil {
-			t.Errorf("readUntilAny() error = %v", err)
-			return
-		}
-		if !reflect.DeepEqual(got, []byte("str")) {
-			t.Errorf("readUntilAny() = %v, want %v", got, []byte("str"))
-		}
-	})
-
-	t.Run("negative empty delimiter list", func(t *testing.T) {
-		t.Parallel()
-		src := newTestCountingReader("string\n")
-		_, err := readUntilAny(src, []byte{})
-		if err == nil {
-			t.Errorf("readUntilAny() expected error, got nil")
-		}
-	})
-
 	t.Run("negative no delimiter", func(t *testing.T) {
 		t.Parallel()
 		src := newTestCountingReader("string")
-		_, err := readUntilAny(src, []byte{'\n'})
+		_, err := readUntilWhitespace(src)
 		if err == nil {
-			t.Errorf("readUntilAny() expected error, got nil")
+			t.Errorf("readUntilWhitespace() expected error, got nil")
 		}
 	})
 
@@ -2763,18 +2815,18 @@ func TestReadUntilAny(t *testing.T) {
 	t.Run("negative token too long", func(t *testing.T) {
 		t.Parallel()
 		src := newTestCountingReader(strings.Repeat("a", maxTokenSize+1) + "\n")
-		_, err := readUntilAny(src, []byte{'\n'})
+		_, err := readUntilWhitespace(src)
 		if err == nil {
-			t.Errorf("readUntilAny() expected error, got nil")
+			t.Errorf("readUntilWhitespace() expected error, got nil")
 		}
 	})
 
 	t.Run("negative input empty", func(t *testing.T) {
 		t.Parallel()
 		src := newTestCountingReader("")
-		_, err := readUntilAny(src, []byte{'\n'})
+		_, err := readUntilWhitespace(src)
 		if err == nil {
-			t.Errorf("readUntilAny() expected error, got nil")
+			t.Errorf("readUntilWhitespace() expected error, got nil")
 		}
 	})
 }
@@ -3062,7 +3114,7 @@ func TestASBReader_readBins(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -3340,7 +3392,7 @@ func TestASBReader_readGlobals(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:              tt.fields.reader,
 				header:              tt.fields.header,
 				metaData:            tt.fields.metaData,
@@ -3452,7 +3504,7 @@ func TestASBReader_NextToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := &Decoder[*models.Token]{
+			r := &Decoder{
 				reader:   tt.fields.reader,
 				header:   tt.fields.header,
 				metaData: tt.fields.metaData,
@@ -3476,7 +3528,7 @@ func TestNewASBReader(t *testing.T) {
 	}
 	tests := []struct {
 		args    args
-		want    *Decoder[*models.Token]
+		want    *Decoder
 		name    string
 		wantErr bool
 	}{
@@ -3489,7 +3541,7 @@ func TestNewASBReader(t *testing.T) {
 						"# first-file\na", // "a" appended to avoid EOF error
 				),
 			},
-			want: &Decoder[*models.Token]{
+			want: &Decoder{
 				reader: newTestCountingReader(
 					"Version 3.1\n" +
 						"# namespace ns1\n" +
@@ -3531,7 +3583,7 @@ func TestNewASBReader(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := NewDecoder[*models.Token](tt.args.src, testFileName, false, slog.Default())
+			got, err := NewDecoder(tt.args.src, testFileName, false, slog.Default())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewASBReader() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -3546,75 +3598,6 @@ func TestNewASBReader(t *testing.T) {
 				t.Errorf("NewASBReader() metadata differs = %v, want %v", got, tt.want)
 			}
 		})
-	}
-}
-
-func TestEncodeDecodeRecordRoundTrip(t *testing.T) {
-	t.Parallel()
-
-	key, keyErr := a.NewKey("test", "roundtrip", "user-key")
-	if keyErr != nil {
-		t.Fatalf("failed to build key: %v", keyErr)
-	}
-
-	inputToken := models.NewRecordToken(&models.Record{
-		Record: &a.Record{
-			Key: key,
-			Bins: a.BinMap{
-				"bool_bin":   true,
-				"int_bin":    int64(42),
-				"float_bin":  3.14,
-				"string_bin": "hello",
-				"bytes_bin":  []byte("bytes"),
-				"hll_bin":    a.HLLValue("hll-value"),
-				"map_bin": &a.RawBlobValue{
-					ParticleType: particleType.MAP,
-					Data:         []byte{0x81, 0xA1, 'a', 0x01},
-				},
-				"list_bin": &a.RawBlobValue{
-					ParticleType: particleType.LIST,
-					Data:         []byte{0x92, 0x01, 0x02},
-				},
-				"geo_bin": a.GeoJSONValue(`{"type":"Point","coordinates":[1,2]}`),
-				"nil_bin": nil,
-			},
-			Generation: 10,
-		},
-		VoidTime: 100,
-	}, 0, nil)
-
-	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, false))
-	var file bytes.Buffer
-	file.Write(encoder.GetHeader(0, true))
-
-	if err := encoder.EncodeToken(inputToken, &file); err != nil {
-		t.Fatalf("failed to encode token: %v", err)
-	}
-
-	decoder, err := NewDecoder[*models.Token](bytes.NewReader(file.Bytes()), testFileName, false, slog.Default())
-	if err != nil {
-		t.Fatalf("failed to create decoder: %v", err)
-	}
-
-	gotToken, err := decoder.NextToken()
-	if err != nil {
-		t.Fatalf("failed to decode token: %v", err)
-	}
-
-	if gotToken.Type != models.TokenTypeRecord {
-		t.Fatalf("unexpected token type: got %v", gotToken.Type)
-	}
-
-	if gotToken.Record.Generation != inputToken.Record.Generation {
-		t.Fatalf("generation mismatch: got %d want %d", gotToken.Record.Generation, inputToken.Record.Generation)
-	}
-
-	if gotToken.Record.VoidTime != inputToken.Record.VoidTime {
-		t.Fatalf("void time mismatch: got %d want %d", gotToken.Record.VoidTime, inputToken.Record.VoidTime)
-	}
-
-	if !reflect.DeepEqual(gotToken.Record.Bins, inputToken.Record.Bins) {
-		t.Fatalf("bins mismatch: got %#v want %#v", gotToken.Record.Bins, inputToken.Record.Bins)
 	}
 }
 
@@ -3647,10 +3630,14 @@ func BenchmarkDecodeRecordRoundTrip(b *testing.B) {
 		VoidTime: 100,
 	}, 0, nil)
 
-	encoder := NewEncoder[*models.Token](NewEncoderConfig("test", false, false))
+	encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
 	var payload bytes.Buffer
-	payload.Write(encoder.GetHeader(0, true))
-	if err := encoder.EncodeToken(token, &payload); err != nil {
+	payload.Write(encoder.GetHeader(true))
+	encoded, err := encoder.EncodeToken(token, nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+	if _, err := payload.Write(encoded); err != nil {
 		b.Fatal(err)
 	}
 
@@ -3659,7 +3646,7 @@ func BenchmarkDecodeRecordRoundTrip(b *testing.B) {
 	b.ResetTimer()
 
 	for b.Loop() {
-		decoder, err := NewDecoder[*models.Token](bytes.NewReader(data), testFileName, false, slog.Default())
+		decoder, err := NewDecoder(bytes.NewReader(data), testFileName, false, slog.Default())
 		if err != nil {
 			b.Fatal(err)
 		}

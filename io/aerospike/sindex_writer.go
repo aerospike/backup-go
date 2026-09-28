@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/models"
 )
 
@@ -61,8 +62,10 @@ func (rw *sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 		sIndexType = a.BLOB
 	case models.GEO2DSphereSIDataType:
 		sIndexType = a.GEO2DSPHERE
+	case models.EmptySIDataType:
+		// skip.
 	default:
-		return fmt.Errorf("invalid sindex bin type: %c", si.Path.BinType)
+		return fmt.Errorf("%w: invalid sindex bin type: %c", errclass.ErrCorruptData, si.Path.BinType)
 	}
 
 	var sIndexCollectionType a.IndexCollectionType
@@ -76,8 +79,10 @@ func (rw *sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 		sIndexCollectionType = a.ICT_MAPKEYS
 	case models.MapValueSIndex:
 		sIndexCollectionType = a.ICT_MAPVALUES
+	case models.SetSIndex:
+		sIndexCollectionType = a.ICT_SET
 	default:
-		return fmt.Errorf("invalid sindex collection type: %c", si.IndexType)
+		return fmt.Errorf("%w: invalid sindex collection type: %c", errclass.ErrCorruptData, si.IndexType)
 	}
 
 	var (
@@ -89,14 +94,14 @@ func (rw *sindexWriter) writeSecondaryIndex(si *models.SIndex) error {
 	if si.Path.B64Context != "" {
 		cdtCtx, err = a.Base64ToCDTContext(si.Path.B64Context)
 		if err != nil {
-			return fmt.Errorf("failed to decode sindex context %s: %w", si.Path.B64Context, err)
+			return fmt.Errorf("%w: failed to decode sindex context %s: %w", errclass.ErrCorruptData, si.Path.B64Context, err)
 		}
 	}
 
 	if si.Expression != "" {
 		exp, err = a.ExpFromBase64(si.Expression)
 		if err != nil {
-			return fmt.Errorf("failed to decode sindex expression %s: %w", si.Expression, err)
+			return fmt.Errorf("%w: failed to decode sindex expression %s: %w", errclass.ErrCorruptData, si.Expression, err)
 		}
 	}
 
@@ -170,14 +175,14 @@ func (rw *sindexWriter) recreateIndexIfExists(
 	cdtCtx ...*a.CDTContext,
 ) (*a.IndexTask, error) {
 	if !createErr.Matches(atypes.INDEX_FOUND) {
-		return nil, fmt.Errorf("failed to create sindex %s: %w", si.Name, createErr)
+		return nil, fmt.Errorf("%w: failed to create sindex %s: %w", errclass.ErrAerospike, si.Name, createErr)
 	}
 
 	rw.logger.Debug("secondary index already exists, replacing it", slog.String("name", si.Name))
 
 	err := rw.asc.DropIndex(rw.writePolicy, si.Namespace, si.Set, si.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to drop sindex %s: %w", si.Name, err)
+		return nil, fmt.Errorf("%w: failed to drop sindex %s: %w", errclass.ErrAerospike, si.Name, err)
 	}
 
 	job, err := rw.createIndex(
@@ -189,7 +194,7 @@ func (rw *sindexWriter) recreateIndexIfExists(
 		cdtCtx...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create replacement sindex %s: %w", si.Name, err)
+		return nil, fmt.Errorf("%w: failed to create replacement sindex %s: %w", errclass.ErrAerospike, si.Name, err)
 	}
 
 	return job, nil
@@ -197,14 +202,14 @@ func (rw *sindexWriter) recreateIndexIfExists(
 
 func (rw *sindexWriter) waitCreateIndexJob(si *models.SIndex, job *a.IndexTask) error {
 	if job == nil {
-		return fmt.Errorf("failed to create sindex: job is nil")
+		return fmt.Errorf("%w: failed to create sindex: job is nil", errclass.ErrAerospike)
 	}
 
 	errs := job.OnComplete()
 
 	err := <-errs
 	if err != nil {
-		return fmt.Errorf("failed to create sindex %s: %w", si.Name, err)
+		return fmt.Errorf("%w: failed to create sindex %s: %w", errclass.ErrAerospike, si.Name, err)
 	}
 
 	return nil

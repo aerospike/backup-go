@@ -1,4 +1,4 @@
-// Copyright 2024 Aerospike, Inc.
+// Copyright 2024-2026 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -47,8 +47,6 @@ type Options struct {
 	StartAfter string
 	// SkipDirCheck, if true, the backup directory won't be checked.
 	SkipDirCheck bool
-	// SortFiles determines whether we need to sort files before reading.
-	SortFiles bool
 
 	// UploadConcurrency defines the max number of concurrent uploads to be performed to
 	// upload the file. Each concurrent upload will create a buffer of size BlockSize.
@@ -80,6 +78,13 @@ type Options struct {
 
 	// WithChecksum enables checksum validation on upload.
 	WithChecksum bool
+
+	// NoChunkLimit indicates that the storage doesn't upload files as a limited number
+	// of chunks (e.g. a local file system or stdout), so the maximum chunk count
+	// restriction doesn't apply to it.
+	// It describes a capability of the storage backend and is set by the Writer
+	// implementation itself, not by the user.
+	NoChunkLimit bool
 }
 
 type Opt func(*Options)
@@ -154,15 +159,6 @@ func WithStartAfter(v string) Opt {
 func WithSkipDirCheck() Opt {
 	return func(r *Options) {
 		r.SkipDirCheck = true
-	}
-}
-
-// WithSorting adds a sorting flag.
-// Which means that files will be read from directory in the sorted order.
-// Is used only for Reader.
-func WithSorting() Opt {
-	return func(r *Options) {
-		r.SortFiles = true
 	}
 }
 

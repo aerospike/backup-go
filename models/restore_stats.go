@@ -38,8 +38,13 @@ type RestoreStats struct {
 	recordsExisted atomic.Uint64
 	// The number of successfully restored records.
 	recordsInserted atomic.Uint64
-	// Total number of bytes read from source.
+	// Total number of bytes read from source, counted after decryption and
+	// decompression.
 	TotalBytesRead atomic.Uint64
+	// Total number of bytes read from storage, counted as stored, before
+	// decryption and decompression. It is in the same unit as the size of the
+	// backup files, so it is what restore progress is measured against.
+	StorageBytesRead atomic.Uint64
 	// The number of errors in doubt while restoring.
 	// (IsInDoubt signifies that the write operation may have gone through on the server
 	// but the client is not able to confirm that due an error.)
@@ -102,6 +107,10 @@ func (rs *RestoreStats) GetTotalBytesRead() uint64 {
 	return rs.TotalBytesRead.Load()
 }
 
+func (rs *RestoreStats) GetStorageBytesRead() uint64 {
+	return rs.StorageBytesRead.Load()
+}
+
 func (rs *RestoreStats) GetRecordsIgnored() uint64 {
 	return rs.RecordsIgnored.Load()
 }
@@ -137,6 +146,7 @@ func SumRestoreStats(stats ...*RestoreStats) *RestoreStats {
 		result.RecordsSkipped.Add(stat.GetRecordsSkipped())
 		result.RecordsIgnored.Add(stat.GetRecordsIgnored())
 		result.TotalBytesRead.Add(stat.GetTotalBytesRead())
+		result.StorageBytesRead.Add(stat.GetStorageBytesRead())
 		result.recordsExisted.Add(stat.GetRecordsExisted())
 		result.recordsFresher.Add(stat.GetRecordsFresher())
 		result.recordsInserted.Add(stat.GetRecordsInserted())

@@ -14,7 +14,10 @@
 
 package metrics
 
-import "io"
+import (
+	"io"
+	"sync/atomic"
+)
 
 // Reader wraps an io.Reader to collect metrics on read operations.
 type Reader struct {
@@ -41,5 +44,35 @@ func (r *Reader) Read(p []byte) (n int, err error) {
 
 // Close closes the reader.
 func (r *Reader) Close() error {
+	return r.reader.Close()
+}
+
+// CountingReader wraps an io.ReadCloser and adds the number of bytes read to a counter.
+type CountingReader struct {
+	reader  io.ReadCloser
+	counter *atomic.Uint64
+}
+
+// NewCountingReader creates a new CountingReader around an existing io.ReadCloser.
+func NewCountingReader(r io.ReadCloser, counter *atomic.Uint64) *CountingReader {
+	return &CountingReader{
+		reader:  r,
+		counter: counter,
+	}
+}
+
+// Read reads data from the reader and adds the number of bytes read to the counter.
+func (r *CountingReader) Read(p []byte) (n int, err error) {
+	n, err = r.reader.Read(p)
+
+	if r.counter != nil && n > 0 {
+		r.counter.Add(uint64(n))
+	}
+
+	return n, err
+}
+
+// Close closes the reader.
+func (r *CountingReader) Close() error {
 	return r.reader.Close()
 }

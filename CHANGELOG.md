@@ -11,6 +11,15 @@ request links for the full detail of any change.
 
 ## [Unreleased]
 
+### Fixed
+
+- Restore progress reached 100% early on compressed backups and then stopped reporting. Progress
+  divided the bytes decoded after decryption and decompression by the stored size of the backup
+  files, so a backup compressed 5:1 reported 100% about a fifth of the way through, and printed
+  nothing for the rest of the restore. Progress now counts the bytes read from storage, which are
+  in the same unit as the file sizes. The new `RestoreStats.StorageBytesRead` counter holds them;
+  `TotalBytesRead` still counts decoded bytes. (BKRS-459)
+
 ### Added
 
 - Set indexes are backed up and restored. The ASB format is bumped to 3.3 to carry them, so a

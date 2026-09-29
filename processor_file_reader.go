@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"sync/atomic"
 
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/io/encryption"
@@ -35,6 +36,9 @@ type fileReaderProcessor struct {
 	encryptionKey []byte
 	// kilobytes per second collector.
 	kbpsCollector *metrics.Collector
+	// storageBytesRead counts bytes as they are read from storage, before
+	// decryption and decompression.
+	storageBytesRead *atomic.Uint64
 
 	readersCh chan models.File
 	errorsCh  chan error
@@ -51,6 +55,7 @@ func newFileReaderProcessor(
 	config *ConfigRestore,
 	encryptionKey []byte,
 	kbpsCollector *metrics.Collector,
+	storageBytesRead *atomic.Uint64,
 	readersCh chan models.File,
 	errorsCh chan error,
 	logger *slog.Logger,
@@ -58,14 +63,15 @@ func newFileReaderProcessor(
 	logger.Debug("created file reader processor")
 
 	return &fileReaderProcessor{
-		reader:        reader,
-		config:        config,
-		encryptionKey: encryptionKey,
-		kbpsCollector: kbpsCollector,
-		readersCh:     readersCh,
-		errorsCh:      errorsCh,
-		logger:        logger,
-		parallel:      config.Parallel,
+		reader:           reader,
+		config:           config,
+		encryptionKey:    encryptionKey,
+		kbpsCollector:    kbpsCollector,
+		storageBytesRead: storageBytesRead,
+		readersCh:        readersCh,
+		errorsCh:         errorsCh,
+		logger:           logger,
+		parallel:         config.Parallel,
 	}
 }
 
@@ -90,6 +96,10 @@ func (fr *fileReaderProcessor) newDataReaders(ctx context.Context) []pipe.Reader
 
 // initDecoder initializes the decoder for the given reader.
 func (fr *fileReaderProcessor) initDecoder(r io.ReadCloser, fileName string) (Decoder, error) {
+	// Count bytes as stored, so that restore progress is measured in the same unit
+	// as the size of the backup files, whatever the compression and encryption.
+	r = metrics.NewCountingReader(r, fr.storageBytesRead)
+
 	reader, err := fr.wrapReader(r)
 	if err != nil {
 		return nil, err

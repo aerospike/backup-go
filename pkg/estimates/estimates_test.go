@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
+	"sync"
 	"testing"
 	"time"
 
@@ -742,4 +743,73 @@ func TestPrintFilesNumber(t *testing.T) {
 			}
 		})
 	}
+}
+
+// progressHandler keeps the pct value of every progress record logged through it.
+type progressHandler struct {
+	mu   sync.Mutex
+	pcts []float64
+}
+
+func (h *progressHandler) Enabled(context.Context, slog.Level) bool { return true }
+
+//nolint:gocritic // the signature is fixed by slog.Handler.
+func (h *progressHandler) Handle(_ context.Context, r slog.Record) error {
+	if r.Message != "progress" {
+		return nil
+	}
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	r.Attrs(func(attr slog.Attr) bool {
+		if attr.Key == "pct" {
+			h.pcts = append(h.pcts, attr.Value.Float64())
+		}
+
+		return true
+	})
+
+	return nil
+}
+
+func (h *progressHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
+
+func (h *progressHandler) WithGroup(string) slog.Handler { return h }
+
+func (h *progressHandler) progressPcts() []float64 {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	return h.pcts
+}
+
+// TestPrintRestoreEstimate_CompressedBackup checks that restore progress is measured with
+// the bytes read from storage, which are in the same unit as the size of the backup files.
+// For a compressed backup the decoded bytes run ahead of the file size, and using them made
+// progress reach 100% early and stop.
+// It waits for one tick of the printer, TargetPrintInterval.
+func TestPrintRestoreEstimate_CompressedBackup(t *testing.T) {
+	t.Parallel()
+
+	const fileSize = 10_000
+
+	stats := models.NewRestoreStats()
+	stats.Start()
+	// A quarter of the stored bytes has been read, which decodes to five times the file size.
+	stats.StorageBytesRead.Store(fileSize / 4)
+	stats.TotalBytesRead.Store(fileSize * 5)
+
+	handler := &progressHandler{}
+
+	ctx, cancel := context.WithTimeout(t.Context(), TargetPrintInterval+time.Second)
+	defer cancel()
+
+	PrintRestoreEstimate(ctx, stats,
+		func() *models.Metrics { return &models.Metrics{} },
+		func() int64 { return fileSize },
+		slog.New(handler),
+	)
+
+	assert.Equal(t, []float64{25}, handler.progressPcts())
 }

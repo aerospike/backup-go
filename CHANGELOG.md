@@ -11,6 +11,8 @@ request links for the full detail of any change.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-09-28
+
 ### Added
 
 - Set indexes are backed up and restored. The ASB format is bumped to 3.3 to carry them, so a
@@ -638,7 +640,8 @@ repository alongside the library.
 
 Initial release.
 
-[Unreleased]: https://github.com/aerospike/backup-go/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/aerospike/backup-go/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/aerospike/backup-go/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/aerospike/backup-go/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/aerospike/backup-go/compare/v0.10.0...v0.11.0
 [0.10.1]: https://github.com/aerospike/backup-go/compare/v0.10.0...v0.10.1

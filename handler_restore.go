@@ -126,6 +126,7 @@ func newRestoreHandler(
 		config,
 		encryptionKey,
 		kbpsCollector,
+		&stats.StorageBytesRead,
 		readersCh,
 		base.errors,
 		logger,

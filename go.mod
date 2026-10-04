@@ -1,6 +1,6 @@
 module github.com/aerospike/backup-go
 
-go 1.25.13
+go 1.26.0
 
 require (
 	cloud.google.com/go/storage v1.68.0
@@ -12,7 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.113.4
 	github.com/aws/smithy-go v1.28.2
 	github.com/google/uuid v1.6.0
-	github.com/googleapis/gax-go/v2 v2.24.1
+	github.com/googleapis/gax-go/v2 v2.26.2
 	github.com/klauspost/compress v1.20.1
 	github.com/segmentio/asm v1.2.1
 	github.com/stretchr/testify v1.12.1

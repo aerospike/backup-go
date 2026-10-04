@@ -19,6 +19,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -32,19 +33,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	testPayloadNamespace = "test"
+	testPayloadSet       = "demo"
+	testPayloadRecords   = 200
+)
+
 // testASBPayload returns an uncompressed, unencrypted ASB file with n records.
 // The bins repeat, so the payload compresses well.
 func testASBPayload(t *testing.T, n int) []byte {
 	t.Helper()
 
-	encoder := NewEncoder("test", false, models.SIndexInfo{})
+	encoder := NewEncoder(testPayloadNamespace, false, models.SIndexInfo{})
 
 	var payload bytes.Buffer
 
 	payload.Write(encoder.GetHeader(true))
 
 	for i := range n {
-		key, aerr := a.NewKey("test", "demo", i)
+		key, aerr := a.NewKey(testPayloadNamespace, testPayloadSet, i)
 		require.NoError(t, aerr)
 
 		token := models.NewRecordToken(&models.Record{
@@ -70,30 +77,29 @@ func storeASBPayload(t *testing.T, plain []byte, compress bool, key []byte) []by
 
 	var stored bytes.Buffer
 
-	var w io.WriteCloser = nopWriteCloser{&stored}
+	// Each writer wraps the last one in the stack, the bottom one writes to stored.
+	writers := []io.WriteCloser{nopWriteCloser{&stored}}
 
 	if key != nil {
-		encWriter, err := encryption.NewWriter(w, key)
+		encWriter, err := encryption.NewWriter(writers[len(writers)-1], key)
 		require.NoError(t, err)
 
-		w = encWriter
+		writers = append(writers, encWriter)
 	}
-
-	encryptedWriter := w
 
 	if compress {
-		zstdWriter, err := zstd.NewWriter(w)
+		zstdWriter, err := zstd.NewWriter(writers[len(writers)-1])
 		require.NoError(t, err)
 
-		w = zstdWriter
+		writers = append(writers, zstdWriter)
 	}
 
-	_, err := w.Write(plain)
+	_, err := writers[len(writers)-1].Write(plain)
 	require.NoError(t, err)
-	require.NoError(t, w.Close())
 
-	if compress {
-		require.NoError(t, encryptedWriter.Close())
+	// Close from the top, so that each writer flushes into the one below it.
+	for _, w := range slices.Backward(writers) {
+		require.NoError(t, w.Close())
 	}
 
 	return stored.Bytes()
@@ -106,36 +112,42 @@ func TestFileReaderProcessor_StorageBytesRead(t *testing.T) {
 	t.Parallel()
 
 	encryptionKey := bytes.Repeat([]byte{0x2a}, 32)
+	compression := NewCompressionPolicy(CompressZSTD, 0)
 
 	tests := []struct {
-		name     string
-		compress bool
-		key      []byte
+		name            string
+		giveCompression *CompressionPolicy
+		giveKey         []byte
+		// wantStoredLess is whether fewer bytes are read from storage than are decoded.
+		wantStoredLess bool
 	}{
 		{name: "plain"},
-		{name: "compressed", compress: true},
-		{name: "encrypted", key: encryptionKey},
-		{name: "compressed and encrypted", compress: true, key: encryptionKey},
+		{name: "compressed", giveCompression: compression, wantStoredLess: true},
+		{name: "encrypted", giveKey: encryptionKey},
+		{
+			name:            "compressed and encrypted",
+			giveCompression: compression,
+			giveKey:         encryptionKey,
+			wantStoredLess:  true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			plain := testASBPayload(t, 200)
-			stored := storeASBPayload(t, plain, tt.compress, tt.key)
+			plain := testASBPayload(t, testPayloadRecords)
+			stored := storeASBPayload(t, plain, tt.giveCompression != nil, tt.giveKey)
 
 			config := NewDefaultRestoreConfig()
-			if tt.compress {
-				config.CompressionPolicy = NewCompressionPolicy(CompressZSTD, 0)
-			}
+			config.CompressionPolicy = tt.giveCompression
 
 			logger := slog.New(slog.DiscardHandler)
 			kbpsCollector := metrics.NewCollector(t.Context(), logger, metrics.KilobytesPerSecond, "", false)
 
 			var storageBytesRead atomic.Uint64
 
-			fr := newFileReaderProcessor(nil, config, tt.key, kbpsCollector, &storageBytesRead, nil, nil, logger)
+			fr := newFileReaderProcessor(nil, config, tt.giveKey, kbpsCollector, &storageBytesRead, nil, nil, logger)
 
 			decoder, err := fr.initDecoder(io.NopCloser(bytes.NewReader(stored)), "test.asb")
 			require.NoError(t, err)
@@ -157,14 +169,11 @@ func TestFileReaderProcessor_StorageBytesRead(t *testing.T) {
 				decodedSize += token.GetSize()
 			}
 
-			require.Equal(t, 200, tokens)
+			require.Equal(t, testPayloadRecords, tokens)
 			assert.Equal(t, uint64(len(stored)), storageBytesRead.Load(),
 				"storage bytes must match the stored file size")
-
-			if tt.compress {
-				assert.Less(t, storageBytesRead.Load(), decodedSize,
-					"a compressed file must read fewer bytes from storage than it decodes")
-			}
+			assert.Equal(t, tt.wantStoredLess, storageBytesRead.Load() < decodedSize,
+				"only a compressed file reads fewer bytes from storage than it decodes")
 		})
 	}
 }

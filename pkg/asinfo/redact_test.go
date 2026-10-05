@@ -16,7 +16,6 @@ package asinfo
 
 import (
 	"bytes"
-	"fmt"
 	"log/slog"
 	"testing"
 
@@ -43,37 +42,25 @@ const (
 )
 
 // testBackupCmd builds a real server backup command carrying cloud credentials.
-func testBackupCmd() string {
-	return fmt.Sprintf(cmdServerBackup,
-		testRedactNamespace,
-		testRedactJobID,
-		testRedactStorage,
-		testRedactBucket,
-		testRedactRegion,
-		testRedactProfile,
-		testRedactAccessVal,
-		testRedactSensitiveVal,
-		testRedactEndpoint,
-		"", "", "",
-		false, false, false,
-	)
+func testBackupCmd(t *testing.T) string {
+	t.Helper()
+
+	cmd, err := newInfoCommands(infomodels.AerospikeVersionSupportsIntegratedBackup).
+		serverBackup(&infomodels.RequestBackup{RequestCommon: testRequestCommon()}, testRedactJobID)
+	require.NoError(t, err)
+
+	return cmd
 }
 
 // testRestoreCmd builds a real server restore command carrying cloud credentials.
-func testRestoreCmd() string {
-	return fmt.Sprintf(cmdServerRestore,
-		testRedactNamespace,
-		testRedactJobID,
-		testRedactStorage,
-		testRedactBucket,
-		testRedactRegion,
-		testRedactProfile,
-		testRedactAccessVal,
-		testRedactSensitiveVal,
-		testRedactEndpoint,
-		false,
-		"",
-	)
+func testRestoreCmd(t *testing.T) string {
+	t.Helper()
+
+	cmd, err := newInfoCommands(infomodels.AerospikeVersionSupportsIntegratedBackup).
+		serverRestore(&infomodels.RequestRestore{RequestCommon: testRequestCommon(), JobID: testRedactJobID})
+	require.NoError(t, err)
+
+	return cmd
 }
 
 // testRequestCommon returns request fields carrying cloud credentials.
@@ -101,7 +88,7 @@ func Test_redactCmd(t *testing.T) {
 	}{
 		{
 			name:        "server backup command",
-			cmd:         testBackupCmd(),
+			cmd:         testBackupCmd(t),
 			wantMissing: []string{testRedactAccessVal, testRedactSensitiveVal},
 			wantPresent: []string{
 				"access-key=" + redactedValue,
@@ -112,7 +99,7 @@ func Test_redactCmd(t *testing.T) {
 		},
 		{
 			name:        "server restore command",
-			cmd:         testRestoreCmd(),
+			cmd:         testRestoreCmd(t),
 			wantMissing: []string{testRedactAccessVal, testRedactSensitiveVal},
 			wantPresent: []string{
 				"access-key=" + redactedValue,
@@ -180,7 +167,7 @@ func Test_redactCmd(t *testing.T) {
 func Test_parseResultResponse_RedactsCredentials(t *testing.T) {
 	t.Parallel()
 
-	cmd := testBackupCmd()
+	cmd := testBackupCmd(t)
 
 	tests := []struct {
 		name   string
@@ -224,7 +211,7 @@ func Test_requestByNodeName_RedactsCredentials(t *testing.T) {
 
 	ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
 
-	_, err := ic.requestByNodeName(testRedactNode, testBackupCmd())
+	_, err := ic.requestByNodeName(testRedactNode, testBackupCmd(t))
 
 	require.Error(t, err)
 	require.NotContains(t, err.Error(), testRedactSensitiveVal)

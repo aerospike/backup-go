@@ -90,7 +90,12 @@ func (ic *Client) requestSIndexes(node infoGetter, namespace string, noWarn bool
 	}
 
 	getCtx := version.IsGreaterOrEqual(supportsSIndexCTX)
-	cmd := ic.buildSindexCmd(namespace, getCtx)
+	// NOTE: getting the sindex ctx was added in Aerospike 6.1
+	// so don't include this in the command at all if the server is older
+	cmd, err := ic.cmds.sindexList(namespace, getCtx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build sindex list command: %w", err)
+	}
 
 	cmdResp, err := ic.requestByNode(node, cmd)
 	if err != nil {
@@ -98,18 +103,6 @@ func (ic *Client) requestSIndexes(node infoGetter, namespace string, noWarn bool
 	}
 
 	return ic.parseSIndexes(cmdResp, noWarn)
-}
-
-func (ic *Client) buildSindexCmd(namespace string, getCtx bool) string {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDSindexList], namespace)
-
-	// NOTE: getting the sindex ctx was added in Aerospike 6.1
-	// so don't include this in the command at all if the server is older
-	if getCtx {
-		cmd += ";b64=true"
-	}
-
-	return cmd
 }
 
 func (ic *Client) getAerospikeVersion(node infoGetter) (infomodels.AerospikeVersion, error) {

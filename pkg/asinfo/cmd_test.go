@@ -27,22 +27,52 @@ import (
 const (
 	testCmdNamespace = "source-ns"
 	testCmdJobID     = "260922T103653-5xsr"
+	testCmdBackupID  = "260901T000000-abcd"
 	testCmdNodes     = "BB9020011AC4202,BB9030011AC4202"
 	testCmdStorage   = "aws-s3"
 	testCmdBucket    = "backup-bucket"
 	testCmdRegion    = "eu-central-1"
 	testCmdProfile   = "default"
-	testCmdAccessKey = "access-value-fake"
-	testCmdSecretKey = "sensitive-value-fake"
 	testCmdEndpoint  = "https://s3.example.com"
 	testCmdPath      = "/backups/source-ns"
+	testCmdSetList   = "set1,set2"
+	testCmdFilterExp = "kwGVfwIAAJMEDqNiaW4="
 
-	testCmdBackupPrefix  = "backup:namespace=source-ns;job-id=260922T103653-5xsr;object-storage-type=aws-s3;"
-	testCmdRestorePrefix = "restore:namespace=source-ns;job-id=260922T103653-5xsr;object-storage-type=aws-s3;"
-	testCmdS3Params      = "s3-bucket=backup-bucket;s3-region=eu-central-1;s3-profile=default;" +
-		"access-key=access-value-fake;secret-key=sensitive-value-fake;s3-endpoint=https://s3.example.com;"
-	testCmdBackupFlagsOff = "no-indexes=false;no-udfs=false;enable-change-stream=false"
+	testCmdBackupBase  = "backup:namespace=source-ns;job-id=260922T103653-5xsr;object-storage-type=aws-s3"
+	testCmdRestoreBase = "restore:namespace=source-ns;job-id=260922T103653-5xsr;" +
+		"backup-ids=260901T000000-abcd;object-storage-type=aws-s3"
+	testCmdPrepareBase   = "restore-prepare:namespace=source-ns;job-id=260922T103653-5xsr"
+	testCmdStorageParams = ";path=/backups/source-ns;s3-bucket=backup-bucket;s3-region=eu-central-1;" +
+		"s3-profile=default;s3-endpoint=https://s3.example.com"
+	testCmdNodesParam     = ";nodes=BB9020011AC4202,BB9030011AC4202"
+	testCmdSetListParam   = ";set-list=set1,set2"
+	testCmdFilterExpParam = ";filter-exp=kwGVfwIAAJMEDqNiaW4="
+
+	testNameUnsetOmitted = "unset fields are omitted"
 )
+
+// testPtr returns a pointer to v, for the optional fields of the requests.
+func testPtr[T any](v T) *T {
+	return &v
+}
+
+// testStorage returns request fields with every storage parameter set.
+func testStorage() infomodels.RequestCommon {
+	return infomodels.RequestCommon{
+		Namespace: testCmdNamespace,
+		Storage:   testCmdStorage,
+		Path:      testCmdPath,
+		Bucket:    testCmdBucket,
+		Region:    testCmdRegion,
+		Profile:   testCmdProfile,
+		Endpoint:  testCmdEndpoint,
+	}
+}
+
+// testPrepareRestore returns a prepare restore request with the required fields set.
+func testPrepareRestore() *infomodels.RequestPrepareRestore {
+	return &infomodels.RequestPrepareRestore{Namespace: testCmdNamespace, JobID: testCmdJobID}
+}
 
 // testVersionBeforeIntegratedBackup returns a server version that has neither
 // the integrated backup nor the recent info command syntax.
@@ -72,7 +102,7 @@ func integratedBackupCalls() []integratedBackupCall {
 					},
 				}, testCmdJobID)
 			},
-			want: testCmdBackupPrefix + testCmdBackupFlagsOff,
+			want: testCmdBackupBase,
 		},
 		{
 			name: cmdNameRestore,
@@ -82,18 +112,18 @@ func integratedBackupCalls() []integratedBackupCall {
 						Namespace: testCmdNamespace,
 						Storage:   testCmdStorage,
 					},
-					JobID: testCmdJobID,
+					JobID:    testCmdJobID,
+					BackupID: testCmdBackupID,
 				})
 			},
-			want: testCmdRestorePrefix + "fuzzy-restore=false",
+			want: testCmdRestoreBase,
 		},
 		{
 			name: cmdNameRestorePrepare,
 			call: func(c infoCommands) (string, error) {
-				return c.serverPrepareRestore(testCmdNamespace, testCmdJobID, testCmdNodes)
+				return c.serverPrepareRestore(testPrepareRestore(), testCmdNodes)
 			},
-			want: "restore-prepare:namespace=source-ns;job-id=260922T103653-5xsr;" +
-				"nodes=BB9020011AC4202,BB9030011AC4202",
+			want: testCmdPrepareBase + testCmdNodesParam,
 		},
 		{
 			name: cmdNameBackupStatus,
@@ -408,8 +438,6 @@ func TestInfoCommands_IntegratedBackupNotSupported(t *testing.T) {
 func TestInfoCommands_IntegratedBackupMissingParams(t *testing.T) {
 	t.Parallel()
 
-	const wantMissingStartParams = "namespace, job-id, object-storage-type"
-
 	cmds := newInfoCommands(infomodels.AerospikeVersionSupportsIntegratedBackup)
 
 	tests := []struct {
@@ -422,19 +450,19 @@ func TestInfoCommands_IntegratedBackupMissingParams(t *testing.T) {
 			call: func() (string, error) {
 				return cmds.serverBackup(&infomodels.RequestBackup{}, "")
 			},
-			wantMissing: wantMissingStartParams,
+			wantMissing: "namespace, job-id, object-storage-type",
 		},
 		{
 			name: cmdNameRestore,
 			call: func() (string, error) {
 				return cmds.serverRestore(&infomodels.RequestRestore{})
 			},
-			wantMissing: wantMissingStartParams,
+			wantMissing: "namespace, job-id, backup-ids, object-storage-type",
 		},
 		{
 			name: cmdNameRestorePrepare,
 			call: func() (string, error) {
-				return cmds.serverPrepareRestore("", "", "")
+				return cmds.serverPrepareRestore(&infomodels.RequestPrepareRestore{}, "")
 			},
 			wantMissing: "namespace, job-id, nodes",
 		},
@@ -491,6 +519,10 @@ func TestInfoCommands_NilRequest(t *testing.T) {
 			name: cmdNameRestore,
 			call: func() (string, error) { return cmds.serverRestore(nil) },
 		},
+		{
+			name: cmdNameRestorePrepare,
+			call: func() (string, error) { return cmds.serverPrepareRestore(nil, testCmdNodes) },
+		},
 	}
 
 	for _, tt := range tests {
@@ -510,36 +542,38 @@ func TestInfoCommands_ValidatePrepareRestore(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name          string
-		giveVersion   infomodels.AerospikeVersion
-		giveNamespace string
-		giveJobID     string
-		wantErr       error
+		name        string
+		giveVersion infomodels.AerospikeVersion
+		give        *infomodels.RequestPrepareRestore
+		wantErr     error
 	}{
 		{
-			name:          "valid",
-			giveVersion:   infomodels.AerospikeVersionSupportsIntegratedBackup,
-			giveNamespace: testCmdNamespace,
-			giveJobID:     testCmdJobID,
+			name:        "valid",
+			giveVersion: infomodels.AerospikeVersionSupportsIntegratedBackup,
+			give:        testPrepareRestore(),
 		},
 		{
-			name:          "server version too old",
-			giveVersion:   testVersionBeforeIntegratedBackup(),
-			giveNamespace: testCmdNamespace,
-			giveJobID:     testCmdJobID,
-			wantErr:       errCommandNotSupported,
+			name:        "server version too old",
+			giveVersion: testVersionBeforeIntegratedBackup(),
+			give:        testPrepareRestore(),
+			wantErr:     errCommandNotSupported,
+		},
+		{
+			name:        "nil request",
+			giveVersion: infomodels.AerospikeVersionSupportsIntegratedBackup,
+			wantErr:     errNilRequest,
 		},
 		{
 			name:        "namespace missing",
 			giveVersion: infomodels.AerospikeVersionSupportsIntegratedBackup,
-			giveJobID:   testCmdJobID,
+			give:        &infomodels.RequestPrepareRestore{JobID: testCmdJobID},
 			wantErr:     errMissingCmdParam,
 		},
 		{
-			name:          "job id missing",
-			giveVersion:   infomodels.AerospikeVersionSupportsIntegratedBackup,
-			giveNamespace: testCmdNamespace,
-			wantErr:       errMissingCmdParam,
+			name:        "job id missing",
+			giveVersion: infomodels.AerospikeVersionSupportsIntegratedBackup,
+			give:        &infomodels.RequestPrepareRestore{Namespace: testCmdNamespace},
+			wantErr:     errMissingCmdParam,
 		},
 	}
 
@@ -547,7 +581,7 @@ func TestInfoCommands_ValidatePrepareRestore(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := newInfoCommands(tt.giveVersion).validatePrepareRestore(tt.giveNamespace, tt.giveJobID)
+			err := newInfoCommands(tt.giveVersion).validatePrepareRestore(tt.give)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 
@@ -564,34 +598,52 @@ func TestInfoCommands_InvalidParams(t *testing.T) {
 
 	cmds := newInfoCommands(infomodels.AerospikeVersionSupportsIntegratedBackup)
 
+	backup := func(setList string) (string, error) {
+		return cmds.serverBackup(&infomodels.RequestBackup{
+			RequestCommon: infomodels.RequestCommon{
+				Namespace: testCmdNamespace,
+				Storage:   testCmdStorage,
+				SetList:   setList,
+			},
+		}, testCmdJobID)
+	}
+
+	restore := func(path, backupID string) (string, error) {
+		return cmds.serverRestore(&infomodels.RequestRestore{
+			RequestCommon: infomodels.RequestCommon{
+				Namespace: testCmdNamespace,
+				Storage:   testCmdStorage,
+				Path:      path,
+			},
+			JobID:    testCmdJobID,
+			BackupID: backupID,
+		})
+	}
+
 	tests := []struct {
-		name string
-		call func() (string, error)
+		name      string
+		giveValue string
+		call      func(value string) (string, error)
 	}{
 		{
-			name: cmdNameBackup,
-			call: func() (string, error) {
-				return cmds.serverBackup(&infomodels.RequestBackup{
-					RequestCommon: infomodels.RequestCommon{
-						Namespace: testCmdNamespace,
-						Storage:   testCmdStorage,
-					},
-					SetList: testUnsafeValue,
-				}, testCmdJobID)
-			},
+			name:      "backup value with separator",
+			giveValue: testUnsafeValue,
+			call:      backup,
 		},
 		{
-			name: cmdNameRestore,
-			call: func() (string, error) {
-				return cmds.serverRestore(&infomodels.RequestRestore{
-					RequestCommon: infomodels.RequestCommon{
-						Namespace: testCmdNamespace,
-						Storage:   testCmdStorage,
-					},
-					JobID: testCmdJobID,
-					Path:  testUnsafeValue,
-				})
-			},
+			name:      "restore value with separator",
+			giveValue: testUnsafeValue,
+			call:      func(value string) (string, error) { return restore(testCmdPath, value) },
+		},
+		{
+			name:      "restore required value with pipe",
+			giveValue: testPipeValue,
+			call:      func(value string) (string, error) { return restore(testCmdPath, value) },
+		},
+		{
+			name:      "restore storage value with pipe",
+			giveValue: testPipeValue,
+			call:      func(value string) (string, error) { return restore(value, testCmdBackupID) },
 		},
 	}
 
@@ -599,10 +651,10 @@ func TestInfoCommands_InvalidParams(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := tt.call()
+			got, err := tt.call(tt.giveValue)
 
 			require.ErrorIs(t, err, errInvalidCmdParam)
-			assert.NotContains(t, err.Error(), testUnsafeValue)
+			assert.NotContains(t, err.Error(), tt.giveValue)
 			assert.Empty(t, got)
 		})
 	}
@@ -612,12 +664,19 @@ func TestInfoCommands_ServerBackup(t *testing.T) {
 	t.Parallel()
 
 	const (
-		testModifiedBefore = "1700000100"
-		testModifiedAfter  = "1700000000"
-		testSetList        = "set1,set2"
+		testModifiedBefore     = "1700000100"
+		testModifiedAfter      = "1700000000"
+		testModifiedAfterParam = ";modified-after=1700000000"
+		testBinList            = "bin1,bin2"
 	)
 
 	cmds := newInfoCommands(infomodels.AerospikeVersionSupportsIntegratedBackup)
+
+	allFields := testStorage()
+	allFields.SetList = testCmdSetList
+	allFields.FilterExp = testCmdFilterExp
+	allFields.NoIndexes = testPtr(true)
+	allFields.NoUDFs = testPtr(false)
 
 	tests := []struct {
 		name string
@@ -627,53 +686,48 @@ func TestInfoCommands_ServerBackup(t *testing.T) {
 		{
 			name: "all fields set",
 			give: &infomodels.RequestBackup{
-				RequestCommon: infomodels.RequestCommon{
-					Namespace: testCmdNamespace,
-					Storage:   testCmdStorage,
-					Bucket:    testCmdBucket,
-					Region:    testCmdRegion,
-					Profile:   testCmdProfile,
-					AccessKey: testCmdAccessKey,
-					SecretKey: testCmdSecretKey,
-					Endpoint:  testCmdEndpoint,
-				},
-				ModifiedBefore:     testModifiedBefore,
-				ModifiedAfter:      testModifiedAfter,
-				SetList:            testSetList,
-				NoIndexes:          true,
-				NoUDFs:             true,
-				EnableChangeStream: true,
+				RequestCommon:  allFields,
+				BinList:        testBinList,
+				ModifiedBefore: testModifiedBefore,
+				ModifiedAfter:  testModifiedAfter,
 			},
-			want: testCmdBackupPrefix +
-				testCmdS3Params + "modified-before=1700000100;modified-after=1700000000;" +
-				"set-list=set1,set2;no-indexes=true;no-udfs=true;enable-change-stream=true",
+			want: testCmdBackupBase + testCmdStorageParams + testCmdSetListParam + ";bin-list=bin1,bin2" +
+				testModifiedAfterParam + ";modified-before=1700000100" + testCmdFilterExpParam +
+				";no-indexes=true;no-udfs=false",
 		},
 		{
-			name: "empty fields are omitted",
+			name: testNameUnsetOmitted,
 			give: &infomodels.RequestBackup{
 				RequestCommon: infomodels.RequestCommon{
 					Namespace: testCmdNamespace,
 					Storage:   testCmdStorage,
 					Bucket:    testCmdBucket,
-					Region:    testCmdRegion,
 				},
 				ModifiedAfter: testModifiedAfter,
 			},
-			want: testCmdBackupPrefix +
-				"s3-bucket=backup-bucket;s3-region=eu-central-1;modified-after=1700000000;" +
-				testCmdBackupFlagsOff,
+			want: testCmdBackupBase + ";s3-bucket=backup-bucket" + testModifiedAfterParam,
 		},
 		{
-			name: "flags are sent independently",
+			name: "pipe in value is allowed",
 			give: &infomodels.RequestBackup{
 				RequestCommon: infomodels.RequestCommon{
 					Namespace: testCmdNamespace,
 					Storage:   testCmdStorage,
+					Path:      testPipeValue,
 				},
-				NoUDFs: true,
 			},
-			want: testCmdBackupPrefix +
-				"no-indexes=false;no-udfs=true;enable-change-stream=false",
+			want: testCmdBackupBase + ";path=v1|v2",
+		},
+		{
+			name: "false flag is sent when set",
+			give: &infomodels.RequestBackup{
+				RequestCommon: infomodels.RequestCommon{
+					Namespace: testCmdNamespace,
+					Storage:   testCmdStorage,
+					NoUDFs:    testPtr(false),
+				},
+			},
+			want: testCmdBackupBase + ";no-udfs=false",
 		},
 	}
 
@@ -692,7 +746,44 @@ func TestInfoCommands_ServerBackup(t *testing.T) {
 func TestInfoCommands_ServerRestore(t *testing.T) {
 	t.Parallel()
 
+	const (
+		testParallel            = 16
+		testRecordsPerSecond    = 5000
+		testMaxInflight         = 400
+		testRetryBaseIntervalMs = 250
+		testRetryMultiplier     = 1.5
+		testRetryMaxAttempts    = 3
+		// testFuzzyParams are the fuzzy restore parameters of the requests below.
+		testFuzzyParams = ";allow-unhosted=true;parallel=16;records-per-second=5000;max-inflight=400;" +
+			"retry-base-interval=250;retry-multiplier=1.5;retry-max-attempts=3;ignore-record-error=false"
+		// testRestoreFlags are the index and UDF flags of the requests below.
+		testRestoreFlags = ";no-indexes=false;no-udfs=true"
+	)
+
 	cmds := newInfoCommands(infomodels.AerospikeVersionSupportsIntegratedBackup)
+
+	newRequest := func(fuzzy *bool) *infomodels.RequestRestore {
+		common := testStorage()
+		common.SetList = testCmdSetList
+		common.FilterExp = testCmdFilterExp
+		common.NoIndexes = testPtr(false)
+		common.NoUDFs = testPtr(true)
+
+		return &infomodels.RequestRestore{
+			RequestCommon:       common,
+			JobID:               testCmdJobID,
+			BackupID:            testCmdBackupID,
+			FuzzyRestore:        fuzzy,
+			AllowUnhosted:       testPtr(true),
+			Parallel:            testParallel,
+			RecordsPerSecond:    testRecordsPerSecond,
+			MaxInflight:         testMaxInflight,
+			RetryBaseIntervalMs: testRetryBaseIntervalMs,
+			RetryMultiplier:     testRetryMultiplier,
+			RetryMaxAttempts:    testRetryMaxAttempts,
+			IgnoreRecordError:   testPtr(false),
+		}
+	}
 
 	tests := []struct {
 		name string
@@ -700,37 +791,35 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 		want string
 	}{
 		{
-			name: "all fields set",
-			give: &infomodels.RequestRestore{
-				RequestCommon: infomodels.RequestCommon{
-					Namespace: testCmdNamespace,
-					Storage:   testCmdStorage,
-					Bucket:    testCmdBucket,
-					Region:    testCmdRegion,
-					Profile:   testCmdProfile,
-					AccessKey: testCmdAccessKey,
-					SecretKey: testCmdSecretKey,
-					Endpoint:  testCmdEndpoint,
-				},
-				JobID:        testCmdJobID,
-				Path:         testCmdPath,
-				FuzzyRestore: true,
-			},
-			want: testCmdRestorePrefix + testCmdS3Params + "fuzzy-restore=true;path=/backups/source-ns",
+			name: "fuzzy restore sends fuzzy parameters",
+			give: newRequest(testPtr(true)),
+			want: testCmdRestoreBase + testCmdStorageParams + testRestoreFlags + ";fuzzy-restore=true" +
+				testCmdSetListParam + testCmdFilterExpParam + testFuzzyParams,
 		},
 		{
-			name: "empty fields are omitted and false flag is sent",
+			name: "cold restore omits fuzzy parameters",
+			give: newRequest(testPtr(false)),
+			want: testCmdRestoreBase + testCmdStorageParams + testRestoreFlags + ";fuzzy-restore=false" +
+				testCmdSetListParam + testCmdFilterExpParam,
+		},
+		{
+			name: "unset fuzzy restore omits fuzzy parameters",
+			give: newRequest(nil),
+			want: testCmdRestoreBase + testCmdStorageParams + testRestoreFlags + testCmdSetListParam +
+				testCmdFilterExpParam,
+		},
+		{
+			name: testNameUnsetOmitted,
 			give: &infomodels.RequestRestore{
 				RequestCommon: infomodels.RequestCommon{
 					Namespace: testCmdNamespace,
 					Storage:   testCmdStorage,
-					Bucket:    testCmdBucket,
 				},
-				JobID: testCmdJobID,
-				Path:  testCmdPath,
+				JobID:        testCmdJobID,
+				BackupID:     testCmdBackupID,
+				FuzzyRestore: testPtr(true),
 			},
-			want: testCmdRestorePrefix +
-				"s3-bucket=backup-bucket;fuzzy-restore=false;path=/backups/source-ns",
+			want: testCmdRestoreBase + ";fuzzy-restore=true",
 		},
 	}
 
@@ -739,6 +828,47 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 			t.Parallel()
 
 			got, err := cmds.serverRestore(tt.give)
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestInfoCommands_ServerPrepareRestore(t *testing.T) {
+	t.Parallel()
+
+	cmds := newInfoCommands(infomodels.AerospikeVersionSupportsIntegratedBackup)
+
+	tests := []struct {
+		name               string
+		giveHydrateReplica *bool
+		want               string
+	}{
+		{
+			name: "hydrate replica unset is omitted",
+			want: testCmdPrepareBase + testCmdNodesParam,
+		},
+		{
+			name:               "hydrate replica true",
+			giveHydrateReplica: testPtr(true),
+			want:               testCmdPrepareBase + ";hydrate-replica=true" + testCmdNodesParam,
+		},
+		{
+			name:               "hydrate replica false",
+			giveHydrateReplica: testPtr(false),
+			want:               testCmdPrepareBase + ";hydrate-replica=false" + testCmdNodesParam,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			r := testPrepareRestore()
+			r.HydrateReplica = tt.giveHydrateReplica
+
+			got, err := cmds.serverPrepareRestore(r, testCmdNodes)
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)

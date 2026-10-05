@@ -1161,16 +1161,16 @@ func (_c *MockInfoGetter_GetVersion_Call) RunAndReturn(run func(ctx context.Cont
 }
 
 // PrepareRestore provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) PrepareRestore(ctx context.Context, jobID string, namespace string) error {
-	ret := _mock.Called(ctx, jobID, namespace)
+func (_mock *MockInfoGetter) PrepareRestore(ctx context.Context, request *models.RequestPrepareRestore) error {
+	ret := _mock.Called(ctx, request)
 
 	if len(ret) == 0 {
 		panic("no return value specified for PrepareRestore")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
-		r0 = returnFunc(ctx, jobID, namespace)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.RequestPrepareRestore) error); ok {
+		r0 = returnFunc(ctx, request)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1184,30 +1184,24 @@ type MockInfoGetter_PrepareRestore_Call struct {
 
 // PrepareRestore is a helper method to define mock.On call
 //   - ctx context.Context
-//   - jobID string
-//   - namespace string
-func (_e *MockInfoGetter_Expecter) PrepareRestore(ctx any, jobID any, namespace any) *MockInfoGetter_PrepareRestore_Call {
-	return &MockInfoGetter_PrepareRestore_Call{Call: _e.mock.On("PrepareRestore", ctx, jobID, namespace)}
+//   - request *models.RequestPrepareRestore
+func (_e *MockInfoGetter_Expecter) PrepareRestore(ctx any, request any) *MockInfoGetter_PrepareRestore_Call {
+	return &MockInfoGetter_PrepareRestore_Call{Call: _e.mock.On("PrepareRestore", ctx, request)}
 }
 
-func (_c *MockInfoGetter_PrepareRestore_Call) Run(run func(ctx context.Context, jobID string, namespace string)) *MockInfoGetter_PrepareRestore_Call {
+func (_c *MockInfoGetter_PrepareRestore_Call) Run(run func(ctx context.Context, request *models.RequestPrepareRestore)) *MockInfoGetter_PrepareRestore_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 string
+		var arg1 *models.RequestPrepareRestore
 		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		var arg2 string
-		if args[2] != nil {
-			arg2 = args[2].(string)
+			arg1 = args[1].(*models.RequestPrepareRestore)
 		}
 		run(
 			arg0,
 			arg1,
-			arg2,
 		)
 	})
 	return _c
@@ -1218,7 +1212,7 @@ func (_c *MockInfoGetter_PrepareRestore_Call) Return(err error) *MockInfoGetter_
 	return _c
 }
 
-func (_c *MockInfoGetter_PrepareRestore_Call) RunAndReturn(run func(ctx context.Context, jobID string, namespace string) error) *MockInfoGetter_PrepareRestore_Call {
+func (_c *MockInfoGetter_PrepareRestore_Call) RunAndReturn(run func(ctx context.Context, request *models.RequestPrepareRestore) error) *MockInfoGetter_PrepareRestore_Call {
 	_c.Call.Return(run)
 	return _c
 }

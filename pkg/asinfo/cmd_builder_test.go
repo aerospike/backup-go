@@ -30,10 +30,16 @@ const (
 	testCmdValue1    = "v1"
 	testCmdWithParam = "cmd:k1=v1"
 
+	// testErrKey1 and testErrKey2 are how the errors report the keys k1 and k2.
+	testErrKey1 = "cmd: k1"
+	testErrKey2 = "cmd: k2"
+
 	// testUnsafeValue would inject an extra parameter if it were sent as is.
 	testUnsafeValue = "v1;fuzzy-restore=true"
 	// testNewlineValue would inject an extra command if it were sent as is.
 	testNewlineValue = "v1\nbackup-abort:job-id=1"
+	// testPipeValue is valid unless the command forbids "|".
+	testPipeValue = "v1|v2"
 )
 
 func TestInfoCmd_BuildParams(t *testing.T) {
@@ -117,6 +123,51 @@ func TestInfoCmd_BuildParams(t *testing.T) {
 			want:  "cmd:k1=0",
 		},
 		{
+			name:  "optional flag unset is omitted",
+			build: func(c *infoCmd) *infoCmd { return c.optFlag(testCmdKey1, nil) },
+			want:  wantEmpty,
+		},
+		{
+			name:  "optional flag false is sent",
+			build: func(c *infoCmd) *infoCmd { return c.optFlag(testCmdKey1, testPtr(false)) },
+			want:  "cmd:k1=false",
+		},
+		{
+			name:  "optional flag true is sent",
+			build: func(c *infoCmd) *infoCmd { return c.optFlag(testCmdKey1, testPtr(true)) },
+			want:  "cmd:k1=true",
+		},
+		{
+			name:  "optional num zero is omitted",
+			build: func(c *infoCmd) *infoCmd { return c.optNum(testCmdKey1, 0) },
+			want:  wantEmpty,
+		},
+		{
+			name:  "optional num is sent",
+			build: func(c *infoCmd) *infoCmd { return c.optNum(testCmdKey1, 42) },
+			want:  "cmd:k1=42",
+		},
+		{
+			name:  "optional float zero is omitted",
+			build: func(c *infoCmd) *infoCmd { return c.optFloat(testCmdKey1, 0) },
+			want:  wantEmpty,
+		},
+		{
+			name:  "optional float with fraction",
+			build: func(c *infoCmd) *infoCmd { return c.optFloat(testCmdKey1, 1.25) },
+			want:  "cmd:k1=1.25",
+		},
+		{
+			name:  "optional float without fraction",
+			build: func(c *infoCmd) *infoCmd { return c.optFloat(testCmdKey1, 2) },
+			want:  "cmd:k1=2",
+		},
+		{
+			name:  "pipe is allowed by default",
+			build: func(c *infoCmd) *infoCmd { return c.str(testCmdKey1, testPipeValue) },
+			want:  "cmd:k1=v1|v2",
+		},
+		{
 			name: "mixed parameter kinds",
 			build: func(c *infoCmd) *infoCmd {
 				return c.num(testCmdKey1, 3).str(testCmdKey2, testValue2).flag(testKey3, false)
@@ -160,7 +211,7 @@ func TestInfoCmd_Build(t *testing.T) {
 				return c.required(testCmdKey1, "").str(testCmdKey2, testCmdValue1)
 			},
 			wantErr:     errMissingCmdParam,
-			wantErrText: "cmd: k1",
+			wantErrText: testErrKey1,
 		},
 		{
 			name: "all missing parameters are reported",
@@ -176,7 +227,7 @@ func TestInfoCmd_Build(t *testing.T) {
 				return c.str(testCmdKey1, testCmdValue1).str(testCmdKey2, testUnsafeValue)
 			},
 			wantErr:     errInvalidCmdParam,
-			wantErrText: "cmd: k2",
+			wantErrText: testErrKey2,
 		},
 		{
 			name: "newline in optional value",
@@ -184,7 +235,7 @@ func TestInfoCmd_Build(t *testing.T) {
 				return c.str(testCmdKey1, testCmdValue1).str(testCmdKey2, testNewlineValue)
 			},
 			wantErr:     errInvalidCmdParam,
-			wantErrText: "cmd: k2",
+			wantErrText: testErrKey2,
 		},
 		{
 			name: "separator in required value",
@@ -192,7 +243,7 @@ func TestInfoCmd_Build(t *testing.T) {
 				return c.required(testCmdKey1, testUnsafeValue)
 			},
 			wantErr:     errInvalidCmdParam,
-			wantErrText: "cmd: k1",
+			wantErrText: testErrKey1,
 		},
 	}
 
@@ -218,6 +269,50 @@ func TestInfoCmd_Build(t *testing.T) {
 	}
 }
 
+func TestInfoCmd_BuildForbidden(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		giveValue string
+		wantErr   error
+	}{
+		{
+			name:      "extra forbidden char",
+			giveValue: testPipeValue,
+			wantErr:   errInvalidCmdParam,
+		},
+		{
+			name:      "default forbidden char is kept",
+			giveValue: testUnsafeValue,
+			wantErr:   errInvalidCmdParam,
+		},
+		{
+			name:      "allowed value",
+			giveValue: testCmdValue1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := newInfoCmd(testCmdName, "|").str(testCmdKey1, tt.giveValue).build()
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				require.ErrorContains(t, err, testErrKey1)
+				assert.NotContains(t, err.Error(), tt.giveValue)
+				assert.Empty(t, got)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, testCmdWithParam, got)
+		})
+	}
+}
+
 func TestInfoCmd_BuildMissingAndInvalid(t *testing.T) {
 	t.Parallel()
 
@@ -226,8 +321,8 @@ func TestInfoCmd_BuildMissingAndInvalid(t *testing.T) {
 	require.ErrorIs(t, err, errMissingCmdParam)
 	require.ErrorIs(t, err, errInvalidCmdParam)
 	require.ErrorIs(t, err, errclass.ErrInvalidConfig)
-	require.ErrorContains(t, err, "cmd: k1")
-	require.ErrorContains(t, err, "cmd: k2")
+	require.ErrorContains(t, err, testErrKey1)
+	require.ErrorContains(t, err, testErrKey2)
 	assert.NotContains(t, err.Error(), testUnsafeValue)
 	assert.NotContains(t, err.Error(), "\n", "error must be a single line")
 	assert.Empty(t, got)
@@ -271,7 +366,7 @@ func TestBuildPathCmd(t *testing.T) {
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 				require.ErrorIs(t, err, errclass.ErrInvalidConfig)
-				require.ErrorContains(t, err, "cmd: k1")
+				require.ErrorContains(t, err, testErrKey1)
 				assert.NotContains(t, err.Error(), testUnsafeValue)
 				assert.NotContains(t, err.Error(), testNewlineValue)
 				assert.Empty(t, got)

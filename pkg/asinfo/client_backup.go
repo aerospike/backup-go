@@ -198,10 +198,10 @@ func isRestoreStarted(resp []infomodels.InfoMap, jobID string) bool {
 }
 
 // PrepareRestore starts a restore preparation on the server.
-func (ic *Client) PrepareRestore(ctx context.Context, jobID, namespace string) error {
+func (ic *Client) PrepareRestore(ctx context.Context, request *infomodels.RequestPrepareRestore) error {
 	// The node list is read on every attempt, so the command is built inside the
 	// retry loop. Everything else is checked here, as retrying cannot change it.
-	if err := ic.cmds.validatePrepareRestore(namespace, jobID); err != nil {
+	if err := ic.cmds.validatePrepareRestore(request); err != nil {
 		return fmt.Errorf("failed to build prepare restore command: %w", err)
 	}
 
@@ -211,7 +211,7 @@ func (ic *Client) PrepareRestore(ctx context.Context, jobID, namespace string) e
 			return fmt.Errorf("failed to get nodes string: %w", err)
 		}
 
-		cmd, err := ic.cmds.serverPrepareRestore(namespace, jobID, allNodes)
+		cmd, err := ic.cmds.serverPrepareRestore(request, allNodes)
 		if err != nil {
 			return fmt.Errorf("failed to build prepare restore command: %w", err)
 		}

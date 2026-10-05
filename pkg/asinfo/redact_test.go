@@ -15,15 +15,12 @@
 package asinfo
 
 import (
-	"bytes"
-	"log/slog"
 	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/asinfo/mocks"
-	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,51 +28,14 @@ const (
 	// Fake credential values, only used to assert they never reach logs or errors.
 	testRedactAccessVal    = "access-value-fake-0123456789"
 	testRedactSensitiveVal = "sensitive-value-fake-9876543210"
-	testRedactJobID        = "1700000000"
 	testRedactNamespace    = "source-ns"
 	testRedactBucket       = "backup-bucket"
-	testRedactRegion       = "eu-central-1"
-	testRedactProfile      = "default"
-	testRedactEndpoint     = "https://s3.example.com"
-	testRedactStorage      = "aws-s3"
 	testRedactNode         = "BB9020011AC4202"
+
+	// testRedactCmd is a command carrying cloud credentials.
+	testRedactCmd = "backup:namespace=" + testRedactNamespace + ";access-key=" + testRedactAccessVal +
+		";secret-key=" + testRedactSensitiveVal + ";s3-bucket=" + testRedactBucket
 )
-
-// testBackupCmd builds a real server backup command carrying cloud credentials.
-func testBackupCmd(t *testing.T) string {
-	t.Helper()
-
-	cmd, err := newInfoCommands(infomodels.AerospikeVersionSupportsIntegratedBackup).
-		serverBackup(&infomodels.RequestBackup{RequestCommon: testRequestCommon()}, testRedactJobID)
-	require.NoError(t, err)
-
-	return cmd
-}
-
-// testRestoreCmd builds a real server restore command carrying cloud credentials.
-func testRestoreCmd(t *testing.T) string {
-	t.Helper()
-
-	cmd, err := newInfoCommands(infomodels.AerospikeVersionSupportsIntegratedBackup).
-		serverRestore(&infomodels.RequestRestore{RequestCommon: testRequestCommon(), JobID: testRedactJobID})
-	require.NoError(t, err)
-
-	return cmd
-}
-
-// testRequestCommon returns request fields carrying cloud credentials.
-func testRequestCommon() infomodels.RequestCommon {
-	return infomodels.RequestCommon{
-		Namespace: testRedactNamespace,
-		Storage:   testRedactStorage,
-		Bucket:    testRedactBucket,
-		Region:    testRedactRegion,
-		Profile:   testRedactProfile,
-		AccessKey: testRedactAccessVal,
-		SecretKey: testRedactSensitiveVal,
-		Endpoint:  testRedactEndpoint,
-	}
-}
 
 func Test_redactCmd(t *testing.T) {
 	t.Parallel()
@@ -87,24 +47,14 @@ func Test_redactCmd(t *testing.T) {
 		wantPresent []string
 	}{
 		{
-			name:        "server backup command",
-			cmd:         testBackupCmd(t),
+			name:        "command with credentials",
+			cmd:         testRedactCmd,
 			wantMissing: []string{testRedactAccessVal, testRedactSensitiveVal},
 			wantPresent: []string{
 				"access-key=" + redactedValue,
 				"secret-key=" + redactedValue,
 				testRedactNamespace,
 				testRedactBucket,
-			},
-		},
-		{
-			name:        "server restore command",
-			cmd:         testRestoreCmd(t),
-			wantMissing: []string{testRedactAccessVal, testRedactSensitiveVal},
-			wantPresent: []string{
-				"access-key=" + redactedValue,
-				"secret-key=" + redactedValue,
-				testRedactEndpoint,
 			},
 		},
 		{
@@ -167,7 +117,7 @@ func Test_redactCmd(t *testing.T) {
 func Test_parseResultResponse_RedactsCredentials(t *testing.T) {
 	t.Parallel()
 
-	cmd := testBackupCmd(t)
+	cmd := testRedactCmd
 
 	tests := []struct {
 		name   string
@@ -211,84 +161,10 @@ func Test_requestByNodeName_RedactsCredentials(t *testing.T) {
 
 	ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
 
-	_, err := ic.requestByNodeName(testRedactNode, testBackupCmd(t))
+	_, err := ic.requestByNodeName(testRedactNode, testRedactCmd)
 
 	require.Error(t, err)
 	require.NotContains(t, err.Error(), testRedactSensitiveVal)
 	require.NotContains(t, err.Error(), testRedactAccessVal)
 	require.Contains(t, err.Error(), "secret-key="+redactedValue)
-}
-
-// Test_StartServer_DoesNotLeakSecretKey is the acceptance check: the full
-// secret key must never reach slog records, neither on the default logger nor
-// at Info level, and it must not surface in the returned error either.
-func Test_StartServer_DoesNotLeakSecretKey(t *testing.T) {
-	// Not parallel: the test swaps the default logger.
-	var (
-		defaultBuf bytes.Buffer
-		infoBuf    bytes.Buffer
-		debugBuf   bytes.Buffer
-	)
-
-	slog.SetDefault(slog.New(slog.NewTextHandler(&defaultBuf, nil)))
-
-	common := testRequestCommon()
-
-	tests := []struct {
-		name   string
-		logger *slog.Logger
-		buf    *bytes.Buffer
-		run    func(ic *Client) error
-	}{
-		{
-			name:   "backup on default logger",
-			logger: slog.Default(),
-			buf:    &defaultBuf,
-			run: func(ic *Client) error {
-				_, err := ic.StartBackup(t.Context(), &infomodels.RequestBackup{RequestCommon: common})
-				return err
-			},
-		},
-		{
-			name:   "backup at info level",
-			logger: slog.New(slog.NewTextHandler(&infoBuf, &slog.HandlerOptions{Level: slog.LevelInfo})),
-			buf:    &infoBuf,
-			run: func(ic *Client) error {
-				_, err := ic.StartBackup(t.Context(), &infomodels.RequestBackup{RequestCommon: common})
-				return err
-			},
-		},
-		{
-			name:   "restore at debug level",
-			logger: slog.New(slog.NewTextHandler(&debugBuf, &slog.HandlerOptions{Level: slog.LevelDebug})),
-			buf:    &debugBuf,
-			run: func(ic *Client) error {
-				return ic.StartRestore(t.Context(), &infomodels.RequestRestore{
-					RequestCommon: common,
-					JobID:         testRedactJobID,
-				})
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockNodeGetter := mocks.NewMockNodeGetter(t)
-			mockNodeGetter.EXPECT().
-				GetRandomNode().
-				Return(nil, &a.AerospikeError{ResultCode: atypes.INVALID_NODE_ERROR}).
-				Maybe()
-
-			ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, 1))
-			ic.logger = tt.logger
-
-			err := tt.run(ic)
-
-			require.Error(t, err)
-			require.NotContains(t, err.Error(), testRedactSensitiveVal)
-			require.NotContains(t, err.Error(), testRedactAccessVal)
-			require.NotContains(t, tt.buf.String(), testRedactSensitiveVal)
-			require.NotContains(t, tt.buf.String(), testRedactAccessVal)
-		})
-	}
 }

@@ -37,13 +37,16 @@ const (
 type infoCmd struct {
 	b         strings.Builder
 	name      string
+	unsafe    string
 	missing   []string
 	invalid   []string
 	hasParams bool
 }
 
-func newInfoCmd(name string) *infoCmd {
-	c := &infoCmd{name: name}
+// newInfoCmd starts the command name. No value of the command may contain
+// cmdUnsafeChars, nor any of the extra forbidden characters.
+func newInfoCmd(name string, forbidden ...string) *infoCmd {
+	c := &infoCmd{name: name, unsafe: cmdUnsafeChars + strings.Join(forbidden, "")}
 	c.b.WriteString(name)
 	c.b.WriteByte(cmdNameSep)
 
@@ -83,6 +86,16 @@ func (c *infoCmd) flag(key string, value bool) *infoCmd {
 	return c
 }
 
+// optFlag adds "key=true" or "key=false" only if value is set, so the server
+// applies its own default otherwise.
+func (c *infoCmd) optFlag(key string, value *bool) *infoCmd {
+	if value == nil {
+		return c
+	}
+
+	return c.flag(key, *value)
+}
+
 // num adds the integer parameter unconditionally.
 func (c *infoCmd) num(key string, value int) *infoCmd {
 	c.add(key, strconv.Itoa(value))
@@ -90,9 +103,32 @@ func (c *infoCmd) num(key string, value int) *infoCmd {
 	return c
 }
 
+// optNum adds the integer parameter only if value is not zero, so the server
+// applies its own default otherwise.
+func (c *infoCmd) optNum(key string, value int) *infoCmd {
+	if value == 0 {
+		return c
+	}
+
+	return c.num(key, value)
+}
+
+// optFloat adds the float parameter in its shortest exact form, only if value
+// is not zero, so the server applies its own default otherwise.
+func (c *infoCmd) optFloat(key string, value float64) *infoCmd {
+	if value == 0 {
+		return c
+	}
+
+	c.add(key, strconv.FormatFloat(value, 'f', -1, 64))
+
+	return c
+}
+
 // build returns the command, or an error if any parameter added with required
-// was empty (errMissingCmdParam) or any value contains one of cmdUnsafeChars
-// (errInvalidCmdParam). Only the keys are reported, values may hold secrets.
+// was empty (errMissingCmdParam) or any value contains a forbidden character
+// (errInvalidCmdParam), see newInfoCmd. Only the keys are reported, values may
+// hold secrets.
 func (c *infoCmd) build() (string, error) {
 	switch {
 	case len(c.missing) > 0 && len(c.invalid) > 0:
@@ -108,7 +144,7 @@ func (c *infoCmd) build() (string, error) {
 }
 
 func (c *infoCmd) add(key, value string) {
-	if strings.ContainsAny(value, cmdUnsafeChars) {
+	if strings.ContainsAny(value, c.unsafe) {
 		c.invalid = append(c.invalid, key)
 	}
 

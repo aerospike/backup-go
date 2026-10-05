@@ -2427,13 +2427,14 @@ func startBackupCall(namespace, storage string) clientCall {
 }
 
 // startRestoreCall calls StartRestore with the given request fields.
-func startRestoreCall(jobID, namespace, storage string) clientCall {
+func startRestoreCall(jobID, backupID, namespace, storage string) clientCall {
 	return clientCall{
 		name: testMethodStartRestore,
 		call: func(ctx context.Context, ic *Client) error {
 			return ic.StartRestore(ctx, &infomodels.RequestRestore{
 				RequestCommon: infomodels.RequestCommon{Namespace: namespace, Storage: storage},
 				JobID:         jobID,
+				BackupID:      backupID,
 			})
 		},
 	}
@@ -2461,14 +2462,17 @@ func abortRestoreCall(jobID, namespace string) clientCall {
 
 // integratedBackupClientCalls returns every integrated backup method of Client
 // called with the given arguments.
-func integratedBackupClientCalls(jobID, namespace, storage string) []clientCall {
+func integratedBackupClientCalls(jobID, backupID, namespace, storage string) []clientCall {
 	return []clientCall{
 		startBackupCall(namespace, storage),
-		startRestoreCall(jobID, namespace, storage),
+		startRestoreCall(jobID, backupID, namespace, storage),
 		{
 			name: testMethodPrepareRestore,
 			call: func(ctx context.Context, ic *Client) error {
-				return ic.PrepareRestore(ctx, jobID, namespace)
+				return ic.PrepareRestore(ctx, &infomodels.RequestPrepareRestore{
+					Namespace: namespace,
+					JobID:     jobID,
+				})
 			},
 		},
 		abortBackupCall(jobID),
@@ -2502,7 +2506,7 @@ func TestClient_RetriesAreNotNested(t *testing.T) {
 
 	tests := []clientCall{
 		startBackupCall(testIntegratedNamespace, testIntegratedStorage),
-		startRestoreCall(testIntegratedJobID, testIntegratedNamespace, testIntegratedStorage),
+		startRestoreCall(testIntegratedJobID, testCmdBackupID, testIntegratedNamespace, testIntegratedStorage),
 		abortBackupCall(testIntegratedJobID),
 		abortRestoreCall(testIntegratedJobID, testIntegratedNamespace),
 		{
@@ -2554,7 +2558,10 @@ func TestClient_PrepareRestore_RetriesWithoutActiveNodes(t *testing.T) {
 
 	ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, testMaxRetries))
 
-	err := ic.PrepareRestore(t.Context(), testIntegratedJobID, testIntegratedNamespace)
+	err := ic.PrepareRestore(t.Context(), &infomodels.RequestPrepareRestore{
+		Namespace: testIntegratedNamespace,
+		JobID:     testIntegratedJobID,
+	})
 
 	require.ErrorIs(t, err, errMissingCmdParam)
 	require.ErrorContains(t, err, paramNodes)
@@ -2566,7 +2573,8 @@ func TestClient_PrepareRestore_RetriesWithoutActiveNodes(t *testing.T) {
 func TestClient_IntegratedBackupNotSupported(t *testing.T) {
 	t.Parallel()
 
-	tests := integratedBackupClientCalls(testIntegratedJobID, testIntegratedNamespace, testIntegratedStorage)
+	tests := integratedBackupClientCalls(testIntegratedJobID, testCmdBackupID, testIntegratedNamespace,
+		testIntegratedStorage)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2590,7 +2598,7 @@ func TestClient_IntegratedBackupNotSupported(t *testing.T) {
 func TestClient_IntegratedBackupMissingParams(t *testing.T) {
 	t.Parallel()
 
-	tests := integratedBackupClientCalls("", "", "")
+	tests := integratedBackupClientCalls("", "", "", "")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

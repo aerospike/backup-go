@@ -43,7 +43,7 @@ type ClusterInfo interface {
 type ServerBackupInfo interface {
 	StartBackup(ctx context.Context, request *infomodels.RequestBackup) (string, error)
 	StartRestore(ctx context.Context, request *infomodels.RequestRestore) error
-	PrepareRestore(ctx context.Context, jobID, namespace string) error
+	PrepareRestore(ctx context.Context, request *infomodels.RequestPrepareRestore) error
 	GetBackupStatus(ctx context.Context, jobID string) (*infomodels.ResponseBackupState, error)
 	GetRestoreStatus(ctx context.Context, namespace string) (string, error)
 	AbortBackup(ctx context.Context, backupID string) error

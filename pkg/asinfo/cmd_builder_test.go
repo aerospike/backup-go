@@ -328,6 +328,96 @@ func TestInfoCmd_BuildMissingAndInvalid(t *testing.T) {
 	assert.Empty(t, got)
 }
 
+func TestCommaSeparatedListValid(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testListSingleID  = "260901T000000-abcd"
+		testListMultiple  = "260901T000000-abcd,260901T000001-efgh"
+		testListCommaOnly = ","
+		testListEmptyPart = "a,,b"
+		testListLeading   = ",a"
+		testListTrailing  = "a,"
+	)
+
+	tests := []struct {
+		name  string
+		give  string
+		valid bool
+	}{
+		{name: "single id", give: testListSingleID, valid: true},
+		{name: "multiple ids", give: testListMultiple, valid: true},
+		{name: "comma only", give: testListCommaOnly, valid: false},
+		{name: "empty entry", give: testListEmptyPart, valid: false},
+		{name: "leading comma", give: testListLeading, valid: false},
+		{name: "trailing comma", give: testListTrailing, valid: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.valid, commaSeparatedListValid(tt.give))
+		})
+	}
+}
+
+func TestInfoCmd_RequiredCommaList(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testListValue      = "id1,id2"
+		testListWant       = "cmd:k1=id1,id2"
+		testListInvalid    = "id1,"
+		testListInvalidKey = "cmd: k1"
+	)
+
+	tests := []struct {
+		name        string
+		giveValue   string
+		want        string
+		wantErr     error
+		wantErrText string
+	}{
+		{
+			name:      "valid list",
+			giveValue: testListValue,
+			want:      testListWant,
+		},
+		{
+			name:        "missing value",
+			giveValue:   "",
+			wantErr:     errMissingCmdParam,
+			wantErrText: testErrKey1,
+		},
+		{
+			name:        "invalid list",
+			giveValue:   testListInvalid,
+			wantErr:     errInvalidCmdParam,
+			wantErrText: testListInvalidKey,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := newInfoCmd(testCmdName).requiredCommaList(testCmdKey1, tt.giveValue).build()
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				require.ErrorIs(t, err, errclass.ErrInvalidConfig)
+				require.ErrorContains(t, err, tt.wantErrText)
+				assert.Empty(t, got)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestBuildPathCmd(t *testing.T) {
 	t.Parallel()
 

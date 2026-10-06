@@ -16,6 +16,7 @@ package asinfo
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -76,6 +77,37 @@ func (c *infoCmd) required(key, value string) *infoCmd {
 	c.add(key, value)
 
 	return c
+}
+
+// requiredCommaList adds the parameter like required, and records it as invalid
+// if value is not a comma-separated list with no empty elements.
+func (c *infoCmd) requiredCommaList(key, value string) *infoCmd {
+	if value == "" {
+		c.missing = append(c.missing, key)
+
+		return c
+	}
+
+	if !commaSeparatedListValid(value) {
+		c.invalid = append(c.invalid, key)
+
+		return c
+	}
+
+	c.add(key, value)
+
+	return c
+}
+
+// commaSeparatedListValid reports whether value is a comma-separated list with
+// at least one element and no empty elements.
+func commaSeparatedListValid(value string) bool {
+	parts := strings.Split(value, ",")
+	if slices.Contains(parts, "") {
+		return false
+	}
+
+	return len(parts) > 0
 }
 
 // flag adds "key=true" or "key=false". It is sent unconditionally, so the

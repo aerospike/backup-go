@@ -112,8 +112,8 @@ func integratedBackupCalls() []integratedBackupCall {
 						Namespace: testCmdNamespace,
 						Storage:   testCmdStorage,
 					},
-					JobID:    testCmdJobID,
-					BackupID: testCmdBackupID,
+					JobID:     testCmdJobID,
+					BackupIDs: testCmdBackupID,
 				})
 			},
 			want: testCmdRestoreBase,
@@ -608,17 +608,23 @@ func TestInfoCommands_InvalidParams(t *testing.T) {
 		}, testCmdJobID)
 	}
 
-	restore := func(path, backupID string) (string, error) {
+	restore := func(path, backupIDs string) (string, error) {
 		return cmds.serverRestore(&infomodels.RequestRestore{
 			RequestCommon: infomodels.RequestCommon{
 				Namespace: testCmdNamespace,
 				Storage:   testCmdStorage,
 				Path:      path,
 			},
-			JobID:    testCmdJobID,
-			BackupID: backupID,
+			JobID:     testCmdJobID,
+			BackupIDs: backupIDs,
 		})
 	}
+
+	const (
+		testInvalidBackupIDsCommaOnly    = ","
+		testInvalidBackupIDsEmptyEntry   = "260901T000000-abcd,,260901T000001-efgh"
+		testInvalidBackupIDsLeadingComma = ",260901T000000-abcd"
+	)
 
 	tests := []struct {
 		name      string
@@ -644,6 +650,21 @@ func TestInfoCommands_InvalidParams(t *testing.T) {
 			name:      "restore storage value with pipe",
 			giveValue: testPipeValue,
 			call:      func(value string) (string, error) { return restore(value, testCmdBackupID) },
+		},
+		{
+			name:      "restore backup ids comma only",
+			giveValue: testInvalidBackupIDsCommaOnly,
+			call:      func(value string) (string, error) { return restore(testCmdPath, value) },
+		},
+		{
+			name:      "restore backup ids empty entry",
+			giveValue: testInvalidBackupIDsEmptyEntry,
+			call:      func(value string) (string, error) { return restore(testCmdPath, value) },
+		},
+		{
+			name:      "restore backup ids leading comma",
+			giveValue: testInvalidBackupIDsLeadingComma,
+			call:      func(value string) (string, error) { return restore(testCmdPath, value) },
 		},
 	}
 
@@ -772,7 +793,7 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 		return &infomodels.RequestRestore{
 			RequestCommon:       common,
 			JobID:               testCmdJobID,
-			BackupID:            testCmdBackupID,
+			BackupIDs:           testCmdBackupID,
 			FuzzyRestore:        fuzzy,
 			AllowUnhosted:       testPtr(true),
 			Parallel:            testParallel,
@@ -816,7 +837,7 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 					Storage:   testCmdStorage,
 				},
 				JobID:        testCmdJobID,
-				BackupID:     testCmdBackupID,
+				BackupIDs:    testCmdBackupID,
 				FuzzyRestore: testPtr(true),
 			},
 			want: testCmdRestoreBase + ";fuzzy-restore=true",

@@ -31,8 +31,8 @@ type RequestRestore struct {
 	// JobID identifies the restore job. A cold restore must use the job id that
 	// was passed to the restore preparation.
 	JobID string
-	// BackupID identifies the backup to restore from.
-	BackupID string
+	// BackupIDs is a comma-separated list of backup ids to restore from.
+	BackupIDs string
 	// FuzzyRestore restores by writing records into the live namespace instead
 	// of the cold partition hydration. The fields below are sent only when it is
 	// true.

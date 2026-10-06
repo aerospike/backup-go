@@ -204,7 +204,7 @@ func (c infoCommands) serverBackup(r *infomodels.RequestBackup, jobID string) (s
 }
 
 // serverRestore returns the command that starts the restore job r.JobID from
-// the backup r.BackupID. The fuzzy restore parameters are sent only if
+// the backups r.BackupIDs. The fuzzy restore parameters are sent only if
 // r.FuzzyRestore is true.
 func (c infoCommands) serverRestore(r *infomodels.RequestRestore) (string, error) {
 	if err := c.requireIntegratedBackup(cmdNameRestore); err != nil {
@@ -218,7 +218,7 @@ func (c infoCommands) serverRestore(r *infomodels.RequestRestore) (string, error
 	cmd := newInfoCmd(cmdNameRestore, restoreUnsafeChars).
 		required(paramNamespace, r.Namespace).
 		required(paramJobID, r.JobID).
-		required(paramBackupIDs, r.BackupID)
+		requiredCommaList(paramBackupIDs, r.BackupIDs)
 
 	addStorageParams(cmd, &r.RequestCommon)
 

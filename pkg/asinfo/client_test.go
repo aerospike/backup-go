@@ -2434,7 +2434,7 @@ func startRestoreCall(jobID, backupID, namespace, storage string) clientCall {
 			return ic.StartRestore(ctx, &infomodels.RequestRestore{
 				RequestCommon: infomodels.RequestCommon{Namespace: namespace, Storage: storage},
 				JobID:         jobID,
-				BackupID:      backupID,
+				BackupIDs:     backupID,
 			})
 		},
 	}

@@ -56,7 +56,7 @@ func newClient(
 		logger:      slog.Default(),
 	}
 
-	ic.cmdDict = newCmdDict(infomodels.AerospikeVersionRecentInfoCommands)
+	ic.cmds = newInfoCommands(infomodels.AerospikeVersionRecentInfoCommands)
 
 	return ic
 }
@@ -295,50 +295,6 @@ func TestAerospikeVersion_IsGreaterThan(t *testing.T) {
 			}
 			if got := av.IsGreater(tt.args.other); got != tt.want {
 				t.Errorf("AerospikeVersion.IsGreaterThan() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_buildSindexCmd(t *testing.T) {
-	t.Parallel()
-	type args struct {
-		namespace string
-		getCtx    bool
-	}
-	tests := []struct {
-		name string
-		want string
-		args args
-	}{
-		{
-			name: "positive no ctx",
-			args: args{
-				namespace: "test",
-				getCtx:    false,
-			},
-			want: "sindex-list:namespace=test",
-		},
-		{
-			name: "positive with ctx",
-			args: args{
-				namespace: "test",
-				getCtx:    true,
-			},
-			want: "sindex-list:namespace=test;b64=true",
-		},
-	}
-
-	mockNodeGetter := mocks.NewMockNodeGetter(t)
-	mockNodeGetter.EXPECT().GetRandomNode().Return(&a.Node{}, nil).Maybe()
-
-	ic := newClient(mockNodeGetter, testInfoPolicy, models.NewDefaultRetryPolicy())
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if got := ic.buildSindexCmd(tt.args.namespace, tt.args.getCtx); got != tt.want {
-				t.Errorf("buildSindexCmd() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -1208,10 +1164,9 @@ func Test_getSIndexes(t *testing.T) {
 			"type=numeric:indextype=default:context=null:state=RW"
 		testSIndexWithCtx = "ns=test:set=testset:indexname=testindex:bin=testbin:" +
 			"type=numeric:indextype=default:context=" + testSIndexB64 + ":state=RW"
+		cmdSIndexNoCtx   = "sindex-list:namespace=test"
+		cmdSIndexWithCtx = "sindex-list:namespace=test;b64=true"
 	)
-
-	cmdSIndexNoCtx := fmt.Sprintf(cmdSindexList, testNamespace)
-	cmdSIndexWithCtx := cmdSIndexNoCtx + ";b64=true"
 
 	mockInfoGetterNoCtx := mocks.NewMockinfoGetter(t)
 	mockInfoGetterNoCtx.EXPECT().RequestInfo(testInfoPolicy, []string{cmdBuild}).Return(
@@ -1692,9 +1647,9 @@ func Test_getUDF(t *testing.T) {
 	const (
 		testUDFName    = "test.lua"
 		testUDFContent = "function test()\n return 1\n end\n"
+		testUDFCmd     = "udf-get:filename=test.lua"
 	)
 
-	testUDFCmd := fmt.Sprintf(cmdUdfGetFilename, testUDFName)
 	testUDFResp := "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte(testUDFContent))
 
 	type args struct {
@@ -1771,6 +1726,32 @@ func Test_getUDF(t *testing.T) {
 	}
 }
 
+func Test_getUDF_InvalidName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		giveName string
+	}{
+		{name: "empty name"},
+		{name: "name with separator", giveName: "test.lua;fuzzy-restore=true"},
+	}
+
+	ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := ic.getUDF(mocks.NewMockinfoGetter(t), tt.giveName)
+
+			require.ErrorIs(t, err, errclass.ErrAerospike)
+			require.NotErrorIs(t, err, errclass.ErrInvalidConfig)
+			assert.Nil(t, got)
+		})
+	}
+}
+
 func Test_getUDFs(t *testing.T) {
 	t.Parallel()
 
@@ -1779,12 +1760,11 @@ func Test_getUDFs(t *testing.T) {
 		testUDF2Name    = "test2.lua"
 		testUDF1Content = "function test()\n return 1\n end\n"
 		testUDF2Content = "function test()\n return 2\n end\n"
+		testUDF1Cmd     = "udf-get:filename=test1.lua"
+		testUDF2Cmd     = "udf-get:filename=test2.lua"
 	)
 
 	var (
-		testUDF1Cmd = fmt.Sprintf(cmdUdfGetFilename, testUDF1Name)
-		testUDF2Cmd = fmt.Sprintf(cmdUdfGetFilename, testUDF2Name)
-
 		testUDF1Resp = "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte(testUDF1Content))
 		testUDF2Resp = "type=LUA;content=" + base64.StdEncoding.EncodeToString([]byte(testUDF2Content))
 	)
@@ -1902,9 +1882,8 @@ func TestGetRecordCount(t *testing.T) {
 	const (
 		testNamespace = "myNamespace"
 		testSet       = "mySet"
+		testSetsCmd   = "sets/myNamespace"
 	)
-
-	testSetsCmd := fmt.Sprintf(cmdSetsOfNamespace, testNamespace)
 
 	mockInfoGetter := mocks.NewMockinfoGetter(t)
 	mockInfoGetter.EXPECT().RequestInfo(testInfoPolicy, []string{testSetsCmd}).Return(map[string]string{
@@ -1969,7 +1948,7 @@ func TestGetRecordCount(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := ic.getRecordCountForNode(tt.args.node, testNamespace, tt.args.sets)
+			got, err := ic.getRecordCountForNode(tt.args.node, testSetsCmd, tt.args.sets)
 			if err != nil && !errors.Is(err, tt.err) {
 				t.Errorf("GetRecordCount() error = %v, wantErr %v", err, tt.err)
 				return
@@ -2092,10 +2071,9 @@ func TestClient_AbortServerBackup(t *testing.T) {
 
 	// The command sent to the principal must carry the job being aborted.
 	ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
-	require.Equal(t,
-		"backup-abort:job-id="+testBackupID,
-		fmt.Sprintf(ic.cmdDict[cmdIDBackupAbort], testBackupID),
-	)
+	cmd, err := ic.cmds.backupAbort(testBackupID)
+	require.NoError(t, err)
+	require.Equal(t, "backup-abort:job-id="+testBackupID, cmd)
 
 	// The principal is needed before the abort can be sent, so a cluster that
 	// hands out no node must surface as an Aerospike-class error.
@@ -2104,7 +2082,7 @@ func TestClient_AbortServerBackup(t *testing.T) {
 
 	ic = newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, 1))
 
-	err := ic.AbortBackup(t.Context(), testBackupID)
+	err = ic.AbortBackup(t.Context(), testBackupID)
 
 	require.ErrorIs(t, err, errclass.ErrAerospike)
 	require.ErrorContains(t, err, "failed to get cluster principal")
@@ -2115,51 +2093,6 @@ const (
 	testAbortRestoreNamespace = "source-ns1"
 	testAbortRestoreJobID     = "260922T103653-5xsr"
 )
-
-// TestClient_AbortRestore_Command pins the wire format of the restore abort command.
-// Unlike the backup abort, it is namespace scoped, and the namespace is the first
-// positional argument, so swapping the arguments must not go unnoticed.
-func TestClient_AbortRestore_Command(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name      string
-		namespace string
-		jobID     string
-		want      string
-	}{
-		{
-			name:      "namespace and job id",
-			namespace: testAbortRestoreNamespace,
-			jobID:     testAbortRestoreJobID,
-			want:      "restore-stop:namespace=source-ns1;job-id=260922T103653-5xsr",
-		},
-		{
-			name:      "numeric job id",
-			namespace: "test",
-			jobID:     "523607479",
-			want:      "restore-stop:namespace=test;job-id=523607479",
-		},
-		{
-			name:      "empty arguments keep their positions",
-			namespace: "",
-			jobID:     "",
-			want:      "restore-stop:namespace=;job-id=",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
-
-			got := fmt.Sprintf(ic.cmdDict[cmdIDRestoreAbort], tt.namespace, tt.jobID)
-
-			require.Equal(t, tt.want, got)
-		})
-	}
-}
 
 // TestClient_AbortRestore covers the failure paths reachable without a live cluster.
 // The abort is sent to the cluster principal, so everything that happens before the
@@ -2335,9 +2268,7 @@ func newTestClient(t *testing.T) *Client {
 	return &Client{
 		policy:      testInfoPolicy,
 		retryPolicy: models.NewDefaultRetryPolicy(),
-		cmdDict: map[int]string{
-			cmdIDBackupStatus: cmdBackupStatus,
-		},
+		cmds:        newInfoCommands(infomodels.AerospikeVersionSupportsIntegratedBackup),
 	}
 }
 
@@ -2345,11 +2276,10 @@ func TestClient_getBackupStatusByNode(t *testing.T) {
 	t.Parallel()
 
 	const (
-		testJobID     = "260922T103653-5xsr"
-		testNamespace = "source-ns1"
+		testJobID       = "260922T103653-5xsr"
+		testNamespace   = "source-ns1"
+		backupStatusCmd = "backup-status:job-id=" + testJobID
 	)
-
-	backupStatusCmd := fmt.Sprintf(cmdBackupStatus, testJobID)
 
 	const runningStatus = "job-id=260922T103653-5xsr:ns=source-ns1:state=INCR_SCAN_ACTIVE:" +
 		"recs-base=515423:recs-incr=0:recs-change=0:recs-filtered=0:recs-skipped-xdr-tomb=0:" +
@@ -2430,7 +2360,7 @@ func TestClient_getBackupStatusByNode(t *testing.T) {
 			)
 
 			ic := newTestClient(t)
-			resp, err := ic.getBackupStatusByNode(node, testJobID)
+			resp, err := ic.getBackupStatusByNode(node, backupStatusCmd)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -2449,17 +2379,121 @@ func TestClient_getBackupStatusByNode(t *testing.T) {
 func TestClient_getBackupStatusByNode_RequestInfoError(t *testing.T) {
 	t.Parallel()
 
-	const testJobID = "523607479"
+	const backupStatusCmd = "backup-status:job-id=523607479"
 
-	backupStatusCmd := fmt.Sprintf(cmdBackupStatus, testJobID)
 	node := newMockInfoGetter(t, backupStatusCmd, nil, a.ErrInvalidParam)
 
 	ic := newTestClient(t)
-	_, err := ic.getBackupStatusByNode(node, testJobID)
+	_, err := ic.getBackupStatusByNode(node, backupStatusCmd)
 	require.Error(t, err)
 
 	assert.Contains(t, err.Error(), "failed to request backup status")
 	assert.ErrorIs(t, err, errclass.ErrAerospike)
+}
+
+// Shared by the integrated backup client tests below.
+const (
+	testIntegratedJobID     = "523607479"
+	testIntegratedNamespace = "test"
+	testIntegratedStorage   = "aws-s3"
+
+	testMethodStartBackup      = "StartBackup"
+	testMethodStartRestore     = "StartRestore"
+	testMethodPrepareRestore   = "PrepareRestore"
+	testMethodAbortBackup      = "AbortBackup"
+	testMethodAbortRestore     = "AbortRestore"
+	testMethodGetBackupStatus  = "GetBackupStatus"
+	testMethodGetRestoreStatus = "GetRestoreStatus"
+)
+
+// clientCall runs one Client method under test.
+type clientCall struct {
+	name string
+	call func(ctx context.Context, ic *Client) error
+}
+
+// startBackupCall calls StartBackup with the given request fields.
+func startBackupCall(namespace, storage string) clientCall {
+	return clientCall{
+		name: testMethodStartBackup,
+		call: func(ctx context.Context, ic *Client) error {
+			_, err := ic.StartBackup(ctx, &infomodels.RequestBackup{
+				RequestCommon: infomodels.RequestCommon{Namespace: namespace, Storage: storage},
+			})
+
+			return err
+		},
+	}
+}
+
+// startRestoreCall calls StartRestore with the given request fields.
+func startRestoreCall(jobID, backupID, namespace, storage string) clientCall {
+	return clientCall{
+		name: testMethodStartRestore,
+		call: func(ctx context.Context, ic *Client) error {
+			return ic.StartRestore(ctx, &infomodels.RequestRestore{
+				RequestCommon: infomodels.RequestCommon{Namespace: namespace, Storage: storage},
+				JobID:         jobID,
+				BackupIDs:     backupID,
+			})
+		},
+	}
+}
+
+// abortBackupCall calls AbortBackup for jobID.
+func abortBackupCall(jobID string) clientCall {
+	return clientCall{
+		name: testMethodAbortBackup,
+		call: func(ctx context.Context, ic *Client) error {
+			return ic.AbortBackup(ctx, jobID)
+		},
+	}
+}
+
+// abortRestoreCall calls AbortRestore for jobID of namespace.
+func abortRestoreCall(jobID, namespace string) clientCall {
+	return clientCall{
+		name: testMethodAbortRestore,
+		call: func(ctx context.Context, ic *Client) error {
+			return ic.AbortRestore(ctx, namespace, jobID)
+		},
+	}
+}
+
+// integratedBackupClientCalls returns every integrated backup method of Client
+// called with the given arguments.
+func integratedBackupClientCalls(jobID, backupID, namespace, storage string) []clientCall {
+	return []clientCall{
+		startBackupCall(namespace, storage),
+		startRestoreCall(jobID, backupID, namespace, storage),
+		{
+			name: testMethodPrepareRestore,
+			call: func(ctx context.Context, ic *Client) error {
+				return ic.PrepareRestore(ctx, &infomodels.RequestPrepareRestore{
+					Namespace: namespace,
+					JobID:     jobID,
+				})
+			},
+		},
+		abortBackupCall(jobID),
+		abortRestoreCall(jobID, namespace),
+		{
+			name: testMethodGetBackupStatus,
+			call: func(ctx context.Context, ic *Client) error {
+				_, err := ic.GetBackupStatus(ctx, jobID)
+
+				return err
+			},
+		},
+		{
+			name: testMethodGetRestoreStatus,
+			call: func(ctx context.Context, ic *Client) error {
+				_, err := ic.GetRestoreStatus(ctx, namespace)
+
+				return err
+			},
+		},
+	}
 }
 
 // TestClient_RetriesAreNotNested guards the commands that look the cluster principal
@@ -2468,57 +2502,17 @@ func TestClient_getBackupStatusByNode_RequestInfoError(t *testing.T) {
 func TestClient_RetriesAreNotNested(t *testing.T) {
 	t.Parallel()
 
-	const (
-		testMaxRetries = 3
-		testJobID      = "523607479"
-		testNamespace  = "test"
-	)
+	const testMaxRetries = 3
 
-	tests := []struct {
-		name string
-		call func(ctx context.Context, ic *Client) error
-	}{
-		{
-			name: "StartBackup",
-			call: func(ctx context.Context, ic *Client) error {
-				_, err := ic.StartBackup(ctx, &infomodels.RequestBackup{
-					RequestCommon: infomodels.RequestCommon{Namespace: testNamespace},
-				})
-
-				return err
-			},
-		},
-		{
-			name: "StartRestore",
-			call: func(ctx context.Context, ic *Client) error {
-				return ic.StartRestore(ctx, &infomodels.RequestRestore{
-					RequestCommon: infomodels.RequestCommon{Namespace: testNamespace},
-					JobID:         testJobID,
-				})
-			},
-		},
-		{
-			name: "PrepareRestore",
-			call: func(ctx context.Context, ic *Client) error {
-				return ic.PrepareRestore(ctx, testJobID, testNamespace)
-			},
-		},
-		{
-			name: "AbortBackup",
-			call: func(ctx context.Context, ic *Client) error {
-				return ic.AbortBackup(ctx, testJobID)
-			},
-		},
-		{
-			name: "AbortRestore",
-			call: func(ctx context.Context, ic *Client) error {
-				return ic.AbortRestore(ctx, testNamespace, testJobID)
-			},
-		},
+	tests := []clientCall{
+		startBackupCall(testIntegratedNamespace, testIntegratedStorage),
+		startRestoreCall(testIntegratedJobID, testCmdBackupID, testIntegratedNamespace, testIntegratedStorage),
+		abortBackupCall(testIntegratedJobID),
+		abortRestoreCall(testIntegratedJobID, testIntegratedNamespace),
 		{
 			name: "GetClusterStable",
 			call: func(ctx context.Context, ic *Client) error {
-				_, err := ic.GetClusterStable(ctx, testNamespace)
+				_, err := ic.GetClusterStable(ctx, testIntegratedNamespace)
 
 				return err
 			},
@@ -2537,8 +2531,8 @@ func TestClient_RetriesAreNotNested(t *testing.T) {
 
 				return nil, a.ErrInvalidParam
 			})
-			// PrepareRestore and GetClusterStable read the node list before asking
-			// for the principal. A single inactive node keeps them going.
+			// GetClusterStable reads the node list before asking for the principal.
+			// A single inactive node keeps it going.
 			mockNodeGetter.EXPECT().GetNodes().Return([]*a.Node{{}}).Maybe()
 
 			ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, testMaxRetries))
@@ -2547,6 +2541,75 @@ func TestClient_RetriesAreNotNested(t *testing.T) {
 
 			require.ErrorIs(t, err, errclass.ErrAerospike)
 			require.Equal(t, testMaxRetries, attempts)
+		})
+	}
+}
+
+// TestClient_PrepareRestore_RetriesWithoutActiveNodes checks that PrepareRestore
+// reads the node list once per attempt. Without an active node the command has
+// no nodes to prepare, so it is never sent to the principal.
+func TestClient_PrepareRestore_RetriesWithoutActiveNodes(t *testing.T) {
+	t.Parallel()
+
+	const testMaxRetries = 3
+
+	mockNodeGetter := mocks.NewMockNodeGetter(t)
+	mockNodeGetter.EXPECT().GetNodes().Return([]*a.Node{{}}).Times(testMaxRetries)
+
+	ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, testMaxRetries))
+
+	err := ic.PrepareRestore(t.Context(), &infomodels.RequestPrepareRestore{
+		Namespace: testIntegratedNamespace,
+		JobID:     testIntegratedJobID,
+	})
+
+	require.ErrorIs(t, err, errMissingCmdParam)
+	require.ErrorContains(t, err, paramNodes)
+}
+
+// TestClient_IntegratedBackupNotSupported checks that the integrated backup methods
+// fail on an older server before any node is asked: the mocked cluster has no
+// expectations, so any request to it fails the test.
+func TestClient_IntegratedBackupNotSupported(t *testing.T) {
+	t.Parallel()
+
+	tests := integratedBackupClientCalls(testIntegratedJobID, testCmdBackupID, testIntegratedNamespace,
+		testIntegratedStorage)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
+			ic.cmds = newInfoCommands(testVersionBeforeIntegratedBackup())
+
+			err := tt.call(t.Context(), ic)
+
+			require.ErrorIs(t, err, errCommandNotSupported)
+			require.ErrorIs(t, err, errclass.ErrUnsupported)
+		})
+	}
+}
+
+// TestClient_IntegratedBackupMissingParams checks that the integrated backup
+// methods reject empty required parameters before any node is asked, so the
+// error is not retried: the mocked cluster has no expectations, so any request
+// to it fails the test.
+func TestClient_IntegratedBackupMissingParams(t *testing.T) {
+	t.Parallel()
+
+	tests := integratedBackupClientCalls("", "", "", "")
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
+
+			err := tt.call(t.Context(), ic)
+
+			require.ErrorIs(t, err, errMissingCmdParam)
+			require.ErrorIs(t, err, errclass.ErrInvalidConfig)
 		})
 	}
 }
@@ -2645,11 +2708,11 @@ func TestClient_sendStartBackup(t *testing.T) {
 		testNamespace = "source-ns1"
 		testStartCmd  = "backup:namespace=" + testNamespace + ";job-id=" + testJobID
 		testAccepted  = "ok"
+		statusCmd     = "backup-status:job-id=" + testJobID
 	)
 
 	runningStatus := fmt.Sprintf("job-id=%s:ns=%s:state=INCR_SCAN_ACTIVE", testJobID, testNamespace)
 	failedStatus := fmt.Sprintf("job-id=%s:ns=%s:state=FAILED", testJobID, testNamespace)
-	statusCmd := fmt.Sprintf(cmdBackupStatus, testJobID)
 
 	tests := []struct {
 		startErr   a.Error
@@ -2705,7 +2768,7 @@ func TestClient_sendStartBackup(t *testing.T) {
 
 			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
 
-			err := ic.sendStartBackup(node, testStartCmd, testJobID)
+			err := ic.sendStartBackup(node, testStartCmd, statusCmd)
 			if tt.wantErrIs != nil {
 				require.ErrorIs(t, err, tt.wantErrIs)
 
@@ -2728,13 +2791,13 @@ func TestClient_sendStartRestore(t *testing.T) {
 		testNamespace = "source-ns1"
 		testStartCmd  = "restore:namespace=" + testNamespace + ";job-id=" + testJobID
 		testAccepted  = "ok"
+		statusCmd     = "restore-status:namespace=" + testNamespace
 	)
 
 	restoringStatus := fmt.Sprintf("job-id=%s:ns=%s:state=%s",
 		testJobID, testNamespace, infomodels.RestoreStateRestoring)
 	otherJobStatus := fmt.Sprintf("job-id=%s:ns=%s:state=%s",
 		"260922T090000-abcd", testNamespace, infomodels.RestoreStateRestoring)
-	statusCmd := fmt.Sprintf(cmdRestoreStatus, testNamespace)
 
 	tests := []struct {
 		startErr   a.Error
@@ -2779,7 +2842,7 @@ func TestClient_sendStartRestore(t *testing.T) {
 
 			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
 
-			err := ic.sendStartRestore(node, testStartCmd, testNamespace, testJobID)
+			err := ic.sendStartRestore(node, testStartCmd, statusCmd, testJobID)
 			if tt.wantErrIs != nil {
 				require.ErrorIs(t, err, tt.wantErrIs)
 

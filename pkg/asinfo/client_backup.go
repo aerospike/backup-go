@@ -43,31 +43,23 @@ var (
 func (ic *Client) StartBackup(ctx context.Context, request *infomodels.RequestBackup) (string, error) {
 	jobID := newJobID()
 
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerBackup],
-		request.Namespace,
-		jobID,
-		request.Storage,
-		request.Bucket,
-		request.Region,
-		request.Profile,
-		request.AccessKey,
-		request.SecretKey,
-		request.Endpoint,
-		request.ModifiedBefore,
-		request.ModifiedAfter,
-		request.SetList,
-		request.NoIndexes,
-		request.NoUDFs,
-		request.EnableChangeStream,
-	)
+	cmd, err := ic.cmds.serverBackup(request, jobID)
+	if err != nil {
+		return "", fmt.Errorf("failed to build backup command: %w", err)
+	}
 
-	err := executeWithRetry(ctx, ic.retryPolicy, func() error {
+	statusCmd, err := ic.cmds.backupStatus(jobID)
+	if err != nil {
+		return "", fmt.Errorf("failed to build backup status command: %w", err)
+	}
+
+	err = executeWithRetry(ctx, ic.retryPolicy, func() error {
 		principal, err := ic.getPrincipalNode()
 		if err != nil {
 			return fmt.Errorf("failed to get cluster principal: %w", err)
 		}
 
-		return ic.sendStartBackup(principal, cmd, jobID)
+		return ic.sendStartBackup(principal, cmd, statusCmd)
 	})
 
 	return jobID, err
@@ -80,14 +72,15 @@ func (ic *Client) StartBackup(ctx context.Context, request *infomodels.RequestBa
 // failure is not conclusive on its own: the state of this very job id decides
 // whether the command arrived. The status is looked up by job id, which is
 // generated once per [Client.StartBackup] call, so state left by an earlier
-// backup of the same namespace cannot be seen here.
-func (ic *Client) sendStartBackup(node infoGetter, cmd, jobID string) error {
+// backup of the same namespace cannot be seen here. statusCmd must be the
+// backup-status command for that job id.
+func (ic *Client) sendStartBackup(node infoGetter, cmd, statusCmd string) error {
 	_, startErr := ic.requestByNode(node, cmd)
 	if startErr == nil {
 		return nil
 	}
 
-	resp, statusErr := ic.getBackupStatusByNode(node, jobID)
+	resp, statusErr := ic.getBackupStatusByNode(node, statusCmd)
 	if statusErr != nil {
 		return fmt.Errorf("failed start backup: %w (backup status unavailable: %w)",
 			startErr, statusErr)
@@ -104,7 +97,10 @@ func (ic *Client) sendStartBackup(node infoGetter, cmd, jobID string) error {
 
 // AbortBackup aborts the backup job identified by backupID on the server.
 func (ic *Client) AbortBackup(ctx context.Context, backupID string) error {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDBackupAbort], backupID)
+	cmd, err := ic.cmds.backupAbort(backupID)
+	if err != nil {
+		return fmt.Errorf("failed to build backup abort command: %w", err)
+	}
 
 	return executeWithRetry(ctx, ic.retryPolicy, func() error {
 		if err := ic.sendToPrincipal(cmd); err != nil {
@@ -117,7 +113,10 @@ func (ic *Client) AbortBackup(ctx context.Context, backupID string) error {
 
 // AbortRestore aborts the restore job identified by backupID and namespace on the server.
 func (ic *Client) AbortRestore(ctx context.Context, namespace, backupID string) error {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDRestoreAbort], namespace, backupID)
+	cmd, err := ic.cmds.restoreAbort(namespace, backupID)
+	if err != nil {
+		return fmt.Errorf("failed to build restore abort command: %w", err)
+	}
 
 	return executeWithRetry(ctx, ic.retryPolicy, func() error {
 		if err := ic.sendToPrincipal(cmd); err != nil {
@@ -130,19 +129,15 @@ func (ic *Client) AbortRestore(ctx context.Context, namespace, backupID string) 
 
 // StartRestore starts a restore job on the server.
 func (ic *Client) StartRestore(ctx context.Context, request *infomodels.RequestRestore) error {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerRestore],
-		request.Namespace,
-		request.JobID,
-		request.Storage,
-		request.Bucket,
-		request.Region,
-		request.Profile,
-		request.AccessKey,
-		request.SecretKey,
-		request.Endpoint,
-		request.FuzzyRestore,
-		request.Path,
-	)
+	cmd, err := ic.cmds.serverRestore(request)
+	if err != nil {
+		return fmt.Errorf("failed to build restore command: %w", err)
+	}
+
+	statusCmd, err := ic.cmds.restoreStatus(request.Namespace)
+	if err != nil {
+		return fmt.Errorf("failed to build restore status command: %w", err)
+	}
 
 	return executeWithRetry(ctx, ic.retryPolicy, func() error {
 		principal, err := ic.getPrincipalNode()
@@ -150,7 +145,7 @@ func (ic *Client) StartRestore(ctx context.Context, request *infomodels.RequestR
 			return fmt.Errorf("failed to get cluster principal: %w", err)
 		}
 
-		return ic.sendStartRestore(principal, cmd, request.Namespace, request.JobID)
+		return ic.sendStartRestore(principal, cmd, statusCmd, request.JobID)
 	})
 }
 
@@ -159,14 +154,15 @@ func (ic *Client) StartRestore(ctx context.Context, request *infomodels.RequestR
 //
 // The request can time out after the server has already accepted the job, so a
 // failure is not conclusive on its own: the state the server holds for this very
-// job id decides whether the command arrived.
-func (ic *Client) sendStartRestore(node infoGetter, cmd, namespace, jobID string) error {
+// job id decides whether the command arrived. statusCmd must be the
+// restore-status command for the namespace of the job.
+func (ic *Client) sendStartRestore(node infoGetter, cmd, statusCmd, jobID string) error {
 	_, startErr := ic.requestByNode(node, cmd)
 	if startErr == nil {
 		return nil
 	}
 
-	resp, statusErr := ic.getRestoreStatusByNode(node, namespace)
+	resp, statusErr := ic.getRestoreStatusByNode(node, statusCmd)
 	if statusErr != nil {
 		return fmt.Errorf("failed start restore: %w (restore status unavailable: %w)",
 			startErr, statusErr)
@@ -202,14 +198,23 @@ func isRestoreStarted(resp []infomodels.InfoMap, jobID string) bool {
 }
 
 // PrepareRestore starts a restore preparation on the server.
-func (ic *Client) PrepareRestore(ctx context.Context, jobID, namespace string) error {
+func (ic *Client) PrepareRestore(ctx context.Context, request *infomodels.RequestPrepareRestore) error {
+	// The node list is read on every attempt, so the command is built inside the
+	// retry loop. Everything else is checked here, as retrying cannot change it.
+	if err := ic.cmds.validatePrepareRestore(request); err != nil {
+		return fmt.Errorf("failed to build prepare restore command: %w", err)
+	}
+
 	return executeWithRetry(ctx, ic.retryPolicy, func() error {
 		allNodes, err := ic.getNodesString()
 		if err != nil {
 			return fmt.Errorf("failed to get nodes string: %w", err)
 		}
 
-		cmd := fmt.Sprintf(ic.cmdDict[cmdIDServerPrepareRestore], namespace, jobID, allNodes)
+		cmd, err := ic.cmds.serverPrepareRestore(request, allNodes)
+		if err != nil {
+			return fmt.Errorf("failed to build prepare restore command: %w", err)
+		}
 
 		if err := ic.sendToPrincipal(cmd); err != nil {
 			return fmt.Errorf("failed prepare restore: %w", err)
@@ -242,6 +247,11 @@ func (ic *Client) getNodesString() (string, error) {
 
 // GetBackupStatus aggregates server-side backup status across all nodes.
 func (ic *Client) GetBackupStatus(ctx context.Context, jobID string) (*infomodels.ResponseBackupState, error) {
+	cmd, err := ic.cmds.backupStatus(jobID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build backup status command: %w", err)
+	}
+
 	return retryValue(ctx, ic.retryPolicy, func() (*infomodels.ResponseBackupState, error) {
 		nodes := ic.cluster.GetNodes()
 
@@ -252,7 +262,7 @@ func (ic *Client) GetBackupStatus(ctx context.Context, jobID string) (*infomodel
 				continue
 			}
 
-			resp, err := ic.getBackupStatusByNode(node, jobID)
+			resp, err := ic.getBackupStatusByNode(node, cmd)
 			if err != nil {
 				if strings.Contains(err.Error(), "no backup job") {
 					return nil, ErrNotFound
@@ -274,9 +284,7 @@ func (ic *Client) GetBackupStatus(ctx context.Context, jobID string) (*infomodel
 	})
 }
 
-func (ic *Client) getBackupStatusByNode(node infoGetter, jobID string) ([]infomodels.InfoMap, error) {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDBackupStatus], jobID)
-
+func (ic *Client) getBackupStatusByNode(node infoGetter, cmd string) ([]infomodels.InfoMap, error) {
 	result, err := ic.requestByNode(node, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to request backup status: %w", err)
@@ -291,6 +299,11 @@ func (ic *Client) getBackupStatusByNode(node infoGetter, jobID string) ([]infomo
 }
 
 func (ic *Client) GetRestoreStatus(ctx context.Context, namespace string) (string, error) {
+	cmd, err := ic.cmds.restoreStatus(namespace)
+	if err != nil {
+		return "", fmt.Errorf("failed to build restore status command: %w", err)
+	}
+
 	return retryValue(ctx, ic.retryPolicy, func() (string, error) {
 		nodes := ic.cluster.GetNodes()
 
@@ -301,7 +314,7 @@ func (ic *Client) GetRestoreStatus(ctx context.Context, namespace string) (strin
 				continue
 			}
 
-			resp, err := ic.getRestoreStatusByNode(node, namespace)
+			resp, err := ic.getRestoreStatusByNode(node, cmd)
 			if err != nil {
 				return "", fmt.Errorf("failed to get restore status from node %s: %w", node.GetName(), err)
 			}
@@ -324,9 +337,7 @@ func (ic *Client) GetRestoreStatus(ctx context.Context, namespace string) (strin
 	})
 }
 
-func (ic *Client) getRestoreStatusByNode(node infoGetter, namespace string) ([]infomodels.InfoMap, error) {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDRestoreStatus], namespace)
-
+func (ic *Client) getRestoreStatusByNode(node infoGetter, cmd string) ([]infomodels.InfoMap, error) {
 	result, err := ic.requestByNode(node, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to request restore status: %w", err)

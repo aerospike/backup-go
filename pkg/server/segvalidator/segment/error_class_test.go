@@ -22,22 +22,29 @@ import (
 )
 
 // TestErrorClasses checks that every segment sentinel carries a class, and
-// that the two format-level ones are reported as unsupported rather than
-// corrupt: an unknown field is a newer writer, not a damaged file.
+// that the format-level ones are reported as unsupported rather than corrupt:
+// an unknown field is a newer writer, not a damaged file.
 func TestErrorClasses(t *testing.T) {
 	t.Parallel()
 
 	corrupt := []error{
-		ErrEmptySegment,
-		ErrNoRecords,
-		ErrBadTailSlack,
+		ErrRecordCountMismatch,
+		ErrFrameTruncated,
+		ErrBadFrameMagic,
+		ErrBadFrameHeaderLength,
+		ErrBadFrameFooterLength,
+		ErrBadBodyLength,
+		ErrBadBodyOffset,
 		ErrHeaderTooShort,
+		ErrTruncatedRecord,
 		ErrBadMagic,
 		ErrRecordTooSmall,
 		ErrRecordOutOfBounds,
 		ErrContentOverflow,
 		ErrBadEndMark,
 		ErrNonZeroPadding,
+		ErrFrameContentMismatch,
+		ErrWrongPartition,
 		ErrZeroGeneration,
 		ErrBadSetNameLength,
 		ErrZeroKeySize,
@@ -51,6 +58,10 @@ func TestErrorClasses(t *testing.T) {
 	}
 
 	unsupported := []error{
+		ErrUnsupportedFrameVersion,
+		ErrUnsupportedFrameFlags,
+		ErrUnsupportedBlockType,
+		ErrCompressedRecord,
 		ErrUnsupportedExtraFields,
 		ErrUnknownParticleType,
 	}
@@ -62,6 +73,7 @@ func TestErrorClasses(t *testing.T) {
 	}{
 		{name: "corrupt data", errs: corrupt, class: errclass.ErrCorruptData},
 		{name: "unsupported", errs: unsupported, class: errclass.ErrUnsupported},
+		{name: "invalid config", errs: []error{ErrInvalidPartition}, class: errclass.ErrInvalidConfig},
 	}
 
 	for _, tt := range tests {

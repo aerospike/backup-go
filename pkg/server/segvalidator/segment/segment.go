@@ -13,54 +13,111 @@
 // limitations under the License.
 
 // Package segment decodes Aerospike server side backup segment files. A segment
-// is a sequence of rblock aligned flat records followed by zero slack; the
-// package parses every record so a caller can prove that a backup is readable
+// is an ASBK frame around a body of tightly packed, rblock aligned flat
+// records; the package checks the frame and parses every record the way the
+// server does on restore, so a caller can prove that a backup is restorable
 // without restoring it.
 package segment
 
 import "fmt"
 
+// PartitionCount is the number of partitions of every namespace.
+const PartitionCount = 4096
+
 // Stats summarizes a validated backup segment.
 type Stats struct {
 	// RecordCount is the number of fully parsed records.
 	RecordCount int
-	// SkippedCompressed is the number of compressed records that were walked
-	// over without decoding. Compression is not produced by the server today;
-	// the counter exists so it does not silently look like data loss when it is.
-	SkippedCompressed int
-	// ByteCount is the number of bytes covered by records, slack excluded.
+	// ByteCount is the number of body bytes covered by records, the frame
+	// excluded.
 	ByteCount int
-	// SlackBytes is the size of the zero filled tail after the last record.
-	SlackBytes int
 }
 
-// Validate parses data as a backup segment and returns what it found.
-//
-// Every record is checked: header, metadata, bins, end marker and padding. The
-// first broken record aborts the walk and is reported as a *RecordError that
-// wraps one of the package sentinels, so both errors.Is and errors.As work.
-func Validate(data []byte) (Stats, error) {
-	var stats Stats
+// Option configures Validate.
+type Option interface {
+	apply(*options)
+}
 
-	if len(data) == 0 {
-		return stats, ErrEmptySegment
+// options holds what the caller knows about the segment beyond its bytes.
+type options struct {
+	partition      int
+	checkPartition bool
+}
+
+// partitionOption is the Option WithPartition returns.
+type partitionOption int
+
+func (p partitionOption) apply(o *options) {
+	o.partition = int(p)
+	o.checkPartition = true
+}
+
+// WithPartition requires every record of the segment to belong to partition
+// id. The server restores a query stream segment into the partition of the
+// manifest naming it, and aborts the restore on a record of any other
+// partition. Change stream segments mix partitions and must not use it. An id
+// outside 0..PartitionCount-1 makes Validate fail with ErrInvalidPartition.
+func WithPartition(id int) Option {
+	return partitionOption(id)
+}
+
+// Validate parses data as a backup segment object and returns what it found.
+//
+// The frame is checked first, then every record of the body: header, metadata,
+// bins, end marker and padding. The body must end exactly on a record
+// boundary, and the number of records must match the frame footer. A
+// compressed record fails the segment, because the server refuses to restore
+// it.
+//
+// The first broken record aborts the walk and is reported as a *RecordError
+// that wraps one of the package sentinels, so both errors.Is and errors.As
+// work. Its offset is relative to the start of the segment object. Frame
+// errors are not tied to a record: they wrap a package sentinel directly
+// instead of a *RecordError.
+//
+// The returned Stats are filled even when the segment fails: they cover the
+// records parsed before the failure, or every record when only the footer
+// count disagrees.
+func Validate(data []byte, opts ...Option) (Stats, error) {
+	var o options
+	for _, opt := range opts {
+		opt.apply(&o)
 	}
 
-	var (
-		off   int
-		index int
-	)
+	if o.checkPartition && (o.partition < 0 || o.partition >= PartitionCount) {
+		return Stats{}, fmt.Errorf("%w: %d", ErrInvalidPartition, o.partition)
+	}
 
-	for {
+	fr, err := parseFrame(data)
+	if err != nil {
+		return Stats{}, err
+	}
+
+	stats, err := walkBody(data[:fr.bodyEnd()], fr.bodyOff, o)
+	if err != nil {
+		return stats, err
+	}
+
+	if parsed := uint64(stats.RecordCount); parsed != fr.recordCount {
+		return stats, fmt.Errorf("%w: footer %d, parsed %d",
+			ErrRecordCountMismatch, fr.recordCount, parsed)
+	}
+
+	return stats, nil
+}
+
+// walkBody parses the records in data[off:]. data must end where the body
+// ends, so no record can reach into the footer.
+func walkBody(data []byte, off int, o options) (Stats, error) {
+	var stats Stats
+
+	for index := 0; off < len(data); index++ {
 		remain := len(data) - off
+		// The body is tightly packed, so any residue too short to hold a
+		// record means the segment was cut inside one, whatever its content.
 		if remain < minRecordSize {
-			if !isZero(data[off:]) {
-				return stats, newRecordError(index, off, ErrBadTailSlack)
-			}
-
-			stats.SlackBytes = remain
-
-			return finish(stats)
+			return stats, newRecordError(index, off,
+				fmt.Errorf("%w: %d bytes left", ErrTruncatedRecord, remain))
 		}
 
 		hdr, err := parseFlatHeader(data[off:])
@@ -69,14 +126,6 @@ func Validate(data []byte) (Stats, error) {
 		}
 
 		if hdr.magic != flatMagic {
-			// A zero filled tail longer than one record is regular padding,
-			// not a corrupt record.
-			if isZero(data[off:]) {
-				stats.SlackBytes = remain
-
-				return finish(stats)
-			}
-
 			return stats, newRecordError(index, off,
 				fmt.Errorf("%w: 0x%08x", ErrBadMagic, hdr.magic))
 		}
@@ -87,31 +136,34 @@ func Validate(data []byte) (Stats, error) {
 		case size < minRecordSize:
 			return stats, newRecordError(index, off,
 				fmt.Errorf("%w: %d", ErrRecordTooSmall, size))
-		case off+size > len(data):
+		case size > remain:
 			return stats, newRecordError(index, off,
 				fmt.Errorf("%w: size %d, remain %d", ErrRecordOutOfBounds, size, remain))
 		}
 
-		if hdr.isCompressed {
-			stats.SkippedCompressed++
-		} else {
-			if err := validateRecord(hdr, data, off, size); err != nil {
-				return stats, newRecordError(index, off, err)
-			}
-
-			stats.RecordCount++
+		if !endMarkInFrame(data[off : off+size]) {
+			return stats, newRecordError(index, off,
+				fmt.Errorf("%w: size %d", ErrFrameContentMismatch, size))
 		}
 
+		if o.checkPartition {
+			if p := recordPartition(data[off:]); p != o.partition {
+				return stats, newRecordError(index, off,
+					fmt.Errorf("%w: record %d, segment %d", ErrWrongPartition, p, o.partition))
+			}
+		}
+
+		if hdr.isCompressed {
+			return stats, newRecordError(index, off, ErrCompressedRecord)
+		}
+
+		if err := validateRecord(hdr, data, off, size); err != nil {
+			return stats, newRecordError(index, off, err)
+		}
+
+		stats.RecordCount++
 		stats.ByteCount += size
 		off += size
-		index++
-	}
-}
-
-// finish rejects a payload that turned out to hold no record at all.
-func finish(stats Stats) (Stats, error) {
-	if stats.RecordCount == 0 && stats.SkippedCompressed == 0 {
-		return stats, ErrNoRecords
 	}
 
 	return stats, nil

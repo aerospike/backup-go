@@ -297,6 +297,10 @@ func (s *Streamer) sampleFromManifests(ctx context.Context, u *unit, manifests [
 // records.
 func (s *Streamer) sampleManifest(ctx context.Context, u *unit, m file, quota int, rnd *rand.Rand,
 ) ([]Segment, error) {
+	if err := u.checkManifestName(m); err != nil {
+		return nil, err
+	}
+
 	body, err := s.store.open(ctx, m.Path)
 	if err != nil {
 		return nil, err
@@ -306,7 +310,13 @@ func (s *Streamer) sampleManifest(ctx context.Context, u *unit, m file, quota in
 	recorded := newReservoir[manifestSegment](quota, rnd)
 	header := manifestHeader{Namespace: u.namespace}
 
+	// Every entry is checked, not only the picked ones: the server aborts the
+	// restore on a malformed entry wherever it sits.
 	err = decodeManifest(body, &header, func(seg manifestSegment) error {
+		if err := seg.check(); err != nil {
+			return err
+		}
+
 		recorded.offer(seg)
 
 		return nil

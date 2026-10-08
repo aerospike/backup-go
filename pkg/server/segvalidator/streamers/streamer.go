@@ -72,13 +72,19 @@ type Segment struct {
 	Path string
 	// Manifest locates the manifest that named this segment, and is empty for a
 	// segment found by listing a data directory. A segment that has one has a
-	// recorded Size and Checksum worth comparing against what the storage
-	// returns.
+	// recorded Size, Checksum and RecordCount worth comparing against what the
+	// storage returns.
 	Manifest string
-	// Checksum is the CRC-32 a manifest records for the segment, as the eight
-	// hexadecimal digits it is written in. It is empty for a segment no
-	// manifest named, and for one whose manifest checksummed it some other way.
+	// Checksum is the CRC-32C a manifest records for the whole segment object,
+	// as the eight hexadecimal digits it is written in. A manifest records one
+	// for every segment it names, so it is meaningless only for a segment no
+	// manifest named, which leaves it empty.
 	Checksum string
+	// RecordCount is the number of records a manifest records for the segment.
+	// It is zero for a segment no manifest named and for one its manifest
+	// records no count for, as a change stream manifest does not. A segment
+	// always holds a record, so zero is never a count a manifest could mean.
+	RecordCount int64
 	// Unrecorded marks a segment the storage holds that no manifest names. It
 	// is read like any other, but nothing recorded what it should be, and it is
 	// either the leftover of an interrupted flush or the sign of a manifest
@@ -87,6 +93,28 @@ type Segment struct {
 	// Size is the size a manifest records for the segment, or the size the
 	// storage reported when listing it.
 	Size int64
+}
+
+// Partition returns the partition a query stream segment is restored into, and
+// so the partition every record of it must belong to.
+//
+// The server restores a partition from the segments its manifests name, and
+// takes the partition from the manifest name, not from where the segment
+// sits. A segment found by listing has no manifest, and its partition is the
+// directory the server wrote it into, data/p<id>/.
+//
+// ok is false for a change stream segment, which mixes partitions, and for a
+// segment whose manifest or, lacking one, directory assigns no partition.
+func (s *Segment) Partition() (id int, ok bool) {
+	if s.Stream != QueryStream {
+		return 0, false
+	}
+
+	if s.Manifest != "" {
+		return partitionOfManifest(s.Manifest)
+	}
+
+	return partitionOfDir(s.Path)
 }
 
 // ManifestIssue describes a manifest a run could not sample from.
@@ -355,6 +383,10 @@ func (s *Streamer) streamManifests(ctx context.Context, u *unit, rec *recorded, 
 // and a segment met before them is described by the little that is known.
 func (s *Streamer) streamManifest(ctx context.Context, u *unit, m file, rec *recorded, out chan<- Segment,
 ) (int64, error) {
+	if err := u.checkManifestName(m); err != nil {
+		return 0, err
+	}
+
 	body, err := s.store.open(ctx, m.Path)
 	if err != nil {
 		return 0, err
@@ -508,6 +540,23 @@ func (u *unit) segmentOf(f file) Segment {
 	}
 }
 
+// checkManifestName refuses a query stream manifest the server would skip. The
+// server restores a partition from the manifests named after it and ignores
+// any other, so what such a manifest records is never restored, however sound
+// it is.
+func (u *unit) checkManifestName(m file) error {
+	if u.stream != QueryStream {
+		return nil
+	}
+
+	if _, ok := partitionOfManifest(m.Path); !ok {
+		return fmt.Errorf("%w: the server does not restore from a manifest named %q",
+			ErrManifestUnusable, path.Base(m.Path))
+	}
+
+	return nil
+}
+
 // segmentOfRecord describes a segment a manifest records. It carries what the
 // manifest promised of it, which is what a validator compares the storage
 // against, and it is a segment whether or not the storage still holds it.
@@ -517,23 +566,21 @@ func (u *unit) segmentOfRecord(m file, header manifestHeader, recorded manifestS
 		return Segment{}, err
 	}
 
-	seg := Segment{
+	if err := recorded.check(); err != nil {
+		return Segment{}, err
+	}
+
+	return Segment{
 		// The manifest knows which namespace it describes; the directory it
 		// was found in is only what that namespace is called in the storage.
-		Namespace: cmp.Or(header.Namespace, u.namespace),
-		Stream:    u.stream,
-		Path:      segmentPath,
-		Manifest:  m.Path,
-		Size:      recorded.Size,
-	}
-
-	// A checksum of an algorithm this package cannot compute is worse than no
-	// checksum: it would fail every segment it describes.
-	if header.Algorithm == crc32Algorithm {
-		seg.Checksum = recorded.Checksum
-	}
-
-	return seg, nil
+		Namespace:   cmp.Or(header.Namespace, u.namespace),
+		Stream:      u.stream,
+		Path:        segmentPath,
+		Manifest:    m.Path,
+		Checksum:    *recorded.Checksum,
+		RecordCount: recorded.RecordCount,
+		Size:        *recorded.Size,
+	}, nil
 }
 
 // units discovers what the backup is made of: its namespaces, the streams of

@@ -18,6 +18,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -26,8 +29,11 @@ const (
 	testGeneration = uint16(1)
 
 	testDigestSize = 20
-	testSlackSize  = 8
-	testLongSlack  = 128
+	// testPartition is the partition of every record buildRecord makes: the
+	// low 12 bits of its digest, which starts 01 02 03 04.
+	testPartition = 0x201
+
+	msgValidateUnexpectedErr = "Validate() unexpected error: %v"
 )
 
 var (
@@ -44,8 +50,14 @@ type recordSpec struct {
 	compressed bool
 	omitSet    bool
 	omitBins   bool
+	// digestSeed shifts every digest byte, which moves the record to another
+	// partition.
+	digestSeed byte
 	// corruptEndMark flips the end marker after it has been computed.
 	corruptEndMark bool
+	// endMarkShift moves the end marker that many bytes past the content, into
+	// the padding of the last rblock.
+	endMarkShift int
 }
 
 // defaultSpec is a well formed single bin record.
@@ -59,8 +71,8 @@ func defaultSpec() recordSpec {
 }
 
 // buildRecord assembles one on-device flat record from spec.
-func buildRecord(t *testing.T, spec recordSpec) []byte {
-	t.Helper()
+func buildRecord(tb testing.TB, spec recordSpec) []byte {
+	tb.Helper()
 
 	var (
 		meta  []byte
@@ -99,7 +111,7 @@ func buildRecord(t *testing.T, spec recordSpec) []byte {
 	binary.LittleEndian.PutUint32(record[4:8], flags)
 
 	for i := range testDigestSize {
-		record[digestOffset+i] = byte(i + 1)
+		record[digestOffset+i] = spec.digestSeed + byte(i+1)
 	}
 
 	writeLutGen(record, spec.generation, 0)
@@ -112,7 +124,9 @@ func buildRecord(t *testing.T, spec recordSpec) []byte {
 		mark ^= 0xff
 	}
 
-	binary.LittleEndian.PutUint32(record[flatSize:], mark)
+	require.LessOrEqual(tb, flatSize+spec.endMarkShift+endMarkSize, writeSize,
+		"end marker shifted out of the record")
+	binary.LittleEndian.PutUint32(record[flatSize+spec.endMarkShift:], mark)
 
 	return record
 }
@@ -164,6 +178,9 @@ func TestValidate(t *testing.T) {
 	badMarkSpec := defaultSpec()
 	badMarkSpec.corruptEndMark = true
 
+	shiftedMarkSpec := defaultSpec()
+	shiftedMarkSpec.endMarkShift = 1
+
 	tests := []struct {
 		build     func(t *testing.T) []byte
 		wantErr   error
@@ -174,7 +191,7 @@ func TestValidate(t *testing.T) {
 			name: "single record",
 			build: func(t *testing.T) []byte {
 				t.Helper()
-				return buildRecord(t, defaultSpec())
+				return buildSegment(t, buildRecord(t, defaultSpec()))
 			},
 			wantStats: Stats{
 				RecordCount: 1,
@@ -185,7 +202,7 @@ func TestValidate(t *testing.T) {
 			name: "two records",
 			build: func(t *testing.T) []byte {
 				t.Helper()
-				return concat(buildRecord(t, defaultSpec()), buildRecord(t, otherSpec))
+				return buildSegment(t, buildRecord(t, defaultSpec()), buildRecord(t, otherSpec))
 			},
 			wantStats: Stats{
 				RecordCount: 2,
@@ -196,7 +213,7 @@ func TestValidate(t *testing.T) {
 			name: "record without bins",
 			build: func(t *testing.T) []byte {
 				t.Helper()
-				return buildRecord(t, noBinsSpec)
+				return buildSegment(t, buildRecord(t, noBinsSpec))
 			},
 			wantStats: Stats{
 				RecordCount: 1,
@@ -204,65 +221,91 @@ func TestValidate(t *testing.T) {
 			},
 		},
 		{
-			name: "trailing zero slack",
+			name: "compressed record",
 			build: func(t *testing.T) []byte {
 				t.Helper()
-				return concat(buildRecord(t, defaultSpec()), make([]byte, testSlackSize))
+				return buildSegment(t, buildRecord(t, compressedSpec))
 			},
-			wantStats: Stats{
-				RecordCount: 1,
-				ByteCount:   64,
-				SlackBytes:  testSlackSize,
-			},
-		},
-		{
-			name: "zero padding longer than a record",
-			build: func(t *testing.T) []byte {
-				t.Helper()
-				return concat(buildRecord(t, defaultSpec()), make([]byte, testLongSlack))
-			},
-			wantStats: Stats{
-				RecordCount: 1,
-				ByteCount:   64,
-				SlackBytes:  testLongSlack,
-			},
-		},
-		{
-			name: "compressed record is skipped",
-			build: func(t *testing.T) []byte {
-				t.Helper()
-				return buildRecord(t, compressedSpec)
-			},
-			wantStats: Stats{
-				SkippedCompressed: 1,
-				ByteCount:         64,
-			},
+			wantErr: ErrCompressedRecord,
 		},
 		{
 			name: "compressed record among valid ones",
 			build: func(t *testing.T) []byte {
 				t.Helper()
-				return concat(
+				return buildSegment(t,
 					buildRecord(t, defaultSpec()),
 					buildRecord(t, compressedSpec),
 					buildRecord(t, otherSpec),
 				)
 			},
-			wantStats: Stats{
-				RecordCount:       2,
-				SkippedCompressed: 1,
-				ByteCount:         192,
-			},
+			wantErr: ErrCompressedRecord,
 		},
 		{
 			name:    "empty payload",
 			build:   func(*testing.T) []byte { return nil },
-			wantErr: ErrEmptySegment,
+			wantErr: ErrFrameTruncated,
 		},
 		{
-			name:    "all zero payload",
-			build:   func(*testing.T) []byte { return make([]byte, minRecordSize) },
-			wantErr: ErrNoRecords,
+			// What a segment written before the frame was introduced looks like.
+			name: "unframed record",
+			build: func(t *testing.T) []byte {
+				t.Helper()
+				return buildRecord(t, defaultSpec())
+			},
+			wantErr: ErrBadFrameMagic,
+		},
+		{
+			name: "broken frame",
+			build: func(t *testing.T) []byte {
+				t.Helper()
+				seg := buildSegment(t, buildRecord(t, defaultSpec()))
+				binary.LittleEndian.PutUint16(seg[frameVersionMajorOffset:], frameVersionMajor+1)
+
+				return seg
+			},
+			wantErr: ErrUnsupportedFrameVersion,
+		},
+		{
+			// The server writes no padding, so zeros where a record should
+			// start are corruption rather than slack.
+			name: "zero rblocks after the last record",
+			build: func(t *testing.T) []byte {
+				t.Helper()
+				return frameBody(t, concat(buildRecord(t, defaultSpec()), make([]byte, minRecordSize)), 1)
+			},
+			wantErr: ErrBadMagic,
+		},
+		{
+			name: "all zero body",
+			build: func(t *testing.T) []byte {
+				t.Helper()
+				return frameBody(t, make([]byte, minRecordSize), 0)
+			},
+			wantErr: ErrBadMagic,
+		},
+		{
+			name: "residue too short for a record",
+			build: func(t *testing.T) []byte {
+				t.Helper()
+				return frameBody(t, concat(buildRecord(t, defaultSpec()), make([]byte, rblockSize)), 1)
+			},
+			wantErr: ErrTruncatedRecord,
+		},
+		{
+			name: "footer counts more records than the body holds",
+			build: func(t *testing.T) []byte {
+				t.Helper()
+				return frameBody(t, buildRecord(t, defaultSpec()), 2)
+			},
+			wantErr: ErrRecordCountMismatch,
+		},
+		{
+			name: "footer counts fewer records than the body holds",
+			build: func(t *testing.T) []byte {
+				t.Helper()
+				return frameBody(t, concat(buildRecord(t, defaultSpec()), buildRecord(t, otherSpec)), 1)
+			},
+			wantErr: ErrRecordCountMismatch,
 		},
 		{
 			name: "bad magic",
@@ -271,17 +314,19 @@ func TestValidate(t *testing.T) {
 				rec := buildRecord(t, defaultSpec())
 				rec[0] ^= 0xff
 
-				return rec
+				return buildSegment(t, rec)
 			},
 			wantErr: ErrBadMagic,
 		},
 		{
+			// The server finds no marker in the last rblock, so it cannot trust
+			// the declared size as the stride of its walk.
 			name: "corrupted end mark",
 			build: func(t *testing.T) []byte {
 				t.Helper()
-				return buildRecord(t, badMarkSpec)
+				return buildSegment(t, buildRecord(t, badMarkSpec))
 			},
-			wantErr: ErrBadEndMark,
+			wantErr: ErrFrameContentMismatch,
 		},
 		{
 			name: "corrupted digest breaks end mark",
@@ -290,25 +335,44 @@ func TestValidate(t *testing.T) {
 				rec := buildRecord(t, defaultSpec())
 				rec[digestOffset] ^= 0xff
 
-				return rec
+				return buildSegment(t, rec)
+			},
+			wantErr: ErrFrameContentMismatch,
+		},
+		{
+			// The marker passes the frame test, but sits where the content
+			// does not end.
+			name: "end mark past the content",
+			build: func(t *testing.T) []byte {
+				t.Helper()
+				return buildSegment(t, buildRecord(t, shiftedMarkSpec))
 			},
 			wantErr: ErrBadEndMark,
 		},
 		{
-			name: "non-zero tail slack",
+			// A record claiming a spare rblock puts its marker before the last
+			// one, where the server does not look for it.
+			name: "record declaring one rblock too many",
 			build: func(t *testing.T) []byte {
 				t.Helper()
-				return concat(buildRecord(t, defaultSpec()), []byte{0x00, 0x01, 0x00})
+				rec := buildRecord(t, defaultSpec())
+				rec = append(rec, make([]byte, rblockSize)...)
+				flags := binary.LittleEndian.Uint32(rec[4:8]) + 1
+				binary.LittleEndian.PutUint32(rec[4:8], flags)
+
+				return buildSegment(t, rec)
 			},
-			wantErr: ErrBadTailSlack,
+			wantErr: ErrFrameContentMismatch,
 		},
 		{
-			name: "truncated record",
+			// The record claims more bytes than the body has left, even though
+			// the footer bytes would cover them.
+			name: "record runs into the footer",
 			build: func(t *testing.T) []byte {
 				t.Helper()
 				rec := buildRecord(t, defaultSpec())
 
-				return rec[:len(rec)-rblockSize]
+				return buildSegment(t, rec[:len(rec)-rblockSize])
 			},
 			wantErr: ErrRecordOutOfBounds,
 		},
@@ -322,7 +386,7 @@ func TestValidate(t *testing.T) {
 				flags := binary.LittleEndian.Uint32(rec[4:8])
 				binary.LittleEndian.PutUint32(rec[4:8], (flags&^flagNRBlocksMask)|1)
 
-				return rec
+				return buildSegment(t, rec)
 			},
 			wantErr: ErrRecordTooSmall,
 		},
@@ -330,7 +394,7 @@ func TestValidate(t *testing.T) {
 			name: "zero generation",
 			build: func(t *testing.T) []byte {
 				t.Helper()
-				return buildRecord(t, zeroGenSpec)
+				return buildSegment(t, buildRecord(t, zeroGenSpec))
 			},
 			wantErr: ErrZeroGeneration,
 		},
@@ -341,7 +405,7 @@ func TestValidate(t *testing.T) {
 				rec := buildRecord(t, defaultSpec())
 				rec[flatRecordHdrSize] = 0
 
-				return rec
+				return buildSegment(t, rec)
 			},
 			wantErr: ErrBadSetNameLength,
 		},
@@ -353,7 +417,7 @@ func TestValidate(t *testing.T) {
 				// header + set length + set name + n-bins + bin name length + bin name
 				rec[flatRecordHdrSize+1+len(testSetName)+1+1+len(testBinName)] = 0x7f
 
-				return rec
+				return buildSegment(t, rec)
 			},
 			wantErr: ErrUnknownParticleType,
 		},
@@ -374,7 +438,7 @@ func TestValidate(t *testing.T) {
 			}
 
 			if err != nil {
-				t.Fatalf("Validate() unexpected error: %v", err)
+				t.Fatalf(msgValidateUnexpectedErr, err)
 			}
 
 			if stats != tt.wantStats {
@@ -392,9 +456,7 @@ func TestValidate_RecordErrorPosition(t *testing.T) {
 	broken := buildRecord(t, defaultSpec())
 	broken[digestOffset] ^= 0xff
 
-	payload := concat(good, good, broken)
-
-	_, err := Validate(payload)
+	_, err := Validate(buildSegment(t, good, good, broken))
 
 	var recErr *RecordError
 	if !errors.As(err, &recErr) {
@@ -405,12 +467,189 @@ func TestValidate_RecordErrorPosition(t *testing.T) {
 		t.Errorf("RecordError.Index = %d, want 2", recErr.Index)
 	}
 
-	if want := 2 * len(good); recErr.Offset != want {
+	// Offsets count from the start of the segment object, frame included.
+	if want := frameHeaderSize + 2*len(good); recErr.Offset != want {
 		t.Errorf("RecordError.Offset = %d, want %d", recErr.Offset, want)
 	}
 
-	if !errors.Is(recErr, ErrBadEndMark) {
-		t.Errorf("RecordError does not wrap ErrBadEndMark: %v", recErr.Err)
+	if !errors.Is(recErr, ErrFrameContentMismatch) {
+		t.Errorf("RecordError does not wrap ErrFrameContentMismatch: %v", recErr.Err)
+	}
+}
+
+func TestValidate_ExtendedHeader(t *testing.T) {
+	t.Parallel()
+
+	const extendedHeaderSize = frameHeaderSize + rblockSize
+
+	good := buildRecord(t, defaultSpec())
+
+	broken := buildRecord(t, defaultSpec())
+	broken[digestOffset] ^= 0xff
+
+	tests := []struct {
+		wantErr    error
+		name       string
+		give       [][]byte
+		wantStats  Stats
+		wantOffset int
+	}{
+		{
+			name:      "records start after the declared header",
+			give:      [][]byte{good, good},
+			wantStats: Stats{RecordCount: 2, ByteCount: 2 * len(good)},
+		},
+		{
+			name:       "broken record is located past the declared header",
+			give:       [][]byte{good, broken},
+			wantErr:    ErrFrameContentMismatch,
+			wantOffset: extendedHeaderSize + len(good),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			seg := buildFrame(t, frameSpec{
+				body:        concat(tt.give...),
+				recordCount: uint64(len(tt.give)),
+				headerLen:   extendedHeaderSize,
+				footerLen:   frameFooterSize,
+			})
+
+			stats, err := Validate(seg)
+			if tt.wantErr != nil {
+				var recErr *RecordError
+				require.ErrorAs(t, err, &recErr)
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.Equal(t, tt.wantOffset, recErr.Offset)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantStats, stats)
+		})
+	}
+}
+
+func TestValidate_Partition(t *testing.T) {
+	t.Parallel()
+
+	otherSpec := defaultSpec()
+	otherSpec.binValue = testOtherBinValue
+
+	foreignSpec := defaultSpec()
+	foreignSpec.digestSeed = 1
+
+	brokenForeignSpec := foreignSpec
+	brokenForeignSpec.corruptEndMark = true
+
+	seg := buildSegment(t, buildRecord(t, defaultSpec()), buildRecord(t, otherSpec))
+	mixed := buildSegment(t, buildRecord(t, defaultSpec()), buildRecord(t, foreignSpec))
+	brokenMixed := buildSegment(t, buildRecord(t, defaultSpec()), buildRecord(t, brokenForeignSpec))
+
+	tests := []struct {
+		wantErr   error
+		name      string
+		give      []byte
+		giveOpts  []Option
+		wantStats Stats
+	}{
+		{
+			name:      "every record in the expected partition",
+			give:      seg,
+			giveOpts:  []Option{WithPartition(testPartition)},
+			wantStats: Stats{RecordCount: 2, ByteCount: 128},
+		},
+		{
+			name:      "partition not checked without the option",
+			give:      mixed,
+			wantStats: Stats{RecordCount: 2, ByteCount: 128},
+		},
+		{
+			name:     "segment of another partition",
+			give:     seg,
+			giveOpts: []Option{WithPartition(testPartition + 1)},
+			wantErr:  ErrWrongPartition,
+		},
+		{
+			name:     "one record of another partition",
+			give:     mixed,
+			giveOpts: []Option{WithPartition(testPartition)},
+			wantErr:  ErrWrongPartition,
+		},
+		{
+			// The server tests the frame of a record before its partition.
+			name:     "broken frame reported before another partition",
+			give:     brokenMixed,
+			giveOpts: []Option{WithPartition(testPartition)},
+			wantErr:  ErrFrameContentMismatch,
+		},
+		{
+			name:     "negative partition",
+			give:     seg,
+			giveOpts: []Option{WithPartition(-1)},
+			wantErr:  ErrInvalidPartition,
+		},
+		{
+			name:     "partition past the last one",
+			give:     seg,
+			giveOpts: []Option{WithPartition(PartitionCount)},
+			wantErr:  ErrInvalidPartition,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			stats, err := Validate(tt.give, tt.giveOpts...)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantStats, stats)
+		})
+	}
+}
+
+func TestRecordPartition(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		digest []byte
+		want   int
+	}{
+		{name: "low 12 bits of the first word", digest: []byte{0x01, 0x02, 0x03, 0x04}, want: 0x201},
+		{name: "high bits are ignored", digest: []byte{0xff, 0xff, 0xff, 0xff}, want: 0xfff},
+		{name: "first partition", digest: []byte{0x00, 0xf0, 0xff, 0xff}, want: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			rec := make([]byte, flatRecordHdrSize)
+			copy(rec[digestOffset:], tt.digest)
+
+			assert.Equal(t, tt.want, recordPartition(rec))
+		})
+	}
+}
+
+func TestValidate_FrameErrorIsNotARecordError(t *testing.T) {
+	t.Parallel()
+
+	_, err := Validate(buildRecord(t, defaultSpec()))
+
+	var recErr *RecordError
+	if errors.As(err, &recErr) {
+		t.Fatalf("Validate() error = %v, want a frame error not tied to a record", err)
 	}
 }
 
@@ -424,46 +663,63 @@ func TestValidate_StatsAreCumulative(t *testing.T) {
 		parts = append(parts, buildRecord(t, defaultSpec()))
 	}
 
-	payload := concat(parts...)
+	body := concat(parts...)
 
-	stats, err := Validate(payload)
+	stats, err := Validate(buildSegment(t, parts...))
 	if err != nil {
-		t.Fatalf("Validate() unexpected error: %v", err)
+		t.Fatalf(msgValidateUnexpectedErr, err)
 	}
 
 	if stats.RecordCount != recordCount {
 		t.Errorf("RecordCount = %d, want %d", stats.RecordCount, recordCount)
 	}
 
-	if stats.ByteCount != len(payload) {
-		t.Errorf("ByteCount = %d, want %d", stats.ByteCount, len(payload))
+	if stats.ByteCount != len(body) {
+		t.Errorf("ByteCount = %d, want %d", stats.ByteCount, len(body))
 	}
 }
 
-func TestIsZero(t *testing.T) {
-	t.Parallel()
+// FuzzValidate feeds arbitrary objects to the validator. A segment comes from
+// storage nobody vouches for, so no input may panic, and whatever is accepted
+// must be consistent with the object it came from.
+func FuzzValidate(f *testing.F) {
+	record := buildRecord(f, defaultSpec())
+	partition := uint16(recordPartition(record))
 
-	tests := []struct {
-		name string
-		data []byte
-		want bool
-	}{
-		{name: "nil", data: nil, want: true},
-		{name: "empty", data: []byte{}, want: true},
-		{name: "all zero", data: make([]byte, 64), want: true},
-		{name: "leading non-zero", data: append([]byte{1}, make([]byte, 63)...), want: false},
-		{name: "trailing non-zero", data: append(make([]byte, 63), 1), want: false},
-	}
+	f.Add([]byte(nil), uint16(0), false)
+	f.Add(record, partition, true)
+	f.Add(buildSegment(f, record), partition, true)
+	f.Add(buildSegment(f, record), partition+1, true)
+	f.Add(buildSegment(f, record, record), partition, false)
+	f.Add(buildFrame(f, frameSpec{
+		body:        record,
+		recordCount: 1,
+		headerLen:   frameHeaderSize + rblockSize,
+		footerLen:   frameFooterSize * 2,
+	}), partition, true)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+	f.Fuzz(func(t *testing.T, data []byte, partition uint16, checkPartition bool) {
+		var opts []Option
+		if checkPartition {
+			opts = append(opts, WithPartition(int(partition&partitionMask)))
+		}
 
-			if got := isZero(tt.data); got != tt.want {
-				t.Fatalf("isZero() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+		stats, err := Validate(data, opts...)
+		require.NotErrorIs(t, err, ErrInvalidPartition)
+
+		var recErr *RecordError
+		if errors.As(err, &recErr) {
+			require.GreaterOrEqual(t, recErr.Offset, frameHeaderSize)
+			require.Less(t, recErr.Offset, len(data))
+		}
+
+		if err != nil {
+			return
+		}
+
+		require.LessOrEqual(t, stats.ByteCount+frameOverhead, len(data))
+		require.Positive(t, stats.RecordCount)
+	})
 }
 
 func TestReadUintvar(t *testing.T) {

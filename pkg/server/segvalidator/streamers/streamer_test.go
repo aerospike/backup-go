@@ -609,8 +609,8 @@ func TestStreaming_ManifestNamingASegmentOutsideTheStorage(t *testing.T) {
 	t.Parallel()
 
 	b := newTestBackupTree(t, 1, 2, 0, 0)
-	b.put(b.manifestPath(0), testManifest(testNS, 0, []manifestSegment{
-		{SegmentName: "../../elsewhere/evil.seg", Size: 64},
+	b.put(b.manifestPath(0), testManifest(testNS, 0, []testSegment{
+		{name: "../../elsewhere/evil.seg", size: 64},
 	}))
 
 	for _, name := range []string{"all", "sample"} {
@@ -733,10 +733,11 @@ func TestStreamAll_ManifestThatBreaksHalfway(t *testing.T) {
 	b := newTestBackup(testBackupID)
 	b.put(good, segmentBody(64))
 	b.put(path.Join(root, dataDir, "p0", "extra.seg"), segmentBody(32))
-	b.put(path.Join(root, manifestDir, "0-7-0000181197010.json"), testManifest(testNS, 0, []manifestSegment{
-		{SegmentName: good, Size: 64},
-		{SegmentName: "../../elsewhere/evil.seg", Size: 64},
-	}))
+	b.put(path.Join(root, manifestDir, fmt.Sprintf(testManifestName, 0, 0)),
+		testManifest(testNS, 0, []testSegment{
+			{name: good, size: 64},
+			{name: "../../elsewhere/evil.seg", size: 64},
+		}))
 
 	rootDir := t.TempDir()
 	writeBackup(t, rootDir, b)

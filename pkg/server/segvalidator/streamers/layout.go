@@ -19,9 +19,11 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/aerospike/backup-go/errclass"
+	"github.com/aerospike/backup-go/pkg/server/segvalidator/segment"
 )
 
 // A server side backup has a fixed layout, and everything in this package is
@@ -53,6 +55,8 @@ const (
 	segmentSuffix = ".seg"
 	// manifestSuffix ends the name of a manifest file.
 	manifestSuffix = ".json"
+	// partitionDirPrefix starts the name of a partition directory, p<id>.
+	partitionDirPrefix = "p"
 )
 
 // maxManifestSize caps a manifest read, so a bogus file cannot keep a validator
@@ -98,35 +102,63 @@ func isSegment(storagePath string) bool {
 	return strings.HasSuffix(storagePath, segmentSuffix)
 }
 
+// partitionOfDir returns the partition whose directory, p<id>, holds a
+// segment. The server prints the id in canonical decimal, so "p01" or "p+1" is
+// not a partition directory it wrote.
+func partitionOfDir(segmentPath string) (id int, ok bool) {
+	digits, found := strings.CutPrefix(path.Base(path.Dir(segmentPath)), partitionDirPrefix)
+	if !found {
+		return 0, false
+	}
+
+	id, ok = parsePartitionID(digits)
+	if !ok || strconv.Itoa(id) != digits {
+		return 0, false
+	}
+
+	return id, true
+}
+
+// parsePartitionID parses a decimal partition id and range checks it.
+func parsePartitionID(digits string) (id int, ok bool) {
+	n, err := strconv.ParseUint(digits, decimalBase, 32)
+	if err != nil || n >= segment.PartitionCount {
+		return 0, false
+	}
+
+	return int(n), true
+}
+
 // isManifest reports whether a listed file is a manifest.
 func isManifest(storagePath string) bool {
 	return strings.HasSuffix(storagePath, manifestSuffix)
 }
 
-// crc32Algorithm is the checksum a manifest records for its segments, and the
-// only one this package knows how to check. A manifest recording another one
-// has its checksums ignored rather than misread.
-const crc32Algorithm = "crc32"
-
 // manifestHeader is what a manifest says about itself. Every field is optional:
-// the namespace of a manifest is also the directory it was found in, the
+// the namespace of a manifest is also the directory it was found in, and the
 // partition only matters for a manifest that names its segments by their bare
-// file name, and a manifest that does not say how it checksummed its segments
-// is taken not to have.
+// file name.
+//
+// The checksum_algorithm a manifest declares is not read: the server checks
+// every segment against CRC-32C whatever the manifest declares, and only
+// quotes the declaration when the check fails.
 type manifestHeader struct {
 	Namespace string
 	Partition string
-	Algorithm string
 }
 
 // manifestSegment is one segment a manifest records: where it is, how big it
-// was written and what it checksummed to. A manifest says more about a segment
-// than this, but the rest describes its contents, which a validator learns by
-// reading the segment itself.
+// was written, what it checksummed to and how many records it holds. A
+// manifest says more about a segment than this, but the rest describes its
+// contents, which a validator learns by reading the segment itself.
+//
+// Checksum and Size are nil when the manifest leaves them out or writes them
+// as null, which the server refuses: see check.
 type manifestSegment struct {
-	SegmentName string `json:"segment_name"`
-	Checksum    string `json:"checksum"`
-	Size        int64  `json:"size"`
+	SegmentName string  `json:"segment_name"`
+	Checksum    *string `json:"checksum"`
+	Size        *int64  `json:"size"`
+	RecordCount int64   `json:"record_count"`
 }
 
 // decodeManifest walks a manifest, filling header in as it goes and handing
@@ -156,8 +188,6 @@ func decodeManifest(r io.Reader, header *manifestHeader, fn func(manifestSegment
 			err = decodeValue(dec, &header.Namespace)
 		case "partition_id":
 			err = decodePartition(dec, &header.Partition)
-		case "checksum_algorithm":
-			err = decodeValue(dec, &header.Algorithm)
 		case "segments":
 			err = decodeSegments(dec, fn)
 		default:
@@ -228,7 +258,7 @@ func decodePartition(dec *json.Decoder, out *string) error {
 
 	var number json.Number
 	if err := json.Unmarshal(raw, &number); err == nil {
-		*out = "p" + number.String()
+		*out = partitionDirPrefix + number.String()
 
 		return nil
 	}
@@ -269,6 +299,21 @@ func expectDelim(dec *json.Decoder, want json.Delim) error {
 	}
 
 	return nil
+}
+
+// check refuses a segment recorded without a size or a checksum. The server
+// takes such a manifest entry for a malformed one and aborts the restore on it.
+func (m manifestSegment) check() error {
+	switch {
+	case m.Size == nil:
+		return fmt.Errorf("%w: segment %q is recorded without a size",
+			ErrManifestUnusable, m.SegmentName)
+	case m.Checksum == nil:
+		return fmt.Errorf("%w: segment %q is recorded without a checksum",
+			ErrManifestUnusable, m.SegmentName)
+	default:
+		return nil
+	}
 }
 
 // resolve turns the name a manifest records into the path of the segment in the

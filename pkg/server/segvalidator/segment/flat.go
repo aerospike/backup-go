@@ -15,7 +15,6 @@
 package segment
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 )
@@ -38,6 +37,8 @@ const (
 
 	// digestOffset is where the 20 byte digest starts inside the header.
 	digestOffset = 8
+	// partitionMask selects the partition id from the first digest word.
+	partitionMask = PartitionCount - 1
 	// endMarkHashSize is the number of header bytes covered by the end marker.
 	endMarkHashSize = 25
 	// endMarkMask clears the top bit the server never sets.
@@ -203,6 +204,12 @@ func parseFlatHeader(data []byte) (flatHeader, error) {
 	}, nil
 }
 
+// recordPartition returns the partition the digest of the record at the start
+// of data places it in.
+func recordPartition(data []byte) int {
+	return int(binary.LittleEndian.Uint32(data[digestOffset:]) & partitionMask)
+}
+
 // readLutGen decodes the 7 byte last_update_time/generation field.
 func readLutGen(data []byte) uint64 {
 	const lutGenSize = flatRecordHdrSize - lutGenOffset
@@ -223,6 +230,25 @@ func writeLutGen(record []byte, generation uint16, lastUpdateTime uint64) {
 	for i := range flatRecordHdrSize - lutGenOffset {
 		record[lutGenOffset+i] = byte(lutGen >> (8 * i))
 	}
+}
+
+// endMarkInFrame reports whether record, cut to the size its header declares,
+// holds its end marker where an honest writer can put one: within the last
+// rblock, as far back as the marker width allows. It is the frame test the
+// server runs before it trusts the declared size as the stride of its walk; the
+// marker at the exact end of the content is checked once the record is decoded.
+func endMarkInFrame(record []byte) bool {
+	want := makeEndMark(record)
+	last := len(record) - endMarkSize
+	first := len(record) - rblockSize - (endMarkSize - 1)
+
+	for pos := last; pos >= first; pos-- {
+		if binary.LittleEndian.Uint32(record[pos:]) == want {
+			return true
+		}
+	}
+
+	return false
 }
 
 // validateRecord walks one whole record: metadata, bins and end marker. hdr
@@ -633,13 +659,3 @@ func skipBlob(data []byte, off, end int) (int, error) {
 
 	return next, nil
 }
-
-// isZero reports whether p contains only zero bytes. bytes.Count is assembly
-// optimized, which matters because this runs over the padding of every record.
-func isZero(p []byte) bool {
-	return bytes.Count(p, zeroByte) == len(p)
-}
-
-// zeroByte is the needle for isZero. It is a package level variable so the
-// slice is not rebuilt on every call.
-var zeroByte = []byte{0}

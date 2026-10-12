@@ -20,12 +20,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"hash/crc32"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -34,33 +34,85 @@ import (
 	"github.com/aerospike/backup-go/pkg/server/segvalidator/streamers"
 )
 
-// fixtureSegmentHex is a one record segment: a 64 byte flat record holding set
-// "demo" and a single string bin.
-const fixtureSegmentHex = "01f27a03030050000102030405060708090a0b0c0d0e0f10111213140000" +
-	"00000001000464656d6f010161030500000068656c6c6fe127ea0700000000000000"
+// The ASBK v1 frame around a 64 byte body holding one record.
+const (
+	fixtureFrameHeaderHex = "4153424b01000000010000002000000040000000000000001000000000000000"
+	fixtureFrameFooterHex = "01000000000000000000000000000000"
+)
 
-// fixtureCompressedHex is the same record with the is_compressed flag set.
-const fixtureCompressedHex = "01f27a030300d0000102030405060708090a0b0c0d0e0f10111213140000" +
-	"00000001000464656d6f010161030500000068656c6c6fe127ea0700000000000000"
+// The 64 byte flat record of the segment fixtures, holding set "demo" and a
+// single string bin. Its digest starts 01 02 03 04, which places it in
+// partition fixturePartition. The two variants differ in the flags word only.
+const (
+	fixtureRecordMagicHex      = "01f27a03"
+	fixtureRecordFlagsHex      = "03005000"
+	fixtureCompressedFlagsHex  = "0300d000"
+	fixtureRecordDigestTailHex = "0102030405060708090a0b0c0d0e0f10111213140000" +
+		"00000001000464656d6f010161030500000068656c6c6fe127ea0700000000000000"
+)
+
+// fixtureSegmentHex is a one record segment.
+const fixtureSegmentHex = fixtureFrameHeaderHex +
+	fixtureRecordMagicHex + fixtureRecordFlagsHex + fixtureRecordDigestTailHex +
+	fixtureFrameFooterHex
+
+// fixtureCompressedHex is the same segment with the is_compressed flag set.
+const fixtureCompressedHex = fixtureFrameHeaderHex +
+	fixtureRecordMagicHex + fixtureCompressedFlagsHex + fixtureRecordDigestTailHex +
+	fixtureFrameFooterHex
 
 const (
 	stubBackupID = "519118324"
 	stubNS       = "source-ns1"
 
-	// fixtureSegmentBytes is the size of the segment fixtures.
-	fixtureSegmentBytes = 64
+	// fixtureSegmentBytes is the size of the segment fixtures, frame included.
+	fixtureSegmentBytes = 112
+	// fixtureRecordBytes is the size of the record a segment fixture holds.
+	fixtureRecordBytes = 64
+	// fixtureFrameHeaderBytes is where the record of a segment fixture starts.
+	fixtureFrameHeaderBytes = 32
+	// fixturePartition is the partition the record of the fixtures belongs to.
+	fixturePartition = 0x201
+	// fixtureSegmentCRC32C is the CRC-32C of fixtureSegmentHex, the checksum
+	// the server records for it.
+	fixtureSegmentCRC32C = "33d1f0a2"
+	// fixtureSegmentCRC32 is the IEEE CRC-32 of fixtureSegmentHex.
+	fixtureSegmentCRC32 = "68139db6"
+)
+
+// Messages repeated across the tests.
+const (
+	msgValidateErr           = "Validate() error = %v"
+	msgValidateIssues        = "Validate() reported issues: %+v"
+	msgNewSegValidatorErr    = "NewSegValidator() error = %v"
+	msgWantErrNoSegments     = "Validate() error = %v, want ErrNoSegments"
+	msgWantContextCanceled   = "Validate() error = %v, want context.Canceled"
+	msgWantOneInvalidSegment = "valid = %d, invalid = %d, want 0 and 1"
 )
 
 var errOpenSegment = errors.New("open failed")
 
-// stubSegmentPath names the nth segment a stubStreamer streams.
+// stubSegmentPath names the nth segment a stubStreamer streams. Every one of
+// them sits in the partition the fixture record belongs to.
 func stubSegmentPath(n int) string {
-	return fmt.Sprintf("%s/ns/%s/query-stream/data/p%d/s0.seg", stubBackupID, stubNS, n)
+	return stubQuerySegmentPath(fixturePartition, n)
 }
 
-// stubManifestPath names the manifest a stubStreamer says a segment came from.
+// stubQuerySegmentPath names the nth query stream segment of a partition.
+func stubQuerySegmentPath(partition, n int) string {
+	return fmt.Sprintf("%s/ns/%s/query-stream/data/p%d/s%d.seg", stubBackupID, stubNS, partition, n)
+}
+
+// stubManifestPath names the manifest a stubStreamer says segment n came from.
 func stubManifestPath(n int) string {
-	return fmt.Sprintf("%s/ns/%s/query-stream/manifest/%d-0.json", stubBackupID, stubNS, n)
+	return stubQueryManifestPath(fixturePartition, n)
+}
+
+// stubQueryManifestPath names manifest n of a partition, n standing in for the
+// regime to keep the names apart.
+func stubQueryManifestPath(partition, n int) string {
+	return fmt.Sprintf("%s/ns/%s/query-stream/manifest/%d-%d-0000000000000-0.json",
+		stubBackupID, stubNS, partition, n)
 }
 
 // stubStreamer streams segments without holding them: they are generated as
@@ -76,8 +128,10 @@ type stubStreamer struct {
 	// recordedSize is the size the manifests claim, when it differs from the
 	// size of the payload.
 	recordedSize int64
-	// recordedChecksum is the CRC-32 the manifests claim.
+	// recordedChecksum is the CRC-32C the manifests claim.
 	recordedChecksum string
+	// recordedCount is the number of records the manifests claim.
+	recordedCount int64
 	// stats is what the streamer reports having seen.
 	stats streamers.Stats
 	// segments is the number of segments the backup holds.
@@ -86,12 +140,25 @@ type stubStreamer struct {
 	fromManifest bool
 	// unrecorded makes every segment one no manifest names.
 	unrecorded bool
+	// streamKind is the stream every segment belongs to.
+	streamKind streamers.Stream
+	// pathOf names the nth segment.
+	pathOf func(n int) string
+	// manifestOf names the manifest the nth segment came from, when
+	// fromManifest is set.
+	manifestOf func(n int) string
 
 	opened atomic.Int64
 }
 
 func newStubStreamer(payload []byte, segments int) *stubStreamer {
-	return &stubStreamer{payload: payload, segments: segments}
+	return &stubStreamer{
+		payload:    payload,
+		segments:   segments,
+		streamKind: streamers.QueryStream,
+		pathOf:     stubSegmentPath,
+		manifestOf: stubManifestPath,
+	}
 }
 
 func (s *stubStreamer) BackupID() string {
@@ -102,7 +169,9 @@ func (s *stubStreamer) StreamAll(ctx context.Context, out chan<- streamers.Segme
 	return s.stream(ctx, s.segments, out)
 }
 
-func (s *stubStreamer) StreamSample(ctx context.Context, n int, out chan<- streamers.Segment) error {
+func (s *stubStreamer) StreamSample(
+	ctx context.Context, n int, out chan<- streamers.Segment,
+) error {
 	return s.stream(ctx, min(n, s.segments), out)
 }
 
@@ -116,16 +185,17 @@ func (s *stubStreamer) stream(ctx context.Context, count int, out chan<- streame
 	for i := range count {
 		seg := streamers.Segment{
 			Namespace: stubNS,
-			Stream:    streamers.QueryStream,
-			Path:      stubSegmentPath(i),
+			Stream:    s.streamKind,
+			Path:      s.pathOf(i),
 			Size:      int64(len(s.payload)),
 		}
 
 		seg.Unrecorded = s.unrecorded
 
 		if s.fromManifest {
-			seg.Manifest = stubManifestPath(i)
+			seg.Manifest = s.manifestOf(i)
 			seg.Checksum = s.recordedChecksum
+			seg.RecordCount = s.recordedCount
 
 			if s.recordedSize != 0 {
 				seg.Size = s.recordedSize
@@ -142,7 +212,9 @@ func (s *stubStreamer) stream(ctx context.Context, count int, out chan<- streame
 	return nil
 }
 
-func (s *stubStreamer) OpenSegment(_ context.Context, seg *streamers.Segment) (io.ReadCloser, error) {
+func (s *stubStreamer) OpenSegment(
+	_ context.Context, seg *streamers.Segment,
+) (io.ReadCloser, error) {
 	s.opened.Add(1)
 
 	if s.missing[seg.Path] {
@@ -188,7 +260,7 @@ func decodeSegmentHex(t *testing.T, s string) []byte {
 // breaks the end marker of its first record.
 func breakSegment(payload []byte) []byte {
 	broken := bytes.Clone(payload)
-	broken[8] ^= 0xff
+	broken[fixtureFrameHeaderBytes+8] ^= 0xff
 
 	return broken
 }
@@ -198,7 +270,7 @@ func newTestSegValidator(t *testing.T, streamer Streamer, opts ...Option) *SegVa
 
 	v, err := NewSegValidator(streamer, opts...)
 	if err != nil {
-		t.Fatalf("NewSegValidator() error = %v", err)
+		t.Fatalf(msgNewSegValidatorErr, err)
 	}
 
 	return v
@@ -213,11 +285,11 @@ func TestSegValidator_ValidateReadableBackup(t *testing.T) {
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
 	if err != nil {
-		t.Fatalf("Validate() error = %v", err)
+		t.Fatalf(msgValidateErr, err)
 	}
 
 	if report.Failed() {
-		t.Fatalf("Validate() reported issues: %+v", report.Issues)
+		t.Fatalf(msgValidateIssues, report.Issues)
 	}
 
 	if report.BackupID != stubBackupID {
@@ -233,32 +305,120 @@ func TestSegValidator_ValidateReadableBackup(t *testing.T) {
 		t.Errorf("TotalRecords = %d, want %d", report.TotalRecords, segments)
 	}
 
-	if report.TotalBytes != segments*fixtureSegmentBytes {
-		t.Errorf("TotalBytes = %d, want %d", report.TotalBytes, segments*fixtureSegmentBytes)
-	}
-
-	if report.SkippedCompressed != 0 {
-		t.Errorf("SkippedCompressed = %d, want 0", report.SkippedCompressed)
+	if report.TotalBytes != segments*fixtureRecordBytes {
+		t.Errorf("TotalBytes = %d, want %d", report.TotalBytes, segments*fixtureRecordBytes)
 	}
 }
 
-func TestSegValidator_CompressedRecordsAreCounted(t *testing.T) {
+func TestSegValidator_UnrestorableSegmentIsRefused(t *testing.T) {
 	t.Parallel()
 
-	streamer := newStubStreamer(decodeSegmentHex(t, fixtureCompressedHex), 1)
+	otherPartitionSegment := func(n int) string {
+		return stubQuerySegmentPath(fixturePartition+1, n)
+	}
+
+	tests := []struct {
+		wantErr      error
+		pathOf       func(n int) string
+		manifestOf   func(n int) string
+		name         string
+		give         string
+		fromManifest bool
+	}{
+		{
+			name:       "compressed record",
+			give:       fixtureCompressedHex,
+			pathOf:     stubSegmentPath,
+			manifestOf: stubManifestPath,
+			wantErr:    segment.ErrCompressedRecord,
+		},
+		{
+			name:       "listed record outside the partition of its directory",
+			give:       fixtureSegmentHex,
+			pathOf:     otherPartitionSegment,
+			manifestOf: stubManifestPath,
+			wantErr:    segment.ErrWrongPartition,
+		},
+		{
+			name:         "record outside the partition of its manifest",
+			give:         fixtureSegmentHex,
+			fromManifest: true,
+			pathOf:       stubSegmentPath,
+			manifestOf: func(n int) string {
+				return stubQueryManifestPath(fixturePartition+1, n)
+			},
+			wantErr: segment.ErrWrongPartition,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			streamer := newStubStreamer(decodeSegmentHex(t, tt.give), 1)
+			streamer.fromManifest = tt.fromManifest
+			// Only fixtureSegmentHex is streamed from a manifest.
+			streamer.recordedChecksum = fixtureSegmentCRC32C
+			streamer.pathOf = tt.pathOf
+			streamer.manifestOf = tt.manifestOf
+
+			report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
+			if err != nil {
+				t.Fatalf(msgValidateErr, err)
+			}
+
+			if len(report.Issues) != 1 || !errors.Is(report.Issues[0].Err, tt.wantErr) {
+				t.Fatalf("issues = %+v, want %v", report.Issues, tt.wantErr)
+			}
+
+			if report.ValidSegments != 0 || report.InvalidSegments != 1 {
+				t.Errorf(msgWantOneInvalidSegment, report.ValidSegments, report.InvalidSegments)
+			}
+		})
+	}
+}
+
+func TestSegValidator_ChangeStreamIsNotPartitionChecked(t *testing.T) {
+	t.Parallel()
+
+	// A change stream segment mixes partitions, so the directory it sits in
+	// says nothing about its records.
+	streamer := newStubStreamer(decodeSegmentHex(t, fixtureSegmentHex), 1)
+	streamer.streamKind = streamers.ChangeStream
+	streamer.pathOf = func(n int) string {
+		return fmt.Sprintf("%s/ns/%s/change-stream/BB951D8A16DC7A2/data/p0/s%d.seg",
+			stubBackupID, stubNS, n)
+	}
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
 	if err != nil {
-		t.Fatalf("Validate() error = %v", err)
+		t.Fatalf(msgValidateErr, err)
 	}
 
 	if report.Failed() {
-		t.Fatalf("Validate() reported issues: %+v", report.Issues)
+		t.Fatalf(msgValidateIssues, report.Issues)
+	}
+}
+
+func TestSegValidator_ManifestPartitionOutranksDirectory(t *testing.T) {
+	t.Parallel()
+
+	// The server restores a segment into the partition of the manifest naming
+	// it, wherever the segment sits.
+	streamer := newStubStreamer(decodeSegmentHex(t, fixtureSegmentHex), 1)
+	streamer.fromManifest = true
+	streamer.recordedChecksum = fixtureSegmentCRC32C
+	streamer.pathOf = func(n int) string {
+		return stubQuerySegmentPath(fixturePartition+1, n)
 	}
 
-	if report.SkippedCompressed != 1 || report.TotalRecords != 0 {
-		t.Fatalf("compressed = %d, records = %d, want 1 and 0",
-			report.SkippedCompressed, report.TotalRecords)
+	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
+	if err != nil {
+		t.Fatalf(msgValidateErr, err)
+	}
+
+	if report.Failed() {
+		t.Fatalf(msgValidateIssues, report.Issues)
 	}
 }
 
@@ -273,7 +433,7 @@ func TestSegValidator_BrokenRecordIsLocated(t *testing.T) {
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
 	if err != nil {
-		t.Fatalf("Validate() error = %v", err)
+		t.Fatalf(msgValidateErr, err)
 	}
 
 	if len(report.Issues) != 1 {
@@ -287,7 +447,7 @@ func TestSegValidator_BrokenRecordIsLocated(t *testing.T) {
 			issue.Namespace, issue.SegmentPath, stubNS, stubSegmentPath(0))
 	}
 
-	if issue.RecordIndex != 0 || issue.Offset != 0 {
+	if issue.RecordIndex != 0 || issue.Offset != fixtureFrameHeaderBytes {
 		t.Errorf("issue at record %d offset %d, want the first record",
 			issue.RecordIndex, issue.Offset)
 	}
@@ -298,7 +458,7 @@ func TestSegValidator_BrokenRecordIsLocated(t *testing.T) {
 	}
 
 	if report.ValidSegments != 0 || report.InvalidSegments != 1 {
-		t.Errorf("valid = %d, invalid = %d, want 0 and 1", report.ValidSegments, report.InvalidSegments)
+		t.Errorf(msgWantOneInvalidSegment, report.ValidSegments, report.InvalidSegments)
 	}
 }
 
@@ -312,7 +472,7 @@ func TestSegValidator_UnreadableSegmentIsReported(t *testing.T) {
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
 	if err != nil {
-		t.Fatalf("Validate() error = %v", err)
+		t.Fatalf(msgValidateErr, err)
 	}
 
 	if len(report.Issues) != 1 || !errors.Is(report.Issues[0].Err, errOpenSegment) {
@@ -339,9 +499,10 @@ func TestSegValidator_IssuesAreCapped(t *testing.T) {
 		return io.NopCloser(bytes.NewReader(breakSegment(payload))), nil
 	}
 
-	report, err := newTestSegValidator(t, streamer, WithMaxIssues(maxIssues)).Validate(t.Context(), CheckAll)
+	report, err := newTestSegValidator(t, streamer, WithMaxIssues(maxIssues)).
+		Validate(t.Context(), CheckAll)
 	if err != nil {
-		t.Fatalf("Validate() error = %v", err)
+		t.Fatalf(msgValidateErr, err)
 	}
 
 	if len(report.Issues) != maxIssues {
@@ -364,11 +525,28 @@ func TestSegValidator_OversizedSegment(t *testing.T) {
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
 	if err != nil {
-		t.Fatalf("Validate() error = %v", err)
+		t.Fatalf(msgValidateErr, err)
 	}
 
 	if len(report.Issues) != 1 || !errors.Is(report.Issues[0].Err, ErrSegmentTooLarge) {
 		t.Fatalf("issues = %+v, want the segment to be refused as too large", report.Issues)
+	}
+}
+
+func TestSegValidator_FullSegmentIsNotTooLarge(t *testing.T) {
+	t.Parallel()
+
+	// A full body plus its frame is the largest segment the server writes, so
+	// it reaches the parser instead of being refused by its size.
+	streamer := newStubStreamer(make([]byte, segment.MaxSegmentSize), 1)
+
+	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
+	if err != nil {
+		t.Fatalf(msgValidateErr, err)
+	}
+
+	if len(report.Issues) != 1 || !errors.Is(report.Issues[0].Err, segment.ErrBadFrameMagic) {
+		t.Fatalf("issues = %+v, want the segment to be parsed and its frame refused", report.Issues)
 	}
 }
 
@@ -384,7 +562,7 @@ func TestSegValidator_SamplingDownloadsOnlyTheSample(t *testing.T) {
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), sampleSize)
 	if err != nil {
-		t.Fatalf("Validate() error = %v", err)
+		t.Fatalf(msgValidateErr, err)
 	}
 
 	if report.CheckedSegments != sampleSize || streamer.opened.Load() != sampleSize {
@@ -398,11 +576,12 @@ func TestSegValidator_MissingSegmentOfAManifest(t *testing.T) {
 
 	streamer := newStubStreamer(decodeSegmentHex(t, fixtureSegmentHex), 2)
 	streamer.fromManifest = true
+	streamer.recordedChecksum = fixtureSegmentCRC32C
 	streamer.missing = map[string]bool{stubSegmentPath(1): true}
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
 	if err != nil {
-		t.Fatalf("Validate() error = %v", err)
+		t.Fatalf(msgValidateErr, err)
 	}
 
 	m := report.Manifests
@@ -430,7 +609,7 @@ func TestSegValidator_SizeMismatchAgainstAManifest(t *testing.T) {
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
 	if err != nil {
-		t.Fatalf("Validate() error = %v", err)
+		t.Fatalf(msgValidateErr, err)
 	}
 
 	if report.Manifests.Problems != 1 || report.Manifests.MissingSegments != 0 {
@@ -452,70 +631,102 @@ func TestSegValidator_SizeIsOnlyCheckedAgainstAManifest(t *testing.T) {
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
 	if err != nil {
-		t.Fatalf("Validate() error = %v", err)
+		t.Fatalf(msgValidateErr, err)
 	}
 
 	if report.Failed() {
-		t.Fatalf("Validate() reported issues: %+v", report.Issues)
+		t.Fatalf(msgValidateIssues, report.Issues)
 	}
 }
 
-func TestSegValidator_ChecksumMismatchAgainstAManifest(t *testing.T) {
+func TestSegValidator_SegmentAgainstItsManifest(t *testing.T) {
 	t.Parallel()
 
-	streamer := newStubStreamer(decodeSegmentHex(t, fixtureSegmentHex), 1)
-	streamer.fromManifest = true
-	streamer.recordedChecksum = "deadbeef"
-
-	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
-	if err != nil {
-		t.Fatalf("Validate() error = %v", err)
+	tests := []struct {
+		name         string
+		giveChecksum string
+		giveCount    int64
+		// wantErr is nil for a segment matching its manifest.
+		wantErr error
+	}{
+		{
+			name:         "matching checksum and record count",
+			giveChecksum: fixtureSegmentCRC32C,
+			giveCount:    1,
+		},
+		{
+			// The checksum is hexadecimal, and its case does not matter.
+			name:         "checksum in upper case",
+			giveChecksum: strings.ToUpper(fixtureSegmentCRC32C),
+		},
+		{
+			// A record count is not recorded by every manifest.
+			name:         "checksum without record count",
+			giveChecksum: fixtureSegmentCRC32C,
+		},
+		{
+			// The server takes an empty checksum for a zero.
+			name:    "empty checksum",
+			wantErr: ErrChecksumMismatch,
+		},
+		{
+			name:         "checksum of another segment",
+			giveChecksum: "deadbeef",
+			wantErr:      ErrChecksumMismatch,
+		},
+		{
+			// The server checks CRC-32C whatever algorithm the manifest
+			// declares, so a CRC-32 of the right bytes is still a mismatch.
+			name:         "IEEE CRC-32 of the segment",
+			giveChecksum: fixtureSegmentCRC32,
+			wantErr:      ErrChecksumMismatch,
+		},
+		{
+			name:         "more records recorded than the segment holds",
+			giveChecksum: fixtureSegmentCRC32C,
+			giveCount:    2,
+			wantErr:      ErrRecordCountMismatch,
+		},
+		{
+			name:         "negative record count",
+			giveChecksum: fixtureSegmentCRC32C,
+			giveCount:    -1,
+			wantErr:      ErrRecordCountMismatch,
+		},
 	}
 
-	if len(report.Issues) != 1 || !errors.Is(report.Issues[0].Err, ErrChecksumMismatch) {
-		t.Fatalf("issues = %+v, want the checksum mismatch", report.Issues)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	if report.Manifests.Problems != 1 || len(report.Manifests.Issues) != 1 {
-		t.Errorf("manifest report = %+v, want the mismatch reported against the manifest", report.Manifests)
-	}
-}
+			streamer := newStubStreamer(decodeSegmentHex(t, fixtureSegmentHex), 1)
+			streamer.fromManifest = true
+			streamer.recordedChecksum = tt.giveChecksum
+			streamer.recordedCount = tt.giveCount
 
-func TestSegValidator_ChecksumOfAReadableSegment(t *testing.T) {
-	t.Parallel()
+			report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
+			if err != nil {
+				t.Fatalf(msgValidateErr, err)
+			}
 
-	payload := decodeSegmentHex(t, fixtureSegmentHex)
-	streamer := newStubStreamer(payload, 1)
-	streamer.fromManifest = true
-	streamer.recordedChecksum = fmt.Sprintf("%08X", crc32.ChecksumIEEE(payload))
+			if tt.wantErr == nil {
+				if report.Failed() {
+					t.Fatalf("Validate() reported issues: %+v, %+v",
+						report.Issues, report.Manifests.Issues)
+				}
 
-	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
-	if err != nil {
-		t.Fatalf("Validate() error = %v", err)
-	}
+				return
+			}
 
-	// The checksum a manifest records is hexadecimal, and a validator does not
-	// care which case it was written in.
-	if report.Failed() {
-		t.Fatalf("Validate() reported issues: %+v, %+v", report.Issues, report.Manifests.Issues)
-	}
-}
+			if len(report.Issues) != 1 || !errors.Is(report.Issues[0].Err, tt.wantErr) {
+				t.Fatalf("issues = %+v, want %v", report.Issues, tt.wantErr)
+			}
 
-func TestSegValidator_ChecksumIsOnlyCheckedWhenRecorded(t *testing.T) {
-	t.Parallel()
-
-	// A manifest that checksummed its segments some other way records nothing
-	// this validator can check, and a segment that still parses is still good.
-	streamer := newStubStreamer(decodeSegmentHex(t, fixtureSegmentHex), 1)
-	streamer.fromManifest = true
-
-	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
-	if err != nil {
-		t.Fatalf("Validate() error = %v", err)
-	}
-
-	if report.Failed() {
-		t.Fatalf("Validate() reported issues: %+v", report.Issues)
+			if report.Manifests.Problems != 1 || len(report.Manifests.Issues) != 1 {
+				t.Errorf("manifest report = %+v, want the mismatch reported against the manifest",
+					report.Manifests)
+			}
+		})
 	}
 }
 
@@ -536,7 +747,7 @@ func TestSegValidator_ManifestIssuesOfTheStreamerAreReported(t *testing.T) {
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
 	if err != nil {
-		t.Fatalf("Validate() error = %v", err)
+		t.Fatalf(msgValidateErr, err)
 	}
 
 	m := report.Manifests
@@ -564,7 +775,7 @@ func TestSegValidator_UnrecordedSegmentsAreReported(t *testing.T) {
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
 	if err != nil {
-		t.Fatalf("Validate() error = %v", err)
+		t.Fatalf(msgValidateErr, err)
 	}
 
 	m := report.Manifests
@@ -573,7 +784,8 @@ func TestSegValidator_UnrecordedSegmentsAreReported(t *testing.T) {
 		t.Fatalf("manifest report = %+v, want the %d segments no manifest names", m, segments)
 	}
 
-	if m.UnrecordedExamples[0] != stubSegmentPath(0) && !slices.Contains(m.UnrecordedExamples, stubSegmentPath(0)) {
+	if m.UnrecordedExamples[0] != stubSegmentPath(0) &&
+		!slices.Contains(m.UnrecordedExamples, stubSegmentPath(0)) {
 		t.Errorf("unrecorded = %v, want the streamed segments", m.UnrecordedExamples)
 	}
 
@@ -597,9 +809,10 @@ func TestSegValidator_UnrecordedExamplesAreCapped(t *testing.T) {
 	streamer := newStubStreamer(decodeSegmentHex(t, fixtureSegmentHex), 20)
 	streamer.unrecorded = true
 
-	report, err := newTestSegValidator(t, streamer, WithMaxIssues(maxIssues)).Validate(t.Context(), CheckAll)
+	report, err := newTestSegValidator(t, streamer, WithMaxIssues(maxIssues)).
+		Validate(t.Context(), CheckAll)
 	if err != nil {
-		t.Fatalf("Validate() error = %v", err)
+		t.Fatalf(msgValidateErr, err)
 	}
 
 	if report.Manifests.Unrecorded != 20 || len(report.Manifests.UnrecordedExamples) != maxIssues {
@@ -614,7 +827,7 @@ func TestSegValidator_NoSegments(t *testing.T) {
 
 	_, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
 	if !errors.Is(err, ErrNoSegments) {
-		t.Fatalf("Validate() error = %v, want ErrNoSegments", err)
+		t.Fatalf(msgWantErrNoSegments, err)
 	}
 }
 
@@ -629,7 +842,7 @@ func TestSegValidator_BackupOfANamespaceThatHeldNoRecords(t *testing.T) {
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), 10_000)
 	if err != nil {
-		t.Fatalf("Validate() error = %v", err)
+		t.Fatalf(msgValidateErr, err)
 	}
 
 	if report.Failed() {
@@ -648,23 +861,25 @@ func TestSegValidator_EmptyNamespaceOnDisk(t *testing.T) {
 	t.Parallel()
 
 	const (
-		backupID   = "527139336"
-		partitions = 8
+		backupID       = "527139336"
+		namespace      = "test"
+		partitions     = 8
+		msgNewLocalErr = "NewLocal() error = %v"
 	)
 
 	root := t.TempDir()
-	manifests := filepath.Join(root, backupID, "ns", "test", "query-stream", "manifest")
+	manifests := filepath.Join(root, backupID, "ns", namespace, "query-stream", "manifest")
 
 	if err := os.MkdirAll(manifests, 0o750); err != nil {
 		t.Fatalf("create manifest directory: %v", err)
 	}
 
 	for p := range partitions {
-		body := fmt.Sprintf(`{"backup_id":%q,"namespace":"test","partition_id":%d,"format_version":1,`+
-			`"checksum_algorithm":"crc32","entry_count":0,"segments":[],"partition_complete":true}`,
-			backupID, p)
+		body := fmt.Sprintf(`{"backup_id":%q,"namespace":%q,"partition_id":%d,"format_version":1,`+
+			`"checksum_algorithm":"crc32c","entry_count":0,"segments":[],"partition_complete":true}`,
+			backupID, namespace, p)
 
-		name := filepath.Join(manifests, fmt.Sprintf("%d-7-0000181197010.json", p))
+		name := filepath.Join(manifests, fmt.Sprintf("%d-7-0000181197010-%06x.json", p, p))
 		if err := os.WriteFile(name, []byte(body), 0o600); err != nil {
 			t.Fatalf("write manifest: %v", err)
 		}
@@ -672,12 +887,12 @@ func TestSegValidator_EmptyNamespaceOnDisk(t *testing.T) {
 
 	streamer, err := streamers.NewLocal(root, backupID)
 	if err != nil {
-		t.Fatalf("NewLocal() error = %v", err)
+		t.Fatalf(msgNewLocalErr, err)
 	}
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), 10_000)
 	if err != nil {
-		t.Fatalf("Validate() error = %v", err)
+		t.Fatalf(msgValidateErr, err)
 	}
 
 	if report.Failed() || report.CheckedSegments != 0 {
@@ -692,11 +907,12 @@ func TestSegValidator_EmptyNamespaceOnDisk(t *testing.T) {
 	// nothing to report about.
 	missing, err := streamers.NewLocal(root, "nosuchbackup")
 	if err != nil {
-		t.Fatalf("NewLocal() error = %v", err)
+		t.Fatalf(msgNewLocalErr, err)
 	}
 
-	if _, err := newTestSegValidator(t, missing).Validate(t.Context(), 10_000); !errors.Is(err, ErrNoSegments) {
-		t.Errorf("Validate() error = %v, want ErrNoSegments", err)
+	_, err = newTestSegValidator(t, missing).Validate(t.Context(), 10_000)
+	if !errors.Is(err, ErrNoSegments) {
+		t.Errorf(msgWantErrNoSegments, err)
 	}
 }
 
@@ -719,7 +935,7 @@ func TestSegValidator_NoSegmentsButUnreadableManifests(t *testing.T) {
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
 	if err != nil {
-		t.Fatalf("Validate() error = %v", err)
+		t.Fatalf(msgValidateErr, err)
 	}
 
 	if report.CheckedSegments != 0 || report.Manifests.Problems != 1 {
@@ -753,7 +969,7 @@ func TestSegValidator_ContextCancelled(t *testing.T) {
 
 	_, err := newTestSegValidator(t, streamer).Validate(ctx, CheckAll)
 	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("Validate() error = %v, want context.Canceled", err)
+		t.Fatalf(msgWantContextCanceled, err)
 	}
 }
 
@@ -768,7 +984,7 @@ func TestNewSegValidatorValidation(t *testing.T) {
 
 	v, err := NewSegValidator(streamer, WithLogger(nil), WithParallel(0), WithMaxIssues(0))
 	if err != nil {
-		t.Fatalf("NewSegValidator() error = %v", err)
+		t.Fatalf(msgNewSegValidatorErr, err)
 	}
 
 	if v.logger == nil || v.parallel < 1 || v.maxIssues != defaultMaxIssues {
@@ -798,7 +1014,7 @@ func TestSegValidator_SegmentReadFails(t *testing.T) {
 	// reason to abandon the run.
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
 	if err != nil {
-		t.Fatalf("Validate() error = %v", err)
+		t.Fatalf(msgValidateErr, err)
 	}
 
 	if len(report.Issues) != 1 || !errors.Is(report.Issues[0].Err, errRead) {
@@ -812,7 +1028,7 @@ func TestSegValidator_SegmentReadFails(t *testing.T) {
 	}
 
 	if report.InvalidSegments != 1 || report.ValidSegments != 0 {
-		t.Errorf("valid = %d, invalid = %d, want 0 and 1", report.ValidSegments, report.InvalidSegments)
+		t.Errorf(msgWantOneInvalidSegment, report.ValidSegments, report.InvalidSegments)
 	}
 }
 
@@ -831,9 +1047,10 @@ func TestSegValidator_StreamerManifestIssuesAreCapped(t *testing.T) {
 		ManifestsFailed: 2,
 	}
 
-	report, err := newTestSegValidator(t, streamer, WithMaxIssues(maxIssues)).Validate(t.Context(), CheckAll)
+	report, err := newTestSegValidator(t, streamer, WithMaxIssues(maxIssues)).
+		Validate(t.Context(), CheckAll)
 	if err != nil {
-		t.Fatalf("Validate() error = %v", err)
+		t.Fatalf(msgValidateErr, err)
 	}
 
 	m := report.Manifests
@@ -861,7 +1078,7 @@ func TestNewSegValidator_Options(t *testing.T) {
 	v, err := NewSegValidator(newStubStreamer(nil, 0),
 		WithLogger(logger), WithParallel(parallel), WithMaxIssues(maxIssues))
 	if err != nil {
-		t.Fatalf("NewSegValidator() error = %v", err)
+		t.Fatalf(msgNewSegValidatorErr, err)
 	}
 
 	if v.logger != logger {
@@ -894,7 +1111,7 @@ func TestSegValidator_ContextCancelledMidRun(t *testing.T) {
 
 	_, err := newTestSegValidator(t, streamer, WithParallel(1)).Validate(ctx, CheckAll)
 	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("Validate() error = %v, want context.Canceled", err)
+		t.Fatalf(msgWantContextCanceled, err)
 	}
 
 	if opened := streamer.opened.Load(); opened > 1_000 {

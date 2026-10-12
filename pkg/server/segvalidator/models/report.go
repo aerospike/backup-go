@@ -43,11 +43,8 @@ type ValidationReport struct {
 	InvalidSegments int64
 	// TotalRecords is the number of records read across all checked segments.
 	TotalRecords int64
-	// TotalBytes is the number of segment bytes parsed, tail slack excluded.
+	// TotalBytes is the number of record bytes parsed, segment frames excluded.
 	TotalBytes int64
-	// SkippedCompressed is the number of compressed records that were walked
-	// over without being decoded.
-	SkippedCompressed int64
 }
 
 // Failed reports whether the run found anything wrong with the backup.

@@ -36,6 +36,18 @@ const (
 	// testChecksum is what the manifests of a test backup record for every
 	// segment they name.
 	testChecksum = "c7905179"
+	// testRecordCount is what the query stream manifests of a test backup
+	// record as the record count of every segment they name.
+	testRecordCount = 216
+	// The fields of a manifest the tests write and break.
+	manifestSegmentsKey = "segments"
+	manifestSizeKey     = "size"
+	manifestChecksumKey = "checksum"
+	// testManifestName formats the name the server gives the manifest of a
+	// query stream partition, {pid}-{regime}-{timestamp}-{uuid}.json.
+	testManifestName = "%d-7-0000181197010-%06x.json"
+
+	msgWantManifestUnusable = "issue error = %v, want ErrManifestUnusable"
 )
 
 // testBackup describes the files of a backup, which a test materializes into a
@@ -75,7 +87,7 @@ func (b *testBackup) remove(storagePath string) {
 // manifest recording them.
 func (b *testBackup) queryPartition(namespace string, partition, segments int) {
 	root := path.Join(b.id, namespacesDir, namespace, string(QueryStream))
-	recorded := make([]manifestSegment, 0, segments)
+	recorded := make([]testSegment, 0, segments)
 
 	for i := range segments {
 		name := fmt.Sprintf("7-%010d-%06x.seg", partition*100+i, partition)
@@ -84,10 +96,10 @@ func (b *testBackup) queryPartition(namespace string, partition, segments int) {
 
 		b.put(segPath, body)
 		b.recorded = append(b.recorded, segPath)
-		recorded = append(recorded, manifestSegment{SegmentName: segPath, Size: int64(len(body))})
+		recorded = append(recorded, testSegment{name: segPath, size: int64(len(body))})
 	}
 
-	b.put(path.Join(root, manifestDir, fmt.Sprintf("%d-7-0000181197010.json", partition)),
+	b.put(path.Join(root, manifestDir, fmt.Sprintf(testManifestName, partition, partition)),
 		testManifest(namespace, partition, recorded))
 }
 
@@ -95,7 +107,7 @@ func (b *testBackup) queryPartition(namespace string, partition, segments int) {
 // data directory instead of being grouped by partition.
 func (b *testBackup) changeNode(namespace, node string, segments int) {
 	root := path.Join(b.id, namespacesDir, namespace, string(ChangeStream), node)
-	recorded := make([]manifestSegment, 0, segments)
+	recorded := make([]testSegment, 0, segments)
 
 	for i := range segments {
 		segPath := path.Join(root, dataDir, fmt.Sprintf("0-%010d-%s.seg", i, node[:6]))
@@ -103,16 +115,29 @@ func (b *testBackup) changeNode(namespace, node string, segments int) {
 
 		b.put(segPath, body)
 		b.recorded = append(b.recorded, segPath)
-		recorded = append(recorded, manifestSegment{SegmentName: segPath, Size: int64(len(body))})
+		recorded = append(recorded, testSegment{name: segPath, size: int64(len(body))})
 	}
 
 	b.put(path.Join(root, manifestDir, "0-0000181275309.json"), testManifest(namespace, -1, recorded))
 }
 
+// streamRuns are the two ways a backup is read, keyed by the name of the
+// subtest each runs in. sample is the size of the sample drawn.
+func streamRuns(ctx context.Context, sample int) map[string]func(*Streamer, chan<- Segment) error {
+	return map[string]func(*Streamer, chan<- Segment) error{
+		"sample": func(s *Streamer, out chan<- Segment) error {
+			return s.StreamSample(ctx, sample, out)
+		},
+		"all": func(s *Streamer, out chan<- Segment) error {
+			return s.StreamAll(ctx, out)
+		},
+	}
+}
+
 // manifestPath is where the manifest of a query stream partition sits.
 func (b *testBackup) manifestPath(partition int) string {
 	return path.Join(b.id, namespacesDir, testNS, string(QueryStream), manifestDir,
-		fmt.Sprintf("%d-7-0000181197010.json", partition))
+		fmt.Sprintf(testManifestName, partition, partition))
 }
 
 // segments are the paths of every segment of the backup, sorted.
@@ -130,20 +155,31 @@ func (b *testBackup) segments() []string {
 	return paths
 }
 
+// testSegment is a segment a test manifest records.
+type testSegment struct {
+	name string
+	size int64
+}
+
 // testManifest writes a manifest the way a server writes one: the segments it
 // records are named by their full path, and the fields around them are there to
 // be walked over. A partition below zero is one the manifest does not name, as
-// a change stream manifest does not.
-func testManifest(namespace string, partition int, segments []manifestSegment) []byte {
+// a change stream manifest does not; like one, it records no record counts.
+func testManifest(namespace string, partition int, segments []testSegment) []byte {
 	recorded := make([]map[string]any, 0, len(segments))
 
 	for _, seg := range segments {
-		recorded = append(recorded, map[string]any{
-			"segment_name": seg.SegmentName,
-			"size":         seg.Size,
-			"checksum":     testChecksum,
-			"record_count": 216,
-		})
+		entry := map[string]any{
+			"segment_name":      seg.name,
+			manifestSizeKey:     seg.size,
+			manifestChecksumKey: testChecksum,
+		}
+
+		if partition >= 0 {
+			entry["record_count"] = testRecordCount
+		}
+
+		recorded = append(recorded, entry)
 	}
 
 	m := map[string]any{
@@ -151,9 +187,9 @@ func testManifest(namespace string, partition int, segments []manifestSegment) [
 		"namespace":          namespace,
 		"format_version":     1,
 		"node_id":            testNode,
-		"checksum_algorithm": "crc32",
+		"checksum_algorithm": "crc32c",
 		"entry_count":        len(segments),
-		"segments":           recorded,
+		manifestSegmentsKey:  recorded,
 		"partition_complete": true,
 	}
 
@@ -531,10 +567,215 @@ func TestStreamAll_UnusableManifestIsReported(t *testing.T) {
 			}
 
 			if !errors.Is(stats.ManifestIssues[0].Err, ErrManifestUnusable) {
-				t.Errorf("issue error = %v, want ErrManifestUnusable", stats.ManifestIssues[0].Err)
+				t.Errorf(msgWantManifestUnusable, stats.ManifestIssues[0].Err)
 			}
 		})
 	}
+}
+
+// A query stream manifest the server cannot parse the name of is one it skips
+// on restore, so the segments it records are never restored: the manifest is
+// reported, whatever it records, and no segment is taken from it.
+func TestStreaming_ManifestTheServerSkipsIsReported(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		// giveBody makes the body of the misnamed manifest out of the one the
+		// backup was written with.
+		giveBody func(written []byte) []byte
+	}{
+		{
+			name:     "manifest recording segments",
+			giveBody: func(written []byte) []byte { return written },
+		},
+		{
+			name:     "manifest recording nothing",
+			giveBody: func([]byte) []byte { return testManifest(testNS, 0, nil) },
+		},
+	}
+
+	for _, tt := range tests {
+		b := newTestBackupTree(t, 2, 2, 0, 0)
+		manifest := b.manifestPath(0)
+		skipped := path.Join(path.Dir(manifest), "0-7-0000181197010.json")
+		b.put(skipped, tt.giveBody(b.files[manifest]))
+		b.remove(manifest)
+
+		for _, tc := range storesOf(t, b) {
+			for name, run := range streamRuns(t.Context(), 4) {
+				t.Run(path.Join(tt.name, tc.name, name), func(t *testing.T) {
+					t.Parallel()
+
+					s := newTestStreamer(t, tc.store)
+
+					segments := collect(t, func(out chan<- Segment) error {
+						return run(s, out)
+					})
+
+					for _, seg := range segments {
+						if seg.Manifest == skipped {
+							t.Fatalf("segment %q taken from the skipped manifest", seg.Path)
+						}
+					}
+
+					stats := s.Stats()
+
+					if len(stats.ManifestIssues) != 1 || stats.ManifestIssues[0].Path != skipped {
+						t.Fatalf("stats = %+v, want the skipped manifest reported", stats)
+					}
+
+					if !errors.Is(stats.ManifestIssues[0].Err, ErrManifestUnusable) {
+						t.Errorf(msgWantManifestUnusable, stats.ManifestIssues[0].Err)
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestStreaming_ManifestEntryTheServerRefusesIsReported(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		// giveEdit breaks the first segment entry of the manifest.
+		giveEdit func(entry map[string]any)
+	}{
+		{
+			name:     "size left out",
+			giveEdit: func(entry map[string]any) { delete(entry, manifestSizeKey) },
+		},
+		{
+			name:     "checksum left out",
+			giveEdit: func(entry map[string]any) { delete(entry, manifestChecksumKey) },
+		},
+		{
+			name:     "size written as null",
+			giveEdit: func(entry map[string]any) { entry[manifestSizeKey] = nil },
+		},
+		{
+			name:     "checksum written as null",
+			giveEdit: func(entry map[string]any) { entry[manifestChecksumKey] = nil },
+		},
+	}
+
+	for _, tt := range tests {
+		b := newTestBackupTree(t, 2, 2, 0, 0)
+		manifest := b.manifestPath(0)
+		b.put(manifest, editSegment(t, b.files[manifest], 0, tt.giveEdit))
+
+		for _, tc := range storesOf(t, b) {
+			for name, run := range streamRuns(t.Context(), 4) {
+				t.Run(path.Join(tt.name, tc.name, name), func(t *testing.T) {
+					t.Parallel()
+
+					s := newTestStreamer(t, tc.store)
+
+					segments := collect(t, func(out chan<- Segment) error {
+						return run(s, out)
+					})
+
+					for _, seg := range segments {
+						if seg.Manifest == manifest {
+							t.Fatalf("segment %q taken from the refused manifest", seg.Path)
+						}
+					}
+
+					stats := s.Stats()
+
+					if len(stats.ManifestIssues) != 1 || stats.ManifestIssues[0].Path != manifest {
+						t.Fatalf("stats = %+v, want the refused manifest reported", stats)
+					}
+
+					if !errors.Is(stats.ManifestIssues[0].Err, ErrManifestUnusable) {
+						t.Errorf(msgWantManifestUnusable, stats.ManifestIssues[0].Err)
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestStreamSample_MalformedEntryOutsideTheSampleIsReported(t *testing.T) {
+	t.Parallel()
+
+	const segments = 8
+
+	// A sample is seeded, and which entries it picks does not depend on what
+	// they hold, so a run over a sound backup tells which entries a run over
+	// the same backup with one entry broken leaves out.
+	sound := newTestBackupTree(t, 1, segments, 0, 0)
+	manifest := sound.manifestPath(0)
+
+	for i, tc := range storesOf(t, sound) {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			picked := collect(t, func(out chan<- Segment) error {
+				return newTestStreamer(t, tc.store).StreamSample(t.Context(), 1, out)
+			})
+			if len(picked) != 1 {
+				t.Fatalf("sample = %+v, want one segment", picked)
+			}
+
+			// The manifest records the segments in the order they were written.
+			left := slices.IndexFunc(sound.recorded, func(p string) bool {
+				return p != picked[0].Path
+			})
+
+			broken := newTestBackupTree(t, 1, segments, 0, 0)
+			broken.put(manifest, editSegment(t, broken.files[manifest], left,
+				func(entry map[string]any) { delete(entry, manifestChecksumKey) }))
+
+			s := newTestStreamer(t, storesOf(t, broken)[i].store)
+			collect(t, func(out chan<- Segment) error {
+				return s.StreamSample(t.Context(), 1, out)
+			})
+
+			stats := s.Stats()
+
+			if len(stats.ManifestIssues) != 1 || stats.ManifestIssues[0].Path != manifest {
+				t.Fatalf("stats = %+v, want the manifest with a broken entry reported", stats)
+			}
+
+			if !errors.Is(stats.ManifestIssues[0].Err, ErrManifestUnusable) {
+				t.Errorf(msgWantManifestUnusable, stats.ManifestIssues[0].Err)
+			}
+		})
+	}
+}
+
+// editSegment rewrites a manifest with edit applied to the segment entry it
+// records at index.
+func editSegment(
+	t *testing.T, manifest []byte, index int, edit func(entry map[string]any),
+) []byte {
+	t.Helper()
+
+	var m map[string]any
+	if err := json.Unmarshal(manifest, &m); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+
+	segments, ok := m[manifestSegmentsKey].([]any)
+	if !ok || index < 0 || index >= len(segments) {
+		t.Fatalf("manifest records no segment %d: %s", index, manifest)
+	}
+
+	entry, ok := segments[index].(map[string]any)
+	if !ok {
+		t.Fatalf("segment entry = %T, want an object", segments[index])
+	}
+
+	edit(entry)
+
+	body, err := json.Marshal(m)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+
+	return body
 }
 
 func TestStreamAll_DataDirectoryOfItsOwn(t *testing.T) {
@@ -607,6 +848,17 @@ func TestStreamAll_DescribesEverySegment(t *testing.T) {
 
 				if seg.Checksum != testChecksum {
 					t.Errorf("%s checksum = %q, want %q", stream, seg.Checksum, testChecksum)
+				}
+
+				// Only a query stream manifest records how many records a
+				// segment holds.
+				wantCount := int64(0)
+				if stream == QueryStream {
+					wantCount = testRecordCount
+				}
+
+				if seg.RecordCount != wantCount {
+					t.Errorf("%s record count = %d, want %d", stream, seg.RecordCount, wantCount)
 				}
 			}
 		})
@@ -747,15 +999,16 @@ func TestStreamSample_TinySampleGoesWhereTheDataIs(t *testing.T) {
 	}
 }
 
-func TestStreamSample_ChecksumOfAnotherAlgorithmIsNotCarried(t *testing.T) {
+func TestStreamSample_ChecksumIsCarriedWhateverTheDeclaredAlgorithm(t *testing.T) {
 	t.Parallel()
 
 	b := newTestBackupTree(t, 1, 2, 0, 0)
-	// A manifest that checksummed its segments some other way records
-	// something this package cannot compare anything against.
+	// The server checks every segment against CRC-32C whatever algorithm its
+	// manifest declares, so the declaration changes nothing.
 	manifest := b.files[b.manifestPath(0)]
 	b.put(b.manifestPath(0),
-		bytes.ReplaceAll(manifest, []byte(`"checksum_algorithm":"crc32"`), []byte(`"checksum_algorithm":"xxh3"`)))
+		bytes.ReplaceAll(manifest,
+			[]byte(`"checksum_algorithm":"crc32c"`), []byte(`"checksum_algorithm":"xxh3"`)))
 
 	for _, tc := range storesOf(t, b) {
 		t.Run(tc.name, func(t *testing.T) {
@@ -768,8 +1021,9 @@ func TestStreamSample_ChecksumOfAnotherAlgorithmIsNotCarried(t *testing.T) {
 			})
 
 			for _, seg := range segments {
-				if seg.Manifest == "" || seg.Checksum != "" {
-					t.Errorf("segment %q carries checksum %q, want none", seg.Path, seg.Checksum)
+				if seg.Manifest == "" || seg.Checksum != testChecksum {
+					t.Errorf("segment %q carries checksum %q, want %q",
+						seg.Path, seg.Checksum, testChecksum)
 				}
 			}
 		})
@@ -1042,7 +1296,7 @@ func TestStreamSample_UnusableManifestIsReported(t *testing.T) {
 			}
 
 			if !errors.Is(issue.Err, ErrManifestUnusable) {
-				t.Errorf("issue error = %v, want ErrManifestUnusable", issue.Err)
+				t.Errorf(msgWantManifestUnusable, issue.Err)
 			}
 		})
 	}
@@ -1059,18 +1313,9 @@ func TestStreaming_EmptyManifestIsReported(t *testing.T) {
 	b := newTestBackupTree(t, 2, 2, 0, 0)
 	b.put(b.manifestPath(0), nil)
 
-	runs := map[string]func(*Streamer, chan<- Segment) error{
-		"sample": func(s *Streamer, out chan<- Segment) error {
-			return s.StreamSample(t.Context(), 4, out)
-		},
-		"all": func(s *Streamer, out chan<- Segment) error {
-			return s.StreamAll(t.Context(), out)
-		},
-	}
-
 	for _, tc := range storesOf(t, b) {
-		for name, run := range runs {
-			t.Run(tc.name+"/"+name, func(t *testing.T) {
+		for name, run := range streamRuns(t.Context(), 4) {
+			t.Run(path.Join(tc.name, name), func(t *testing.T) {
 				t.Parallel()
 
 				s := newTestStreamer(t, tc.store)
@@ -1090,7 +1335,7 @@ func TestStreaming_EmptyManifestIsReported(t *testing.T) {
 				}
 
 				if !errors.Is(stats.ManifestIssues[0].Err, ErrManifestUnusable) {
-					t.Errorf("issue error = %v, want ErrManifestUnusable", stats.ManifestIssues[0].Err)
+					t.Errorf(msgWantManifestUnusable, stats.ManifestIssues[0].Err)
 				}
 			})
 		}

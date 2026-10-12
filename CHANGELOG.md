@@ -11,6 +11,47 @@ request links for the full detail of any change.
 
 ## [Unreleased]
 
+### Changed
+
+- `pkg/server/segvalidator` reads segments in the format the server writes now, an ASBK frame
+  around the records, and checks each one the way the server does before it restores it: the
+  frame header, a body that is not empty, at most 8 MiB and rblock aligned, the record count in
+  the frame footer, and every record of the body. A segment without a frame, written by an
+  earlier server build, is reported as invalid, and so is an object larger than the 8 MiB plus
+  48 bytes the server fetches (`segment.MaxSegmentSize`).
+- A record fails its segment when its end marker is not in its last rblock
+  (`segment.ErrFrameContentMismatch`), when it is compressed (`segment.ErrCompressedRecord`; it
+  used to be skipped), and, in the query stream, when its digest places it in a partition other
+  than the one the server restores the segment into (`segment.ErrWrongPartition`). That
+  partition is read from the name of the manifest naming the segment, as the server reads it,
+  or from the `p<id>` directory of a segment no manifest names. `segment.Validate` takes options
+  for it, `segment.WithPartition`, and `streamers.Segment.Partition` reports it.
+- A query stream manifest whose name the server cannot parse as
+  `{pid}-{regime}-{timestamp}-{uuid}.json` is reported with `streamers.ErrManifestUnusable`, and
+  the segments it names are reported as recorded by no manifest: the server skips such a
+  manifest on restore.
+- The checksum a manifest records for a segment is checked as CRC-32C of the whole segment
+  object, which is what the server writes and checks on restore. It used to be checked as IEEE
+  CRC-32, and only when the manifest declared `"checksum_algorithm": "crc32"`, so the checksums
+  of the backups the server writes now were never checked. The declared algorithm is not read,
+  as the server does not read it either.
+- A manifest recording a segment without a `size` or a `checksum`, or with either written as
+  `null`, is reported with `streamers.ErrManifestUnusable`, as the server aborts the restore on
+  such an entry. The recorded size and checksum of every segment a manifest names are now always
+  compared: a recorded size of zero and an empty checksum used to skip the comparison.
+- A segment that parses but holds a different number of records than its manifest records as
+  `record_count` fails with `ErrRecordCountMismatch`, reported against the manifest. A manifest
+  that records no count, as a change stream manifest does not, is not compared.
+- `ValidationReport.TotalBytes` counts the bytes of the records, the segment frames excluded.
+
+### Removed
+
+- `ValidationReport.SkippedCompressed` and `segment.Stats.SkippedCompressed`: a compressed
+  record now fails its segment.
+- `segment.ErrEmptySegment`, `segment.ErrNoRecords` and `segment.ErrBadTailSlack`. An empty or
+  cut segment fails with `segment.ErrFrameTruncated`, `segment.ErrBadBodyLength` or
+  `segment.ErrTruncatedRecord`; a body is packed tightly, so no tail of any content is accepted.
+
 ### Fixed
 
 - Restore progress reached 100% early on compressed backups and then stopped reporting. Progress

@@ -21,7 +21,6 @@ const (
 	RestoreStateReady     = "READY"
 	RestoreStateRestoring = "RESTORING"
 	RestoreStateFailed    = "FAILED"
-	NsRestoreStateUnknown = "UNKNOWN"
 )
 
 // restoreStatePriority defines priority for "active" states when

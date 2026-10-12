@@ -39,6 +39,10 @@ func TestErrorClasses(t *testing.T) {
 		{name: "replication factor not found", err: errReplicationFactorNotFound, class: errclass.ErrAerospike},
 		{name: "parse record info", err: errParseRecordInfo, class: errclass.ErrAerospike},
 		{name: "udf missing filename", err: errUDFMissingFilename, class: errclass.ErrAerospike},
+		{name: "command not supported", err: errCommandNotSupported, class: errclass.ErrUnsupported},
+		{name: "missing command parameter", err: errMissingCmdParam, class: errclass.ErrInvalidConfig},
+		{name: "invalid command parameter", err: errInvalidCmdParam, class: errclass.ErrInvalidConfig},
+		{name: "nil request", err: errNilRequest, class: errclass.ErrInvalidConfig},
 	}
 
 	for _, tt := range tests {

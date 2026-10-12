@@ -11,6 +11,22 @@ request links for the full detail of any change.
 
 ## [Unreleased]
 
+### Added
+
+- Server-integrated backup and restore requests carry every parameter of the server commands.
+  `RequestBackup` gains `BinList`; `RequestCommon` gains `Path`, `SetList` and `FilterExp`;
+  `RequestRestore` gains `BackupIDs`, a comma-separated list sent as the required `backup-ids`, and the fuzzy restore
+  settings `AllowUnhosted`, `Parallel`, `RecordsPerSecond`, `MaxInflight`, `RetryBaseIntervalMs`,
+  `RetryMultiplier`, `RetryMaxAttempts` and `IgnoreRecordError`, which are sent only when
+  `FuzzyRestore` is true. The new `RequestPrepareRestore` carries `HydrateReplica`. An optional
+  field is sent only when it is set: a string when not empty, a number when not zero and a bool
+  pointer when not nil, so the server applies its own default otherwise. (BKRS-464)
+- Info commands are validated before they are sent. A missing required parameter, a nil request,
+  a malformed comma-separated `backup-ids` value (empty elements), or a value containing `;` or a
+  newline (and `|` for `restore`) fails with `ErrInvalidConfig`, and a server older than 8.1 fails
+  with `ErrUnsupported`. Neither is retried, and the error names only the offending keys, never
+  their values. (BKRS-464)
+-
 ### Changed
 
 - `pkg/server/segvalidator` reads segments in the format the server writes now, an ASBK frame
@@ -43,6 +59,14 @@ request links for the full detail of any change.
   `record_count` fails with `ErrRecordCountMismatch`, reported against the manifest. A manifest
   that records no count, as a change stream manifest does not, is not compared.
 - `ValidationReport.TotalBytes` counts the bytes of the records, the segment frames excluded.
+- **Breaking.** `ServerBackupInfo.PrepareRestore` takes a `*models.RequestPrepareRestore` instead
+  of the job id and namespace. (BKRS-464)
+- **Breaking.** `RequestRestore.BackupID` is renamed to `BackupIDs` to match the `backup-ids`
+  info parameter. (BKRS-464)
+- **Breaking.** The bool fields of the server-integrated requests are pointers: `NoIndexes` and
+  `NoUDFs`, now in `RequestCommon`, and `RequestRestore.FuzzyRestore`. A nil value is not sent.
+  `SetList` and `Path` moved to `RequestCommon`, so struct literals that set them change.
+  (BKRS-464)
 
 ### Removed
 
@@ -51,6 +75,9 @@ request links for the full detail of any change.
 - `segment.ErrEmptySegment`, `segment.ErrNoRecords` and `segment.ErrBadTailSlack`. An empty or
   cut segment fails with `segment.ErrFrameTruncated`, `segment.ErrBadBodyLength` or
   `segment.ErrTruncatedRecord`; a body is packed tightly, so no tail of any content is accepted.
+- **Breaking.** `RequestCommon.AccessKey` and `RequestCommon.SecretKey`. The server ignores these
+  parameters since SERVER-700. (BKRS-464)
+- **Breaking.** `RequestBackup.EnableChangeStream`, which the server no longer accepts. (BKRS-464)
 
 ### Fixed
 

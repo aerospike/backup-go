@@ -134,6 +134,9 @@ type ConfigBackup struct {
 	ScanThrottlingTimeout time.Duration
 }
 
+// defaultNamespace is the namespace NewDefaultBackupConfig sets.
+const defaultNamespace = "test"
+
 // NewDefaultBackupConfig returns a new ConfigBackup with default values.
 // Note that Namespace defaults to "test" rather than to an empty string.
 func NewDefaultBackupConfig() *ConfigBackup {
@@ -141,7 +144,7 @@ func NewDefaultBackupConfig() *ConfigBackup {
 		PartitionFilters: []*a.PartitionFilter{NewPartitionFilterAll()},
 		ParallelRead:     1,
 		ParallelWrite:    1,
-		Namespace:        "test", //nolint:goconst // default value
+		Namespace:        defaultNamespace,
 		ScanPolicy:       a.NewScanPolicy(),
 	}
 }

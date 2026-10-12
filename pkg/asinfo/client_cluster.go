@@ -84,6 +84,12 @@ func (ic *Client) GetSIndexes(ctx context.Context, namespace string) ([]*models.
 }
 
 func (ic *Client) getSIndexes(ctx context.Context, namespace string, noWarn bool) ([]*models.SIndex, error) {
+	// The command depends on the version of the node it is sent to, so it is
+	// built per request. The namespace is checked here, as retrying cannot fix it.
+	if _, err := ic.cmds.sindexList(namespace, false); err != nil {
+		return nil, fmt.Errorf("failed to build sindex list command: %w", err)
+	}
+
 	return retryValue(ctx, ic.retryPolicy, func() ([]*models.SIndex, error) {
 		node, aErr := ic.cluster.GetRandomNode()
 		if aErr != nil {
@@ -118,13 +124,23 @@ func (ic *Client) SupportsBatchWrite(ctx context.Context) (bool, error) {
 
 // GetRecordCount counts number of records in given namespace and sets.
 func (ic *Client) GetRecordCount(ctx context.Context, namespace string, sets []string) (uint64, error) {
+	namespaceCmd, err := ic.cmds.namespaceInfo(namespace)
+	if err != nil {
+		return 0, fmt.Errorf("failed to build namespace info command: %w", err)
+	}
+
+	setsCmd, err := ic.cmds.setsOfNamespace(namespace)
+	if err != nil {
+		return 0, fmt.Errorf("failed to build sets command: %w", err)
+	}
+
 	return retryValue(ctx, ic.retryPolicy, func() (uint64, error) {
 		node, aErr := ic.cluster.GetRandomNode()
 		if aErr != nil {
 			return 0, fmt.Errorf("%w: %w", errclass.ErrAerospike, aErr)
 		}
 
-		effectiveReplicationFactor, err := ic.getEffectiveReplicationFactor(node, namespace)
+		effectiveReplicationFactor, err := ic.getEffectiveReplicationFactor(node, namespaceCmd)
 		if err != nil {
 			return 0, err
 		}
@@ -145,9 +161,9 @@ func (ic *Client) GetRecordCount(ctx context.Context, namespace string, sets []s
 
 			switch {
 			case len(sets) == 0:
-				recordCountForNode, err = ic.getRecordCountForNodeNamespace(node, namespace)
+				recordCountForNode, err = ic.getRecordCountForNodeNamespace(node, namespaceCmd)
 			default:
-				recordCountForNode, err = ic.getRecordCountForNode(node, namespace, sets)
+				recordCountForNode, err = ic.getRecordCountForNode(node, setsCmd, sets)
 			}
 
 			if err != nil {
@@ -163,8 +179,13 @@ func (ic *Client) GetRecordCount(ctx context.Context, namespace string, sets []s
 
 // GetPendingMigrations returns the number of pending migrations.
 func (ic *Client) GetPendingMigrations(ctx context.Context, namespace string) (uint64, error) {
+	cmd, err := ic.cmds.namespaceInfo(namespace)
+	if err != nil {
+		return 0, fmt.Errorf("failed to build namespace info command: %w", err)
+	}
+
 	return retryValue(ctx, ic.retryPolicy, func() (uint64, error) {
-		result, err := ic.getClusterTotalMigrations(namespace)
+		result, err := ic.getClusterTotalMigrations(cmd)
 		if err != nil {
 			return 0, fmt.Errorf("failed to fetch migration stats: %w", err)
 		}
@@ -173,8 +194,9 @@ func (ic *Client) GetPendingMigrations(ctx context.Context, namespace string) (u
 	})
 }
 
-// getClusterTotalMigrations sums up migrations from ALL nodes at once.
-func (ic *Client) getClusterTotalMigrations(namespace string) (uint64, error) {
+// getClusterTotalMigrations sums up migrations from ALL nodes at once. cmd must
+// be the namespace info command of the namespace.
+func (ic *Client) getClusterTotalMigrations(cmd string) (uint64, error) {
 	nodes := ic.cluster.GetNodes()
 	if len(nodes) == 0 {
 		return 0, errNoNodesConnected
@@ -183,7 +205,7 @@ func (ic *Client) getClusterTotalMigrations(namespace string) (uint64, error) {
 	var total uint64
 
 	for _, node := range nodes {
-		migrations, err := ic.getPendingMigrations(node, namespace)
+		migrations, err := ic.getPendingMigrations(node, cmd)
 		if err != nil {
 			return 0, err
 		}
@@ -194,9 +216,7 @@ func (ic *Client) getClusterTotalMigrations(namespace string) (uint64, error) {
 	return total, nil
 }
 
-func (ic *Client) getPendingMigrations(node infoGetter, namespace string) (uint64, error) {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDNamespaceInfo], namespace)
-
+func (ic *Client) getPendingMigrations(node infoGetter, cmd string) (uint64, error) {
 	response, aErr := ic.requestByNode(node, cmd)
 	if aErr != nil {
 		return 0, fmt.Errorf("%w: failed to get request info: %w", errclass.ErrAerospike, aErr)
@@ -248,7 +268,10 @@ func (ic *Client) GetNodesNames() []string {
 
 // GetSetsList returns the list of set names for the given namespace, excluding the MRT monitor set.
 func (ic *Client) GetSetsList(ctx context.Context, namespace string) ([]string, error) {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDSetsOfNamespace], namespace)
+	cmd, err := ic.cmds.setsOfNamespace(namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build sets command: %w", err)
+	}
 
 	result, err := ic.requestRandomNode(ctx, cmd)
 	if err != nil {
@@ -280,7 +303,7 @@ func (ic *Client) GetSetsList(ctx context.Context, namespace string) ([]string, 
 
 // GetRackNodes returns list of nodes by rack id.
 func (ic *Client) GetRackNodes(ctx context.Context, rackID int) ([]string, error) {
-	cmd := ic.cmdDict[cmdIDRack]
+	cmd := cmdRacks
 
 	result, err := ic.requestRandomNode(ctx, cmd)
 	if err != nil {
@@ -315,13 +338,13 @@ func (ic *Client) GetRackNodes(ctx context.Context, rackID int) ([]string, error
 func (ic *Client) GetService(ctx context.Context, node string) (string, error) {
 	// First request TLS name.
 	result, err := retryValue(ctx, ic.retryPolicy, func() (string, error) {
-		return ic.requestByNodeName(node, ic.cmdDict[cmdIDServiceTLSStd])
+		return ic.requestByNodeName(node, cmdServiceTLSStd)
 	})
 
 	// If result is empty, then request plain.
 	if result == "" {
 		result, err = retryValue(ctx, ic.retryPolicy, func() (string, error) {
-			return ic.requestByNodeName(node, ic.cmdDict[cmdIDServiceClearStd])
+			return ic.requestByNodeName(node, cmdServiceClearStd)
 		})
 	}
 
@@ -330,7 +353,7 @@ func (ic *Client) GetService(ctx context.Context, node string) (string, error) {
 
 // GetNamespacesList returns list of namespaces.
 func (ic *Client) GetNamespacesList(ctx context.Context) ([]string, error) {
-	cmd := ic.cmdDict[cmdIDNamespaces]
+	cmd := cmdNamespaces
 
 	result, err := ic.requestRandomNode(ctx, cmd)
 	if err != nil {
@@ -342,7 +365,7 @@ func (ic *Client) GetNamespacesList(ctx context.Context) ([]string, error) {
 
 // GetStatus returns cluster status.
 func (ic *Client) GetStatus(ctx context.Context) (string, error) {
-	cmd := ic.cmdDict[cmdIDStatus]
+	cmd := cmdStatus
 
 	result, err := ic.requestRandomNode(ctx, cmd)
 	if err != nil {
@@ -360,7 +383,7 @@ func (ic *Client) GetPrimaryPartitions(ctx context.Context, node, namespace stri
 }
 
 func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
-	cmd := ic.cmdDict[cmdIDReplicas]
+	cmd := cmdReplicas
 
 	result, err := ic.requestByNodeName(node, cmd)
 	if err != nil {
@@ -401,7 +424,7 @@ func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
 }
 
 func (ic *Client) getUDFs(node infoGetter) ([]*models.UDF, error) {
-	cmd := ic.cmdDict[cmdIDUdfList]
+	cmd := cmdUdfList
 
 	cmdResp, err := ic.requestByNode(node, cmd)
 	if err != nil {
@@ -438,7 +461,13 @@ func (ic *Client) getUDFs(node infoGetter) ([]*models.UDF, error) {
 }
 
 func (ic *Client) getUDF(node infoGetter, name string) (*models.UDF, error) {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDUdfGetFilename], name)
+	// The name comes from the udf-list response, so a name the command cannot
+	// carry is a server data error. The build error is not wrapped to keep its
+	// configuration error class out of the chain.
+	cmd, err := ic.cmds.udfGet(name)
+	if err != nil {
+		return nil, fmt.Errorf("%w: invalid udf name in udf-list response: %s", errclass.ErrAerospike, err.Error())
+	}
 
 	cmdResp, err := ic.requestByNode(node, cmd)
 	if err != nil {
@@ -455,10 +484,10 @@ func (ic *Client) getUDF(node infoGetter, name string) (*models.UDF, error) {
 	return udf, nil
 }
 
-func (ic *Client) getRecordCountForNode(node infoGetter, namespace string, sets []string,
+// getRecordCountForNode counts the records of the given sets on node. cmd must
+// be the sets command of the namespace.
+func (ic *Client) getRecordCountForNode(node infoGetter, cmd string, sets []string,
 ) (uint64, error) {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDSetsOfNamespace], namespace)
-
 	response, aErr := ic.requestByNode(node, cmd)
 	if aErr != nil {
 		return 0, fmt.Errorf("%w: failed to get record count: %w", errclass.ErrAerospike, aErr)
@@ -500,10 +529,10 @@ func (ic *Client) getRecordCountForNode(node infoGetter, namespace string, sets 
 	return recordsNumber, nil
 }
 
-func (ic *Client) getRecordCountForNodeNamespace(node infoGetter, namespace string,
+// getRecordCountForNodeNamespace counts the records of the namespace on node.
+// cmd must be the namespace info command of the namespace.
+func (ic *Client) getRecordCountForNodeNamespace(node infoGetter, cmd string,
 ) (uint64, error) {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDNamespaceInfo], namespace)
-
 	response, aErr := ic.requestByNode(node, cmd)
 	if aErr != nil {
 		return 0, fmt.Errorf("%w: failed to request info: %w", errclass.ErrAerospike, aErr)
@@ -528,10 +557,10 @@ func (ic *Client) getRecordCountForNodeNamespace(node infoGetter, namespace stri
 	return 0, errParseRecordInfo
 }
 
-func (ic *Client) getEffectiveReplicationFactor(node infoGetter, namespace string,
+// getEffectiveReplicationFactor reads the replication factor of the namespace
+// from node. cmd must be the namespace info command of the namespace.
+func (ic *Client) getEffectiveReplicationFactor(node infoGetter, cmd string,
 ) (int, error) {
-	cmd := fmt.Sprintf(ic.cmdDict[cmdIDNamespaceInfo], namespace)
-
 	response, aErr := ic.requestByNode(node, cmd)
 	if aErr != nil {
 		return 0, fmt.Errorf("%w: failed to get namespace info: %w", errclass.ErrAerospike, aErr)
@@ -555,6 +584,12 @@ func (ic *Client) getEffectiveReplicationFactor(node infoGetter, namespace strin
 // GetClusterStable checks the stability of a cluster within the specified namespace and retries on transient errors.
 // Returns a boolean indicating the stability status and an error if the operation fails after retries.
 func (ic *Client) GetClusterStable(ctx context.Context, namespace string) (bool, error) {
+	// The cluster size is read on every attempt, so the command is built inside
+	// the retry loop. Everything else is checked here, as retrying cannot change it.
+	if err := ic.cmds.validateClusterStable(namespace); err != nil {
+		return false, fmt.Errorf("failed to build cluster stable command: %w", err)
+	}
+
 	return retryValue(ctx, ic.retryPolicy, func() (bool, error) {
 		return ic.getClusterStable(namespace)
 	})
@@ -574,9 +609,12 @@ func (ic *Client) getClusterStable(namespace string) (bool, error) {
 		return false, fmt.Errorf("%w: cluster key not found in statistics", errclass.ErrAerospike)
 	}
 
-	for _, node := range nodes {
-		cmd := fmt.Sprintf(ic.cmdDict[cmdIDClusterStable], nodesNum, namespace)
+	cmd, err := ic.cmds.clusterStable(nodesNum, namespace)
+	if err != nil {
+		return false, fmt.Errorf("failed to build cluster stable command: %w", err)
+	}
 
+	for _, node := range nodes {
 		result, err := ic.requestRandomNodeOnce(cmd)
 		if err != nil {
 			return false, fmt.Errorf("failed to get node %s stable status: %w", node.GetName(), err)
@@ -593,7 +631,7 @@ func (ic *Client) getClusterStable(namespace string) (bool, error) {
 // getStatistics returns cluster statistics. Every caller runs inside a retried
 // operation, so a single info request is made here.
 func (ic *Client) getStatistics() ([]infomodels.InfoMap, error) {
-	cmd := ic.cmdDict[cmdIDStatistics]
+	cmd := cmdStatistics
 
 	result, err := ic.requestRandomNodeOnce(cmd)
 	if err != nil {

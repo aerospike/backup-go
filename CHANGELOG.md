@@ -67,6 +67,18 @@ request links for the full detail of any change.
   `NoUDFs`, now in `RequestCommon`, and `RequestRestore.FuzzyRestore`. A nil value is not sent.
   `SetList` and `Path` moved to `RequestCommon`, so struct literals that set them change.
   (BKRS-464)
+- **Breaking.** The Secret Agent client now comes from
+  `github.com/aerospike/tools-common-go/secretagent`, shared with the other Aerospike Go tools.
+  `NewSecretAgentClient` returns `*secretagent.Client` from that package. (TOOLS-4533)
+- Secret references are parsed like the Aerospike C tools do: `secrets:<key>` without a resource
+  is accepted, and a reference is split on its last colon, so the resource may contain colons.
+  (TOOLS-4533)
+- `SecretAgentConfig` with a client certificate and no CA file is rejected as `ErrInvalidConfig`.
+  The certificate used to be ignored and the connection made in plaintext. (TOOLS-4533)
+- `SecretAgentConfig.TimeoutMillisecond` bounds each request as a whole, from dial to response,
+  instead of each read and write separately. (TOOLS-4533)
+- An empty or malformed Secret Agent response is reported as `ErrCorruptData`. An empty secret
+  used to be returned as an empty value. (TOOLS-4533)
 
 ### Removed
 
@@ -78,6 +90,8 @@ request links for the full detail of any change.
 - **Breaking.** `RequestCommon.AccessKey` and `RequestCommon.SecretKey`. The server ignores these
   parameters since SERVER-700. (BKRS-464)
 - **Breaking.** `RequestBackup.EnableChangeStream`, which the server no longer accepts. (BKRS-464)
+- **Breaking.** The `pkg/secretagent` package, including `connection` and `models`. Use
+  `github.com/aerospike/tools-common-go/secretagent` instead. (TOOLS-4533)
 
 ### Fixed
 

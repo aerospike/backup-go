@@ -17,13 +17,14 @@ package backup
 import (
 	"fmt"
 
-	saClient "github.com/aerospike/backup-go/pkg/secretagent"
+	"github.com/aerospike/tools-common-go/secretagent"
 )
 
 // SecretAgentConfig contains Secret Agent connection information.
 type SecretAgentConfig struct {
 	// Connection type: tcp, unix.
-	// Use constants form the `secretagent`: `ConnectionTypeTCP` or `ConnectionTypeUDS`
+	// Use constants from github.com/aerospike/tools-common-go/secretagent:
+	// `ConnectionTypeTCP` or `ConnectionTypeUDS`.
 	ConnectionType *string
 	// Secret agent host for TCP connection or socket file path for UDS connection.
 	Address *string
@@ -67,7 +68,7 @@ func (s *SecretAgentConfig) validate() error {
 	}
 
 	if s.ConnectionType != nil &&
-		(*s.ConnectionType != saClient.ConnectionTypeTCP && *s.ConnectionType != saClient.ConnectionTypeUDS) {
+		(*s.ConnectionType != secretagent.ConnectionTypeTCP && *s.ConnectionType != secretagent.ConnectionTypeUDS) {
 		return fmt.Errorf("unsupported connection type: %s", *s.ConnectionType)
 	}
 
@@ -77,6 +78,10 @@ func (s *SecretAgentConfig) validate() error {
 
 	if s.KeyFile != nil && s.CertFile == nil {
 		return fmt.Errorf("cert file is required when key file is set")
+	}
+
+	if s.CertFile != nil && s.CaFile == nil {
+		return fmt.Errorf("ca file is required when cert file is set")
 	}
 
 	return nil

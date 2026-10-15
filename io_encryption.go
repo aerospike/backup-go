@@ -27,7 +27,7 @@ import (
 	"regexp"
 	"strings"
 
-	saClient "github.com/aerospike/backup-go/pkg/secretagent"
+	"github.com/aerospike/tools-common-go/secretagent"
 )
 
 var (
@@ -38,7 +38,7 @@ var (
 // readPrivateKey parses and loads a private key according to the EncryptionPolicy
 // configuration. It can load the private key from a file, env variable or Secret Agent.
 // secretAgent must be non-nil when using KeySecret; pass nil for file/env-only loading.
-func readPrivateKey(ctx context.Context, encPolicy *EncryptionPolicy, secretAgent *saClient.Client) ([]byte, error) {
+func readPrivateKey(ctx context.Context, encPolicy *EncryptionPolicy, secretAgent *secretagent.Client) ([]byte, error) {
 	var (
 		pemData []byte
 		err     error
@@ -98,7 +98,7 @@ func resolveEncryptionKey(
 		return nil, nil
 	}
 
-	var secretAgentClient *saClient.Client
+	var secretAgentClient *secretagent.Client
 
 	if secretAgentConfig != nil {
 		var err error
@@ -162,7 +162,7 @@ func readPemFromEnv(keyEnv string) ([]byte, error) {
 
 // readPemFromSecret reads the key from secret agent without a header
 // and footer, decrypts it adding the header and footer.
-func readPemFromSecret(ctx context.Context, secret string, client *saClient.Client) ([]byte, error) {
+func readPemFromSecret(ctx context.Context, secret string, client *secretagent.Client) ([]byte, error) {
 	key, err := getSecret(ctx, client, secret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read secret config key: %w", err)

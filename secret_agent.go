@@ -16,101 +16,51 @@ package backup
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
+	"errors"
 	"fmt"
-	"os"
-	"strings"
 	"time"
 
-	saClient "github.com/aerospike/backup-go/pkg/secretagent"
+	"github.com/aerospike/tools-common-go/secretagent"
 )
 
-const secretPrefix = "secrets:"
+var secretAgentErrClasses = []struct {
+	from, to error
+}{
+	{from: secretagent.ErrInvalidConfig, to: ErrInvalidConfig},
+	{from: secretagent.ErrUnsupported, to: ErrUnsupported},
+	{from: secretagent.ErrRequestFailed, to: ErrSecretAgent},
+	{from: secretagent.ErrInvalidResponse, to: ErrCorruptData},
+}
+
+// classifySecretAgentError attaches the error class matching the
+// tools-common-go secretagent sentinel that err wraps.
+func classifySecretAgentError(err error) error {
+	for _, c := range secretAgentErrClasses {
+		if errors.Is(err, c.from) {
+			return fmt.Errorf("%w: %w", c.to, err)
+		}
+	}
+
+	return fmt.Errorf("%w: %w", ErrSecretAgent, err)
+}
 
 // getSecret gets the secret from the secret agent using the given client.
-func getSecret(ctx context.Context, client *saClient.Client, key string) (string, error) {
+func getSecret(ctx context.Context, client *secretagent.Client, key string) (string, error) {
 	if client == nil {
 		return "", fmt.Errorf("%w: secret config not initialized", ErrInvalidConfig)
 	}
 
-	resource, secretKey, err := getResourceKey(key)
+	ref, err := secretagent.ParseRef(key)
 	if err != nil {
-		return "", err
+		return "", classifySecretAgentError(err)
 	}
 
-	result, err := client.GetSecret(ctx, resource, secretKey)
+	result, err := client.GetSecret(ctx, ref.Resource, ref.Key)
 	if err != nil {
-		return "", fmt.Errorf("failed to get secret from secret agent: %w", err)
+		return "", fmt.Errorf("failed to get secret from secret agent: %w", classifySecretAgentError(err))
 	}
 
 	return result, nil
-}
-
-// getResourceKey returns the resource and secret key for the given secret key.
-func getResourceKey(key string) (resource, secretKey string, err error) {
-	if !isSecret(key) {
-		return "", "",
-			fmt.Errorf("%w: invalid secret key format, must be secrets:<resource>:<secret>", ErrInvalidConfig)
-	}
-
-	keyArr := strings.Split(key, ":")
-	if len(keyArr) != 3 {
-		return "", "", fmt.Errorf("%w: invalid secret key format", ErrInvalidConfig)
-	}
-	// We believe that keyArr[0] == secretPrefix
-	return keyArr[1], keyArr[2], nil
-}
-
-// getTLSConfig returns the TLS configuration for the given CA file if it is set.
-func getTLSConfig(config *SecretAgentConfig) (*tls.Config, error) {
-	if config.CaFile == nil {
-		return nil, nil
-	}
-
-	caCert, err := os.ReadFile(*config.CaFile)
-	if err != nil {
-		return nil, fmt.Errorf("%w: failed to read ca file: %w", ErrInvalidConfig, err)
-	}
-
-	caCertPool := x509.NewCertPool()
-
-	ok := caCertPool.AppendCertsFromPEM(caCert)
-	if !ok {
-		return nil, fmt.Errorf("%w: nothing to append to ca cert pool", ErrInvalidConfig)
-	}
-
-	// TLS 1.2 is the default floor. Older versions remain reachable only through
-	// an explicit SecretAgentConfig.MinTLSVersion opt-in for legacy deployments.
-	tlsConfig := &tls.Config{
-		RootCAs:    caCertPool,
-		MinVersion: tls.VersionTLS12,
-	}
-
-	if config.MinTLSVersion != nil {
-		tlsConfig.MinVersion = *config.MinTLSVersion
-	}
-
-	if config.TLSName != nil && *config.TLSName != "" {
-		tlsConfig.ServerName = *config.TLSName
-	}
-
-	// If cert and key files are specified, we load them.
-	if config.CertFile != nil && config.KeyFile != nil {
-		cert, err := tls.LoadX509KeyPair(*config.CertFile, *config.KeyFile)
-		if err != nil {
-			return nil, fmt.Errorf("%w: failed to load client certificate: %w", ErrInvalidConfig, err)
-		}
-
-		tlsConfig.Certificates = []tls.Certificate{cert}
-	}
-
-	return tlsConfig, nil
-}
-
-// isSecret checks if string is secret. e.g.: secrets:resource2:cacert
-func isSecret(secret string) bool {
-	return strings.HasPrefix(secret, secretPrefix)
 }
 
 // ParseSecret checks if the provided string contains a secret key and attempts
@@ -119,8 +69,7 @@ func isSecret(secret string) bool {
 // If the input string does not contain a secret key it is returned as is,
 // without any modification.
 func ParseSecret(ctx context.Context, config *SecretAgentConfig, secret string) (string, error) {
-	// If value doesn't contain the secret, we return it as is.
-	if !isSecret(secret) {
+	if !secretagent.IsSecret(secret) {
 		return secret, nil
 	}
 
@@ -133,45 +82,51 @@ func ParseSecret(ctx context.Context, config *SecretAgentConfig, secret string) 
 }
 
 // NewSecretAgentClient initializes a new secret agent client from config.
-func NewSecretAgentClient(config *SecretAgentConfig) (*saClient.Client, error) {
+func NewSecretAgentClient(config *SecretAgentConfig) (*secretagent.Client, error) {
 	if config == nil {
 		return nil, fmt.Errorf("%w: secret config not initialized", ErrInvalidConfig)
 	}
-	// Getting tls config.
-	tlsConfig, err := getTLSConfig(config)
+
+	tlsConfig, err := secretagent.NewTLSConfig(secretagent.TLSOptions{
+		CAFile:     deref(config.CaFile),
+		CertFile:   deref(config.CertFile),
+		KeyFile:    deref(config.KeyFile),
+		ServerName: deref(config.TLSName),
+		MinVersion: deref(config.MinTLSVersion),
+	})
 	if err != nil {
-		return nil, err
+		return nil, classifySecretAgentError(err)
 	}
 
-	// Parsing config values.
-	address := *config.Address
+	address := deref(config.Address)
 	if config.Port != nil {
-		address = fmt.Sprintf("%s:%d", *config.Address, *config.Port)
+		address = fmt.Sprintf("%s:%d", address, *config.Port)
 	}
 
-	// Parsing timeout, if it is a nil, by default we set 1000 Millisecond
-	timeout := 1000 * time.Millisecond
+	timeout := secretagent.DefaultTimeout
 	if config.TimeoutMillisecond != nil {
 		timeout = time.Duration(*config.TimeoutMillisecond) * time.Millisecond
 	}
 
-	// Parsing isBase64 param.
-	var isBase64 bool
-	if config.IsBase64 != nil {
-		isBase64 = *config.IsBase64
-	}
-
-	// Initializing client.
-	client, err := saClient.NewClient(
-		*config.ConnectionType,
-		address,
-		timeout,
-		isBase64,
-		tlsConfig,
-	)
+	client, err := secretagent.NewClient(secretagent.Config{
+		TLS:            tlsConfig,
+		ConnectionType: deref(config.ConnectionType),
+		Address:        address,
+		Timeout:        timeout,
+		Base64:         deref(config.IsBase64),
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize secret agent client: %w", err)
+		return nil, fmt.Errorf("failed to initialize secret agent client: %w", classifySecretAgentError(err))
 	}
 
 	return client, nil
+}
+
+func deref[T any](p *T) T {
+	var zero T
+	if p == nil {
+		return zero
+	}
+
+	return *p
 }

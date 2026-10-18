@@ -19,42 +19,41 @@ import (
 	"time"
 )
 
+// Keys of the "backup-status" info response, besides the shared ones of
+// job_status.go.
 const (
-	// infoTimeLayout is the ISO 8601 basic UTC layout the server uses for the
-	// backup job timestamps, e.g. 20260922T134400.123Z.
-	infoTimeLayout = "20060102T150405.000Z"
-
-	// infoNoValue is emitted by the server in place of a timestamp that is not
-	// set yet, e.g. the finish-time of a running job.
-	infoNoValue = "-"
-)
-
-// Keys of the "backup-status" info response. The optional fields
-// drain-blocked-migrations and error-reason appear in the middle of the
-// record, so the response must be read by key and never by position.
-const (
-	fieldJobID                  = "job-id"
-	fieldNamespace              = "ns"
-	fieldState                  = "state"
-	fieldRecsBackedUp           = "recs-backed-up"
-	fieldRecsBase               = "recs-base"
-	fieldRecsIncr               = "recs-incr"
-	fieldRecsChange             = "recs-change"
-	fieldRecsFiltered           = "recs-filtered"
-	fieldRecsDegenerate         = "recs-degenerate"
-	fieldRecsSkippedXDRTomb     = "recs-skipped-xdr-tomb"
-	fieldRecsReadFailed         = "recs-read-failed"
-	fieldPartitionsFlushed      = "partitions-flushed"
-	fieldPartitionsOwned        = "partitions-owned"
-	fieldPartitionsScanned      = "partitions-scanned"
-	fieldProgressPct            = "progress-pct"
-	fieldChangeStreamActive     = "change-stream-active"
-	fieldStartTime              = "start-time"
-	fieldFinishTime             = "finish-time"
-	fieldDrainBlockedMigrations = "drain-blocked-migrations"
-	fieldErrorReason            = "error-reason"
-	fieldPartitionsCountPending = "partitions-count-pending"
-	fieldCountReadFailures      = "count-read-failures"
+	fieldBackupRPS                    = "backup-rps"
+	fieldBackupWorkerThreads          = "backup-worker-threads"
+	fieldBackupUploadThreads          = "backup-upload-threads"
+	fieldBackupS3ThroughputTargetGbps = "backup-s3-throughput-target-gbps"
+	fieldRecsBackedUp                 = "recs-backed-up"
+	fieldRecsBase                     = "recs-base"
+	fieldRecsQueryIncr                = "recs-query-incr"
+	fieldRecsChangeIncr               = "recs-change-incr"
+	fieldBytesBackedUp                = "bytes-backed-up"
+	fieldBytesBase                    = "bytes-base"
+	fieldBytesQueryIncr               = "bytes-query-incr"
+	fieldBytesChangeIncr              = "bytes-change-incr"
+	fieldRecsFiltered                 = "recs-filtered"
+	fieldRecsDegenerate               = "recs-degenerate"
+	fieldRecsSkippedXDRTomb           = "recs-skipped-xdr-tomb"
+	fieldRecsReadFailed               = "recs-read-failed"
+	fieldPartitionsFlushed            = "partitions-flushed"
+	fieldPartitionsOwned              = "partitions-owned"
+	fieldPartitionsScanned            = "partitions-scanned"
+	fieldProgressPct                  = "progress-pct"
+	fieldChangeStreamActive           = "change-stream-active"
+	fieldDrainBlockedMigrations       = "drain-blocked-migrations"
+	fieldPartitionsCountPending       = "partitions-count-pending"
+	fieldCountReadFailures            = "count-read-failures"
+	fieldBackpressureActive           = "backpressure-active"
+	fieldBackpressureActivations      = "backpressure-activations"
+	fieldBytesInPerSec                = "bytes-in-per-sec"
+	fieldBytesOutPerSec               = "bytes-out-per-sec"
+	fieldUploadQDepth                 = "upload-q-depth"
+	fieldUploadQCap                   = "upload-q-cap"
+	fieldBuffersInUse                 = "buffers-in-use"
+	fieldTotalBuffersAllocated        = "total-buffers-allocated"
 )
 
 type BackupState string
@@ -69,8 +68,8 @@ const (
 	BackupStateCommitting           BackupState = "COMMITTING"
 	BackupStateComplete             BackupState = "COMPLETE"
 	BackupStateFailed               BackupState = "FAILED"
-	// BackupStateAborting is synthetic: the server reports it once an abort has
-	// been requested but the job has not reached a terminal state yet.
+	// BackupStateAborting is reported once an abort has been accepted and the
+	// discard is still in progress.
 	BackupStateAborting BackupState = "ABORTING"
 	BackupStateAborted  BackupState = "ABORTED"
 	BackupStateUnknown  BackupState = "UNKNOWN"
@@ -123,7 +122,8 @@ var backupStateOrder = []BackupState{
 }
 
 // ResponseBackupState represents the status of a server-side backup job,
-// as reported by the "backup-status" info command.
+// as reported by the "backup-status" info command. The figures of a single
+// node cover the partitions that node is responsible for.
 type ResponseBackupState struct {
 	// StartTime is zero while the job has not started yet.
 	StartTime time.Time
@@ -132,46 +132,87 @@ type ResponseBackupState struct {
 
 	JobID     string
 	Namespace string
-	// ErrorReason is only reported by the server when the job carries one.
+	// ErrorReason is only reported by the server when the job failed or was aborted.
 	ErrorReason string
 	State       BackupState
+	// AbortOrigin is only reported by the server when the job was aborted.
+	AbortOrigin AbortOrigin
 
-	// RecsBackedUp is the sum of RecsBase, RecsIncr and RecsChange. It counts
-	// durable records over all three lines rather than distinct records, so it
-	// is not monotonic.
+	// BackupRPS is the effective records per second limit, 0 for no limit.
+	BackupRPS uint32
+	// BackupWorkerThreads is the effective number of scan threads per node.
+	BackupWorkerThreads uint32
+	// BackupUploadThreads is the effective number of upload threads per node.
+	BackupUploadThreads uint32
+	// BackupS3ThroughputTargetGbps is the effective S3 throughput target per node.
+	BackupS3ThroughputTargetGbps uint32
+
+	// RecsBackedUp is the sum of RecsBase, RecsQueryIncr and RecsChangeIncr. It
+	// counts durable records over all three lines rather than distinct records,
+	// so it is not monotonic.
 	RecsBackedUp uint64
-	// RecsBase counts durable records of the base scan. It is understated while
+	// RecsBase counts records of the base (full) scan. It is understated while
 	// PartitionsCountPending is non-zero.
 	RecsBase uint64
-	// RecsIncr counts durable records of the incremental scan.
-	RecsIncr uint64
-	// RecsChange counts durable records of the change stream.
-	RecsChange uint64
-	// RecsFiltered counts records dropped by the set or expression filter.
+	// RecsQueryIncr counts records of the incremental scan.
+	RecsQueryIncr uint64
+	// RecsChangeIncr counts records captured from writes during the backup.
+	RecsChangeIncr uint64
+	// BytesBackedUp is the sum of BytesBase, BytesQueryIncr and BytesChangeIncr.
+	BytesBackedUp uint64
+	// BytesBase counts bytes of the base scan.
+	BytesBase uint64
+	// BytesQueryIncr counts bytes of the incremental scan.
+	BytesQueryIncr uint64
+	// BytesChangeIncr counts bytes of the writes captured during the backup.
+	BytesChangeIncr uint64
+	// RecsFiltered counts records dropped by the filter expression or by an
+	// empty bin list projection. With either set, it also counts migrating
+	// records that could not be filtered and were dropped.
 	RecsFiltered uint64
-	// RecsDegenerate counts degenerate records.
+	// RecsDegenerate counts captured writes with no set name or no bins.
 	RecsDegenerate uint64
-	// RecsSkippedXDRTomb counts skipped XDR tombstones.
+	// RecsSkippedXDRTomb counts XDR tombstones skipped by the scans.
 	RecsSkippedXDRTomb uint64
-	// RecsReadFailed counts records that failed to be read.
+	// RecsReadFailed counts records that could not be read. A non-zero value
+	// in a complete job means these records are missing from the backup.
 	RecsReadFailed uint64
 	// DrainBlockedMigrations is only reported while the job drains and
 	// migrations hold it back.
 	DrainBlockedMigrations uint64
-	// CountReadFailures counts manifest read failures of the base count.
+	// CountReadFailures counts read failures of the base count.
 	CountReadFailures uint64
 
-	// PartitionsFlushed counts partitions flushed to the object store.
+	// PartitionsFlushed counts partitions whose data is durable in storage.
 	PartitionsFlushed uint32
-	// PartitionsOwned counts partitions owned by the node.
+	// PartitionsOwned counts partitions the node is responsible for.
 	PartitionsOwned uint32
 	// PartitionsScanned counts partitions already scanned.
 	PartitionsScanned uint32
-	// PartitionsCountPending counts partitions with no base count received yet.
+	// PartitionsCountPending counts partitions not complete yet.
 	PartitionsCountPending uint32
 
+	// ProgressPct is 0-50 for the base scan, 50-95 for the incremental scan,
+	// holds at 95 while draining and is 100 only once the job is complete.
 	ProgressPct        float64
 	ChangeStreamActive bool
+
+	// BackpressureActive is true while the scan is throttled by the upload pipeline.
+	BackpressureActive bool
+	// BackpressureActivations counts the times the backpressure engaged.
+	BackpressureActivations uint64
+	// BytesInPerSec is the ingest rate over the last ~3 seconds.
+	BytesInPerSec uint64
+	// BytesOutPerSec is the upload rate over the last ~3 seconds.
+	BytesOutPerSec uint64
+	// UploadQDepth is the current depth of the upload queue.
+	UploadQDepth uint64
+	// UploadQCap is the capacity of the upload queue.
+	UploadQCap uint64
+	// BuffersInUse is the number of buffers in use.
+	BuffersInUse uint64
+	// TotalBuffersAllocated is the number of buffers allocated.
+	TotalBuffersAllocated uint64
 }
 
 // NewResponseBackupState builds a ResponseBackupState from the first
@@ -188,19 +229,12 @@ func NewResponseBackupState(im []InfoMap) *ResponseBackupState {
 			Namespace:   r[fieldNamespace],
 			ErrorReason: r[fieldErrorReason],
 			State:       BackupState(state),
+			AbortOrigin: AbortOrigin(r[fieldAbortOrigin]),
 			StartTime:   parseInfoTime(r[fieldStartTime]),
 			FinishTime:  parseInfoTime(r[fieldFinishTime]),
 		}
 
-		status.parseCounters(r)
-
-		if v, ok, _ := r.ParseFloat64(fieldProgressPct); ok {
-			status.ProgressPct = v
-		}
-
-		if v, ok, _ := r.ParseBool(fieldChangeStreamActive); ok {
-			status.ChangeStreamActive = v
-		}
+		status.parseFields(r)
 
 		return status
 	}
@@ -208,64 +242,52 @@ func NewResponseBackupState(im []InfoMap) *ResponseBackupState {
 	return nil
 }
 
-// parseCounters fills the numeric counters from the info map. A counter the
-// server did not report, or reported in an unparsable form, is left at zero:
-// the optional fields of the response make a missing key an expected case, and
-// a single bad counter must not discard the rest of the status.
-func (s *ResponseBackupState) parseCounters(r InfoMap) {
-	uint64Fields := []struct {
-		key string
-		dst *uint64
-	}{
-		{fieldRecsBackedUp, &s.RecsBackedUp},
-		{fieldRecsBase, &s.RecsBase},
-		{fieldRecsIncr, &s.RecsIncr},
-		{fieldRecsChange, &s.RecsChange},
-		{fieldRecsFiltered, &s.RecsFiltered},
-		{fieldRecsDegenerate, &s.RecsDegenerate},
-		{fieldRecsSkippedXDRTomb, &s.RecsSkippedXDRTomb},
-		{fieldRecsReadFailed, &s.RecsReadFailed},
-		{fieldDrainBlockedMigrations, &s.DrainBlockedMigrations},
-		{fieldCountReadFailures, &s.CountReadFailures},
-	}
+// parseFields fills the numeric and boolean fields from the info map, see
+// [parseInfoFields] for the fields that are missing or unparsable.
+func (s *ResponseBackupState) parseFields(r InfoMap) {
+	parseInfoFields(r, InfoMap.ParseUint64,
+		infoFieldOf(fieldRecsBackedUp, &s.RecsBackedUp),
+		infoFieldOf(fieldRecsBase, &s.RecsBase),
+		infoFieldOf(fieldRecsQueryIncr, &s.RecsQueryIncr),
+		infoFieldOf(fieldRecsChangeIncr, &s.RecsChangeIncr),
+		infoFieldOf(fieldBytesBackedUp, &s.BytesBackedUp),
+		infoFieldOf(fieldBytesBase, &s.BytesBase),
+		infoFieldOf(fieldBytesQueryIncr, &s.BytesQueryIncr),
+		infoFieldOf(fieldBytesChangeIncr, &s.BytesChangeIncr),
+		infoFieldOf(fieldRecsFiltered, &s.RecsFiltered),
+		infoFieldOf(fieldRecsDegenerate, &s.RecsDegenerate),
+		infoFieldOf(fieldRecsSkippedXDRTomb, &s.RecsSkippedXDRTomb),
+		infoFieldOf(fieldRecsReadFailed, &s.RecsReadFailed),
+		infoFieldOf(fieldDrainBlockedMigrations, &s.DrainBlockedMigrations),
+		infoFieldOf(fieldCountReadFailures, &s.CountReadFailures),
+		infoFieldOf(fieldBackpressureActivations, &s.BackpressureActivations),
+		infoFieldOf(fieldBytesInPerSec, &s.BytesInPerSec),
+		infoFieldOf(fieldBytesOutPerSec, &s.BytesOutPerSec),
+		infoFieldOf(fieldUploadQDepth, &s.UploadQDepth),
+		infoFieldOf(fieldUploadQCap, &s.UploadQCap),
+		infoFieldOf(fieldBuffersInUse, &s.BuffersInUse),
+		infoFieldOf(fieldTotalBuffersAllocated, &s.TotalBuffersAllocated),
+	)
 
-	for _, f := range uint64Fields {
-		if v, ok, _ := r.ParseUint64(f.key); ok {
-			*f.dst = v
-		}
-	}
+	parseInfoFields(r, InfoMap.ParseUint32,
+		infoFieldOf(fieldBackupRPS, &s.BackupRPS),
+		infoFieldOf(fieldBackupWorkerThreads, &s.BackupWorkerThreads),
+		infoFieldOf(fieldBackupUploadThreads, &s.BackupUploadThreads),
+		infoFieldOf(fieldBackupS3ThroughputTargetGbps, &s.BackupS3ThroughputTargetGbps),
+		infoFieldOf(fieldPartitionsFlushed, &s.PartitionsFlushed),
+		infoFieldOf(fieldPartitionsOwned, &s.PartitionsOwned),
+		infoFieldOf(fieldPartitionsScanned, &s.PartitionsScanned),
+		infoFieldOf(fieldPartitionsCountPending, &s.PartitionsCountPending),
+	)
 
-	uint32Fields := []struct {
-		key string
-		dst *uint32
-	}{
-		{fieldPartitionsFlushed, &s.PartitionsFlushed},
-		{fieldPartitionsOwned, &s.PartitionsOwned},
-		{fieldPartitionsScanned, &s.PartitionsScanned},
-		{fieldPartitionsCountPending, &s.PartitionsCountPending},
-	}
+	parseInfoFields(r, InfoMap.ParseFloat64,
+		infoFieldOf(fieldProgressPct, &s.ProgressPct),
+	)
 
-	for _, f := range uint32Fields {
-		if v, ok, _ := r.ParseUint32(f.key); ok {
-			*f.dst = v
-		}
-	}
-}
-
-// parseInfoTime parses a timestamp of the info response. The server emits
-// infoNoValue for a timestamp that is not set yet, which yields the zero time,
-// as does any value that does not match the expected layout.
-func parseInfoTime(val string) time.Time {
-	if val == "" || val == infoNoValue {
-		return time.Time{}
-	}
-
-	t, err := time.Parse(infoTimeLayout, val)
-	if err != nil {
-		return time.Time{}
-	}
-
-	return t
+	parseInfoFields(r, InfoMap.ParseBool,
+		infoFieldOf(fieldChangeStreamActive, &s.ChangeStreamActive),
+		infoFieldOf(fieldBackpressureActive, &s.BackpressureActive),
+	)
 }
 
 // ResolveBackupState returns the combined backup state across nodes.
@@ -317,10 +339,11 @@ func backupStateRank(state BackupState) (int, bool) {
 	return 0, false
 }
 
-// MergeResponseBackupStates combines per-node backup status responses
-// into a single cluster-wide view. Counters are summed, StartTime is the
-// earliest timestamp across nodes, FinishTime is the latest, and ErrorReason is
-// the first one reported by any node.
+// MergeResponseBackupStates combines per-node backup status responses into a
+// single cluster-wide view. Counters and gauges are summed, the effective
+// limits, the same on every node, are taken as their maximum, StartTime is the
+// earliest timestamp across nodes, FinishTime is the latest, and ErrorReason
+// and AbortOrigin are the first ones reported by any node.
 func MergeResponseBackupStates(statuses []*ResponseBackupState) *ResponseBackupState {
 	valid := make([]*ResponseBackupState, 0, len(statuses))
 
@@ -346,38 +369,10 @@ func MergeResponseBackupStates(statuses []*ResponseBackupState) *ResponseBackupS
 	for _, status := range valid {
 		states = append(states, status.State)
 
-		merged.RecsBackedUp += status.RecsBackedUp
-		merged.RecsBase += status.RecsBase
-		merged.RecsIncr += status.RecsIncr
-		merged.RecsChange += status.RecsChange
-		merged.RecsFiltered += status.RecsFiltered
-		merged.RecsDegenerate += status.RecsDegenerate
-		merged.RecsSkippedXDRTomb += status.RecsSkippedXDRTomb
-		merged.RecsReadFailed += status.RecsReadFailed
-		merged.DrainBlockedMigrations += status.DrainBlockedMigrations
-		merged.CountReadFailures += status.CountReadFailures
-		merged.PartitionsFlushed += status.PartitionsFlushed
-		merged.PartitionsOwned += status.PartitionsOwned
-		merged.PartitionsScanned += status.PartitionsScanned
-		merged.PartitionsCountPending += status.PartitionsCountPending
-		merged.ChangeStreamActive = merged.ChangeStreamActive || status.ChangeStreamActive
-
-		if merged.ErrorReason == "" {
-			merged.ErrorReason = status.ErrorReason
-		}
+		merged.add(status)
 
 		if status.PartitionsOwned > 0 {
 			progressWeightedSum += status.ProgressPct * float64(status.PartitionsOwned)
-		}
-
-		if !status.StartTime.IsZero() &&
-			(merged.StartTime.IsZero() || status.StartTime.Before(merged.StartTime)) {
-			merged.StartTime = status.StartTime
-		}
-
-		if !status.FinishTime.IsZero() &&
-			(merged.FinishTime.IsZero() || status.FinishTime.After(merged.FinishTime)) {
-			merged.FinishTime = status.FinishTime
 		}
 	}
 
@@ -391,4 +386,47 @@ func MergeResponseBackupStates(statuses []*ResponseBackupState) *ResponseBackupS
 	}
 
 	return merged
+}
+
+// add merges the figures of a single node into s, see [MergeResponseBackupStates].
+func (s *ResponseBackupState) add(n *ResponseBackupState) {
+	s.ErrorReason = firstSet(s.ErrorReason, n.ErrorReason)
+	s.AbortOrigin = firstSet(s.AbortOrigin, n.AbortOrigin)
+	s.StartTime = earliestTime(s.StartTime, n.StartTime)
+	s.FinishTime = latestTime(s.FinishTime, n.FinishTime)
+
+	s.BackupRPS = max(s.BackupRPS, n.BackupRPS)
+	s.BackupWorkerThreads = max(s.BackupWorkerThreads, n.BackupWorkerThreads)
+	s.BackupUploadThreads = max(s.BackupUploadThreads, n.BackupUploadThreads)
+	s.BackupS3ThroughputTargetGbps = max(s.BackupS3ThroughputTargetGbps, n.BackupS3ThroughputTargetGbps)
+
+	s.RecsBackedUp += n.RecsBackedUp
+	s.RecsBase += n.RecsBase
+	s.RecsQueryIncr += n.RecsQueryIncr
+	s.RecsChangeIncr += n.RecsChangeIncr
+	s.BytesBackedUp += n.BytesBackedUp
+	s.BytesBase += n.BytesBase
+	s.BytesQueryIncr += n.BytesQueryIncr
+	s.BytesChangeIncr += n.BytesChangeIncr
+	s.RecsFiltered += n.RecsFiltered
+	s.RecsDegenerate += n.RecsDegenerate
+	s.RecsSkippedXDRTomb += n.RecsSkippedXDRTomb
+	s.RecsReadFailed += n.RecsReadFailed
+	s.DrainBlockedMigrations += n.DrainBlockedMigrations
+	s.CountReadFailures += n.CountReadFailures
+
+	s.PartitionsFlushed += n.PartitionsFlushed
+	s.PartitionsOwned += n.PartitionsOwned
+	s.PartitionsScanned += n.PartitionsScanned
+	s.PartitionsCountPending += n.PartitionsCountPending
+
+	s.ChangeStreamActive = s.ChangeStreamActive || n.ChangeStreamActive
+	s.BackpressureActive = s.BackpressureActive || n.BackpressureActive
+	s.BackpressureActivations += n.BackpressureActivations
+	s.BytesInPerSec += n.BytesInPerSec
+	s.BytesOutPerSec += n.BytesOutPerSec
+	s.UploadQDepth += n.UploadQDepth
+	s.UploadQCap += n.UploadQCap
+	s.BuffersInUse += n.BuffersInUse
+	s.TotalBuffersAllocated += n.TotalBuffersAllocated
 }

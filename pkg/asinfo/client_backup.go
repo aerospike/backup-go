@@ -17,26 +17,10 @@ package asinfo
 import (
 	"context"
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/aerospike/backup-go/errclass"
 	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
-)
-
-// Fields of the server job status info responses.
-const (
-	fieldState = "state"
-	fieldJobID = "job-id"
-)
-
-var (
-	// restoreStartedStates are the restore states that only a job the server has
-	// already accepted can be in.
-	restoreStartedStates = []string{
-		infomodels.RestoreStateRestoring,
-		infomodels.RestoreStateFailed,
-	}
 )
 
 // StartBackup starts a backup job on the server.
@@ -134,7 +118,7 @@ func (ic *Client) StartRestore(ctx context.Context, request *infomodels.RequestR
 		return fmt.Errorf("failed to build restore command: %w", err)
 	}
 
-	statusCmd, err := ic.cmds.restoreStatus(request.Namespace)
+	statusCmd, err := ic.cmds.restoreStatus(request.JobID)
 	if err != nil {
 		return fmt.Errorf("failed to build restore status command: %w", err)
 	}
@@ -155,7 +139,7 @@ func (ic *Client) StartRestore(ctx context.Context, request *infomodels.RequestR
 // The request can time out after the server has already accepted the job, so a
 // failure is not conclusive on its own: the state the server holds for this very
 // job id decides whether the command arrived. statusCmd must be the
-// restore-status command for the namespace of the job.
+// restore-status command for the job.
 func (ic *Client) sendStartRestore(node infoGetter, cmd, statusCmd, jobID string) error {
 	_, startErr := ic.requestByNode(node, cmd)
 	if startErr == nil {
@@ -178,23 +162,15 @@ func (ic *Client) sendStartRestore(node infoGetter, cmd, statusCmd, jobID string
 // isRestoreStarted reports whether the response confirms the server accepted the
 // start command for the given restore job.
 //
-// The restore-status command is keyed by namespace, so the job id is matched to
-// keep state left by an earlier restore of the same namespace from being taken
-// for this one. The server reports a job id only while a job is present, and only
-// the states in restoreStartedStates belong to a job that was actually started.
-// What the job does after that is reported by [Client.GetRestoreStatus].
+// A cold job is reported from its preparation on, so the presence of the job
+// alone does not prove the start: see [infomodels.ResponseRestoreState.IsStarted].
+// The job id is matched as well, so that a row of another job is never taken
+// for this one. What the job does after that is reported by
+// [Client.GetRestoreStatus].
 func isRestoreStarted(resp []infomodels.InfoMap, jobID string) bool {
-	for _, r := range resp {
-		if r[fieldJobID] != jobID {
-			continue
-		}
+	status := infomodels.NewResponseRestoreState(resp)
 
-		if slices.Contains(restoreStartedStates, r[fieldState]) {
-			return true
-		}
-	}
-
-	return false
+	return status != nil && status.JobID == jobID && status.IsStarted()
 }
 
 // PrepareRestore starts a restore preparation on the server.
@@ -298,43 +274,81 @@ func (ic *Client) getBackupStatusByNode(node infoGetter, cmd string) ([]infomode
 	return infoResponse, nil
 }
 
-func (ic *Client) GetRestoreStatus(ctx context.Context, namespace string) (string, error) {
-	cmd, err := ic.cmds.restoreStatus(namespace)
+// OpenRestore releases the namespace held by the aborted cold restore job jobID on
+// the server, opening it to clients with the data the restore had written.
+func (ic *Client) OpenRestore(ctx context.Context, namespace, jobID string) error {
+	cmd, err := ic.cmds.restoreOpen(namespace, jobID)
 	if err != nil {
-		return "", fmt.Errorf("failed to build restore status command: %w", err)
+		return fmt.Errorf("failed to build restore open command: %w", err)
 	}
 
-	return retryValue(ctx, ic.retryPolicy, func() (string, error) {
-		nodes := ic.cluster.GetNodes()
-
-		seen := make(map[string]struct{}, len(nodes))
-
-		for _, node := range nodes {
-			if !node.IsActive() {
-				continue
-			}
-
-			resp, err := ic.getRestoreStatusByNode(node, cmd)
-			if err != nil {
-				return "", fmt.Errorf("failed to get restore status from node %s: %w", node.GetName(), err)
-			}
-
-			for _, r := range resp {
-				state, ok := r[fieldState]
-				if !ok {
-					continue
-				}
-
-				seen[state] = struct{}{}
-			}
+	return executeWithRetry(ctx, ic.retryPolicy, func() error {
+		if err := ic.sendToPrincipal(cmd); err != nil {
+			return fmt.Errorf("failed to open restore: %w", err)
 		}
 
-		if len(seen) == 0 {
-			return "", fmt.Errorf("no restore state found for namespace %s: %w", namespace, ErrNotFound)
-		}
-
-		return infomodels.ResolveRestoreState(seen), nil
+		return nil
 	})
+}
+
+// GetRestoreStatus aggregates the status of the restore job jobID of namespace
+// across all nodes. NsState of the result is READY only when every node hosting
+// the namespace reports READY. A job of another namespace is not found.
+func (ic *Client) GetRestoreStatus(ctx context.Context, namespace, jobID string,
+) (*infomodels.ResponseRestoreState, error) {
+	if err := ic.cmds.validateRestoreStatusNamespace(namespace); err != nil {
+		return nil, fmt.Errorf("failed to build restore status command: %w", err)
+	}
+
+	cmd, err := ic.cmds.restoreStatus(jobID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build restore status command: %w", err)
+	}
+
+	return retryValue(ctx, ic.retryPolicy, func() (*infomodels.ResponseRestoreState, error) {
+		return getRestoreStatus(ic, ic.cluster.GetNodes(), cmd, namespace, jobID)
+	})
+}
+
+// statusNode is the part of a cluster node the status commands use.
+type statusNode interface {
+	infoGetter
+	IsActive() bool
+	GetName() string
+}
+
+// getRestoreStatus reads the restore status with cmd from every active node and
+// merges the rows of the job jobID of namespace, see [Client.GetRestoreStatus].
+func getRestoreStatus[N statusNode](ic *Client, nodes []N, cmd, namespace, jobID string,
+) (*infomodels.ResponseRestoreState, error) {
+	statuses := make([]*infomodels.ResponseRestoreState, 0, len(nodes))
+
+	for _, node := range nodes {
+		if !node.IsActive() {
+			continue
+		}
+
+		resp, err := ic.getRestoreStatusByNode(node, cmd)
+		if err != nil {
+			if strings.Contains(err.Error(), "no restore job") {
+				return nil, fmt.Errorf("restore job %s on node %s: %w", jobID, node.GetName(), ErrNotFound)
+			}
+
+			return nil, fmt.Errorf("failed to get restore status from node %s: %w", node.GetName(), err)
+		}
+
+		status := infomodels.NewResponseRestoreState(resp)
+		if status != nil && status.Namespace == namespace {
+			statuses = append(statuses, status)
+		}
+	}
+
+	if len(statuses) == 0 {
+		return nil, fmt.Errorf("no restore state found for job-id %s of namespace %s: %w",
+			jobID, namespace, ErrNotFound)
+	}
+
+	return infomodels.MergeResponseRestoreStates(statuses), nil
 }
 
 func (ic *Client) getRestoreStatusByNode(node infoGetter, cmd string) ([]infomodels.InfoMap, error) {

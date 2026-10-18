@@ -16,6 +16,7 @@ package asinfo
 
 import (
 	"fmt"
+	"strconv"
 
 	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
 )
@@ -50,6 +51,7 @@ const (
 	cmdNameRestore         = "restore"
 	cmdNameRestoreStatus   = "restore-status"
 	cmdNameRestoreAbort    = "restore-abort"
+	cmdNameRestoreOpen     = "restore-open"
 )
 
 // Command parameter keys.
@@ -79,19 +81,27 @@ const (
 	paramHydrateReplica         = "hydrate-replica"
 	paramFuzzyRestore           = "fuzzy-restore"
 	paramAllowUnhosted          = "allow-unhosted"
-	paramParallel               = "parallel"
-	paramRecordsPerSecond       = "records-per-second"
 	paramMaxInflight            = "max-inflight"
 	paramRetryBaseInterval      = "retry-base-interval"
 	paramRetryMultiplier        = "retry-multiplier"
 	paramRetryMaxAttempts       = "retry-max-attempts"
 	paramIgnoreRecordError      = "ignore-record-error"
+	paramApplyMetadataLast      = "apply-metadata-last"
+	paramIncrementalPath        = "incremental-path"
 	paramRestoreDownloadThreads = "restore-download-threads"
+	paramRestoreWorkerThreads   = "restore-worker-threads"
+	paramRestoreRPS             = "restore-rps"
+	paramExtraTTL               = "extra-ttl"
+	paramBackupRPS              = "backup-rps"
+	paramBackupWorkerThreads    = "backup-worker-threads"
+	paramBackupUploadThreads    = "backup-upload-threads"
+	paramBackupS3Throughput     = "backup-s3-throughput-target-gbps"
 )
 
-// restoreUnsafeChars must not appear in a restore value, as the server uses
-// "|" as a separator.
-const restoreUnsafeChars = "|"
+// jobUnsafeChars must not appear in a value of a backup or restore command, as
+// the server uses "|" as a separator of the values it stores with the job and
+// rejects it in every job id.
+const jobUnsafeChars = "|"
 
 // infoCommands builds info commands for a specific Aerospike server version.
 type infoCommands struct {
@@ -188,7 +198,7 @@ func (c infoCommands) serverBackup(r *infomodels.RequestBackup, jobID string) (s
 		return "", fmt.Errorf("%w: %s", errNilRequest, cmdNameBackup)
 	}
 
-	cmd := newInfoCmd(cmdNameBackup).
+	cmd := newInfoCmd(cmdNameBackup, jobUnsafeChars).
 		required(paramNamespace, r.Namespace).
 		required(paramJobID, jobID)
 
@@ -201,12 +211,16 @@ func (c infoCommands) serverBackup(r *infomodels.RequestBackup, jobID string) (s
 		str(paramFilterExp, r.FilterExp).
 		optFlag(paramNoIndexes, r.NoIndexes).
 		optFlag(paramNoUDFs, r.NoUDFs).
+		optNum(paramBackupRPS, r.BackupRPS).
+		optNum(paramBackupWorkerThreads, r.BackupWorkerThreads).
+		optNum(paramBackupUploadThreads, r.BackupUploadThreads).
+		optNum(paramBackupS3Throughput, r.BackupS3ThroughputTargetGbps).
 		build()
 }
 
 // serverRestore returns the command that starts the restore job r.JobID from
-// the backups r.BackupIDs. The fuzzy restore parameters are sent only if
-// r.FuzzyRestore is true.
+// the backups r.BackupIDs. A parameter that does not apply to the restore mode
+// selected by r.FuzzyRestore fails with errParamNotApplicable.
 func (c infoCommands) serverRestore(r *infomodels.RequestRestore) (string, error) {
 	if err := c.requireIntegratedBackup(cmdNameRestore); err != nil {
 		return "", err
@@ -216,32 +230,82 @@ func (c infoCommands) serverRestore(r *infomodels.RequestRestore) (string, error
 		return "", fmt.Errorf("%w: %s", errNilRequest, cmdNameRestore)
 	}
 
-	cmd := newInfoCmd(cmdNameRestore, restoreUnsafeChars).
+	cmd := newInfoCmd(cmdNameRestore, jobUnsafeChars).
 		required(paramNamespace, r.Namespace).
 		required(paramJobID, r.JobID).
 		requiredCommaList(paramBackupIDs, r.BackupIDs)
 
 	addStorageParams(cmd, &r.RequestCommon)
 
-	cmd.optFlag(paramNoIndexes, r.NoIndexes).
+	// The command is returned only if checkRestoreMode finds no parameter of
+	// the other mode set, so every parameter is added unconditionally.
+	restoreCmd, err := cmd.str(paramIncrementalPath, r.IncrementalPath).
+		optFlag(paramNoIndexes, r.NoIndexes).
 		optFlag(paramNoUDFs, r.NoUDFs).
 		optFlag(paramFuzzyRestore, r.FuzzyRestore).
 		str(paramSetList, r.SetList).
 		str(paramFilterExp, r.FilterExp).
-		optNum(paramRestoreDownloadThreads, r.RestoreDownloadThreads)
+		optNum(paramRestoreDownloadThreads, r.RestoreDownloadThreads).
+		optNum(paramRestoreWorkerThreads, r.RestoreWorkerThreads).
+		optNum(paramRestoreRPS, r.RestoreRPS).
+		optNum(paramExtraTTL, r.ExtraTTL).
+		optFlag(paramAllowUnhosted, r.AllowUnhosted).
+		optNum(paramMaxInflight, r.MaxInflight).
+		optNumPtr(paramRetryBaseInterval, r.RetryBaseIntervalMs).
+		optFloat(paramRetryMultiplier, r.RetryMultiplier).
+		optNum(paramRetryMaxAttempts, r.RetryMaxAttempts).
+		optFlag(paramIgnoreRecordError, r.IgnoreRecordError).
+		optFlag(paramApplyMetadataLast, r.ApplyMetadataLast).
+		build()
 
-	if r.FuzzyRestore != nil && *r.FuzzyRestore {
-		cmd.optFlag(paramAllowUnhosted, r.AllowUnhosted).
-			optNum(paramParallel, r.Parallel).
-			optNum(paramRecordsPerSecond, r.RecordsPerSecond).
-			optNum(paramMaxInflight, r.MaxInflight).
-			optNum(paramRetryBaseInterval, r.RetryBaseIntervalMs).
-			optFloat(paramRetryMultiplier, r.RetryMultiplier).
-			optNum(paramRetryMaxAttempts, r.RetryMaxAttempts).
-			optFlag(paramIgnoreRecordError, r.IgnoreRecordError)
+	modeErr := checkRestoreMode(r)
+
+	switch {
+	case err != nil && modeErr != nil:
+		return "", fmt.Errorf("%w; %w", err, modeErr)
+	case err != nil:
+		return "", err
+	case modeErr != nil:
+		return "", modeErr
 	}
 
-	return cmd.build()
+	return restoreCmd, nil
+}
+
+// checkRestoreMode returns errParamNotApplicable naming every parameter set in
+// r that the restore mode selected by r.FuzzyRestore does not accept.
+func checkRestoreMode(r *infomodels.RequestRestore) error {
+	fuzzy := r.FuzzyRestore != nil && *r.FuzzyRestore
+
+	params := []struct {
+		key       string
+		set       bool
+		fuzzyOnly bool
+	}{
+		{key: paramFilterExp, set: r.FilterExp != ""},
+		{key: paramAllowUnhosted, set: r.AllowUnhosted != nil, fuzzyOnly: true},
+		{key: paramMaxInflight, set: r.MaxInflight != 0, fuzzyOnly: true},
+		{key: paramRetryBaseInterval, set: r.RetryBaseIntervalMs != nil, fuzzyOnly: true},
+		{key: paramRetryMultiplier, set: r.RetryMultiplier != 0, fuzzyOnly: true},
+		{key: paramRetryMaxAttempts, set: r.RetryMaxAttempts != 0, fuzzyOnly: true},
+		{key: paramIgnoreRecordError, set: r.IgnoreRecordError != nil, fuzzyOnly: true},
+		{key: paramApplyMetadataLast, set: r.ApplyMetadataLast != nil, fuzzyOnly: true},
+	}
+
+	var keys []string
+
+	for _, p := range params {
+		if p.set && p.fuzzyOnly != fuzzy {
+			keys = append(keys, p.key)
+		}
+	}
+
+	if len(keys) == 0 {
+		return nil
+	}
+
+	return paramsErr(errParamNotApplicable,
+		cmdNameRestore+" with "+paramFuzzyRestore+"="+strconv.FormatBool(fuzzy), keys)
 }
 
 // validatePrepareRestore checks everything serverPrepareRestore needs except the
@@ -275,20 +339,33 @@ func (c infoCommands) backupStatus(jobID string) (string, error) {
 		return "", err
 	}
 
-	return newInfoCmd(cmdNameBackupStatus).
+	return newInfoCmd(cmdNameBackupStatus, jobUnsafeChars).
 		required(paramJobID, jobID).
 		build()
 }
 
-// restoreStatus returns the command that reads the restore state of namespace ns.
-func (c infoCommands) restoreStatus(ns string) (string, error) {
+// restoreStatus returns the command that reads the state of the restore job
+// jobID. The job is filtered by its id only: job ids are single-use, and a
+// namespace filter may be answered with an error by a node that does not know
+// the namespace, instead of the row of the job.
+func (c infoCommands) restoreStatus(jobID string) (string, error) {
 	if err := c.requireIntegratedBackup(cmdNameRestoreStatus); err != nil {
 		return "", err
 	}
 
-	return newInfoCmd(cmdNameRestoreStatus).
+	return newInfoCmd(cmdNameRestoreStatus, jobUnsafeChars).
+		required(paramJobID, jobID).
+		build()
+}
+
+// validateRestoreStatusNamespace checks the namespace the restore-status rows
+// are filtered by on the client side, as restoreStatus does not send it.
+func (c infoCommands) validateRestoreStatusNamespace(ns string) error {
+	_, err := newInfoCmd(cmdNameRestoreStatus, jobUnsafeChars).
 		required(paramNamespace, ns).
 		build()
+
+	return err
 }
 
 // backupAbort returns the command that aborts the backup job jobID.
@@ -297,7 +374,7 @@ func (c infoCommands) backupAbort(jobID string) (string, error) {
 		return "", err
 	}
 
-	return newInfoCmd(cmdNameBackupAbort).
+	return newInfoCmd(cmdNameBackupAbort, jobUnsafeChars).
 		required(paramJobID, jobID).
 		build()
 }
@@ -308,7 +385,20 @@ func (c infoCommands) restoreAbort(ns, jobID string) (string, error) {
 		return "", err
 	}
 
-	return newInfoCmd(cmdNameRestoreAbort).
+	return newInfoCmd(cmdNameRestoreAbort, jobUnsafeChars).
+		required(paramNamespace, ns).
+		required(paramJobID, jobID).
+		build()
+}
+
+// restoreOpen returns the command that releases namespace ns held by the
+// aborted cold restore job jobID.
+func (c infoCommands) restoreOpen(ns, jobID string) (string, error) {
+	if err := c.requireIntegratedBackup(cmdNameRestoreOpen); err != nil {
+		return "", err
+	}
+
+	return newInfoCmd(cmdNameRestoreOpen, jobUnsafeChars).
 		required(paramNamespace, ns).
 		required(paramJobID, jobID).
 		build()
@@ -330,7 +420,7 @@ func (c infoCommands) checkPrepareRestore(r *infomodels.RequestPrepareRestore) e
 
 // prepareRestoreCmd returns the restore-prepare command without the node list.
 func prepareRestoreCmd(r *infomodels.RequestPrepareRestore) *infoCmd {
-	return newInfoCmd(cmdNameRestorePrepare).
+	return newInfoCmd(cmdNameRestorePrepare, jobUnsafeChars).
 		required(paramNamespace, r.Namespace).
 		required(paramJobID, r.JobID).
 		optFlag(paramHydrateReplica, r.HydrateReplica)

@@ -19,43 +19,80 @@ type RequestBackup struct {
 	RequestCommon
 	// BinList is a comma-separated list of bins to back up.
 	BinList string
-	// ModifiedBefore is the upper bound of the record last update time, in Unix seconds.
+	// ModifiedBefore is the upper bound of the record last update time, in Unix
+	// seconds. It is a string because it is passed to the server verbatim: the
+	// server validates the value (decimal seconds after 2010-01-01, no
+	// milliseconds) and reports a precise error for a malformed one.
 	ModifiedBefore string
-	// ModifiedAfter is the lower bound of the record last update time, in Unix seconds.
+	// ModifiedAfter is the lower bound of the record last update time, in Unix
+	// seconds. It is a string for the same reason as ModifiedBefore.
 	ModifiedAfter string
+	// BackupRPS limits the records per second of each scan on each node.
+	// The server default is 0, no limit; a non-zero value must be at least
+	// 5 × BackupWorkerThreads.
+	BackupRPS int
+	// BackupWorkerThreads is the number of scan threads per node, from 1 to 128.
+	BackupWorkerThreads int
+	// BackupUploadThreads is the number of upload threads per node, from 1 to 128.
+	BackupUploadThreads int
+	// BackupS3ThroughputTargetGbps is the target throughput of the S3 client per
+	// node, in Gbit/s, from 1 to 400.
+	BackupS3ThroughputTargetGbps int
 }
 
 // RequestRestore represents a request to start a restore job on the server.
+//
+// Some parameters apply to one restore mode only. Setting a parameter that does
+// not apply to the mode chosen by FuzzyRestore fails the request, since the
+// server rejects such a parameter instead of ignoring it.
 type RequestRestore struct {
 	RequestCommon
 	// JobID identifies the restore job. A cold restore must use the job id that
 	// was passed to the restore preparation.
 	JobID string
-	// BackupIDs is a comma-separated list of backup ids to restore from.
+	// BackupIDs is a comma-separated list of backup ids to restore from: a full
+	// backup first, then its incremental backups in chronological order.
 	BackupIDs string
+	// IncrementalPath is the path of the incremental backups, the entries after
+	// the first one of BackupIDs, when it differs from Path.
+	IncrementalPath string
 	// FuzzyRestore restores by writing records into the live namespace instead
-	// of the cold partition hydration. The fields below are sent only when it is
-	// true.
+	// of the cold partition hydration. FilterExp applies to the cold restore
+	// only; the fields marked as fuzzy only apply when FuzzyRestore is true.
 	FuzzyRestore *bool
-	// AllowUnhosted allows the restore even if the principal does not host the namespace.
+	// RestoreWorkerThreads is the number of apply threads per node, from 1 to 128.
+	RestoreWorkerThreads int
+	// RestoreDownloadThreads is the number of download threads per node, from 1 to 128.
+	RestoreDownloadThreads int
+	// RestoreRPS limits the records per second each node applies. The server
+	// default is 0, no limit.
+	RestoreRPS int
+	// ExtraTTL is added to the expiry of every restored record that expires, in
+	// seconds, from 0 to 315360000.
+	ExtraTTL int
+	// AllowUnhosted allows the restore even if the principal does not host the
+	// namespace. Fuzzy only.
 	AllowUnhosted *bool
-	// Parallel is the number of worker threads.
-	Parallel int
-	// RecordsPerSecond limits the write rate.
-	RecordsPerSecond int
-	// MaxInflight is the maximum number of concurrent writes.
+	// MaxInflight is the maximum number of outstanding writes per node, from 1
+	// to 100000. Fuzzy only.
 	MaxInflight int
 	// RetryBaseIntervalMs is the base delay before a retry, in milliseconds.
-	RetryBaseIntervalMs int
-	// RetryMultiplier is the backoff multiplier of the retry delay.
+	// It is a pointer because zero is a valid delay that differs from the
+	// server default of 1000; nil omits the parameter. Fuzzy only.
+	RetryBaseIntervalMs *int
+	// RetryMultiplier is the backoff multiplier of the retry delay, at least 1.0.
+	// Fuzzy only.
 	RetryMultiplier float64
-	// RetryMaxAttempts is the maximum number of attempts per record.
+	// RetryMaxAttempts is the maximum number of attempts per record, the first
+	// one included. Zero omits the parameter, so the server default of 5
+	// applies; use 1 for no retry. Fuzzy only.
 	RetryMaxAttempts int
 	// IgnoreRecordError continues the restore on errors of individual records.
+	// Fuzzy only.
 	IgnoreRecordError *bool
-	// RestoreDownloadThreads is the number of threads used to download backup files.
-	// The server accepts values from 1 to 128; zero omits the parameter.
-	RestoreDownloadThreads int
+	// ApplyMetadataLast creates the secondary indexes and UDFs after the records
+	// instead of before. Fuzzy only.
+	ApplyMetadataLast *bool
 }
 
 // RequestPrepareRestore represents a request to prepare a cold restore on the server.
@@ -71,8 +108,8 @@ type RequestPrepareRestore struct {
 // RequestCommon represents common fields for backup and restore requests.
 //
 // Optional fields of all requests are sent to the server only when they are
-// set: strings when not empty, numbers when not zero and bool pointers when not
-// nil. Otherwise the server applies its own default.
+// set: strings when not empty, numbers when not zero and pointers when not nil.
+// Otherwise the server applies its own default.
 type RequestCommon struct {
 	// Namespace is the namespace to back up or to restore into.
 	Namespace string
@@ -90,7 +127,8 @@ type RequestCommon struct {
 	Endpoint string
 	// SetList is a comma-separated list of sets.
 	SetList string
-	// FilterExp is a base64-encoded filter expression.
+	// FilterExp is a base64-encoded filter expression. A restore accepts it
+	// only in the cold mode.
 	FilterExp string
 	// NoIndexes skips the secondary indexes.
 	NoIndexes *bool

@@ -15,6 +15,7 @@
 package asinfo
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/aerospike/backup-go/errclass"
@@ -49,6 +50,9 @@ const (
 	testCmdFilterExpParam = ";filter-exp=kwGVfwIAAJMEDqNiaW4="
 
 	testNameUnsetOmitted = "unset fields are omitted"
+
+	// testCmdMissingNsAndJobID is how the errors report a missing namespace and job id.
+	testCmdMissingNsAndJobID = "namespace, job-id"
 )
 
 // testPtr returns a pointer to v, for the optional fields of the requests.
@@ -132,8 +136,8 @@ func integratedBackupCalls() []integratedBackupCall {
 		},
 		{
 			name: cmdNameRestoreStatus,
-			call: func(c infoCommands) (string, error) { return c.restoreStatus(testCmdNamespace) },
-			want: "restore-status:namespace=source-ns",
+			call: func(c infoCommands) (string, error) { return c.restoreStatus(testCmdJobID) },
+			want: "restore-status:job-id=260922T103653-5xsr",
 		},
 		{
 			name: cmdNameBackupAbort,
@@ -146,6 +150,13 @@ func integratedBackupCalls() []integratedBackupCall {
 				return c.restoreAbort(testCmdNamespace, testCmdJobID)
 			},
 			want: "restore-abort:namespace=source-ns;job-id=260922T103653-5xsr",
+		},
+		{
+			name: cmdNameRestoreOpen,
+			call: func(c infoCommands) (string, error) {
+				return c.restoreOpen(testCmdNamespace, testCmdJobID)
+			},
+			want: "restore-open:namespace=source-ns;job-id=260922T103653-5xsr",
 		},
 	}
 }
@@ -474,7 +485,7 @@ func TestInfoCommands_IntegratedBackupMissingParams(t *testing.T) {
 		{
 			name:        cmdNameRestoreStatus,
 			call:        func() (string, error) { return cmds.restoreStatus("") },
-			wantMissing: paramNamespace,
+			wantMissing: paramJobID,
 		},
 		{
 			name:        cmdNameBackupAbort,
@@ -484,7 +495,12 @@ func TestInfoCommands_IntegratedBackupMissingParams(t *testing.T) {
 		{
 			name:        cmdNameRestoreAbort,
 			call:        func() (string, error) { return cmds.restoreAbort("", "") },
-			wantMissing: "namespace, job-id",
+			wantMissing: testCmdMissingNsAndJobID,
+		},
+		{
+			name:        cmdNameRestoreOpen,
+			call:        func() (string, error) { return cmds.restoreOpen("", "") },
+			wantMissing: testCmdMissingNsAndJobID,
 		},
 	}
 
@@ -593,6 +609,57 @@ func TestInfoCommands_ValidatePrepareRestore(t *testing.T) {
 	}
 }
 
+func TestInfoCommands_ValidateRestoreStatusNamespace(t *testing.T) {
+	t.Parallel()
+
+	cmds := newInfoCommands(infomodels.AerospikeVersionSupportsIntegratedBackup)
+
+	tests := []struct {
+		wantErrIs error
+		name      string
+		give      string
+	}{
+		{
+			name: "valid",
+			give: testCmdNamespace,
+		},
+		{
+			name:      "empty",
+			wantErrIs: errMissingCmdParam,
+		},
+		{
+			name:      "with separator",
+			give:      testUnsafeValue,
+			wantErrIs: errInvalidCmdParam,
+		},
+		{
+			name:      "with pipe",
+			give:      testPipeValue,
+			wantErrIs: errInvalidCmdParam,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := cmds.validateRestoreStatusNamespace(tt.give)
+			if tt.wantErrIs != nil {
+				require.ErrorIs(t, err, tt.wantErrIs)
+				require.ErrorContains(t, err, cmdNameRestoreStatus+": "+paramNamespace)
+
+				if tt.give != "" {
+					assert.NotContains(t, err.Error(), tt.give)
+				}
+
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestInfoCommands_InvalidParams(t *testing.T) {
 	t.Parallel()
 
@@ -637,6 +704,11 @@ func TestInfoCommands_InvalidParams(t *testing.T) {
 			call:      backup,
 		},
 		{
+			name:      "backup value with pipe",
+			giveValue: testPipeValue,
+			call:      backup,
+		},
+		{
 			name:      "restore value with separator",
 			giveValue: testUnsafeValue,
 			call:      func(value string) (string, error) { return restore(testCmdPath, value) },
@@ -650,6 +722,41 @@ func TestInfoCommands_InvalidParams(t *testing.T) {
 			name:      "restore storage value with pipe",
 			giveValue: testPipeValue,
 			call:      func(value string) (string, error) { return restore(value, testCmdBackupID) },
+		},
+		{
+			name:      "restore prepare job id with pipe",
+			giveValue: testPipeValue,
+			call: func(value string) (string, error) {
+				return cmds.serverPrepareRestore(&infomodels.RequestPrepareRestore{
+					Namespace: testCmdNamespace,
+					JobID:     value,
+				}, testCmdNodes)
+			},
+		},
+		{
+			name:      "backup status job id with pipe",
+			giveValue: testPipeValue,
+			call:      cmds.backupStatus,
+		},
+		{
+			name:      "backup abort job id with pipe",
+			giveValue: testPipeValue,
+			call:      cmds.backupAbort,
+		},
+		{
+			name:      "restore status job id with pipe",
+			giveValue: testPipeValue,
+			call:      cmds.restoreStatus,
+		},
+		{
+			name:      "restore abort job id with pipe",
+			giveValue: testPipeValue,
+			call:      func(value string) (string, error) { return cmds.restoreAbort(testCmdNamespace, value) },
+		},
+		{
+			name:      "restore open job id with pipe",
+			giveValue: testPipeValue,
+			call:      func(value string) (string, error) { return cmds.restoreOpen(testCmdNamespace, value) },
 		},
 		{
 			name:      "restore backup ids comma only",
@@ -707,14 +814,19 @@ func TestInfoCommands_ServerBackup(t *testing.T) {
 		{
 			name: "all fields set",
 			give: &infomodels.RequestBackup{
-				RequestCommon:  allFields,
-				BinList:        testBinList,
-				ModifiedBefore: testModifiedBefore,
-				ModifiedAfter:  testModifiedAfter,
+				RequestCommon:                allFields,
+				BinList:                      testBinList,
+				ModifiedBefore:               testModifiedBefore,
+				ModifiedAfter:                testModifiedAfter,
+				BackupRPS:                    1000,
+				BackupWorkerThreads:          8,
+				BackupUploadThreads:          16,
+				BackupS3ThroughputTargetGbps: 25,
 			},
 			want: testCmdBackupBase + testCmdStorageParams + testCmdSetListParam + ";bin-list=bin1,bin2" +
 				testModifiedAfterParam + ";modified-before=1700000100" + testCmdFilterExpParam +
-				";no-indexes=true;no-udfs=false",
+				";no-indexes=true;no-udfs=false;backup-rps=1000;backup-worker-threads=8;" +
+				"backup-upload-threads=16;backup-s3-throughput-target-gbps=25",
 		},
 		{
 			name: testNameUnsetOmitted,
@@ -727,17 +839,6 @@ func TestInfoCommands_ServerBackup(t *testing.T) {
 				ModifiedAfter: testModifiedAfter,
 			},
 			want: testCmdBackupBase + ";s3-bucket=backup-bucket" + testModifiedAfterParam,
-		},
-		{
-			name: "pipe in value is allowed",
-			give: &infomodels.RequestBackup{
-				RequestCommon: infomodels.RequestCommon{
-					Namespace: testCmdNamespace,
-					Storage:   testCmdStorage,
-					Path:      testPipeValue,
-				},
-			},
-			want: testCmdBackupBase + ";path=v1|v2",
 		},
 		{
 			name: "false flag is sent when set",
@@ -768,27 +869,26 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 	t.Parallel()
 
 	const (
-		testParallel                    = 16
-		testRecordsPerSecond            = 5000
-		testMaxInflight                 = 400
-		testRetryBaseIntervalMs         = 250
-		testRetryMultiplier             = 1.5
-		testRetryMaxAttempts            = 3
-		testRestoreDownloadThreads      = 8
-		testRestoreDownloadThreadsParam = ";restore-download-threads=8"
-		// testFuzzyParams are the fuzzy restore parameters of the requests below.
-		testFuzzyParams = ";allow-unhosted=true;parallel=16;records-per-second=5000;max-inflight=400;" +
-			"retry-base-interval=250;retry-multiplier=1.5;retry-max-attempts=3;ignore-record-error=false"
-		// testRestoreFlags are the index and UDF flags of the requests below.
-		testRestoreFlags = ";no-indexes=false;no-udfs=true"
+		testIncrementalPath = "/backups/incr"
+		// testRestoreHead are the parameters of the requests below that precede
+		// the mode flag, in the order the command adds them.
+		testRestoreHead = testCmdRestoreBase + testCmdStorageParams + ";incremental-path=/backups/incr" +
+			";no-indexes=false;no-udfs=true"
+		// testRestoreLimits are the parameters of both modes that follow the filter.
+		testRestoreLimits = ";restore-download-threads=8;restore-worker-threads=16;restore-rps=5000;" +
+			"extra-ttl=3600"
+		// testFuzzyParams are the fuzzy only parameters of the requests below.
+		testFuzzyParams = ";allow-unhosted=true;max-inflight=400;retry-base-interval=250;" +
+			"retry-multiplier=1.5;retry-max-attempts=3;ignore-record-error=false;apply-metadata-last=true"
+		testFuzzyFlag = ";fuzzy-restore=true"
 	)
 
 	cmds := newInfoCommands(infomodels.AerospikeVersionSupportsIntegratedBackup)
 
+	// newRequest returns a request with every parameter of both modes set.
 	newRequest := func(fuzzy *bool) *infomodels.RequestRestore {
 		common := testStorage()
 		common.SetList = testCmdSetList
-		common.FilterExp = testCmdFilterExp
 		common.NoIndexes = testPtr(false)
 		common.NoUDFs = testPtr(true)
 
@@ -796,18 +896,49 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 			RequestCommon:          common,
 			JobID:                  testCmdJobID,
 			BackupIDs:              testCmdBackupID,
+			IncrementalPath:        testIncrementalPath,
 			FuzzyRestore:           fuzzy,
-			AllowUnhosted:          testPtr(true),
-			Parallel:               testParallel,
-			RecordsPerSecond:       testRecordsPerSecond,
-			MaxInflight:            testMaxInflight,
-			RetryBaseIntervalMs:    testRetryBaseIntervalMs,
-			RetryMultiplier:        testRetryMultiplier,
-			RetryMaxAttempts:       testRetryMaxAttempts,
-			IgnoreRecordError:      testPtr(false),
-			RestoreDownloadThreads: testRestoreDownloadThreads,
+			RestoreDownloadThreads: 8,
+			RestoreWorkerThreads:   16,
+			RestoreRPS:             5000,
+			ExtraTTL:               3600,
 		}
 	}
+
+	newFuzzyRequest := func() *infomodels.RequestRestore {
+		r := newRequest(testPtr(true))
+		r.AllowUnhosted = testPtr(true)
+		r.MaxInflight = 400
+		r.RetryBaseIntervalMs = testPtr(250)
+		r.RetryMultiplier = 1.5
+		r.RetryMaxAttempts = 3
+		r.IgnoreRecordError = testPtr(false)
+		r.ApplyMetadataLast = testPtr(true)
+
+		return r
+	}
+
+	newColdRequest := func(fuzzy *bool) *infomodels.RequestRestore {
+		r := newRequest(fuzzy)
+		r.FilterExp = testCmdFilterExp
+
+		return r
+	}
+
+	newMinimalFuzzyRequest := func() *infomodels.RequestRestore {
+		return &infomodels.RequestRestore{
+			RequestCommon: infomodels.RequestCommon{
+				Namespace: testCmdNamespace,
+				Storage:   testCmdStorage,
+			},
+			JobID:        testCmdJobID,
+			BackupIDs:    testCmdBackupID,
+			FuzzyRestore: testPtr(true),
+		}
+	}
+
+	retryBaseIntervalZero := newMinimalFuzzyRequest()
+	retryBaseIntervalZero.RetryBaseIntervalMs = testPtr(0)
 
 	tests := []struct {
 		name string
@@ -815,35 +946,30 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 		want string
 	}{
 		{
-			name: "fuzzy restore sends fuzzy parameters",
-			give: newRequest(testPtr(true)),
-			want: testCmdRestoreBase + testCmdStorageParams + testRestoreFlags + ";fuzzy-restore=true" +
-				testCmdSetListParam + testCmdFilterExpParam + testRestoreDownloadThreadsParam + testFuzzyParams,
+			name: "fuzzy restore sends every fuzzy parameter",
+			give: newFuzzyRequest(),
+			want: testRestoreHead + testFuzzyFlag + testCmdSetListParam + testRestoreLimits + testFuzzyParams,
 		},
 		{
-			name: "cold restore omits fuzzy parameters",
-			give: newRequest(testPtr(false)),
-			want: testCmdRestoreBase + testCmdStorageParams + testRestoreFlags + ";fuzzy-restore=false" +
-				testCmdSetListParam + testCmdFilterExpParam + testRestoreDownloadThreadsParam,
+			name: "cold restore sends the filter",
+			give: newColdRequest(testPtr(false)),
+			want: testRestoreHead + ";fuzzy-restore=false" + testCmdSetListParam + testCmdFilterExpParam +
+				testRestoreLimits,
 		},
 		{
-			name: "unset fuzzy restore omits fuzzy parameters",
-			give: newRequest(nil),
-			want: testCmdRestoreBase + testCmdStorageParams + testRestoreFlags + testCmdSetListParam +
-				testCmdFilterExpParam + testRestoreDownloadThreadsParam,
+			name: "unset fuzzy restore is a cold restore",
+			give: newColdRequest(nil),
+			want: testRestoreHead + testCmdSetListParam + testCmdFilterExpParam + testRestoreLimits,
 		},
 		{
 			name: testNameUnsetOmitted,
-			give: &infomodels.RequestRestore{
-				RequestCommon: infomodels.RequestCommon{
-					Namespace: testCmdNamespace,
-					Storage:   testCmdStorage,
-				},
-				JobID:        testCmdJobID,
-				BackupIDs:    testCmdBackupID,
-				FuzzyRestore: testPtr(true),
-			},
-			want: testCmdRestoreBase + ";fuzzy-restore=true",
+			give: newMinimalFuzzyRequest(),
+			want: testCmdRestoreBase + testFuzzyFlag,
+		},
+		{
+			name: "zero retry base interval is sent",
+			give: retryBaseIntervalZero,
+			want: testCmdRestoreBase + testFuzzyFlag + ";retry-base-interval=0",
 		},
 	}
 
@@ -855,6 +981,92 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestInfoCommands_ServerRestoreModeMismatch(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testColdMode  = "restore with fuzzy-restore=false: "
+		testFuzzyMode = "restore with fuzzy-restore=true: "
+	)
+
+	cmds := newInfoCommands(infomodels.AerospikeVersionSupportsIntegratedBackup)
+
+	newRequest := func(fuzzy *bool) *infomodels.RequestRestore {
+		return &infomodels.RequestRestore{
+			RequestCommon: infomodels.RequestCommon{
+				Namespace: testCmdNamespace,
+				Storage:   testCmdStorage,
+			},
+			JobID:        testCmdJobID,
+			BackupIDs:    testCmdBackupID,
+			FuzzyRestore: fuzzy,
+		}
+	}
+
+	fuzzyWithFilter := newRequest(testPtr(true))
+	fuzzyWithFilter.FilterExp = testCmdFilterExp
+
+	coldWithFuzzyParams := newRequest(testPtr(false))
+	coldWithFuzzyParams.AllowUnhosted = testPtr(false)
+	coldWithFuzzyParams.MaxInflight = 1
+	coldWithFuzzyParams.RetryBaseIntervalMs = testPtr(0)
+	coldWithFuzzyParams.RetryMultiplier = 1
+	coldWithFuzzyParams.RetryMaxAttempts = 1
+	coldWithFuzzyParams.IgnoreRecordError = testPtr(false)
+	coldWithFuzzyParams.ApplyMetadataLast = testPtr(false)
+
+	unsetModeWithFuzzyParam := newRequest(nil)
+	unsetModeWithFuzzyParam.MaxInflight = 1
+
+	missingJobIDWithFuzzyParam := newRequest(nil)
+	missingJobIDWithFuzzyParam.JobID = ""
+	missingJobIDWithFuzzyParam.MaxInflight = 1
+
+	tests := []struct {
+		name        string
+		give        *infomodels.RequestRestore
+		wantErrText string
+		wantMissing bool
+	}{
+		{
+			name:        "missing parameter is reported with the mode mismatch",
+			give:        missingJobIDWithFuzzyParam,
+			wantErrText: testColdMode + paramMaxInflight,
+			wantMissing: true,
+		},
+		{
+			name:        "filter expression in fuzzy restore",
+			give:        fuzzyWithFilter,
+			wantErrText: testFuzzyMode + paramFilterExp,
+		},
+		{
+			name: "every fuzzy only parameter in cold restore",
+			give: coldWithFuzzyParams,
+			wantErrText: testColdMode + "allow-unhosted, max-inflight, retry-base-interval, " +
+				"retry-multiplier, retry-max-attempts, ignore-record-error, apply-metadata-last",
+		},
+		{
+			name:        "fuzzy only parameter with unset mode",
+			give:        unsetModeWithFuzzyParam,
+			wantErrText: testColdMode + paramMaxInflight,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := cmds.serverRestore(tt.give)
+
+			require.ErrorIs(t, err, errParamNotApplicable)
+			require.ErrorIs(t, err, errclass.ErrInvalidConfig)
+			require.ErrorContains(t, err, tt.wantErrText)
+			assert.Equal(t, tt.wantMissing, errors.Is(err, errMissingCmdParam))
+			assert.Empty(t, got)
 		})
 	}
 }

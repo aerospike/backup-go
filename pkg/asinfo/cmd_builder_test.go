@@ -50,6 +50,9 @@ func TestInfoCmd_BuildParams(t *testing.T) {
 		testValue2 = "v2"
 		testValue3 = "v3"
 		wantEmpty  = "cmd:"
+		// wantNum is k1 sent with the value 42 of the number test cases.
+		wantNum     = "cmd:k1=42"
+		wantNumZero = "cmd:k1=0"
 	)
 
 	tests := []struct {
@@ -115,12 +118,12 @@ func TestInfoCmd_BuildParams(t *testing.T) {
 		{
 			name:  "num",
 			build: func(c *infoCmd) *infoCmd { return c.num(testCmdKey1, 42) },
-			want:  "cmd:k1=42",
+			want:  wantNum,
 		},
 		{
 			name:  "num zero is sent",
 			build: func(c *infoCmd) *infoCmd { return c.num(testCmdKey1, 0) },
-			want:  "cmd:k1=0",
+			want:  wantNumZero,
 		},
 		{
 			name:  "optional flag unset is omitted",
@@ -145,7 +148,22 @@ func TestInfoCmd_BuildParams(t *testing.T) {
 		{
 			name:  "optional num is sent",
 			build: func(c *infoCmd) *infoCmd { return c.optNum(testCmdKey1, 42) },
-			want:  "cmd:k1=42",
+			want:  wantNum,
+		},
+		{
+			name:  "optional num pointer unset is omitted",
+			build: func(c *infoCmd) *infoCmd { return c.optNumPtr(testCmdKey1, nil) },
+			want:  wantEmpty,
+		},
+		{
+			name:  "optional num pointer zero is sent",
+			build: func(c *infoCmd) *infoCmd { return c.optNumPtr(testCmdKey1, testPtr(0)) },
+			want:  wantNumZero,
+		},
+		{
+			name:  "optional num pointer is sent",
+			build: func(c *infoCmd) *infoCmd { return c.optNumPtr(testCmdKey1, testPtr(42)) },
+			want:  wantNum,
 		},
 		{
 			name:  "optional float zero is omitted",

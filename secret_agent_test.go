@@ -15,38 +15,24 @@
 package backup
 
 import (
-	"context"
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/binary"
-	"encoding/json"
-	"encoding/pem"
-	"fmt"
-	"io"
-	"math/big"
-	"net"
-	"os"
+	"encoding/base64"
 	"testing"
-	"time"
 
-	saClient "github.com/aerospike/backup-go/pkg/secretagent"
-	"github.com/aerospike/backup-go/pkg/secretagent/connection"
-	"github.com/aerospike/backup-go/pkg/secretagent/models"
+	"github.com/aerospike/tools-common-go/secretagent"
+	"github.com/aerospike/tools-common-go/secretagent/secretagenttest"
 	"github.com/stretchr/testify/require"
 )
 
 const (
-	testSAPort             = 2222
-	testSASecretKey        = "secrets:resource:key"
-	testSASecretErrPrefix  = "sacred:resource:key"
-	testSASecretKeyErr     = "resource:key"
-	testSASecretKeyErrLong = "secrets:resource:key:val"
-	testCaFile             = "tests/integration/cert_test.pem"
-	magic                  = 0x51dec1cc
-	testPKey               = `MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDq+ku8oxfSQnUF
+	testSAPort            = 2222
+	testSAResource        = "resource"
+	testSAKey             = "key"
+	testSASecretKey       = "secrets:resource:key"
+	testSASecretErrPrefix = "sacred:resource:key"
+	testSASecretKeyErr    = "resource:key"
+	testCaFile            = "tests/integration/cert_test.pem"
+	testPKey              = `MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDq+ku8oxfSQnUF
 4qs8ctSYwtQwgyGViCfO7fnVf+cyIcKhZSCUlqIQPN17pBzUaWLKaLCSvIhehE1N
 ETAtbUEgMUbn7R4WGV7N5ACl2mgLh6Rczz5FSSSwrZ/YRSHTsp7oaaKE5bA9S2jY
 IKkGMZSGAsh90xVeggDypciI0Pw2aJwed/EXI0PWND2LKut5POJYyHgbxgygp1AC
@@ -74,398 +60,298 @@ rqDyLDkROLjIJE1InlzrtH9rHGInExFVWbzL1jpCV7GtQsYVdiSxHzNaRB47UGZI
 ah87+EsQLgoao6VWDlepN54P`
 )
 
-func mockTCPServer(ctx context.Context, address string, handler func(net.Conn)) (net.Listener, error) {
-	var lc net.ListenConfig
-	listener, err := lc.Listen(ctx, saClient.ConnectionTypeTCP, address)
-	if err != nil {
-		return nil, err
-	}
-
-	go func() {
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				continue
-			}
-			go handler(conn)
-		}
-	}()
-
-	return listener, nil
+func testSecrets() secretagenttest.Secrets {
+	return secretagenttest.Secrets{testSAResource: {testSAKey: testPKey}}
 }
 
-func mockHandler(conn net.Conn) {
-	defer sneakyClose(conn)
-	_, _ = connection.ReadBytes(conn, 10)
+func testServerConfig(srv *secretagenttest.Server) *SecretAgentConfig {
+	connectionType := srv.Network()
+	address := srv.Addr()
+	cfg := &SecretAgentConfig{ConnectionType: &connectionType, Address: &address}
 
-	resp := models.Response{
-		SecretValue: testPKey,
-		Error:       "",
-	}
-	respJSON, _ := json.Marshal(resp)
-	length := len(respJSON)
-	header := make([]byte, 8)
-	binary.BigEndian.PutUint32(header[:4], magic)
-	binary.BigEndian.PutUint32(header[4:], uint32(length))
-
-	_, err := conn.Write(append(header, respJSON...))
-	if err != nil {
-		fmt.Println(err)
-	}
-}
-
-func TestSecretAgent_isSecret(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		secret string
-		result bool
-	}{
-		{testSASecretKey, true},
-		{testSASecretKeyErr, false},
-		{"", false},
+	if caFile := srv.CAFile(); caFile != "" {
+		cfg.CaFile = &caFile
 	}
 
-	for _, tt := range testCases {
-		result := isSecret(tt.secret)
-		require.Equal(t, tt.result, result)
-	}
-}
-
-func TestSecretAgent_getResourceKey(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		key        string
-		resource   string
-		secretKey  string
-		errContent string
-	}{
-		{testSASecretKey, "resource", "key", ""},
-		{testSASecretErrPrefix, "", "", "invalid secret key format"},
-		{testSASecretKeyErrLong, "", "", "invalid secret key format"},
+	if certFile, keyFile := srv.ClientCertFile(), srv.ClientKeyFile(); certFile != "" {
+		cfg.CertFile, cfg.KeyFile = &certFile, &keyFile
 	}
 
-	for i, tt := range testCases {
-		res, sk, err := getResourceKey(tt.key)
-		require.Equal(t, tt.resource, res)
-		require.Equal(t, tt.secretKey, sk)
-		if tt.errContent != "" {
-			require.ErrorContains(t, err, tt.errContent, "case %d", i)
-		} else {
-			require.NoError(t, err, "case %d", i)
-		}
-	}
-}
-
-func TestSecretAgent_getTlSConfig(t *testing.T) {
-	t.Parallel()
-
-	filePem := testCaFile
-	filePemNotExist := "tests/integration/smth.pem"
-	filePemWrong := "tests/integration/pkey_test"
-
-	testCases := []struct {
-		config     *SecretAgentConfig
-		errContent string
-	}{
-		{&SecretAgentConfig{CaFile: nil}, ""},
-		{&SecretAgentConfig{CaFile: &filePem}, ""},
-		{&SecretAgentConfig{CaFile: &filePemNotExist}, "failed to read ca file"},
-		{&SecretAgentConfig{CaFile: &filePemWrong}, "nothing to append to ca cert pool"},
-	}
-
-	for i, tt := range testCases {
-		_, err := getTLSConfig(tt.config)
-		if tt.errContent != "" {
-			require.ErrorContains(t, err, tt.errContent, "case %d", i)
-		} else {
-			require.NoError(t, err, "case %d", i)
-		}
-	}
-}
-
-func TestSecretAgent_getSecret(t *testing.T) {
-	t.Parallel()
-
-	listener, err := mockTCPServer(t.Context(), fmt.Sprintf(":%d", testSAPort), mockHandler)
-	require.NoError(t, err)
-	defer sneakyClose(listener)
-
-	// Wait for server start.
-	time.Sleep(1 * time.Second)
-
-	cfg := testSecretAgentConfig()
-
-	testCases := []struct {
-		config     *SecretAgentConfig
-		key        string
-		errContent string
-	}{
-		{cfg, testSASecretKey, ""},
-		{nil, testSASecretKey, "secret config not initialized"},
-		{cfg, testSASecretKeyErr, "invalid secret key format"},
-		{cfg, testSASecretErrPrefix, "invalid secret key format"},
-		{cfg, testSASecretKeyErrLong, "invalid secret key format"},
-	}
-
-	for i, tt := range testCases {
-		var client *saClient.Client
-		if tt.config != nil {
-			var errClient error
-			client, errClient = NewSecretAgentClient(tt.config)
-			require.NoError(t, errClient, "case %d", i)
-		}
-		_, err = getSecret(t.Context(), client, tt.key)
-		if tt.errContent != "" {
-			require.ErrorContains(t, err, tt.errContent, "case %d", i)
-		} else {
-			require.NoError(t, err, "case %d", i)
-		}
-	}
+	return cfg
 }
 
 func TestParseSecret_ReturnsPlainValueWhenNotSecret(t *testing.T) {
 	t.Parallel()
 
-	cfg := &SecretAgentConfig{}
-	value, err := ParseSecret(t.Context(), cfg, "plain-value")
+	value, err := ParseSecret(t.Context(), nil, "plain-value")
 
 	require.NoError(t, err)
 	require.Equal(t, "plain-value", value)
 }
 
-func TestParseSecret_SecretValueIsResolved(t *testing.T) {
-	// We intentionally do NOT call t.Parallel here because we spin up a real TCP listener
-	// and want to avoid any flakiness around timing / port reuse.
-
-	// Use mockTCPServer with an ephemeral port.
-	listener, err := mockTCPServer(t.Context(), "127.0.0.1:0", mockHandler)
-	require.NoError(t, err)
-	defer sneakyClose(listener)
-
-	// Give the server a tiny bit of time to start accepting.
-	time.Sleep(20 * time.Millisecond)
-
-	addr := listener.Addr().String()
-	connectionType := saClient.ConnectionTypeTCP
-	timeoutMs := 1000
-	isBase64 := false
-
-	cfg := &SecretAgentConfig{
-		Address:            &addr,
-		ConnectionType:     &connectionType,
-		TimeoutMillisecond: &timeoutMs,
-		IsBase64:           &isBase64,
-	}
-
-	value, err := ParseSecret(t.Context(), cfg, testSASecretKey)
-	require.NoError(t, err)
-	require.Equal(t, testPKey, value)
-}
-
-func TestParseSecret_SecretAgentError(t *testing.T) {
+func TestParseSecret_Resolves(t *testing.T) {
 	t.Parallel()
 
-	// nil config should propagate the NewSecretAgentClient error out of ParseSecret.
-	value, err := ParseSecret(t.Context(), nil, testSASecretKey)
-	require.ErrorContains(t, err, "secret config not initialized")
-	require.Empty(t, value)
-}
-
-func TestSecretAgent_getTlSConfig_WithTLSNameAndClientCert(t *testing.T) {
-	t.Parallel()
-
-	certPath, keyPath := generateTempCertAndKey(t)
-	serverName := "example.com"
-
-	cfg := &SecretAgentConfig{
-		CaFile:   &certPath, // also acts as CA here
-		TLSName:  &serverName,
-		CertFile: &certPath,
-		KeyFile:  &keyPath,
-	}
-
-	tlsConfig, err := getTLSConfig(cfg)
-	require.NoError(t, err)
-	require.NotNil(t, tlsConfig)
-	require.Equal(t, serverName, tlsConfig.ServerName)
-	require.NotEmpty(t, tlsConfig.Certificates, "client certificate should be loaded")
-}
-
-func TestSecretAgent_getTlSConfig_MinVersion(t *testing.T) {
-	t.Parallel()
-
-	filePem := testCaFile
-
-	minTLS13 := uint16(tls.VersionTLS13)
-	minTLS10 := uint16(tls.VersionTLS10)
-
-	testCases := []struct {
-		name          string
-		minTLSVersion *uint16
-		want          uint16
+	tests := []struct {
+		name   string
+		server func(testing.TB, secretagenttest.Secrets) *secretagenttest.Server
 	}{
-		{
-			name:          "default is TLS 1.2",
-			minTLSVersion: nil,
-			want:          tls.VersionTLS12,
-		},
-		{
-			name:          "explicit TLS 1.3",
-			minTLSVersion: &minTLS13,
-			want:          tls.VersionTLS13,
-		},
-		{
-			name:          "legacy opt-in TLS 1.0",
-			minTLSVersion: &minTLS10,
-			want:          tls.VersionTLS10,
-		},
+		{name: "tcp", server: secretagenttest.NewServer},
+		{name: "unix", server: secretagenttest.NewUnixServer},
+		{name: "tls", server: secretagenttest.NewTLSServer},
+		{name: "mutual tls", server: secretagenttest.NewMutualTLSServer},
 	}
 
-	for _, tt := range testCases {
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			cfg := &SecretAgentConfig{
-				CaFile:        &filePem,
-				MinTLSVersion: tt.minTLSVersion,
-			}
+			srv := tt.server(t, testSecrets())
 
-			tlsConfig, err := getTLSConfig(cfg)
-
+			value, err := ParseSecret(t.Context(), testServerConfig(srv), testSASecretKey)
 			require.NoError(t, err)
-			require.NotNil(t, tlsConfig)
-			require.Equal(t, tt.want, tlsConfig.MinVersion)
+			require.Equal(t, testPKey, value)
 		})
 	}
 }
 
-func TestSecretAgent_getTlSConfig_InvalidClientCert(t *testing.T) {
+func TestParseSecret_References(t *testing.T) {
 	t.Parallel()
 
-	// same key file used as both cert and key should cause LoadX509KeyPair to fail
-	filePem := testCaFile
-	badCertAndKey := "tests/integration/pkey_test"
+	srv := secretagenttest.NewServer(t, secretagenttest.Secrets{
+		"":         {"key": "no resource"},
+		"res:with": {"colon": "colon in resource"},
+	})
+	cfg := testServerConfig(srv)
 
-	cfg := &SecretAgentConfig{
-		CaFile:   &filePem,
-		CertFile: &badCertAndKey,
-		KeyFile:  &badCertAndKey,
+	tests := []struct {
+		ref  string
+		want string
+	}{
+		{ref: "secrets:key", want: "no resource"},
+		{ref: "secrets:res:with:colon", want: "colon in resource"},
 	}
 
-	_, err := getTLSConfig(cfg)
-	require.ErrorContains(t, err, "failed to load client certificate")
+	for _, tt := range tests {
+		value, err := ParseSecret(t.Context(), cfg, tt.ref)
+		require.NoError(t, err, tt.ref)
+		require.Equal(t, tt.want, value, tt.ref)
+	}
+}
+
+func TestParseSecret_Base64(t *testing.T) {
+	t.Parallel()
+
+	srv := secretagenttest.NewServer(t, secretagenttest.Secrets{
+		testSAResource: {testSAKey: base64.StdEncoding.EncodeToString([]byte("decoded"))},
+	})
+	cfg := testServerConfig(srv)
+	isBase64 := true
+	cfg.IsBase64 = &isBase64
+
+	value, err := ParseSecret(t.Context(), cfg, testSASecretKey)
+	require.NoError(t, err)
+	require.Equal(t, "decoded", value)
+}
+
+func TestParseSecret_TLSName(t *testing.T) {
+	t.Parallel()
+
+	srv := secretagenttest.NewTLSServer(t, testSecrets())
+
+	tests := []struct {
+		tlsName string
+		wantErr error
+	}{
+		{tlsName: "localhost"},
+		{tlsName: "example.com", wantErr: ErrSecretAgent},
+	}
+
+	for _, tt := range tests {
+		cfg := testServerConfig(srv)
+		cfg.TLSName = &tt.tlsName
+
+		_, err := ParseSecret(t.Context(), cfg, testSASecretKey)
+		if tt.wantErr != nil {
+			require.ErrorIs(t, err, tt.wantErr, tt.tlsName)
+		} else {
+			require.NoError(t, err, tt.tlsName)
+		}
+	}
+}
+
+func TestParseSecret_MinTLSVersion(t *testing.T) {
+	t.Parallel()
+
+	pki, err := secretagenttest.GeneratePKI(t.TempDir())
+	require.NoError(t, err)
+
+	cert, err := tls.LoadX509KeyPair(pki.ServerCertFile, pki.ServerKeyFile)
+	require.NoError(t, err)
+
+	//nolint:gosec // The server caps TLS at 1.2 to reject a client that requires 1.3.
+	ln, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS12,
+		MaxVersion:   tls.VersionTLS12,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ln.Close() })
+
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+
+			_ = conn.(*tls.Conn).HandshakeContext(t.Context())
+			_ = conn.Close()
+		}
+	}()
+
+	connectionType := secretagent.ConnectionTypeTCP
+	address := ln.Addr().String()
+	minVersion := uint16(tls.VersionTLS13)
+	cfg := &SecretAgentConfig{
+		ConnectionType: &connectionType,
+		Address:        &address,
+		CaFile:         &pki.CAFile,
+		MinTLSVersion:  &minVersion,
+	}
+
+	_, err = ParseSecret(t.Context(), cfg, testSASecretKey)
+	require.ErrorIs(t, err, ErrSecretAgent)
+	require.ErrorContains(t, err, "protocol version")
+}
+
+func TestParseSecret_Errors(t *testing.T) {
+	t.Parallel()
+
+	srv := secretagenttest.NewServer(t, testSecrets())
+	cfg := testServerConfig(srv)
+
+	tests := []struct {
+		name    string
+		config  *SecretAgentConfig
+		secret  string
+		wantErr error
+	}{
+		{name: "nil config", config: nil, secret: testSASecretKey, wantErr: ErrInvalidConfig},
+		{name: "empty key", config: cfg, secret: "secrets:resource:", wantErr: ErrInvalidConfig},
+		{name: "unknown secret", config: cfg, secret: "secrets:resource:missing", wantErr: ErrSecretAgent},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			value, err := ParseSecret(t.Context(), tt.config, tt.secret)
+			require.ErrorIs(t, err, tt.wantErr)
+			require.Empty(t, value)
+		})
+	}
+}
+
+func TestGetSecret_Errors(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewSecretAgentClient(testSecretAgentConfig())
+	require.NoError(t, err)
+
+	tests := []struct {
+		name   string
+		client *secretagent.Client
+		key    string
+	}{
+		{name: "nil client", client: nil, key: testSASecretKey},
+		{name: "missing prefix", client: client, key: testSASecretKeyErr},
+		{name: "wrong prefix", client: client, key: testSASecretErrPrefix},
+	}
+
+	for _, tt := range tests {
+		_, err := getSecret(t.Context(), tt.client, tt.key)
+		require.ErrorIs(t, err, ErrInvalidConfig, tt.name)
+	}
+}
+
+func TestNewSecretAgentClient_Errors(t *testing.T) {
+	t.Parallel()
+
+	pki, err := secretagenttest.GeneratePKI(t.TempDir())
+	require.NoError(t, err)
+
+	caFile := testCaFile
+	missingFile := "tests/integration/smth.pem"
+	notACert := "tests/integration/pkey_test"
+	unix := secretagent.ConnectionTypeUDS
+	unknownType := "udp"
+	negativeTimeout := -1
+
+	tests := []struct {
+		name    string
+		modify  func(*SecretAgentConfig)
+		wantErr error
+	}{
+		{
+			name:    "missing ca file",
+			modify:  func(c *SecretAgentConfig) { c.CaFile = &missingFile },
+			wantErr: ErrInvalidConfig,
+		},
+		{
+			name:    "ca file without certificates",
+			modify:  func(c *SecretAgentConfig) { c.CaFile = &notACert },
+			wantErr: ErrInvalidConfig,
+		},
+		{
+			name: "invalid client certificate",
+			modify: func(c *SecretAgentConfig) {
+				c.CaFile, c.CertFile, c.KeyFile = &caFile, &notACert, &notACert
+			},
+			wantErr: ErrInvalidConfig,
+		},
+		{
+			name: "client certificate without ca file",
+			modify: func(c *SecretAgentConfig) {
+				c.CertFile, c.KeyFile = &pki.ClientCertFile, &pki.ClientKeyFile
+			},
+			wantErr: ErrInvalidConfig,
+		},
+		{
+			name: "tls over unix socket",
+			modify: func(c *SecretAgentConfig) {
+				c.ConnectionType, c.CaFile = &unix, &caFile
+			},
+			wantErr: ErrUnsupported,
+		},
+		{
+			name:    "unknown connection type",
+			modify:  func(c *SecretAgentConfig) { c.ConnectionType = &unknownType },
+			wantErr: ErrInvalidConfig,
+		},
+		{
+			name:    "negative timeout",
+			modify:  func(c *SecretAgentConfig) { c.TimeoutMillisecond = &negativeTimeout },
+			wantErr: ErrInvalidConfig,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			cfg := testSecretAgentConfig()
+			tt.modify(cfg)
+
+			_, err := NewSecretAgentClient(cfg)
+			require.ErrorIs(t, err, tt.wantErr)
+		})
+	}
 }
 
 func TestNewSecretAgentClient_NilConfig(t *testing.T) {
 	t.Parallel()
 
 	_, err := NewSecretAgentClient(nil)
-	require.ErrorContains(t, err, "secret config not initialized")
-}
-
-func TestNewSecretAgentClient_TLSConfigError(t *testing.T) {
-	t.Parallel()
-
-	// Point CaFile at a non-existing file so getTLSConfig fails and bubbles up.
-	addr := "127.0.0.1:0"
-	connectionType := saClient.ConnectionTypeTCP
-	badCa := "tests/integration/smth.pem"
-
-	cfg := &SecretAgentConfig{
-		Address:        &addr,
-		ConnectionType: &connectionType,
-		CaFile:         &badCa,
-	}
-
-	_, err := NewSecretAgentClient(cfg)
-	require.ErrorContains(t, err, "failed to read ca file")
-}
-
-func TestNewSecretAgentClient_Success(t *testing.T) {
-	// As with the ParseSecret success test, avoid t.Parallel since we spin up a real listener.
-
-	listener, err := mockTCPServer(t.Context(), "127.0.0.1:0", mockHandler)
-	require.NoError(t, err)
-	defer sneakyClose(listener)
-
-	// Give the server a tiny bit of time to start accepting.
-	time.Sleep(20 * time.Millisecond)
-
-	addr := listener.Addr().String()
-	connectionType := saClient.ConnectionTypeTCP
-	timeoutMs := 1500
-	isBase64 := true
-
-	cfg := &SecretAgentConfig{
-		Address:            &addr,
-		ConnectionType:     &connectionType,
-		TimeoutMillisecond: &timeoutMs,
-		IsBase64:           &isBase64,
-		// CaFile is nil here on purpose to also cover the "no TLS config" path.
-	}
-
-	client, err := NewSecretAgentClient(cfg)
-	require.NoError(t, err)
-	require.NotNil(t, client)
-}
-
-func generateTempCertAndKey(t *testing.T) (certFile, keyFile string) {
-	t.Helper()
-
-	// Generate RSA private key
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
-	require.NoError(t, err)
-
-	// Self-signed certificate template
-	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
-	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
-	require.NoError(t, err)
-
-	template := x509.Certificate{
-		SerialNumber: serialNumber,
-		Subject: pkix.Name{
-			CommonName:   "Test Cert",
-			Organization: []string{"Aerospike"},
-		},
-		NotBefore: time.Now().Add(-time.Hour),
-		NotAfter:  time.Now().Add(24 * time.Hour),
-
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-		BasicConstraintsValid: true,
-		IsCA:                  true,
-	}
-
-	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
-	require.NoError(t, err)
-
-	// Write cert to temp file
-	dir := t.TempDir()
-
-	certPath := dir + "/cert.pem"
-	keyPath := dir + "/key.pem"
-
-	certOut, err := os.Create(certPath)
-	require.NoError(t, err)
-	defer sneakyClose(certOut)
-
-	err = pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
-	require.NoError(t, err)
-
-	// Write key to temp file
-	keyOut, err := os.Create(keyPath)
-	require.NoError(t, err)
-	defer sneakyClose(keyOut)
-
-	keyBytes := x509.MarshalPKCS1PrivateKey(priv)
-	err = pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyBytes})
-	require.NoError(t, err)
-
-	return certPath, keyPath
-}
-
-func sneakyClose(c io.Closer) {
-	_ = c.Close()
+	require.ErrorIs(t, err, ErrInvalidConfig)
 }

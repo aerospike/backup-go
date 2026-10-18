@@ -15,7 +15,6 @@
 package backup
 
 import (
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -23,14 +22,14 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/io/encoding/asb"
 	"github.com/aerospike/backup-go/io/storage/local"
 	"github.com/aerospike/backup-go/io/storage/options"
-	"github.com/aerospike/backup-go/pkg/secretagent"
 	"github.com/aerospike/backup-go/pkg/server/segvalidator"
+	"github.com/aerospike/tools-common-go/secretagent"
+	"github.com/aerospike/tools-common-go/secretagent/secretagenttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -248,11 +247,9 @@ func TestErrorClass_ExactlyOne(t *testing.T) {
 	const (
 		unreachableTCP = "127.0.0.1:1"
 		missingSocket  = "/tmp/backup-go-no-such.sock"
-		shortTimeout   = 100 * time.Millisecond
+		shortTimeoutMs = 100
 		notAnASBFile   = "not an asb file\n"
 		testFileName   = "backup.asb"
-		testResource   = "resource"
-		testSecretKey  = "key"
 	)
 
 	ctx := t.Context()
@@ -333,8 +330,12 @@ func TestErrorClass_ExactlyOne(t *testing.T) {
 		{
 			name: "secret agent with TLS over a unix socket",
 			call: func() error {
-				_, err := secretagent.NewClient(secretagent.ConnectionTypeUDS, missingSocket, shortTimeout, false,
-					&tls.Config{MinVersion: tls.VersionTLS12})
+				connectionType, address, caFile := secretagent.ConnectionTypeUDS, missingSocket, testCaFile
+				_, err := NewSecretAgentClient(&SecretAgentConfig{
+					ConnectionType: &connectionType,
+					Address:        &address,
+					CaFile:         &caFile,
+				})
 
 				return err
 			},
@@ -343,18 +344,34 @@ func TestErrorClass_ExactlyOne(t *testing.T) {
 		{
 			name: "secret agent unreachable",
 			call: func() error {
-				// NewClient only rejects TLS over a non-TCP connection, so this
-				// combination cannot fail. Port 1 on the loopback interface is
-				// not listening in any sane environment, so the dial fails fast
-				// instead of hanging.
-				agent, _ := secretagent.NewClient(secretagent.ConnectionTypeTCP, unreachableTCP,
-					shortTimeout, false, nil)
-
-				_, err := agent.GetSecret(ctx, testResource, testSecretKey)
+				// Port 1 on the loopback interface is not listening in any sane
+				// environment, so the dial fails fast instead of hanging.
+				connectionType, address, timeout := secretagent.ConnectionTypeTCP, unreachableTCP, shortTimeoutMs
+				_, err := ParseSecret(ctx, &SecretAgentConfig{
+					ConnectionType:     &connectionType,
+					Address:            &address,
+					TimeoutMillisecond: &timeout,
+				}, testSASecretKey)
 
 				return err
 			},
 			want: ErrSecretAgent,
+		},
+		{
+			name: "secret agent returns a value that is not base64",
+			call: func() error {
+				srv := secretagenttest.NewServer(t, secretagenttest.Secrets{
+					testSAResource: {testSAKey: "not base64!"},
+				})
+				cfg := testServerConfig(srv)
+				isBase64 := true
+				cfg.IsBase64 = &isBase64
+
+				_, err := ParseSecret(ctx, cfg, testSASecretKey)
+
+				return err
+			},
+			want: ErrCorruptData,
 		},
 		{
 			name: "segment validator without a streamer",

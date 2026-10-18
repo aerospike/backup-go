@@ -17,12 +17,12 @@ package backup
 import (
 	"testing"
 
-	saClient "github.com/aerospike/backup-go/pkg/secretagent"
+	"github.com/aerospike/tools-common-go/secretagent"
 	"github.com/stretchr/testify/require"
 )
 
 func testSecretAgentConfig() *SecretAgentConfig {
-	cType := saClient.ConnectionTypeTCP
+	cType := secretagent.ConnectionTypeTCP
 	address := "127.0.0.1"
 	port := testSAPort
 	timeout := 1000
@@ -43,7 +43,7 @@ func TestConfigSecretAgent_validate(t *testing.T) {
 	cfgValid := testSecretAgentConfig()
 
 	cfgValidUDS := testSecretAgentConfig()
-	cTypeUDS := saClient.ConnectionTypeUDS
+	cTypeUDS := secretagent.ConnectionTypeUDS
 	addrUDS := "/tmp/secret-agent.sock"
 	cfgValidUDS.ConnectionType = &cTypeUDS
 	cfgValidUDS.Address = &addrUDS
@@ -87,6 +87,10 @@ func TestConfigSecretAgent_validate(t *testing.T) {
 	cfgKeyNoCert := testSecretAgentConfig()
 	key := "/path/to/key.pem"
 	cfgKeyNoCert.KeyFile = &key
+
+	cfgCertNoCA := testSecretAgentConfig()
+	cfgCertNoCA.CertFile = &cert
+	cfgCertNoCA.KeyFile = &key
 
 	testCases := []struct {
 		name       string
@@ -152,6 +156,11 @@ func TestConfigSecretAgent_validate(t *testing.T) {
 			name:       "key file without cert file",
 			config:     cfgKeyNoCert,
 			errContent: "cert file is required when key file is set",
+		},
+		{
+			name:       "cert file without ca file",
+			config:     cfgCertNoCA,
+			errContent: "ca file is required when cert file is set",
 		},
 	}
 

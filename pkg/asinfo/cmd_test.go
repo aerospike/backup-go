@@ -768,12 +768,14 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 	t.Parallel()
 
 	const (
-		testParallel            = 16
-		testRecordsPerSecond    = 5000
-		testMaxInflight         = 400
-		testRetryBaseIntervalMs = 250
-		testRetryMultiplier     = 1.5
-		testRetryMaxAttempts    = 3
+		testParallel                    = 16
+		testRecordsPerSecond            = 5000
+		testMaxInflight                 = 400
+		testRetryBaseIntervalMs         = 250
+		testRetryMultiplier             = 1.5
+		testRetryMaxAttempts            = 3
+		testRestoreDownloadThreads      = 8
+		testRestoreDownloadThreadsParam = ";restore-download-threads=8"
 		// testFuzzyParams are the fuzzy restore parameters of the requests below.
 		testFuzzyParams = ";allow-unhosted=true;parallel=16;records-per-second=5000;max-inflight=400;" +
 			"retry-base-interval=250;retry-multiplier=1.5;retry-max-attempts=3;ignore-record-error=false"
@@ -791,18 +793,19 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 		common.NoUDFs = testPtr(true)
 
 		return &infomodels.RequestRestore{
-			RequestCommon:       common,
-			JobID:               testCmdJobID,
-			BackupIDs:           testCmdBackupID,
-			FuzzyRestore:        fuzzy,
-			AllowUnhosted:       testPtr(true),
-			Parallel:            testParallel,
-			RecordsPerSecond:    testRecordsPerSecond,
-			MaxInflight:         testMaxInflight,
-			RetryBaseIntervalMs: testRetryBaseIntervalMs,
-			RetryMultiplier:     testRetryMultiplier,
-			RetryMaxAttempts:    testRetryMaxAttempts,
-			IgnoreRecordError:   testPtr(false),
+			RequestCommon:          common,
+			JobID:                  testCmdJobID,
+			BackupIDs:              testCmdBackupID,
+			FuzzyRestore:           fuzzy,
+			AllowUnhosted:          testPtr(true),
+			Parallel:               testParallel,
+			RecordsPerSecond:       testRecordsPerSecond,
+			MaxInflight:            testMaxInflight,
+			RetryBaseIntervalMs:    testRetryBaseIntervalMs,
+			RetryMultiplier:        testRetryMultiplier,
+			RetryMaxAttempts:       testRetryMaxAttempts,
+			IgnoreRecordError:      testPtr(false),
+			RestoreDownloadThreads: testRestoreDownloadThreads,
 		}
 	}
 
@@ -815,19 +818,19 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 			name: "fuzzy restore sends fuzzy parameters",
 			give: newRequest(testPtr(true)),
 			want: testCmdRestoreBase + testCmdStorageParams + testRestoreFlags + ";fuzzy-restore=true" +
-				testCmdSetListParam + testCmdFilterExpParam + testFuzzyParams,
+				testCmdSetListParam + testCmdFilterExpParam + testRestoreDownloadThreadsParam + testFuzzyParams,
 		},
 		{
 			name: "cold restore omits fuzzy parameters",
 			give: newRequest(testPtr(false)),
 			want: testCmdRestoreBase + testCmdStorageParams + testRestoreFlags + ";fuzzy-restore=false" +
-				testCmdSetListParam + testCmdFilterExpParam,
+				testCmdSetListParam + testCmdFilterExpParam + testRestoreDownloadThreadsParam,
 		},
 		{
 			name: "unset fuzzy restore omits fuzzy parameters",
 			give: newRequest(nil),
 			want: testCmdRestoreBase + testCmdStorageParams + testRestoreFlags + testCmdSetListParam +
-				testCmdFilterExpParam,
+				testCmdFilterExpParam + testRestoreDownloadThreadsParam,
 		},
 		{
 			name: testNameUnsetOmitted,

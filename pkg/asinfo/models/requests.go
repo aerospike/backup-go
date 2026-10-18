@@ -53,6 +53,9 @@ type RequestRestore struct {
 	RetryMaxAttempts int
 	// IgnoreRecordError continues the restore on errors of individual records.
 	IgnoreRecordError *bool
+	// RestoreDownloadThreads is the number of threads used to download backup files.
+	// The server accepts values from 1 to 128; zero omits the parameter.
+	RestoreDownloadThreads int
 }
 
 // RequestPrepareRestore represents a request to prepare a cold restore on the server.

@@ -10,8 +10,3 @@ updates:
     schedule:
       interval: "weekly"
     target-branch: "dev"
-
-  - package-ecosystem: gomod
-    directory: /
-    schedule:
-      interval: weekly

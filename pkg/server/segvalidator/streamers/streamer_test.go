@@ -102,7 +102,7 @@ func drain(run func(chan<- Segment) error) error {
 
 	go func() { done <- run(out) }()
 
-	for range out { //nolint:revive // The segments are drained, not inspected.
+	for range out {
 	}
 
 	return <-done

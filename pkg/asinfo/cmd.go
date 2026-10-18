@@ -54,38 +54,39 @@ const (
 
 // Command parameter keys.
 const (
-	paramFilename          = "filename"
-	paramSize              = "size"
-	paramIgnoreMigrations  = "ignore-migrations"
-	paramNamespace         = "namespace"
-	paramNamespaceShort    = "ns"
-	paramB64               = "b64"
-	paramJobID             = "job-id"
-	paramBackupIDs         = "backup-ids"
-	paramObjectStorageType = "object-storage-type"
-	paramPath              = "path"
-	paramS3Bucket          = "s3-bucket"
-	paramS3Region          = "s3-region"
-	paramS3Profile         = "s3-profile"
-	paramS3Endpoint        = "s3-endpoint"
-	paramSetList           = "set-list"
-	paramBinList           = "bin-list"
-	paramModifiedAfter     = "modified-after"
-	paramModifiedBefore    = "modified-before"
-	paramFilterExp         = "filter-exp"
-	paramNoIndexes         = "no-indexes"
-	paramNoUDFs            = "no-udfs"
-	paramNodes             = "nodes"
-	paramHydrateReplica    = "hydrate-replica"
-	paramFuzzyRestore      = "fuzzy-restore"
-	paramAllowUnhosted     = "allow-unhosted"
-	paramParallel          = "parallel"
-	paramRecordsPerSecond  = "records-per-second"
-	paramMaxInflight       = "max-inflight"
-	paramRetryBaseInterval = "retry-base-interval"
-	paramRetryMultiplier   = "retry-multiplier"
-	paramRetryMaxAttempts  = "retry-max-attempts"
-	paramIgnoreRecordError = "ignore-record-error"
+	paramFilename               = "filename"
+	paramSize                   = "size"
+	paramIgnoreMigrations       = "ignore-migrations"
+	paramNamespace              = "namespace"
+	paramNamespaceShort         = "ns"
+	paramB64                    = "b64"
+	paramJobID                  = "job-id"
+	paramBackupIDs              = "backup-ids"
+	paramObjectStorageType      = "object-storage-type"
+	paramPath                   = "path"
+	paramS3Bucket               = "s3-bucket"
+	paramS3Region               = "s3-region"
+	paramS3Profile              = "s3-profile"
+	paramS3Endpoint             = "s3-endpoint"
+	paramSetList                = "set-list"
+	paramBinList                = "bin-list"
+	paramModifiedAfter          = "modified-after"
+	paramModifiedBefore         = "modified-before"
+	paramFilterExp              = "filter-exp"
+	paramNoIndexes              = "no-indexes"
+	paramNoUDFs                 = "no-udfs"
+	paramNodes                  = "nodes"
+	paramHydrateReplica         = "hydrate-replica"
+	paramFuzzyRestore           = "fuzzy-restore"
+	paramAllowUnhosted          = "allow-unhosted"
+	paramParallel               = "parallel"
+	paramRecordsPerSecond       = "records-per-second"
+	paramMaxInflight            = "max-inflight"
+	paramRetryBaseInterval      = "retry-base-interval"
+	paramRetryMultiplier        = "retry-multiplier"
+	paramRetryMaxAttempts       = "retry-max-attempts"
+	paramIgnoreRecordError      = "ignore-record-error"
+	paramRestoreDownloadThreads = "restore-download-threads"
 )
 
 // restoreUnsafeChars must not appear in a restore value, as the server uses
@@ -226,7 +227,8 @@ func (c infoCommands) serverRestore(r *infomodels.RequestRestore) (string, error
 		optFlag(paramNoUDFs, r.NoUDFs).
 		optFlag(paramFuzzyRestore, r.FuzzyRestore).
 		str(paramSetList, r.SetList).
-		str(paramFilterExp, r.FilterExp)
+		str(paramFilterExp, r.FilterExp).
+		optNum(paramRestoreDownloadThreads, r.RestoreDownloadThreads)
 
 	if r.FuzzyRestore != nil && *r.FuzzyRestore {
 		cmd.optFlag(paramAllowUnhosted, r.AllowUnhosted).

@@ -92,7 +92,7 @@ Then commit the result together with the interface change.
 
 ## Linting
 
-CI runs golangci-lint v2.12.2 against [.golangci.yaml](.golangci.yaml). The repo also has a
+CI runs golangci-lint v2.14.0 against [.golangci.yaml](.golangci.yaml). The repo also has a
 pre-commit hook for it, plus gitleaks, end-of-file and trailing-whitespace fixers:
 
 ```bash

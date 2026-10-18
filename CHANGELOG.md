@@ -21,12 +21,14 @@ request links for the full detail of any change.
   `FuzzyRestore` is true. The new `RequestPrepareRestore` carries `HydrateReplica`. An optional
   field is sent only when it is set: a string when not empty, a number when not zero and a bool
   pointer when not nil, so the server applies its own default otherwise. (BKRS-464)
+- `RequestRestore` gains `RestoreDownloadThreads`, sent as `restore-download-threads` on the
+  server-integrated `restore` info command when not zero, for cold and fuzzy restore alike.
 - Info commands are validated before they are sent. A missing required parameter, a nil request,
   a malformed comma-separated `backup-ids` value (empty elements), or a value containing `;` or a
   newline (and `|` for `restore`) fails with `ErrInvalidConfig`, and a server older than 8.1 fails
   with `ErrUnsupported`. Neither is retried, and the error names only the offending keys, never
   their values. (BKRS-464)
--
+
 ### Changed
 
 - `pkg/server/segvalidator` reads segments in the format the server writes now, an ASBK frame

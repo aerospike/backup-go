@@ -29,6 +29,14 @@ request links for the full detail of any change.
   instead of being sent, as the server rejects such a parameter. (BKRS-464)
 - `ServerBackupInfo.OpenRestore` sends `restore-open`, which releases a namespace held by an
   aborted cold restore. (BKRS-464)
+- `ServerBackupInfo.ClearRestoreStorage` sends `restore-clear-storage` to every node whose row of
+  a cold restore being prepared reports `clear=required`, so that its SSD namespace storage is
+  cleared in place and can reach READY without a node restart. Unlike the other restore commands
+  it is sent to each such node, not to the principal; a node that is already clearing or needs no
+  clear is skipped, so a retry never clears a node twice, and a failing node does not stop the
+  others. `ResponseRestoreState` reports `Clear`, `ClearZeroedBytes` and `ClearMs`; the typed
+  `ClearState` is resolved across nodes by `ResolveClearState`, which reports `required` if any
+  node requires a clear. (BKRS-464)
 - `ResponseBackupState` reports every field of `backup-status`: the effective limits, the byte
   counters, `AbortOrigin` and the upload pipeline diagnostics. (BKRS-464)
 - `ResponseRestoreState`, the status of a restore job with every field of `restore-status`, and

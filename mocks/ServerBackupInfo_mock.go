@@ -167,6 +167,69 @@ func (_c *MockServerBackupInfo_AbortRestore_Call) RunAndReturn(run func(ctx cont
 	return _c
 }
 
+// ClearRestoreStorage provides a mock function for the type MockServerBackupInfo
+func (_mock *MockServerBackupInfo) ClearRestoreStorage(ctx context.Context, namespace string, jobID string) error {
+	ret := _mock.Called(ctx, namespace, jobID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ClearRestoreStorage")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = returnFunc(ctx, namespace, jobID)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockServerBackupInfo_ClearRestoreStorage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ClearRestoreStorage'
+type MockServerBackupInfo_ClearRestoreStorage_Call struct {
+	*mock.Call
+}
+
+// ClearRestoreStorage is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+//   - jobID string
+func (_e *MockServerBackupInfo_Expecter) ClearRestoreStorage(ctx any, namespace any, jobID any) *MockServerBackupInfo_ClearRestoreStorage_Call {
+	return &MockServerBackupInfo_ClearRestoreStorage_Call{Call: _e.mock.On("ClearRestoreStorage", ctx, namespace, jobID)}
+}
+
+func (_c *MockServerBackupInfo_ClearRestoreStorage_Call) Run(run func(ctx context.Context, namespace string, jobID string)) *MockServerBackupInfo_ClearRestoreStorage_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockServerBackupInfo_ClearRestoreStorage_Call) Return(err error) *MockServerBackupInfo_ClearRestoreStorage_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockServerBackupInfo_ClearRestoreStorage_Call) RunAndReturn(run func(ctx context.Context, namespace string, jobID string) error) *MockServerBackupInfo_ClearRestoreStorage_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetBackupStatus provides a mock function for the type MockServerBackupInfo
 func (_mock *MockServerBackupInfo) GetBackupStatus(ctx context.Context, jobID string) (*models.ResponseBackupState, error) {
 	ret := _mock.Called(ctx, jobID)

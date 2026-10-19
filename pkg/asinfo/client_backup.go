@@ -16,6 +16,7 @@ package asinfo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -328,27 +329,125 @@ func getRestoreStatus[N statusNode](ic *Client, nodes []N, cmd, namespace, jobID
 			continue
 		}
 
-		resp, err := ic.getRestoreStatusByNode(node, cmd)
+		status, err := ic.restoreStatusOfNode(node, cmd, jobID)
 		if err != nil {
-			if strings.Contains(err.Error(), "no restore job") {
-				return nil, fmt.Errorf("restore job %s on node %s: %w", jobID, node.GetName(), ErrNotFound)
-			}
-
-			return nil, fmt.Errorf("failed to get restore status from node %s: %w", node.GetName(), err)
+			return nil, err
 		}
 
-		status := infomodels.NewResponseRestoreState(resp)
 		if status != nil && status.Namespace == namespace {
 			statuses = append(statuses, status)
 		}
 	}
 
 	if len(statuses) == 0 {
-		return nil, fmt.Errorf("no restore state found for job-id %s of namespace %s: %w",
-			jobID, namespace, ErrNotFound)
+		return nil, errNoRestoreState(namespace, jobID)
 	}
 
 	return infomodels.MergeResponseRestoreStates(statuses), nil
+}
+
+// restoreStatusOfNode reads the row of the restore job jobID from node with the
+// restore-status command cmd. It returns nil if the node reports no row.
+func (ic *Client) restoreStatusOfNode(node statusNode, cmd, jobID string,
+) (*infomodels.ResponseRestoreState, error) {
+	resp, err := ic.getRestoreStatusByNode(node, cmd)
+	if err != nil {
+		if strings.Contains(err.Error(), "no restore job") {
+			return nil, fmt.Errorf("restore job %s on node %s: %w", jobID, node.GetName(), ErrNotFound)
+		}
+
+		return nil, fmt.Errorf("failed to get restore status from node %s: %w", node.GetName(), err)
+	}
+
+	return infomodels.NewResponseRestoreState(resp), nil
+}
+
+// errNoRestoreState reports that no node holds a row of the restore job jobID
+// of namespace.
+func errNoRestoreState(namespace, jobID string) error {
+	return fmt.Errorf("no restore state found for job-id %s of namespace %s: %w",
+		jobID, namespace, ErrNotFound)
+}
+
+// ClearRestoreStorage clears the storage of namespace on every node that the
+// cold restore job jobID, while it is being prepared, reports as needing a
+// clear, so that the namespace can reach READY there without a node restart.
+//
+// Unlike the other restore commands, restore-clear-storage applies to the node
+// it is sent to, so it is sent to each such node instead of the principal. The
+// clear runs in the background: its progress is reported by
+// [Client.GetRestoreStatus]. A node that needs no clear, or is already
+// clearing, is skipped, so a retry never sends a clear to a node twice. A node
+// may back out of an accepted clear and report [infomodels.ClearStateRequired]
+// again; calling ClearRestoreStorage again sends the clear to it once more.
+//
+// The clear drops the data of the namespace on the node. The server accepts it
+// only for an SSD namespace (storage-engine device) that is not in strong
+// consistency, with sindex-gc-period not zero if the namespace has secondary
+// indexes, and from a user with the restore permission and the truncate
+// permission on the namespace. It refuses it otherwise, and the refusal is
+// retried like any other error, although a retry cannot change it.
+func (ic *Client) ClearRestoreStorage(ctx context.Context, namespace, jobID string) error {
+	statusCmd, err := ic.cmds.restoreStatus(jobID)
+	if err != nil {
+		return fmt.Errorf("failed to build restore status command: %w", err)
+	}
+
+	cmd, err := ic.cmds.restoreClearStorage(namespace, jobID)
+	if err != nil {
+		return fmt.Errorf("failed to build restore clear storage command: %w", err)
+	}
+
+	return executeWithRetry(ctx, ic.retryPolicy, func() error {
+		return clearRestoreStorage(ic, ic.cluster.GetNodes(), statusCmd, cmd, namespace, jobID)
+	})
+}
+
+// clearRestoreStorage sends the restore-clear-storage command cmd to every
+// active node whose row of the restore job jobID of namespace, read with
+// statusCmd, requires a clear, see [Client.ClearRestoreStorage]. A failing node
+// does not stop the others: the errors of all nodes are returned together. The
+// job is reported as not found only when no node failed, so that the errors of
+// the nodes are never hidden behind ErrNotFound.
+func clearRestoreStorage[N statusNode](ic *Client, nodes []N, statusCmd, cmd, namespace, jobID string) error {
+	var (
+		errs  []error
+		found bool
+	)
+
+	for _, node := range nodes {
+		if !node.IsActive() {
+			continue
+		}
+
+		status, err := ic.restoreStatusOfNode(node, statusCmd, jobID)
+		if err != nil {
+			errs = append(errs, err)
+
+			continue
+		}
+
+		if status == nil || status.Namespace != namespace {
+			continue
+		}
+
+		found = true
+
+		if status.Clear != infomodels.ClearStateRequired {
+			continue
+		}
+
+		if _, err := ic.requestByNode(node, cmd); err != nil {
+			errs = append(errs, fmt.Errorf("failed to clear restore storage on node %s: %w",
+				node.GetName(), err))
+		}
+	}
+
+	if !found && len(errs) == 0 {
+		return errNoRestoreState(namespace, jobID)
+	}
+
+	return errors.Join(errs...)
 }
 
 func (ic *Client) getRestoreStatusByNode(node infoGetter, cmd string) ([]infomodels.InfoMap, error) {

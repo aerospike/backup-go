@@ -35,7 +35,8 @@ const (
 	testStateActive = string(RestoreStateActive)
 	testNsStateNone = string(NamespaceStateNone)
 
-	testNsStateUnknown NamespaceState = "DRAINING"
+	testNsStateUnknown    NamespaceState = "DRAINING"
+	testClearStateUnknown ClearState     = "verifying"
 )
 
 func TestNewResponseRestoreState(t *testing.T) {
@@ -73,6 +74,9 @@ func TestNewResponseRestoreState(t *testing.T) {
 					fieldTTLClamped:             "5",
 					fieldClusterKey:             testClusterKey,
 					fieldDone:                   testFalse,
+					fieldClear:                  string(ClearStateNone),
+					fieldClearZeroedBytes:       "4294967296",
+					fieldClearMs:                "8421",
 				},
 			},
 			want: &ResponseRestoreState{
@@ -96,6 +100,9 @@ func TestNewResponseRestoreState(t *testing.T) {
 				MissingLayoutNodes:     1,
 				NDoneNodes:             2,
 				ClusterKey:             testClusterKey,
+				Clear:                  ClearStateNone,
+				ClearZeroedBytes:       4294967296,
+				ClearMs:                8421,
 			},
 		},
 		{
@@ -280,6 +287,60 @@ func TestResolveNamespaceState(t *testing.T) {
 	}
 }
 
+func TestResolveClearState(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		states []ClearState
+		want   ClearState
+	}{
+		{
+			name:   "none only when no node needs or runs a clear",
+			states: []ClearState{ClearStateNone, ClearStateNone},
+			want:   ClearStateNone,
+		},
+		{
+			name:   "clearing overrides none",
+			states: []ClearState{ClearStateNone, ClearStateClearing},
+			want:   ClearStateClearing,
+		},
+		{
+			name:   "required overrides all",
+			states: []ClearState{ClearStateClearing, testClearStateUnknown, ClearStateRequired, ClearStateNone},
+			want:   ClearStateRequired,
+		},
+		{
+			name:   "unknown state overrides every known state but required",
+			states: []ClearState{ClearStateNone, testClearStateUnknown, ClearStateClearing},
+			want:   testClearStateUnknown,
+		},
+		{
+			name:   "nodes reporting no state are skipped",
+			states: []ClearState{"", ClearStateClearing},
+			want:   ClearStateClearing,
+		},
+		{
+			name:   "no node reports a state",
+			states: []ClearState{""},
+			want:   "",
+		},
+		{
+			name:   "no states at all",
+			states: nil,
+			want:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, ResolveClearState(tt.states))
+		})
+	}
+}
+
 func TestResolveRestoreState(t *testing.T) {
 	t.Parallel()
 
@@ -369,6 +430,9 @@ func TestMergeResponseRestoreStates(t *testing.T) {
 					NDoneNodes:             2,
 					ClusterKey:             testClusterKey,
 					Done:                   true,
+					Clear:                  ClearStateNone,
+					ClearZeroedBytes:       1000,
+					ClearMs:                900,
 				},
 				nil,
 				{
@@ -392,6 +456,9 @@ func TestMergeResponseRestoreStates(t *testing.T) {
 					MissingLayoutNodes:     1,
 					NDoneNodes:             1,
 					Joiner:                 true,
+					Clear:                  ClearStateClearing,
+					ClearZeroedBytes:       500,
+					ClearMs:                1200,
 				},
 			},
 			want: &ResponseRestoreState{
@@ -417,6 +484,9 @@ func TestMergeResponseRestoreStates(t *testing.T) {
 				ClusterKey:             testClusterKey,
 				Joiner:                 true,
 				Done:                   true,
+				Clear:                  ClearStateClearing,
+				ClearZeroedBytes:       1500,
+				ClearMs:                1200,
 			},
 		},
 		{

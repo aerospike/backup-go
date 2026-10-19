@@ -39,19 +39,20 @@ const (
 
 // Names of commands with parameters.
 const (
-	cmdNameSetsOfNamespace = "sets"
-	cmdNameNamespaceInfo   = "namespace"
-	cmdNameUdfGet          = "udf-get"
-	cmdNameClusterStable   = "cluster-stable"
-	cmdNameSindexList      = "sindex-list"
-	cmdNameBackup          = "backup"
-	cmdNameBackupStatus    = "backup-status"
-	cmdNameBackupAbort     = "backup-abort"
-	cmdNameRestorePrepare  = "restore-prepare"
-	cmdNameRestore         = "restore"
-	cmdNameRestoreStatus   = "restore-status"
-	cmdNameRestoreAbort    = "restore-abort"
-	cmdNameRestoreOpen     = "restore-open"
+	cmdNameSetsOfNamespace     = "sets"
+	cmdNameNamespaceInfo       = "namespace"
+	cmdNameUdfGet              = "udf-get"
+	cmdNameClusterStable       = "cluster-stable"
+	cmdNameSindexList          = "sindex-list"
+	cmdNameBackup              = "backup"
+	cmdNameBackupStatus        = "backup-status"
+	cmdNameBackupAbort         = "backup-abort"
+	cmdNameRestorePrepare      = "restore-prepare"
+	cmdNameRestore             = "restore"
+	cmdNameRestoreStatus       = "restore-status"
+	cmdNameRestoreAbort        = "restore-abort"
+	cmdNameRestoreOpen         = "restore-open"
+	cmdNameRestoreClearStorage = "restore-clear-storage"
 )
 
 // Command parameter keys.
@@ -399,6 +400,19 @@ func (c infoCommands) restoreOpen(ns, jobID string) (string, error) {
 	}
 
 	return newInfoCmd(cmdNameRestoreOpen, jobUnsafeChars).
+		required(paramNamespace, ns).
+		required(paramJobID, jobID).
+		build()
+}
+
+// restoreClearStorage returns the command that clears the storage of namespace
+// ns on the node it is sent to, for the cold restore job jobID being prepared.
+func (c infoCommands) restoreClearStorage(ns, jobID string) (string, error) {
+	if err := c.requireIntegratedBackup(cmdNameRestoreClearStorage); err != nil {
+		return "", err
+	}
+
+	return newInfoCmd(cmdNameRestoreClearStorage, jobUnsafeChars).
 		required(paramNamespace, ns).
 		required(paramJobID, jobID).
 		build()

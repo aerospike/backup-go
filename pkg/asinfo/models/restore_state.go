@@ -95,29 +95,50 @@ var namespaceStatePriority = []NamespaceState{
 // PREPARING, OPENING, NONE and READY last. An empty state is returned when no
 // node reports a state.
 func ResolveNamespaceState(states []NamespaceState) NamespaceState {
-	var (
-		resolved     NamespaceState
-		resolvedRank = len(namespaceStatePriority)
-		unknownRank  = slices.Index(namespaceStatePriority, namespaceStateUnknown)
-	)
+	return resolveByPriority(states, namespaceStatePriority, namespaceStateUnknown,
+		func(state NamespaceState) bool {
+			return state == "" || state == NamespaceStateNotHosted
+		})
+}
 
-	for _, state := range states {
-		if state == "" || state == NamespaceStateNotHosted {
-			continue
-		}
+// ClearState is the storage clear state of a cold restore on a node, the clear
+// field of the restore-status info response.
+type ClearState string
 
-		rank := slices.Index(namespaceStatePriority, state)
-		if rank < 0 {
-			rank = unknownRank
-		}
+const (
+	// ClearStateNone is a node that needs no clear, or whose last clear finished.
+	ClearStateNone ClearState = "none"
+	// ClearStateRequired is a node that must be cleared with
+	// restore-clear-storage before its namespace can reach READY.
+	ClearStateRequired ClearState = "required"
+	// ClearStateClearing is a node whose clear was accepted and is running.
+	ClearStateClearing ClearState = "clearing"
 
-		if rank < resolvedRank {
-			resolvedRank = rank
-			resolved = state
-		}
-	}
+	// clearStateUnknown holds the place of the states this package does not
+	// know in clearStatePriority. The server never reports it.
+	clearStateUnknown ClearState = "<unknown>"
+)
 
-	return resolved
+// clearStatePriority orders the clear states for [ResolveClearState].
+// Lower index = higher priority.
+var clearStatePriority = []ClearState{
+	ClearStateRequired,
+	clearStateUnknown,
+	ClearStateClearing,
+	ClearStateNone,
+}
+
+// ResolveClearState picks a single clear state out of the states reported by
+// the nodes, so that the cluster is only reported as needing no clear when no
+// node needs or runs one.
+//
+// The nodes that report no state, such as the rows of a fuzzy restore, are
+// skipped. The states are resolved by priority: required, then a state this
+// package does not know (it cannot be proven to need no clear), clearing and
+// none last. An empty state is returned when no node reports a state.
+func ResolveClearState(states []ClearState) ClearState {
+	return resolveByPriority(states, clearStatePriority, clearStateUnknown,
+		func(state ClearState) bool { return state == "" })
 }
 
 // ResolveRestoreState returns the combined restore job state across nodes.
@@ -143,4 +164,34 @@ func ResolveRestoreState(states []RestoreState) RestoreState {
 	}
 
 	return RestoreStateUnknown
+}
+
+// resolveByPriority returns the state of the highest priority among states.
+// priority lists the known states from the highest priority down and holds
+// unknown in the place of the states it does not list. The states for which
+// skip reports true are ignored; the zero value is returned when none is left.
+func resolveByPriority[T comparable](states, priority []T, unknown T, skip func(T) bool) T {
+	var (
+		resolved     T
+		resolvedRank = len(priority)
+		unknownRank  = slices.Index(priority, unknown)
+	)
+
+	for _, state := range states {
+		if skip(state) {
+			continue
+		}
+
+		rank := slices.Index(priority, state)
+		if rank < 0 {
+			rank = unknownRank
+		}
+
+		if rank < resolvedRank {
+			resolvedRank = rank
+			resolved = state
+		}
+	}
+
+	return resolved
 }

@@ -49,4 +49,5 @@ type ServerBackupInfo interface {
 	AbortBackup(ctx context.Context, backupID string) error
 	AbortRestore(ctx context.Context, namespace, backupID string) error
 	OpenRestore(ctx context.Context, namespace, jobID string) error
+	ClearRestoreStorage(ctx context.Context, namespace, jobID string) error
 }

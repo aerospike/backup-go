@@ -38,6 +38,9 @@ const (
 	fieldTTLClamped         = "ttl-clamped"
 	fieldClusterKey         = "cluster-key"
 	fieldDone               = "done"
+	fieldClear              = "clear"
+	fieldClearZeroedBytes   = "clear-zeroed-bytes"
+	fieldClearMs            = "clear-ms"
 
 	fieldApplied      = "applied"
 	fieldIgnored      = "ignored"
@@ -119,6 +122,14 @@ type ResponseRestoreState struct {
 	// Done is true when the job is complete. While the job is live, only the
 	// principal sets it.
 	Done bool
+	// Clear is the storage clear state of the node. A node reporting
+	// ClearStateRequired must be cleared with restore-clear-storage before its
+	// namespace can reach READY.
+	Clear ClearState
+	// ClearZeroedBytes counts the bytes zeroed by the last completed clear.
+	ClearZeroedBytes uint64
+	// ClearMs is the wall time of the last completed clear, in milliseconds.
+	ClearMs uint64
 
 	// Fuzzy restore fields. With more than one backup id, the coverage counters
 	// are for the entry of BackupEntry.
@@ -166,6 +177,7 @@ func NewResponseRestoreState(im []InfoMap) *ResponseRestoreState {
 			AbortOrigin: AbortOrigin(r[fieldAbortOrigin]),
 			BackupID:    r[fieldBackupID],
 			ClusterKey:  r[fieldClusterKey],
+			Clear:       ClearState(r[fieldClear]),
 			StartTime:   parseInfoTime(r[fieldStartTime]),
 			FinishTime:  parseInfoTime(r[fieldFinishTime]),
 		}
@@ -193,6 +205,8 @@ func (s *ResponseRestoreState) parseFields(r InfoMap) {
 		infoFieldOf(fieldRead, &s.Read),
 		infoFieldOf(fieldDeleted, &s.Deleted),
 		infoFieldOf(fieldDeleteAbsent, &s.DeleteAbsent),
+		infoFieldOf(fieldClearZeroedBytes, &s.ClearZeroedBytes),
+		infoFieldOf(fieldClearMs, &s.ClearMs),
 	)
 
 	parseInfoFields(r, InfoMap.ParseUint32,
@@ -218,11 +232,11 @@ func (s *ResponseRestoreState) parseFields(r InfoMap) {
 
 // MergeResponseRestoreStates combines per-node restore status responses into a
 // single cluster-wide view:
-//   - State and NsState are resolved with [ResolveRestoreState] and
-//     [ResolveNamespaceState];
-//   - the per-node counters are summed;
-//   - the effective limits and the figures every node reports in the cluster
-//     view (PidsInScope, MissingLayoutNodes, NDoneNodes, ClusterWide,
+//   - State, NsState and Clear are resolved with [ResolveRestoreState],
+//     [ResolveNamespaceState] and [ResolveClearState];
+//   - the per-node counters are summed, ClearZeroedBytes included;
+//   - the effective limits, ClearMs and the figures every node reports in the
+//     cluster view (PidsInScope, MissingLayoutNodes, NDoneNodes, ClusterWide,
 //     BackupEntries) are taken as their maximum;
 //   - BackupID and BackupEntry are those of the node that is the furthest
 //     behind;
@@ -231,10 +245,11 @@ func (s *ResponseRestoreState) parseFields(r InfoMap) {
 //     strings are the first ones reported by any node.
 func MergeResponseRestoreStates(statuses []*ResponseRestoreState) *ResponseRestoreState {
 	var (
-		merged    *ResponseRestoreState
-		states    []RestoreState
-		nsStates  []NamespaceState
-		hasBackup bool
+		merged      *ResponseRestoreState
+		states      []RestoreState
+		nsStates    []NamespaceState
+		clearStates []ClearState
+		hasBackup   bool
 	)
 
 	for _, status := range statuses {
@@ -252,6 +267,7 @@ func MergeResponseRestoreStates(statuses []*ResponseRestoreState) *ResponseResto
 
 		states = append(states, status.State)
 		nsStates = append(nsStates, status.NsState)
+		clearStates = append(clearStates, status.Clear)
 
 		if status.BackupEntries > 0 && (!hasBackup || merged.isBehind(status)) {
 			merged.BackupID = status.BackupID
@@ -268,6 +284,7 @@ func MergeResponseRestoreStates(statuses []*ResponseRestoreState) *ResponseResto
 
 	merged.State = ResolveRestoreState(states)
 	merged.NsState = ResolveNamespaceState(nsStates)
+	merged.Clear = ResolveClearState(clearStates)
 
 	return merged
 }
@@ -299,6 +316,7 @@ func (s *ResponseRestoreState) add(n *ResponseRestoreState) {
 	s.MissingLayoutNodes = max(s.MissingLayoutNodes, n.MissingLayoutNodes)
 	s.NDoneNodes = max(s.NDoneNodes, n.NDoneNodes)
 	s.ClusterWide = max(s.ClusterWide, n.ClusterWide)
+	s.ClearMs = max(s.ClearMs, n.ClearMs)
 
 	s.Joiner = s.Joiner || n.Joiner
 	s.Placeholder = s.Placeholder || n.Placeholder
@@ -316,6 +334,7 @@ func (s *ResponseRestoreState) add(n *ResponseRestoreState) {
 	s.Read += n.Read
 	s.Deleted += n.Deleted
 	s.DeleteAbsent += n.DeleteAbsent
+	s.ClearZeroedBytes += n.ClearZeroedBytes
 }
 
 // IsStarted reports whether the status belongs to a restore job that was

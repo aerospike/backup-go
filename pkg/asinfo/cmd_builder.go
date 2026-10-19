@@ -145,6 +145,16 @@ func (c *infoCmd) optNum(key string, value int) *infoCmd {
 	return c.num(key, value)
 }
 
+// optNumPtr adds the integer parameter only if value is set, so that zero can
+// be sent while nil lets the server apply its own default.
+func (c *infoCmd) optNumPtr(key string, value *int) *infoCmd {
+	if value == nil {
+		return c
+	}
+
+	return c.num(key, *value)
+}
+
 // optFloat adds the float parameter in its shortest exact form, only if value
 // is not zero, so the server applies its own default otherwise.
 func (c *infoCmd) optFloat(key string, value float64) *infoCmd {

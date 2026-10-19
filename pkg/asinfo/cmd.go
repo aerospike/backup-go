@@ -16,7 +16,6 @@ package asinfo
 
 import (
 	"fmt"
-	"strconv"
 
 	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
 )
@@ -220,8 +219,8 @@ func (c infoCommands) serverBackup(r *infomodels.RequestBackup, jobID string) (s
 }
 
 // serverRestore returns the command that starts the restore job r.JobID from
-// the backups r.BackupIDs. A parameter that does not apply to the restore mode
-// selected by r.FuzzyRestore fails with errParamNotApplicable.
+// the backups r.BackupIDs: a fuzzy restore if r.Fuzzy is set, a cold one
+// otherwise. A filter set for a fuzzy restore fails with errParamNotApplicable.
 func (c infoCommands) serverRestore(r *infomodels.RequestRestore) (string, error) {
 	if err := c.requireIntegratedBackup(cmdNameRestore); err != nil {
 		return "", err
@@ -238,27 +237,21 @@ func (c infoCommands) serverRestore(r *infomodels.RequestRestore) (string, error
 
 	addStorageParams(cmd, &r.RequestCommon)
 
-	// The command is returned only if checkRestoreMode finds no parameter of
-	// the other mode set, so every parameter is added unconditionally.
-	restoreCmd, err := cmd.str(paramIncrementalPath, r.IncrementalPath).
+	// The command is returned only if checkRestoreMode accepts the filter, so
+	// it is added unconditionally.
+	cmd.str(paramIncrementalPath, r.IncrementalPath).
 		optFlag(paramNoIndexes, r.NoIndexes).
 		optFlag(paramNoUDFs, r.NoUDFs).
-		optFlag(paramFuzzyRestore, r.FuzzyRestore).
 		str(paramSetList, r.SetList).
 		str(paramFilterExp, r.FilterExp).
 		optNum(paramRestoreDownloadThreads, r.RestoreDownloadThreads).
 		optNum(paramRestoreWorkerThreads, r.RestoreWorkerThreads).
 		optNum(paramRestoreRPS, r.RestoreRPS).
-		optNum(paramExtraTTL, r.ExtraTTL).
-		optFlag(paramAllowUnhosted, r.AllowUnhosted).
-		optNum(paramMaxInflight, r.MaxInflight).
-		optNumPtr(paramRetryBaseInterval, r.RetryBaseIntervalMs).
-		optFloat(paramRetryMultiplier, r.RetryMultiplier).
-		optNum(paramRetryMaxAttempts, r.RetryMaxAttempts).
-		optFlag(paramIgnoreRecordError, r.IgnoreRecordError).
-		optFlag(paramApplyMetadataLast, r.ApplyMetadataLast).
-		build()
+		optNum(paramExtraTTL, r.ExtraTTL)
 
+	addFuzzyRestoreParams(cmd, r.Fuzzy)
+
+	restoreCmd, err := cmd.build()
 	modeErr := checkRestoreMode(r)
 
 	switch {
@@ -273,40 +266,33 @@ func (c infoCommands) serverRestore(r *infomodels.RequestRestore) (string, error
 	return restoreCmd, nil
 }
 
-// checkRestoreMode returns errParamNotApplicable naming every parameter set in
-// r that the restore mode selected by r.FuzzyRestore does not accept.
+// addFuzzyRestoreParams selects the fuzzy restore and adds its settings f, if f
+// is set. A nil f leaves the restore cold, the server default.
+func addFuzzyRestoreParams(cmd *infoCmd, f *infomodels.RequestFuzzyRestore) {
+	if f == nil {
+		return
+	}
+
+	cmd.flag(paramFuzzyRestore, true).
+		optFlag(paramAllowUnhosted, f.AllowUnhosted).
+		optNum(paramMaxInflight, f.MaxInflight).
+		optNumPtr(paramRetryBaseInterval, f.RetryBaseIntervalMs).
+		optFloat(paramRetryMultiplier, f.RetryMultiplier).
+		optNum(paramRetryMaxAttempts, f.RetryMaxAttempts).
+		optFlag(paramIgnoreRecordError, f.IgnoreRecordError).
+		optFlag(paramApplyMetadataLast, f.ApplyMetadataLast)
+}
+
+// checkRestoreMode returns errParamNotApplicable if r sets the filter, which
+// only the cold restore accepts, for a fuzzy restore. The fuzzy only settings
+// need no check: they are held by r.Fuzzy, so a cold restore cannot set them.
 func checkRestoreMode(r *infomodels.RequestRestore) error {
-	fuzzy := r.FuzzyRestore != nil && *r.FuzzyRestore
-
-	params := []struct {
-		key       string
-		set       bool
-		fuzzyOnly bool
-	}{
-		{key: paramFilterExp, set: r.FilterExp != ""},
-		{key: paramAllowUnhosted, set: r.AllowUnhosted != nil, fuzzyOnly: true},
-		{key: paramMaxInflight, set: r.MaxInflight != 0, fuzzyOnly: true},
-		{key: paramRetryBaseInterval, set: r.RetryBaseIntervalMs != nil, fuzzyOnly: true},
-		{key: paramRetryMultiplier, set: r.RetryMultiplier != 0, fuzzyOnly: true},
-		{key: paramRetryMaxAttempts, set: r.RetryMaxAttempts != 0, fuzzyOnly: true},
-		{key: paramIgnoreRecordError, set: r.IgnoreRecordError != nil, fuzzyOnly: true},
-		{key: paramApplyMetadataLast, set: r.ApplyMetadataLast != nil, fuzzyOnly: true},
-	}
-
-	var keys []string
-
-	for _, p := range params {
-		if p.set && p.fuzzyOnly != fuzzy {
-			keys = append(keys, p.key)
-		}
-	}
-
-	if len(keys) == 0 {
+	if r.Fuzzy == nil || r.FilterExp == "" {
 		return nil
 	}
 
-	return paramsErr(errParamNotApplicable,
-		cmdNameRestore+" with "+paramFuzzyRestore+"="+strconv.FormatBool(fuzzy), keys)
+	return paramsErr(errParamNotApplicable, cmdNameRestore+" with "+paramFuzzyRestore+"=true",
+		[]string{paramFilterExp})
 }
 
 // validatePrepareRestore checks everything serverPrepareRestore needs except the

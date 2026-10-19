@@ -42,9 +42,10 @@ type RequestBackup struct {
 
 // RequestRestore represents a request to start a restore job on the server.
 //
-// Some parameters apply to one restore mode only. Setting a parameter that does
-// not apply to the mode chosen by FuzzyRestore fails the request, since the
-// server rejects such a parameter instead of ignoring it.
+// The restore is cold unless Fuzzy is set. The settings of the fuzzy restore
+// are held by Fuzzy, so that they cannot be set for a cold restore. FilterExp
+// applies to the cold restore only: setting it together with Fuzzy fails the
+// request, since the server rejects it instead of ignoring it.
 type RequestRestore struct {
 	RequestCommon
 	// JobID identifies the restore job. A cold restore must use the job id that
@@ -56,10 +57,6 @@ type RequestRestore struct {
 	// IncrementalPath is the path of the incremental backups, the entries after
 	// the first one of BackupIDs, when it differs from Path.
 	IncrementalPath string
-	// FuzzyRestore restores by writing records into the live namespace instead
-	// of the cold partition hydration. FilterExp applies to the cold restore
-	// only; the fields marked as fuzzy only apply when FuzzyRestore is true.
-	FuzzyRestore *bool
 	// RestoreWorkerThreads is the number of apply threads per node, from 1 to 128.
 	RestoreWorkerThreads int
 	// RestoreDownloadThreads is the number of download threads per node, from 1 to 128.
@@ -70,28 +67,36 @@ type RequestRestore struct {
 	// ExtraTTL is added to the expiry of every restored record that expires, in
 	// seconds, from 0 to 315360000.
 	ExtraTTL int
+	// Fuzzy selects the fuzzy restore, which writes records into the live
+	// namespace instead of the cold partition hydration. Nil selects the cold
+	// restore.
+	Fuzzy *RequestFuzzyRestore
+}
+
+// RequestFuzzyRestore holds the settings that apply to a fuzzy restore only.
+// An empty RequestFuzzyRestore selects the fuzzy restore with the server
+// defaults.
+type RequestFuzzyRestore struct {
 	// AllowUnhosted allows the restore even if the principal does not host the
-	// namespace. Fuzzy only.
+	// namespace.
 	AllowUnhosted *bool
 	// MaxInflight is the maximum number of outstanding writes per node, from 1
-	// to 100000. Fuzzy only.
+	// to 100000.
 	MaxInflight int
 	// RetryBaseIntervalMs is the base delay before a retry, in milliseconds.
 	// It is a pointer because zero is a valid delay that differs from the
-	// server default of 1000; nil omits the parameter. Fuzzy only.
+	// server default of 1000; nil omits the parameter.
 	RetryBaseIntervalMs *int
 	// RetryMultiplier is the backoff multiplier of the retry delay, at least 1.0.
-	// Fuzzy only.
 	RetryMultiplier float64
 	// RetryMaxAttempts is the maximum number of attempts per record, the first
 	// one included. Zero omits the parameter, so the server default of 5
-	// applies; use 1 for no retry. Fuzzy only.
+	// applies; use 1 for no retry.
 	RetryMaxAttempts int
 	// IgnoreRecordError continues the restore on errors of individual records.
-	// Fuzzy only.
 	IgnoreRecordError *bool
 	// ApplyMetadataLast creates the secondary indexes and UDFs after the records
-	// instead of before. Fuzzy only.
+	// instead of before.
 	ApplyMetadataLast *bool
 }
 
@@ -128,7 +133,7 @@ type RequestCommon struct {
 	// SetList is a comma-separated list of sets.
 	SetList string
 	// FilterExp is a base64-encoded filter expression. A restore accepts it
-	// only in the cold mode.
+	// only in the cold mode, see [RequestRestore].
 	FilterExp string
 	// NoIndexes skips the secondary indexes.
 	NoIndexes *bool

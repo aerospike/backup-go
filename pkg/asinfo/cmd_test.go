@@ -890,7 +890,7 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 	const (
 		testIncrementalPath = "/backups/incr"
 		// testRestoreHead are the parameters of the requests below that precede
-		// the mode flag, in the order the command adds them.
+		// the set list, in the order the command adds them.
 		testRestoreHead = testCmdRestoreBase + testCmdStorageParams + ";incremental-path=/backups/incr" +
 			";no-indexes=false;no-udfs=true"
 		// testRestoreLimits are the parameters of both modes that follow the filter.
@@ -905,7 +905,7 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 	cmds := newInfoCommands(infomodels.AerospikeVersionSupportsIntegratedBackup)
 
 	// newRequest returns a request with every parameter of both modes set.
-	newRequest := func(fuzzy *bool) *infomodels.RequestRestore {
+	newRequest := func(fuzzy *infomodels.RequestFuzzyRestore) *infomodels.RequestRestore {
 		common := testStorage()
 		common.SetList = testCmdSetList
 		common.NoIndexes = testPtr(false)
@@ -916,48 +916,28 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 			JobID:                  testCmdJobID,
 			BackupIDs:              testCmdBackupID,
 			IncrementalPath:        testIncrementalPath,
-			FuzzyRestore:           fuzzy,
 			RestoreDownloadThreads: 8,
 			RestoreWorkerThreads:   16,
 			RestoreRPS:             5000,
 			ExtraTTL:               3600,
+			Fuzzy:                  fuzzy,
 		}
 	}
 
-	newFuzzyRequest := func() *infomodels.RequestRestore {
-		r := newRequest(testPtr(true))
-		r.AllowUnhosted = testPtr(true)
-		r.MaxInflight = 400
-		r.RetryBaseIntervalMs = testPtr(250)
-		r.RetryMultiplier = 1.5
-		r.RetryMaxAttempts = 3
-		r.IgnoreRecordError = testPtr(false)
-		r.ApplyMetadataLast = testPtr(true)
+	coldRequest := newRequest(nil)
+	coldRequest.FilterExp = testCmdFilterExp
 
-		return r
-	}
-
-	newColdRequest := func(fuzzy *bool) *infomodels.RequestRestore {
-		r := newRequest(fuzzy)
-		r.FilterExp = testCmdFilterExp
-
-		return r
-	}
-
-	newMinimalFuzzyRequest := func() *infomodels.RequestRestore {
+	newMinimalFuzzyRequest := func(fuzzy *infomodels.RequestFuzzyRestore) *infomodels.RequestRestore {
 		return &infomodels.RequestRestore{
 			RequestCommon: infomodels.RequestCommon{
 				Namespace: testCmdNamespace,
 				Storage:   testCmdStorage,
 			},
-			JobID:        testCmdJobID,
-			BackupIDs:    testCmdBackupID,
-			FuzzyRestore: testPtr(true),
+			JobID:     testCmdJobID,
+			BackupIDs: testCmdBackupID,
+			Fuzzy:     fuzzy,
 		}
 	}
-
-	retryBaseIntervalZero := newMinimalFuzzyRequest()
-	retryBaseIntervalZero.RetryBaseIntervalMs = testPtr(0)
 
 	tests := []struct {
 		name string
@@ -966,28 +946,30 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 	}{
 		{
 			name: "fuzzy restore sends every fuzzy parameter",
-			give: newFuzzyRequest(),
-			want: testRestoreHead + testFuzzyFlag + testCmdSetListParam + testRestoreLimits + testFuzzyParams,
+			give: newRequest(&infomodels.RequestFuzzyRestore{
+				AllowUnhosted:       testPtr(true),
+				MaxInflight:         400,
+				RetryBaseIntervalMs: testPtr(250),
+				RetryMultiplier:     1.5,
+				RetryMaxAttempts:    3,
+				IgnoreRecordError:   testPtr(false),
+				ApplyMetadataLast:   testPtr(true),
+			}),
+			want: testRestoreHead + testCmdSetListParam + testRestoreLimits + testFuzzyFlag + testFuzzyParams,
 		},
 		{
-			name: "cold restore sends the filter",
-			give: newColdRequest(testPtr(false)),
-			want: testRestoreHead + ";fuzzy-restore=false" + testCmdSetListParam + testCmdFilterExpParam +
-				testRestoreLimits,
-		},
-		{
-			name: "unset fuzzy restore is a cold restore",
-			give: newColdRequest(nil),
+			name: "nil fuzzy is a cold restore with the filter",
+			give: coldRequest,
 			want: testRestoreHead + testCmdSetListParam + testCmdFilterExpParam + testRestoreLimits,
 		},
 		{
 			name: testNameUnsetOmitted,
-			give: newMinimalFuzzyRequest(),
+			give: newMinimalFuzzyRequest(&infomodels.RequestFuzzyRestore{}),
 			want: testCmdRestoreBase + testFuzzyFlag,
 		},
 		{
 			name: "zero retry base interval is sent",
-			give: retryBaseIntervalZero,
+			give: newMinimalFuzzyRequest(&infomodels.RequestFuzzyRestore{RetryBaseIntervalMs: testPtr(0)}),
 			want: testCmdRestoreBase + testFuzzyFlag + ";retry-base-interval=0",
 		},
 	}
@@ -1007,71 +989,36 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 func TestInfoCommands_ServerRestoreModeMismatch(t *testing.T) {
 	t.Parallel()
 
-	const (
-		testColdMode  = "restore with fuzzy-restore=false: "
-		testFuzzyMode = "restore with fuzzy-restore=true: "
-	)
+	const testFuzzyFilter = "restore with fuzzy-restore=true: " + paramFilterExp
 
 	cmds := newInfoCommands(infomodels.AerospikeVersionSupportsIntegratedBackup)
 
-	newRequest := func(fuzzy *bool) *infomodels.RequestRestore {
+	newFuzzyWithFilter := func(jobID string) *infomodels.RequestRestore {
 		return &infomodels.RequestRestore{
 			RequestCommon: infomodels.RequestCommon{
 				Namespace: testCmdNamespace,
 				Storage:   testCmdStorage,
+				FilterExp: testCmdFilterExp,
 			},
-			JobID:        testCmdJobID,
-			BackupIDs:    testCmdBackupID,
-			FuzzyRestore: fuzzy,
+			JobID:     jobID,
+			BackupIDs: testCmdBackupID,
+			Fuzzy:     &infomodels.RequestFuzzyRestore{},
 		}
 	}
-
-	fuzzyWithFilter := newRequest(testPtr(true))
-	fuzzyWithFilter.FilterExp = testCmdFilterExp
-
-	coldWithFuzzyParams := newRequest(testPtr(false))
-	coldWithFuzzyParams.AllowUnhosted = testPtr(false)
-	coldWithFuzzyParams.MaxInflight = 1
-	coldWithFuzzyParams.RetryBaseIntervalMs = testPtr(0)
-	coldWithFuzzyParams.RetryMultiplier = 1
-	coldWithFuzzyParams.RetryMaxAttempts = 1
-	coldWithFuzzyParams.IgnoreRecordError = testPtr(false)
-	coldWithFuzzyParams.ApplyMetadataLast = testPtr(false)
-
-	unsetModeWithFuzzyParam := newRequest(nil)
-	unsetModeWithFuzzyParam.MaxInflight = 1
-
-	missingJobIDWithFuzzyParam := newRequest(nil)
-	missingJobIDWithFuzzyParam.JobID = ""
-	missingJobIDWithFuzzyParam.MaxInflight = 1
 
 	tests := []struct {
 		name        string
 		give        *infomodels.RequestRestore
-		wantErrText string
 		wantMissing bool
 	}{
 		{
+			name: "filter expression in fuzzy restore",
+			give: newFuzzyWithFilter(testCmdJobID),
+		},
+		{
 			name:        "missing parameter is reported with the mode mismatch",
-			give:        missingJobIDWithFuzzyParam,
-			wantErrText: testColdMode + paramMaxInflight,
+			give:        newFuzzyWithFilter(""),
 			wantMissing: true,
-		},
-		{
-			name:        "filter expression in fuzzy restore",
-			give:        fuzzyWithFilter,
-			wantErrText: testFuzzyMode + paramFilterExp,
-		},
-		{
-			name: "every fuzzy only parameter in cold restore",
-			give: coldWithFuzzyParams,
-			wantErrText: testColdMode + "allow-unhosted, max-inflight, retry-base-interval, " +
-				"retry-multiplier, retry-max-attempts, ignore-record-error, apply-metadata-last",
-		},
-		{
-			name:        "fuzzy only parameter with unset mode",
-			give:        unsetModeWithFuzzyParam,
-			wantErrText: testColdMode + paramMaxInflight,
 		},
 	}
 
@@ -1083,7 +1030,7 @@ func TestInfoCommands_ServerRestoreModeMismatch(t *testing.T) {
 
 			require.ErrorIs(t, err, errParamNotApplicable)
 			require.ErrorIs(t, err, errclass.ErrInvalidConfig)
-			require.ErrorContains(t, err, tt.wantErrText)
+			require.ErrorContains(t, err, testFuzzyFilter)
 			assert.Equal(t, tt.wantMissing, errors.Is(err, errMissingCmdParam))
 			assert.Empty(t, got)
 		})

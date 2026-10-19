@@ -84,36 +84,3 @@ func TestEarliestAndLatestTime(t *testing.T) {
 		})
 	}
 }
-
-func TestFirstSet(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		a, b string
-		want string
-	}{
-		{
-			name: "both unset",
-		},
-		{
-			name: "first set",
-			a:    testErrorReason,
-			b:    testAbortReason,
-			want: testErrorReason,
-		},
-		{
-			name: "only second set",
-			b:    testAbortReason,
-			want: testAbortReason,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			assert.Equal(t, tt.want, firstSet(tt.a, tt.b))
-		})
-	}
-}

@@ -108,13 +108,3 @@ func latestTime(a, b time.Time) time.Time {
 
 	return a
 }
-
-// firstSet returns a if it is set, b otherwise.
-func firstSet[T comparable](a, b T) T {
-	var zero T
-	if a != zero {
-		return a
-	}
-
-	return b
-}

@@ -15,6 +15,7 @@
 package models
 
 import (
+	"cmp"
 	"slices"
 	"time"
 )
@@ -390,8 +391,8 @@ func MergeResponseBackupStates(statuses []*ResponseBackupState) *ResponseBackupS
 
 // add merges the figures of a single node into s, see [MergeResponseBackupStates].
 func (s *ResponseBackupState) add(n *ResponseBackupState) {
-	s.ErrorReason = firstSet(s.ErrorReason, n.ErrorReason)
-	s.AbortOrigin = firstSet(s.AbortOrigin, n.AbortOrigin)
+	s.ErrorReason = cmp.Or(s.ErrorReason, n.ErrorReason)
+	s.AbortOrigin = cmp.Or(s.AbortOrigin, n.AbortOrigin)
 	s.StartTime = earliestTime(s.StartTime, n.StartTime)
 	s.FinishTime = latestTime(s.FinishTime, n.FinishTime)
 

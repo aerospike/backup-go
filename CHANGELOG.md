@@ -17,16 +17,16 @@ request links for the full detail of any change.
   `RequestBackup` gains `BinList`; `RequestCommon` gains `Path`, `SetList` and `FilterExp`;
   `RequestRestore` gains `BackupIDs`, a comma-separated list sent as the required `backup-ids`,
   `IncrementalPath`, the settings of both modes `RestoreWorkerThreads`, `RestoreDownloadThreads`,
-  `RestoreRPS` and `ExtraTTL`, and the fuzzy restore settings `AllowUnhosted`, `MaxInflight`,
-  `RetryBaseIntervalMs`, `RetryMultiplier`, `RetryMaxAttempts`, `IgnoreRecordError` and
-  `ApplyMetadataLast`. `RequestBackup` gains `BackupRPS`, `BackupWorkerThreads`,
+  `RestoreRPS` and `ExtraTTL`, and `Fuzzy`, the new `RequestFuzzyRestore` with the fuzzy restore
+  settings `AllowUnhosted`, `MaxInflight`, `RetryBaseIntervalMs`, `RetryMultiplier`,
+  `RetryMaxAttempts`, `IgnoreRecordError` and `ApplyMetadataLast`, so that a cold restore cannot
+  set them. `RequestBackup` gains `BackupRPS`, `BackupWorkerThreads`,
   `BackupUploadThreads` and `BackupS3ThroughputTargetGbps`. The new `RequestPrepareRestore`
   carries `HydrateReplica`. An optional field is sent only when it is set: a string when not
   empty, a number when not zero and a pointer when not nil, so the server applies its own default
   otherwise. `RetryBaseIntervalMs` is an `*int`, so that a zero delay can be sent. (BKRS-464)
-- A restore request that sets a parameter its mode does not accept, `FilterExp` with
-  `FuzzyRestore` true or a fuzzy restore setting without it, fails with `ErrInvalidConfig`
-  instead of being sent, as the server rejects such a parameter. (BKRS-464)
+- A fuzzy restore request that sets `FilterExp`, which only the cold restore accepts, fails with
+  `ErrInvalidConfig` instead of being sent, as the server rejects it. (BKRS-464)
 - `ServerBackupInfo.OpenRestore` sends `restore-open`, which releases a namespace held by an
   aborted cold restore. (BKRS-464)
 - `ServerBackupInfo.ClearRestoreStorage` sends `restore-clear-storage` to every node whose row of
@@ -109,9 +109,11 @@ request links for the full detail of any change.
 - **Breaking.** `RequestRestore.BackupID` is renamed to `BackupIDs` to match the `backup-ids`
   info parameter. (BKRS-464)
 - **Breaking.** The bool fields of the server-integrated requests are pointers: `NoIndexes` and
-  `NoUDFs`, now in `RequestCommon`, and `RequestRestore.FuzzyRestore`. A nil value is not sent.
-  `SetList` and `Path` moved to `RequestCommon`, so struct literals that set them change.
-  (BKRS-464)
+  `NoUDFs`, now in `RequestCommon`. A nil value is not sent. `SetList` and `Path` moved to
+  `RequestCommon`, so struct literals that set them change. (BKRS-464)
+- **Breaking.** `RequestRestore.FuzzyRestore` is replaced by `RequestRestore.Fuzzy`, a
+  `*RequestFuzzyRestore`: a nil value selects the cold restore, any other value the fuzzy restore
+  with its settings. (BKRS-464)
 
 ### Removed
 

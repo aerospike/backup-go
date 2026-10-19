@@ -320,6 +320,9 @@ type statusNode interface {
 
 // getRestoreStatus reads the restore status with cmd from every active node and
 // merges the rows of the job jobID of namespace, see [Client.GetRestoreStatus].
+// Unlike clearRestoreStorage, it stops at the first failing node: the merged
+// state is only correct with the row of every node, and a partial merge could
+// report READY or COMPLETE while the missing node is not.
 func getRestoreStatus[N statusNode](ic *Client, nodes []N, cmd, namespace, jobID string,
 ) (*infomodels.ResponseRestoreState, error) {
 	statuses := make([]*infomodels.ResponseRestoreState, 0, len(nodes))

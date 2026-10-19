@@ -14,7 +14,10 @@
 
 package models
 
-import "time"
+import (
+	"cmp"
+	"time"
+)
 
 // Keys of the "restore-status" info response, besides the shared ones of
 // job_status.go.
@@ -301,9 +304,9 @@ func (s *ResponseRestoreState) isBehind(n *ResponseRestoreState) bool {
 
 // add merges the figures of a single node into s, see [MergeResponseRestoreStates].
 func (s *ResponseRestoreState) add(n *ResponseRestoreState) {
-	s.ErrorReason = firstSet(s.ErrorReason, n.ErrorReason)
-	s.AbortOrigin = firstSet(s.AbortOrigin, n.AbortOrigin)
-	s.ClusterKey = firstSet(s.ClusterKey, n.ClusterKey)
+	s.ErrorReason = cmp.Or(s.ErrorReason, n.ErrorReason)
+	s.AbortOrigin = cmp.Or(s.AbortOrigin, n.AbortOrigin)
+	s.ClusterKey = cmp.Or(s.ClusterKey, n.ClusterKey)
 	s.StartTime = earliestTime(s.StartTime, n.StartTime)
 	s.FinishTime = latestTime(s.FinishTime, n.FinishTime)
 

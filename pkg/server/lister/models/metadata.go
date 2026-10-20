@@ -25,9 +25,15 @@ const (
 	MetadataStatusAborted MetadataStatus = "aborted"
 )
 
-// Metadata is the metadata for a backup.
+// Metadata is the metadata for a backup, as recorded in its metadata.json.
 type Metadata struct {
 	BackupID  string         `json:"backup_id"`
 	Namespace string         `json:"namespace"`
 	Status    MetadataStatus `json:"status"`
+	// ModifiedAfter is the lower bound of the record last update time, in Unix seconds;
+	// zero when unset.
+	ModifiedAfter int64 `json:"modified_after_unix_s"`
+	// ModifiedBefore is the upper bound of the record last update time, in Unix seconds;
+	// zero when unset.
+	ModifiedBefore int64 `json:"modified_before_unix_s"`
 }

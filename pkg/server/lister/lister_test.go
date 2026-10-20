@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/aerospike/backup-go/pkg/server/lister/mocks"
+	"github.com/aerospike/backup-go/pkg/server/lister/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -237,6 +238,31 @@ func TestLister_GetMetadata(t *testing.T) {
 	_, err = l.GetMetadata(t.Context(), "missing")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrMetadataNotFound)
+}
+
+func TestLister_GetMetadata_ModifiedBounds(t *testing.T) {
+	m := mocks.NewMockS3API(t)
+	m.EXPECT().GetObject(mock.Anything, mock.Anything).RunAndReturn(
+		func(_ context.Context, in *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+			if *in.Key == jobID1+"/metadata.json" {
+				return objectBody(`{"backup_id":"` + jobID1 + `","namespace":"ns","sets":"s1,s2",` +
+					`"status":"complete","backup_type":"incremental",` +
+					`"modified_after_unix_s":1773669600,"modified_before_unix_s":1773670800}`), nil
+			}
+			return nil, &types.NoSuchKey{}
+		})
+
+	l := NewLister(m, "bucket", "")
+
+	md, err := l.GetMetadata(t.Context(), jobID1)
+	require.NoError(t, err)
+	assert.Equal(t, models.Metadata{
+		BackupID:       jobID1,
+		Namespace:      "ns",
+		Status:         models.MetadataStatusComplete,
+		ModifiedAfter:  1773669600,
+		ModifiedBefore: 1773670800,
+	}, md)
 }
 
 func TestIsNotFound(t *testing.T) {

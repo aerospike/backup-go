@@ -13,8 +13,6 @@ request links for the full detail of any change.
 
 ### Added
 
-- The backup lister reports the record time bounds of each server-integrated backup: `Metadata`
-  gains `ModifiedAfter` and `ModifiedBefore` from its `metadata.json`. (BKRS-473)
 - Server-integrated backup and restore requests carry every parameter of the server commands.
   `RequestBackup` gains `BinList`; `RequestCommon` gains `Path`, `SetList` and `FilterExp`;
   `RequestRestore` gains `BackupIDs`, a comma-separated list sent as the required `backup-ids`,

@@ -13,6 +13,11 @@ request links for the full detail of any change.
 
 ### Added
 
+- `lister.Lister.GetStatistics` returns the record, byte and file counts of a server-integrated
+  backup in `models.Statistics`, summed from the manifests of its query and change streams
+  without reading record data. The byte and file counts are exact; the record count is the base
+  scan's, an estimate that is exact when no write overlaps the backup. The incremental scan and
+  change stream record counts are reported apart. (BKRS-478)
 - Server-integrated backup and restore requests carry every parameter of the server commands.
   `RequestBackup` gains `BinList`; `RequestCommon` gains `Path`, `SetList` and `FilterExp`;
   `RequestRestore` gains `BackupIDs`, a comma-separated list sent as the required `backup-ids`,

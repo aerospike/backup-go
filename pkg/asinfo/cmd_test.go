@@ -49,6 +49,19 @@ const (
 	testCmdSetListParam   = ";set-list=set1,set2"
 	testCmdFilterExpParam = ";filter-exp=kwGVfwIAAJMEDqNiaW4="
 
+	// testCmdBackupIDsChain is a full backup followed by an incremental one.
+	testCmdBackupIDsChain = testCmdBackupID + ",260901T000001-efgh"
+
+	testCmdRestorePolicyStrict = ";restore-policy=strict"
+	testCmdRestorePolicyFuzzy  = ";restore-policy=fuzzy"
+
+	testNameEmpty   = "empty"
+	testNameStrict  = "strict"
+	testNameFuzzy   = "fuzzy"
+	testNameUnknown = "unknown"
+	// testPolicyCold is a policy neither the backup nor the restore knows.
+	testPolicyCold = "cold"
+
 	testNameUnsetOmitted = "unset fields are omitted"
 
 	// testCmdMissingNsAndJobID is how the errors report a missing namespace and job id.
@@ -71,6 +84,33 @@ func testStorage() infomodels.RequestCommon {
 		Profile:   testCmdProfile,
 		Endpoint:  testCmdEndpoint,
 	}
+}
+
+// testCmdMinimalCommon returns request fields with only the required ones set.
+func testCmdMinimalCommon() infomodels.RequestCommon {
+	return infomodels.RequestCommon{Namespace: testCmdNamespace, Storage: testCmdStorage}
+}
+
+// testMinimalRestore returns a restore request with only the required fields
+// and the given policy set.
+func testMinimalRestore(policy infomodels.RestorePolicy) *infomodels.RequestRestore {
+	return &infomodels.RequestRestore{
+		RequestCommon: testCmdMinimalCommon(),
+		JobID:         testCmdJobID,
+		BackupIDs:     testCmdBackupID,
+		Policy:        policy,
+	}
+}
+
+// testSetFuzzyParams sets every parameter of r that only the fuzzy policy accepts.
+func testSetFuzzyParams(r *infomodels.RequestRestore) {
+	r.AllowUnhosted = testPtr(true)
+	r.MaxInflight = 400
+	r.RetryBaseIntervalMs = testPtr(250)
+	r.RetryMultiplier = 1.5
+	r.RetryMaxAttempts = 3
+	r.IgnoreRecordError = testPtr(false)
+	r.ApplyMetadataLast = testPtr(true)
 }
 
 // testPrepareRestore returns a prepare restore request with the required fields set.
@@ -636,7 +676,7 @@ func TestInfoCommands_ValidateRestoreStatusNamespace(t *testing.T) {
 			give: testCmdNamespace,
 		},
 		{
-			name:      "empty",
+			name:      testNameEmpty,
 			wantErrIs: errMissingCmdParam,
 		},
 		{
@@ -841,11 +881,28 @@ func TestInfoCommands_ServerBackup(t *testing.T) {
 				BackupWorkerThreads:          8,
 				BackupUploadThreads:          16,
 				BackupS3ThroughputTargetGbps: 25,
+				Policy:                       infomodels.BackupPolicyBestEffort,
 			},
 			want: testCmdBackupBase + testCmdStorageParams + testCmdSetListParam + ";bin-list=bin1,bin2" +
 				testModifiedAfterParam + ";modified-before=1700000100" + testCmdFilterExpParam +
 				";no-indexes=true;no-udfs=false;backup-rps=1000;backup-worker-threads=8;" +
-				"backup-upload-threads=16;backup-s3-throughput-target-gbps=25",
+				"backup-upload-threads=16;backup-s3-throughput-target-gbps=25;backup-policy=best-effort",
+		},
+		{
+			name: "strict policy",
+			give: &infomodels.RequestBackup{
+				RequestCommon: testCmdMinimalCommon(),
+				Policy:        infomodels.BackupPolicyStrict,
+			},
+			want: testCmdBackupBase + ";backup-policy=strict",
+		},
+		{
+			name: "fuzzy policy",
+			give: &infomodels.RequestBackup{
+				RequestCommon: testCmdMinimalCommon(),
+				Policy:        infomodels.BackupPolicyFuzzy,
+			},
+			want: testCmdBackupBase + ";backup-policy=fuzzy",
 		},
 		{
 			name: testNameUnsetOmitted,
@@ -889,23 +946,27 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 
 	const (
 		testIncrementalPath = "/backups/incr"
-		// testRestoreHead are the parameters of the requests below that precede
-		// the set list, in the order the command adds them.
-		testRestoreHead = testCmdRestoreBase + testCmdStorageParams + ";incremental-path=/backups/incr" +
-			";no-indexes=false;no-udfs=true"
+		testRestoreFlags    = ";no-indexes=false;no-udfs=true"
+		// testStrictHead and testFuzzyHead are the parameters of the requests
+		// below that precede the set list, in the order the command adds them.
+		// The fuzzy policy accepts neither several backup ids nor an
+		// incremental path.
+		testStrictHead = "restore:namespace=" + testCmdNamespace + ";job-id=" + testCmdJobID +
+			";backup-ids=" + testCmdBackupIDsChain + ";object-storage-type=" + testCmdStorage +
+			testCmdStorageParams + ";incremental-path=" + testIncrementalPath + testRestoreFlags
+		testFuzzyHead = testCmdRestoreBase + testCmdStorageParams + testRestoreFlags
 		// testRestoreLimits are the parameters of both modes that follow the filter.
 		testRestoreLimits = ";restore-download-threads=8;restore-worker-threads=16;restore-rps=5000;" +
 			"extra-ttl=3600"
-		// testFuzzyParams are the fuzzy only parameters of the requests below.
+		// testFuzzyParams are the fuzzy only parameters set by testSetFuzzyParams.
 		testFuzzyParams = ";allow-unhosted=true;max-inflight=400;retry-base-interval=250;" +
 			"retry-multiplier=1.5;retry-max-attempts=3;ignore-record-error=false;apply-metadata-last=true"
-		testFuzzyFlag = ";fuzzy-restore=true"
 	)
 
 	cmds := newInfoCommands(infomodels.AerospikeVersionSupportsIntegratedBackup)
 
-	// newRequest returns a request with every parameter of both modes set.
-	newRequest := func(fuzzy *infomodels.RequestFuzzyRestore) *infomodels.RequestRestore {
+	// newRequest returns a request with every parameter of both policies set.
+	newRequest := func(policy infomodels.RestorePolicy) *infomodels.RequestRestore {
 		common := testStorage()
 		common.SetList = testCmdSetList
 		common.NoIndexes = testPtr(false)
@@ -915,29 +976,35 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 			RequestCommon:          common,
 			JobID:                  testCmdJobID,
 			BackupIDs:              testCmdBackupID,
-			IncrementalPath:        testIncrementalPath,
 			RestoreDownloadThreads: 8,
 			RestoreWorkerThreads:   16,
 			RestoreRPS:             5000,
 			ExtraTTL:               3600,
-			Fuzzy:                  fuzzy,
+			Policy:                 policy,
 		}
 	}
 
-	coldRequest := newRequest(nil)
-	coldRequest.FilterExp = testCmdFilterExp
+	// newStrictRequest returns a request with every parameter of the strict
+	// policy set.
+	newStrictRequest := func(policy infomodels.RestorePolicy) *infomodels.RequestRestore {
+		r := newRequest(policy)
+		r.BackupIDs = testCmdBackupIDsChain
+		r.IncrementalPath = testIncrementalPath
+		r.FilterExp = testCmdFilterExp
 
-	newMinimalFuzzyRequest := func(fuzzy *infomodels.RequestFuzzyRestore) *infomodels.RequestRestore {
-		return &infomodels.RequestRestore{
-			RequestCommon: infomodels.RequestCommon{
-				Namespace: testCmdNamespace,
-				Storage:   testCmdStorage,
-			},
-			JobID:     testCmdJobID,
-			BackupIDs: testCmdBackupID,
-			Fuzzy:     fuzzy,
-		}
+		return r
 	}
+
+	strictRequest := newStrictRequest(infomodels.RestorePolicyStrict)
+	defaultRequest := newStrictRequest("")
+
+	fuzzyRequest := newRequest(infomodels.RestorePolicyFuzzy)
+	testSetFuzzyParams(fuzzyRequest)
+
+	minimalFuzzyRequest := testMinimalRestore(infomodels.RestorePolicyFuzzy)
+
+	zeroIntervalRequest := testMinimalRestore(infomodels.RestorePolicyFuzzy)
+	zeroIntervalRequest.RetryBaseIntervalMs = testPtr(0)
 
 	tests := []struct {
 		name string
@@ -945,32 +1012,31 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 		want string
 	}{
 		{
-			name: "fuzzy restore sends every fuzzy parameter",
-			give: newRequest(&infomodels.RequestFuzzyRestore{
-				AllowUnhosted:       testPtr(true),
-				MaxInflight:         400,
-				RetryBaseIntervalMs: testPtr(250),
-				RetryMultiplier:     1.5,
-				RetryMaxAttempts:    3,
-				IgnoreRecordError:   testPtr(false),
-				ApplyMetadataLast:   testPtr(true),
-			}),
-			want: testRestoreHead + testCmdSetListParam + testRestoreLimits + testFuzzyFlag + testFuzzyParams,
+			name: "strict policy sends every strict only parameter",
+			give: strictRequest,
+			want: testStrictHead + testCmdSetListParam + testCmdFilterExpParam + testRestoreLimits +
+				testCmdRestorePolicyStrict,
 		},
 		{
-			name: "nil fuzzy is a cold restore with the filter",
-			give: coldRequest,
-			want: testRestoreHead + testCmdSetListParam + testCmdFilterExpParam + testRestoreLimits,
+			name: "empty policy is not sent and accepts every strict only parameter",
+			give: defaultRequest,
+			want: testStrictHead + testCmdSetListParam + testCmdFilterExpParam + testRestoreLimits,
+		},
+		{
+			name: "fuzzy policy sends every fuzzy only parameter",
+			give: fuzzyRequest,
+			want: testFuzzyHead + testCmdSetListParam + testRestoreLimits + testCmdRestorePolicyFuzzy +
+				testFuzzyParams,
 		},
 		{
 			name: testNameUnsetOmitted,
-			give: newMinimalFuzzyRequest(&infomodels.RequestFuzzyRestore{}),
-			want: testCmdRestoreBase + testFuzzyFlag,
+			give: minimalFuzzyRequest,
+			want: testCmdRestoreBase + testCmdRestorePolicyFuzzy,
 		},
 		{
 			name: "zero retry base interval is sent",
-			give: newMinimalFuzzyRequest(&infomodels.RequestFuzzyRestore{RetryBaseIntervalMs: testPtr(0)}),
-			want: testCmdRestoreBase + testFuzzyFlag + ";retry-base-interval=0",
+			give: zeroIntervalRequest,
+			want: testCmdRestoreBase + testCmdRestorePolicyFuzzy + ";retry-base-interval=0",
 		},
 	}
 
@@ -986,38 +1052,116 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 	}
 }
 
-func TestInfoCommands_ServerRestoreModeMismatch(t *testing.T) {
+func TestInfoCommands_ServerRestorePolicyMismatch(t *testing.T) {
 	t.Parallel()
 
-	const testFuzzyFilter = "restore with fuzzy-restore=true: " + paramFilterExp
+	const (
+		// testFuzzyPrefix starts the report of the strict only parameters set
+		// for the fuzzy policy.
+		testFuzzyPrefix = "restore with restore-policy=fuzzy: "
+		testFuzzyFilter = testFuzzyPrefix + paramFilterExp
+		// testStrictPrefix starts the report of the fuzzy only parameters set
+		// for the strict policy.
+		testStrictPrefix = "restore with restore-policy=strict: "
+		// testDefaultPrefix starts the same report for an empty policy.
+		testDefaultPrefix = "restore with default restore-policy (strict): "
+		// testIncrementalOneID reports an incremental path for one backup id.
+		testIncrementalOneID = "restore with one backup id: " + paramIncrementalPath
+	)
 
 	cmds := newInfoCommands(infomodels.AerospikeVersionSupportsIntegratedBackup)
 
-	newFuzzyWithFilter := func(jobID string) *infomodels.RequestRestore {
-		return &infomodels.RequestRestore{
-			RequestCommon: infomodels.RequestCommon{
-				Namespace: testCmdNamespace,
-				Storage:   testCmdStorage,
-				FilterExp: testCmdFilterExp,
-			},
-			JobID:     jobID,
-			BackupIDs: testCmdBackupID,
-			Fuzzy:     &infomodels.RequestFuzzyRestore{},
-		}
-	}
+	fuzzyWithFilter := testMinimalRestore(infomodels.RestorePolicyFuzzy)
+	fuzzyWithFilter.FilterExp = testCmdFilterExp
+
+	fuzzyWithBackupIDsChain := testMinimalRestore(infomodels.RestorePolicyFuzzy)
+	fuzzyWithBackupIDsChain.BackupIDs = testCmdBackupIDsChain
+
+	fuzzyWithIncrementalPath := testMinimalRestore(infomodels.RestorePolicyFuzzy)
+	fuzzyWithIncrementalPath.IncrementalPath = testCmdPath
+
+	strictWithIncrementalPath := testMinimalRestore(infomodels.RestorePolicyStrict)
+	strictWithIncrementalPath.IncrementalPath = testCmdPath
+
+	fuzzyWithFilterAndIncrementalPath := testMinimalRestore(infomodels.RestorePolicyFuzzy)
+	fuzzyWithFilterAndIncrementalPath.FilterExp = testCmdFilterExp
+	fuzzyWithFilterAndIncrementalPath.IncrementalPath = testCmdPath
+
+	fuzzyWithStrictParams := testMinimalRestore(infomodels.RestorePolicyFuzzy)
+	fuzzyWithStrictParams.BackupIDs = testCmdBackupIDsChain
+	fuzzyWithStrictParams.IncrementalPath = testCmdPath
+	fuzzyWithStrictParams.FilterExp = testCmdFilterExp
+
+	strictWithFuzzyParams := testMinimalRestore(infomodels.RestorePolicyStrict)
+	testSetFuzzyParams(strictWithFuzzyParams)
+
+	defaultWithMaxInflight := testMinimalRestore("")
+	defaultWithMaxInflight.MaxInflight = 1
+
+	strictWithZeroInterval := testMinimalRestore(infomodels.RestorePolicyStrict)
+	strictWithZeroInterval.RetryBaseIntervalMs = testPtr(0)
+
+	fuzzyWithFilterNoJobID := testMinimalRestore(infomodels.RestorePolicyFuzzy)
+	fuzzyWithFilterNoJobID.FilterExp = testCmdFilterExp
+	fuzzyWithFilterNoJobID.JobID = ""
 
 	tests := []struct {
 		name        string
 		give        *infomodels.RequestRestore
+		wantErrText string
 		wantMissing bool
 	}{
 		{
-			name: "filter expression in fuzzy restore",
-			give: newFuzzyWithFilter(testCmdJobID),
+			name:        "filter expression with fuzzy policy",
+			give:        fuzzyWithFilter,
+			wantErrText: testFuzzyFilter,
 		},
 		{
-			name:        "missing parameter is reported with the mode mismatch",
-			give:        newFuzzyWithFilter(""),
+			name:        "several backup ids with fuzzy policy",
+			give:        fuzzyWithBackupIDsChain,
+			wantErrText: testFuzzyPrefix + paramBackupIDs,
+		},
+		{
+			name:        "every strict only parameter with fuzzy policy",
+			give:        fuzzyWithStrictParams,
+			wantErrText: testFuzzyPrefix + paramBackupIDs + ", " + paramFilterExp,
+		},
+		{
+			name:        "incremental path for one backup id with fuzzy policy",
+			give:        fuzzyWithIncrementalPath,
+			wantErrText: testIncrementalOneID,
+		},
+		{
+			name:        "incremental path for one backup id with strict policy",
+			give:        strictWithIncrementalPath,
+			wantErrText: testIncrementalOneID,
+		},
+		{
+			name: "policy mismatch is reported with the incremental path",
+			give: fuzzyWithFilterAndIncrementalPath,
+			wantErrText: testFuzzyFilter + "; " + errParamNotApplicable.Error() + ": " +
+				testIncrementalOneID,
+		},
+		{
+			name: "every fuzzy only parameter with strict policy",
+			give: strictWithFuzzyParams,
+			wantErrText: testStrictPrefix + "allow-unhosted, max-inflight, retry-base-interval, " +
+				"retry-multiplier, retry-max-attempts, ignore-record-error, apply-metadata-last",
+		},
+		{
+			name:        "fuzzy only parameter with empty policy",
+			give:        defaultWithMaxInflight,
+			wantErrText: testDefaultPrefix + paramMaxInflight,
+		},
+		{
+			name:        "zero retry base interval with strict policy",
+			give:        strictWithZeroInterval,
+			wantErrText: testStrictPrefix + paramRetryBaseInterval,
+		},
+		{
+			name:        "missing parameter is reported with the policy mismatch",
+			give:        fuzzyWithFilterNoJobID,
+			wantErrText: testFuzzyFilter,
 			wantMissing: true,
 		},
 	}
@@ -1030,9 +1174,279 @@ func TestInfoCommands_ServerRestoreModeMismatch(t *testing.T) {
 
 			require.ErrorIs(t, err, errParamNotApplicable)
 			require.ErrorIs(t, err, errclass.ErrInvalidConfig)
-			require.ErrorContains(t, err, testFuzzyFilter)
+			require.ErrorContains(t, err, tt.wantErrText)
 			assert.Equal(t, tt.wantMissing, errors.Is(err, errMissingCmdParam))
 			assert.Empty(t, got)
+		})
+	}
+}
+
+func TestInfoCommands_ServerRestoreFuzzyInvalidBackupIDs(t *testing.T) {
+	t.Parallel()
+
+	cmds := newInfoCommands(infomodels.AerospikeVersionSupportsIntegratedBackup)
+
+	tests := []struct {
+		name string
+		give string
+	}{
+		{name: "trailing comma", give: testCmdBackupID + ","},
+		{name: "empty entry", give: testCmdBackupID + ",," + testCmdBackupID},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			r := testMinimalRestore(infomodels.RestorePolicyFuzzy)
+			r.BackupIDs = tt.give
+
+			got, err := cmds.serverRestore(r)
+
+			require.ErrorIs(t, err, errInvalidCmdParam)
+			require.NotErrorIs(t, err, errParamNotApplicable)
+			assert.Empty(t, got)
+		})
+	}
+}
+
+func TestBackupIDCount(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		give string
+		want int
+	}{
+		{name: testNameEmpty, give: "", want: 0},
+		{name: "one id", give: testCmdBackupID, want: 1},
+		{name: "chain", give: testCmdBackupIDsChain, want: 2},
+		{name: "invalid list", give: testCmdBackupID + ",", want: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, backupIDCount(tt.give))
+		})
+	}
+}
+
+func TestJoinErrs(t *testing.T) {
+	t.Parallel()
+
+	errFirst := errors.New("first")
+	errSecond := errors.New("second")
+
+	tests := []struct {
+		name     string
+		give     []error
+		wantText string
+		wantIs   []error
+	}{
+		{name: "none", give: nil},
+		{name: "only nil", give: []error{nil, nil}},
+		{
+			name:     "one",
+			give:     []error{nil, errFirst},
+			wantText: errFirst.Error(),
+			wantIs:   []error{errFirst},
+		},
+		{
+			name:     "several on one line",
+			give:     []error{errFirst, nil, errSecond},
+			wantText: "first; second",
+			wantIs:   []error{errFirst, errSecond},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := joinErrs(tt.give...)
+			if tt.wantText == "" {
+				require.NoError(t, err)
+
+				return
+			}
+
+			require.EqualError(t, err, tt.wantText)
+
+			for _, want := range tt.wantIs {
+				require.ErrorIs(t, err, want)
+			}
+		})
+	}
+}
+
+func TestInfoCommands_UnknownPolicy(t *testing.T) {
+	t.Parallel()
+
+	const (
+		// testUnknownPolicy is a policy neither the backup nor the restore knows.
+		testUnknownPolicy = "best-fuzzy"
+		// testBackupPolicyErr and testRestorePolicyErr are how the errors
+		// report testUnknownPolicy.
+		testBackupPolicyErr  = cmdNameBackup + ": " + paramBackupPolicy + `="` + testUnknownPolicy + `"`
+		testRestorePolicyErr = cmdNameRestore + ": " + paramRestorePolicy + `="` + testUnknownPolicy + `"`
+	)
+
+	cmds := newInfoCommands(infomodels.AerospikeVersionSupportsIntegratedBackup)
+
+	backup := func(jobID string) (string, error) {
+		return cmds.serverBackup(&infomodels.RequestBackup{
+			RequestCommon: testCmdMinimalCommon(),
+			Policy:        testUnknownPolicy,
+		}, jobID)
+	}
+
+	restoreWithFuzzyParams := testMinimalRestore(testUnknownPolicy)
+	testSetFuzzyParams(restoreWithFuzzyParams)
+
+	restoreWithFilter := testMinimalRestore(testUnknownPolicy)
+	restoreWithFilter.FilterExp = testCmdFilterExp
+
+	restoreNoJobID := testMinimalRestore(testUnknownPolicy)
+	restoreNoJobID.JobID = ""
+
+	tests := []struct {
+		name        string
+		call        func() (string, error)
+		wantErrText string
+		wantMissing bool
+	}{
+		{
+			name:        "backup",
+			call:        func() (string, error) { return backup(testCmdJobID) },
+			wantErrText: testBackupPolicyErr,
+		},
+		{
+			name:        "backup with missing parameter",
+			call:        func() (string, error) { return backup("") },
+			wantErrText: testBackupPolicyErr,
+			wantMissing: true,
+		},
+		{
+			name: "restore",
+			call: func() (string, error) {
+				return cmds.serverRestore(testMinimalRestore(testUnknownPolicy))
+			},
+			wantErrText: testRestorePolicyErr,
+		},
+		{
+			name:        "restore with fuzzy only parameters",
+			call:        func() (string, error) { return cmds.serverRestore(restoreWithFuzzyParams) },
+			wantErrText: testRestorePolicyErr,
+		},
+		{
+			name:        "restore with filter expression",
+			call:        func() (string, error) { return cmds.serverRestore(restoreWithFilter) },
+			wantErrText: testRestorePolicyErr,
+		},
+		{
+			name:        "restore with missing parameter",
+			call:        func() (string, error) { return cmds.serverRestore(restoreNoJobID) },
+			wantErrText: testRestorePolicyErr,
+			wantMissing: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := tt.call()
+
+			require.ErrorIs(t, err, errUnknownPolicy)
+			require.ErrorIs(t, err, errclass.ErrInvalidConfig)
+			require.ErrorContains(t, err, tt.wantErrText)
+			require.NotErrorIs(t, err, errParamNotApplicable)
+			assert.Equal(t, tt.wantMissing, errors.Is(err, errMissingCmdParam))
+			assert.Empty(t, got)
+		})
+	}
+}
+
+func TestCheckPolicy(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		give        infomodels.RestorePolicy
+		wantErrText string
+	}{
+		{name: testNameEmpty, give: ""},
+		{name: testNameStrict, give: infomodels.RestorePolicyStrict},
+		{name: testNameFuzzy, give: infomodels.RestorePolicyFuzzy},
+		{name: testNameUnknown, give: testPolicyCold, wantErrText: `restore: restore-policy="cold"`},
+		{name: "case sensitive", give: "Strict", wantErrText: `restore: restore-policy="Strict"`},
+		{name: "newline is quoted", give: "a\nb", wantErrText: `restore: restore-policy="a\nb"`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := checkPolicy(cmdNameRestore, paramRestorePolicy, tt.give, knownRestorePolicy)
+			if tt.wantErrText != "" {
+				require.ErrorIs(t, err, errUnknownPolicy)
+				require.ErrorIs(t, err, errclass.ErrInvalidConfig)
+				require.ErrorContains(t, err, tt.wantErrText)
+
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestKnownBackupPolicy(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		give infomodels.BackupPolicy
+		want bool
+	}{
+		{name: testNameStrict, give: infomodels.BackupPolicyStrict, want: true},
+		{name: "best effort", give: infomodels.BackupPolicyBestEffort, want: true},
+		{name: testNameFuzzy, give: infomodels.BackupPolicyFuzzy, want: true},
+		{name: testNameEmpty, give: "", want: false},
+		{name: testNameUnknown, give: testPolicyCold, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, knownBackupPolicy(tt.give))
+		})
+	}
+}
+
+func TestKnownRestorePolicy(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		give infomodels.RestorePolicy
+		want bool
+	}{
+		{name: testNameStrict, give: infomodels.RestorePolicyStrict, want: true},
+		{name: testNameFuzzy, give: infomodels.RestorePolicyFuzzy, want: true},
+		{name: testNameEmpty, give: "", want: false},
+		{name: "backup only policy", give: "best-effort", want: false},
+		{name: testNameUnknown, give: testPolicyCold, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, knownRestorePolicy(tt.give))
 		})
 	}
 }

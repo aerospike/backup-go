@@ -36,12 +36,12 @@ const (
 // String parameters with empty values are omitted, so the server receives only
 // the fields that were actually set.
 type infoCmd struct {
-	b         strings.Builder
-	name      string
-	unsafe    string
-	missing   []string
-	invalid   []string
-	hasParams bool
+	b       strings.Builder
+	name    string
+	unsafe  string
+	keys    []string
+	missing []string
+	invalid []string
 }
 
 // newInfoCmd starts the command name. No value of the command may contain
@@ -190,14 +190,20 @@ func (c *infoCmd) add(key, value string) {
 		c.invalid = append(c.invalid, key)
 	}
 
-	if c.hasParams {
+	if len(c.keys) > 0 {
 		c.b.WriteByte(cmdParamSep)
 	}
 
 	c.b.WriteString(key)
 	c.b.WriteByte(cmdValueSep)
 	c.b.WriteString(value)
-	c.hasParams = true
+	c.keys = append(c.keys, key)
+}
+
+// paramKeys returns the keys of the parameters added so far, in the order they
+// were added. Parameters that were omitted or missing are not included.
+func (c *infoCmd) paramKeys() []string {
+	return slices.Clone(c.keys)
 }
 
 // buildPathCmd returns a path-style command "name/value", such as "sets/<ns>".

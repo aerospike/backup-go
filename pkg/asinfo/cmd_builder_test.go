@@ -35,7 +35,7 @@ const (
 	testErrKey2 = "cmd: k2"
 
 	// testUnsafeValue would inject an extra parameter if it were sent as is.
-	testUnsafeValue = "v1;fuzzy-restore=true"
+	testUnsafeValue = "v1;restore-policy=fuzzy"
 	// testNewlineValue would inject an extra command if it were sent as is.
 	testNewlineValue = "v1\nbackup-abort:job-id=1"
 	// testPipeValue is valid unless the command forbids "|".
@@ -344,6 +344,60 @@ func TestInfoCmd_BuildMissingAndInvalid(t *testing.T) {
 	assert.NotContains(t, err.Error(), testUnsafeValue)
 	assert.NotContains(t, err.Error(), "\n", "error must be a single line")
 	assert.Empty(t, got)
+}
+
+func TestInfoCmd_ParamKeys(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		build func(c *infoCmd) *infoCmd
+		want  []string
+	}{
+		{
+			name:  "nothing added",
+			build: func(c *infoCmd) *infoCmd { return c },
+		},
+		{
+			name: "keys in the order they were added",
+			build: func(c *infoCmd) *infoCmd {
+				return c.num(testCmdKey2, 1).str(testCmdKey1, testCmdValue1)
+			},
+			want: []string{testCmdKey2, testCmdKey1},
+		},
+		{
+			name: "omitted parameters are skipped",
+			build: func(c *infoCmd) *infoCmd {
+				return c.str(testCmdKey1, "").optNum(testCmdKey2, 0).optFlag(testCmdKey1, nil)
+			},
+		},
+		{
+			name: "missing parameter is skipped",
+			build: func(c *infoCmd) *infoCmd {
+				return c.required(testCmdKey1, "").optNumPtr(testCmdKey2, testPtr(0))
+			},
+			want: []string{testCmdKey2},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, tt.build(newInfoCmd(testCmdName)).paramKeys())
+		})
+	}
+}
+
+func TestInfoCmd_ParamKeysCopy(t *testing.T) {
+	t.Parallel()
+
+	cmd := newInfoCmd(testCmdName).str(testCmdKey1, testCmdValue1)
+
+	keys := cmd.paramKeys()
+	keys[0] = testCmdKey2
+
+	assert.Equal(t, []string{testCmdKey1}, cmd.paramKeys())
 }
 
 func TestCommaSeparatedListValid(t *testing.T) {

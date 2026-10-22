@@ -79,10 +79,12 @@ var (
 	errInvalidCmdParam = fmt.Errorf("%w: info command parameter value contains separator",
 		errclass.ErrInvalidConfig)
 	errNilRequest = fmt.Errorf("%w: nil request", errclass.ErrInvalidConfig)
-	// errParamNotApplicable reports a parameter that the chosen restore mode
-	// does not accept: the server rejects it instead of ignoring it.
-	errParamNotApplicable = fmt.Errorf("%w: info command parameter does not apply to the restore mode",
+	// errParamNotApplicable reports a parameter that the rest of the request,
+	// such as the restore policy, does not accept: the server rejects it
+	// instead of ignoring it.
+	errParamNotApplicable = fmt.Errorf("%w: info command parameter does not apply to the request",
 		errclass.ErrInvalidConfig)
+	errUnknownPolicy = fmt.Errorf("%w: info command policy is unknown", errclass.ErrInvalidConfig)
 
 	secretAgentValRegex = regexp.MustCompile(`(.+?)=secrets:(.+?):(.+?)`)
 )

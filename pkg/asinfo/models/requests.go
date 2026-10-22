@@ -14,6 +14,34 @@
 
 package models
 
+// BackupPolicy is how consistent a backup must be, see [RequestBackup.Policy].
+type BackupPolicy string
+
+// Backup policies the server accepts.
+const (
+	// BackupPolicyStrict aborts the backup on any failure.
+	BackupPolicyStrict BackupPolicy = "strict"
+	// BackupPolicyBestEffort tries a strict backup. A failure after the base
+	// scan is durable cluster-wide commits the backup as fuzzy instead of
+	// aborting it.
+	BackupPolicyBestEffort BackupPolicy = "best-effort"
+	// BackupPolicyFuzzy runs the base scan only, without the change stream.
+	BackupPolicyFuzzy BackupPolicy = "fuzzy"
+)
+
+// RestorePolicy selects the restore mode, see [RequestRestore.Policy].
+type RestorePolicy string
+
+// Restore policies the server accepts.
+const (
+	// RestorePolicyStrict selects the cold restore: the partitions of a
+	// prepared namespace are hydrated from strict backups only.
+	RestorePolicyStrict RestorePolicy = "strict"
+	// RestorePolicyFuzzy writes the records of a single backup of any
+	// consistency into the live namespace.
+	RestorePolicyFuzzy RestorePolicy = "fuzzy"
+)
+
 // RequestBackup represents a request to start a backup job on the server.
 type RequestBackup struct {
 	RequestCommon
@@ -38,14 +66,21 @@ type RequestBackup struct {
 	// BackupS3ThroughputTargetGbps is the target throughput of the S3 client per
 	// node, in Gbit/s, from 1 to 400.
 	BackupS3ThroughputTargetGbps int
+	// Policy is how consistent the backup must be: strict, best-effort or
+	// fuzzy, see [BackupPolicy]. Empty omits the parameter, so the server
+	// default applies.
+	Policy BackupPolicy
 }
 
 // RequestRestore represents a request to start a restore job on the server.
 //
-// The restore is cold unless Fuzzy is set. The settings of the fuzzy restore
-// are held by Fuzzy, so that they cannot be set for a cold restore. FilterExp
-// applies to the cold restore only: setting it together with Fuzzy fails the
-// request, since the server rejects it instead of ignoring it.
+// Policy selects the restore mode, strict (cold) by default. The parameters of
+// one mode fail the request in the other one, since the server rejects them
+// instead of ignoring them. Only the strict policy accepts FilterExp and more
+// than one id in BackupIDs. Only the fuzzy policy accepts AllowUnhosted,
+// MaxInflight, RetryBaseIntervalMs, RetryMultiplier, RetryMaxAttempts,
+// IgnoreRecordError and ApplyMetadataLast. IncrementalPath needs more than
+// one id in BackupIDs, so only the strict policy accepts it as well.
 type RequestRestore struct {
 	RequestCommon
 	// JobID identifies the restore job. A cold restore must use the job id that
@@ -55,7 +90,8 @@ type RequestRestore struct {
 	// backup first, then its incremental backups in chronological order.
 	BackupIDs string
 	// IncrementalPath is the path of the incremental backups, the entries after
-	// the first one of BackupIDs, when it differs from Path.
+	// the first one of BackupIDs, when it differs from Path. Setting it for a
+	// single backup id fails the request.
 	IncrementalPath string
 	// RestoreWorkerThreads is the number of apply threads per node, from 1 to 128.
 	RestoreWorkerThreads int
@@ -67,16 +103,11 @@ type RequestRestore struct {
 	// ExtraTTL is added to the expiry of every restored record that expires, in
 	// seconds, from 0 to 315360000.
 	ExtraTTL int
-	// Fuzzy selects the fuzzy restore, which writes records into the live
-	// namespace instead of the cold partition hydration. Nil selects the cold
-	// restore.
-	Fuzzy *RequestFuzzyRestore
-}
-
-// RequestFuzzyRestore holds the settings that apply to a fuzzy restore only.
-// An empty RequestFuzzyRestore selects the fuzzy restore with the server
-// defaults.
-type RequestFuzzyRestore struct {
+	// Policy selects the restore mode. strict: cold hydration from strict
+	// backups only; the server refuses a fuzzy backup. fuzzy: restore through
+	// writes from a single backup of any consistency. Empty omits the
+	// parameter, so the server default, strict, applies.
+	Policy RestorePolicy
 	// AllowUnhosted allows the restore even if the principal does not host the
 	// namespace.
 	AllowUnhosted *bool
@@ -133,7 +164,7 @@ type RequestCommon struct {
 	// SetList is a comma-separated list of sets.
 	SetList string
 	// FilterExp is a base64-encoded filter expression. A restore accepts it
-	// only in the cold mode, see [RequestRestore].
+	// only with the strict policy, see [RequestRestore].
 	FilterExp string
 	// NoIndexes skips the secondary indexes.
 	NoIndexes *bool

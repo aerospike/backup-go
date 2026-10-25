@@ -394,7 +394,7 @@ func TestStreamAll_ManifestThatCannotBeReadAgain(t *testing.T) {
 		st.failOpen = func(storagePath string) error {
 			// The first read is the one that streams the manifest; the second
 			// is the one that reconciles the directory it recorded.
-			if isManifest(storagePath) && opened.Add(1) > 1 {
+			if isManifest(storagePath) && path.Base(storagePath) != metadataFile && opened.Add(1) > 1 {
 				return errStorage
 			}
 

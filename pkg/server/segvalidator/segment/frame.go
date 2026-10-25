@@ -47,10 +47,6 @@ const (
 	// frameOverhead is what the frame adds to the body of a written segment.
 	frameOverhead = frameHeaderSize + frameFooterSize
 
-	// frameBlockRecords is the only block type the server interprets: a body
-	// of flat records.
-	frameBlockRecords = 1
-
 	// frameFlagsCriticalMask selects the flag bits a reader must understand.
 	// None of them is known yet, so any set critical bit refuses the segment.
 	// Unknown ancillary bits in the high byte are ignored.
@@ -76,6 +72,28 @@ const (
 	frameFooterLenOffset    = 24
 )
 
+// BlockType says which stream wrote the flat records a segment frame wraps.
+// The server stamps it on every segment it writes, and a restore requires it
+// to match the stream the segment is restored as, so that a segment listed
+// under the manifests of the other stream is refused rather than applied.
+type BlockType uint16
+
+const (
+	// BlockQueryRecords marks a body of flat records the scan of a namespace
+	// wrote: a query stream segment.
+	BlockQueryRecords BlockType = 1
+	// BlockChangeRecords marks a body of flat records the change stream
+	// wrote while the backup was running.
+	BlockChangeRecords BlockType = 2
+)
+
+// known reports whether the server interprets a body of this type. The other
+// values, 3 for a manifest and 4 for a checkpoint among them, are reserved and
+// refused on read.
+func (t BlockType) known() bool {
+	return t == BlockQueryRecords || t == BlockChangeRecords
+}
+
 // frame is the decoded part of a segment frame the validator relies on.
 type frame struct {
 	// recordCount is the number of records the writer put into the body.
@@ -94,7 +112,11 @@ func (f frame) bodyEnd() int {
 // parseFrame decodes the frame of a segment object and locates its body. It
 // applies the same checks, in the same order, as the server does before it
 // restores a segment, so a segment it accepts is one the server walks.
-func parseFrame(data []byte) (frame, error) {
+//
+// want is the block type the stream the segment is restored as requires, or
+// zero to accept any type the server interprets. The server checks it once the
+// frame itself has been read, and before it checks the body.
+func parseFrame(data []byte, want BlockType) (frame, error) {
 	if len(data) < framePrefixSize {
 		return frame{}, fmt.Errorf("%w: %d bytes", ErrFrameTruncated, len(data))
 	}
@@ -116,8 +138,9 @@ func parseFrame(data []byte) (frame, error) {
 		return frame{}, fmt.Errorf("%w: 0x%04x", ErrUnsupportedFrameFlags, flags)
 	}
 
-	if bt := binary.LittleEndian.Uint16(data[frameBlockTypeOffset:]); bt != frameBlockRecords {
-		return frame{}, fmt.Errorf("%w: %d", ErrUnsupportedBlockType, bt)
+	blockType := BlockType(binary.LittleEndian.Uint16(data[frameBlockTypeOffset:]))
+	if !blockType.known() {
+		return frame{}, fmt.Errorf("%w: %d", ErrUnsupportedBlockType, blockType)
 	}
 
 	headerLen := uint64(binary.LittleEndian.Uint32(data[frameHeaderLenOffset:]))
@@ -141,6 +164,10 @@ func parseFrame(data []byte) (frame, error) {
 	if headerLen+footerLen > size || bodyLen > size-headerLen-footerLen {
 		return frame{}, fmt.Errorf("%w: header %d, body %d, footer %d, object %d",
 			ErrFrameTruncated, headerLen, bodyLen, footerLen, size)
+	}
+
+	if want != 0 && blockType != want {
+		return frame{}, fmt.Errorf("%w: segment %d, expected %d", ErrBlockTypeMismatch, blockType, want)
 	}
 
 	if bodyLen == 0 || bodyLen > maxBodySize || bodyLen%rblockSize != 0 {

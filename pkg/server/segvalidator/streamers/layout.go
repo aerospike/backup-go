@@ -60,9 +60,14 @@ const (
 )
 
 // maxManifestSize caps a manifest read, so a bogus file cannot keep a validator
-// downloading forever. A manifest is walked as it arrives, so the limit bounds
-// the transfer and not the memory reading one costs.
-const maxManifestSize = 64 << 20
+// downloading forever. It is the ceiling the server reads a manifest up to on
+// restore. A manifest is walked as it arrives, so the limit bounds the transfer
+// and not the memory reading one costs.
+const maxManifestSize = 256 << 20
+
+// maxManifestsPerPartition is the number of query stream manifests the server
+// restores a partition from. A partition with more of them fails the restore.
+const maxManifestsPerPartition = 16
 
 // Stream is one of the two streams a server side backup writes. They hold the
 // same kind of data and are validated the same way; which one a segment came
@@ -76,8 +81,28 @@ const (
 	ChangeStream Stream = "change-stream"
 )
 
+// BlockType returns the block type the server stamps on the segments of the
+// stream, which is the one a restore requires of them. ok is false for a stream
+// the server does not write.
+func (s Stream) BlockType() (t segment.BlockType, ok bool) {
+	switch s {
+	case QueryStream:
+		return segment.BlockQueryRecords, true
+	case ChangeStream:
+		return segment.BlockChangeRecords, true
+	default:
+		return 0, false
+	}
+}
+
 // streams are the streams of a namespace, in the order they are visited.
 var streams = []Stream{QueryStream, ChangeStream}
+
+// ErrNoQueryManifests is reported for a namespace a restore finds no query
+// stream manifest for. The server takes that for a backup id that does not
+// exist and fails the restore, unless the backup is an incremental one of a
+// backup-ids list.
+var ErrNoQueryManifests = fmt.Errorf("%w: namespace has no query stream manifest", errclass.ErrNotFound)
 
 // ErrManifestUnusable is returned for a manifest that cannot be turned into a
 // list of segments, whether because it did not parse or because it names

@@ -617,6 +617,86 @@ func TestValidate_Partition(t *testing.T) {
 	}
 }
 
+func TestValidate_BlockType(t *testing.T) {
+	t.Parallel()
+
+	const reservedBlockType = BlockType(3)
+
+	query := buildSegment(t, buildRecord(t, defaultSpec()))
+
+	change := buildSegment(t, buildRecord(t, defaultSpec()))
+	binary.LittleEndian.PutUint16(change[frameBlockTypeOffset:], uint16(BlockChangeRecords))
+
+	oneRecord := Stats{RecordCount: 1, ByteCount: 64}
+
+	tests := []struct {
+		wantErr   error
+		name      string
+		give      []byte
+		giveOpts  []Option
+		wantStats Stats
+	}{
+		{
+			name:      "query segment in the query stream",
+			give:      query,
+			giveOpts:  []Option{WithBlockType(BlockQueryRecords)},
+			wantStats: oneRecord,
+		},
+		{
+			name:      "change segment in the change stream",
+			give:      change,
+			giveOpts:  []Option{WithBlockType(BlockChangeRecords)},
+			wantStats: oneRecord,
+		},
+		{
+			name:      "change segment accepted without the option",
+			give:      change,
+			wantStats: oneRecord,
+		},
+		{
+			name:     "query segment in the change stream",
+			give:     query,
+			giveOpts: []Option{WithBlockType(BlockChangeRecords)},
+			wantErr:  ErrBlockTypeMismatch,
+		},
+		{
+			name:     "change segment in the query stream",
+			give:     change,
+			giveOpts: []Option{WithBlockType(BlockQueryRecords)},
+			wantErr:  ErrBlockTypeMismatch,
+		},
+		{
+			name:     "reserved block type required",
+			give:     query,
+			giveOpts: []Option{WithBlockType(reservedBlockType)},
+			wantErr:  ErrInvalidBlockType,
+		},
+		{
+			name:     "zero block type required",
+			give:     query,
+			giveOpts: []Option{WithBlockType(0)},
+			wantErr:  ErrInvalidBlockType,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			stats, err := Validate(tt.give, tt.giveOpts...)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.NotErrorAs(t, err, new(*RecordError))
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantStats, stats)
+		})
+	}
+}
+
 func TestRecordPartition(t *testing.T) {
 	t.Parallel()
 

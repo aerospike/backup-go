@@ -39,10 +39,12 @@ import (
 	"math/rand/v2"
 	"path"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 
 	"github.com/aerospike/backup-go/errclass"
+	"github.com/aerospike/backup-go/pkg/server/segvalidator/segment"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -147,6 +149,20 @@ type Stats struct {
 	Segments int64
 	// Unrecorded is the number of them that no manifest names.
 	Unrecorded int64
+	// ManifestsSuperseded is the number of change stream manifests the run
+	// listed and did not read, because a newer manifest of the same node
+	// replaced them and a restore reads that one alone.
+	ManifestsSuperseded int64
+	// Commit is what the commit record of the backup says. It decides whether
+	// a restore starts at all, and whether the change stream is part of it.
+	Commit CommitRecord
+	// EmptyNamespaces are the namespaces a restore finds no query stream
+	// manifest for, sorted. Only a run over every segment lists the manifests
+	// in full, so a sampled run leaves it empty.
+	EmptyNamespaces []string
+	// ChangeStreamSkipped tells that the change stream was not read, because
+	// the backup is fuzzy and a restore never reads it.
+	ChangeStreamSkipped bool
 }
 
 // Streamer streams the segments of one backup out of the storage holding it.
@@ -268,14 +284,18 @@ func (s *Streamer) OpenSegment(ctx context.Context, seg *Segment) (io.ReadCloser
 // its data directories list, so that a backup missing its metadata is still
 // read rather than silently skipped.
 //
-// Nothing but the manifests is downloaded here, and a manifest is walked as it
-// arrives. The work of one stream runs in parallel and a slow consumer
-// throttles it, so a backup of any size is walked at the speed it is checked
-// and never piles up in memory.
+// The commit record of the backup is read first and reported in Stats. The
+// change stream of a backup it says is fuzzy is skipped, as a restore skips it,
+// and the change stream of a node is read from its newest manifest alone.
+//
+// Nothing but the commit record and the manifests is downloaded here, and a
+// manifest is walked as it arrives. The work of one stream runs in parallel and
+// a slow consumer throttles it, so a backup of any size is walked at the speed
+// it is checked and never piles up in memory.
 func (s *Streamer) StreamAll(ctx context.Context, out chan<- Segment) error {
 	defer close(out)
 
-	units, err := s.units(ctx)
+	units, namespaces, err := s.restoredUnits(ctx)
 	if err != nil {
 		return err
 	}
@@ -289,7 +309,74 @@ func (s *Streamer) StreamAll(ctx context.Context, out chan<- Segment) error {
 		}
 	}
 
+	s.checkEmptyNamespaces(namespaces)
+
 	return nil
+}
+
+// checkEmptyNamespaces reports the namespaces of the backup a restore finds no
+// query stream manifest for: the ones the storage holds, and the one the commit
+// record names, which may be missing from the storage altogether.
+//
+// The server tells a backup that captured nothing from wrong coordinates only
+// for an incremental backup restored as part of a backup-ids list. Restoring
+// any other backup, a namespace without a single manifest whose name it reads
+// fails the restore, which is a problem of the backup. Of an incremental
+// backup it is only reported, because a list restores it.
+func (s *Streamer) checkEmptyNamespaces(namespaces []string) {
+	commit := s.stats.commitRecord()
+
+	candidates := namespaces
+	if commit.Namespace != "" && !slices.Contains(namespaces, commit.Namespace) {
+		candidates = append(slices.Clone(namespaces), commit.Namespace)
+	}
+
+	var empty []string
+
+	for _, namespace := range candidates {
+		if s.stats.queryManifests(namespace) == 0 {
+			empty = append(empty, namespace)
+		}
+	}
+
+	slices.Sort(empty)
+	s.stats.setEmptyNamespaces(empty)
+
+	if commit.BackupType == BackupTypeIncremental {
+		return
+	}
+
+	for _, namespace := range empty {
+		s.stats.addManifestIssue(namespace, s.queryManifestDir(namespace),
+			fmt.Errorf("%w: %s", ErrNoQueryManifests, namespace))
+	}
+}
+
+// queryManifestDir locates the directory a restore lists the query stream
+// manifests of a namespace in.
+func (s *Streamer) queryManifestDir(namespace string) string {
+	return path.Join(streamRoot(s.backupID, namespace, QueryStream), manifestDir)
+}
+
+// countQueryManifest counts a query stream manifest a restore reads, which is
+// one in the manifest directory of the stream whose name the server reads, and
+// reports a partition the first time it has more of them than the server
+// restores, which fails the restore.
+func (s *Streamer) countQueryManifest(u *unit, m file) {
+	if !strings.HasPrefix(m.Path, s.queryManifestDir(u.namespace)+"/") {
+		return
+	}
+
+	partition, ok := partitionOfManifest(m.Path)
+	if !ok {
+		return
+	}
+
+	if n := s.stats.addQueryManifest(u.namespace, partition); n == maxManifestsPerPartition+1 {
+		s.stats.addManifestIssue(u.namespace, m.Path,
+			fmt.Errorf("%w: partition %d has more than %d manifests, the server restores at most %d",
+				ErrManifestUnusable, partition, maxManifestsPerPartition, maxManifestsPerPartition))
+	}
 }
 
 // streamUnit sends every segment of one stream of one namespace: the ones its
@@ -328,12 +415,10 @@ func (s *Streamer) streamManifests(ctx context.Context, u *unit, rec *recorded, 
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(s.options.concurrency)
 
-	listErr := s.store.listFiles(ctx, u.manifests(), func(f file) error {
-		if !isManifest(f.Path) {
-			return nil
+	listErr := s.listManifests(ctx, u, 0, func(f file) error {
+		if u.stream == QueryStream {
+			s.countQueryManifest(u, f)
 		}
-
-		s.stats.manifestsFound.Add(1)
 
 		g.Go(func() error {
 			sent, err := s.streamManifest(gctx, u, f, rec, out)
@@ -368,7 +453,7 @@ func (s *Streamer) streamManifests(ctx context.Context, u *unit, rec *recorded, 
 	}
 
 	if listErr != nil {
-		return recorded.Load(), fmt.Errorf("list manifests of %s: %w", u.manifests(), listErr)
+		return recorded.Load(), listErr
 	}
 
 	return recorded.Load(), nil
@@ -540,16 +625,24 @@ func (u *unit) segmentOf(f file) Segment {
 	}
 }
 
-// checkManifestName refuses a query stream manifest the server would skip. The
-// server restores a partition from the manifests named after it and ignores
-// any other, so what such a manifest records is never restored, however sound
-// it is.
+// checkManifestName refuses a manifest the server would skip. The server
+// restores a partition from the query stream manifests named after it, and a
+// node from the change stream manifest its name places in the node, and
+// ignores any other, so what such a manifest records is never restored,
+// however sound it is.
 func (u *unit) checkManifestName(m file) error {
-	if u.stream != QueryStream {
+	var ok bool
+
+	switch u.stream {
+	case QueryStream:
+		_, ok = partitionOfManifest(m.Path)
+	case ChangeStream:
+		_, _, ok = parseChangeManifest(m.Path)
+	default:
 		return nil
 	}
 
-	if _, ok := partitionOfManifest(m.Path); !ok {
+	if !ok {
 		return fmt.Errorf("%w: the server does not restore from a manifest named %q",
 			ErrManifestUnusable, path.Base(m.Path))
 	}
@@ -583,16 +676,40 @@ func (u *unit) segmentOfRecord(m file, header manifestHeader, recorded manifestS
 	}, nil
 }
 
+// restoredUnits reads the commit record of the backup and discovers the units a
+// restore of it reads. A restore reads the change stream of a strict backup,
+// and never the change stream of a fuzzy one, which is only the leftover of a
+// backup that fell back to its scan: it is not part of the backup, so it is not
+// validated as if it were.
+func (s *Streamer) restoredUnits(ctx context.Context) (units []unit, namespaces []string, err error) {
+	commit, err := s.readCommit(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	skipChange := commit.Fuzzy()
+	s.stats.setCommit(&commit, skipChange)
+
+	if skipChange {
+		s.logger.InfoContext(ctx, "the backup is fuzzy, its change stream is not validated",
+			slog.String("backupId", s.backupID),
+		)
+	}
+
+	return s.units(ctx, skipChange)
+}
+
 // units discovers what the backup is made of: its namespaces, the streams of
-// each of them and the partitions of each stream.
+// each of them and the partitions of each stream. It returns the units and the
+// namespaces they belong to.
 //
 // This is the whole cost of finding the shape of a backup, and it does not
 // depend on the number of segments: one listing names the namespaces, one names
 // the streams, and one names the partitions of a stream.
-func (s *Streamer) units(ctx context.Context) ([]unit, error) {
+func (s *Streamer) units(ctx context.Context, skipChange bool) ([]unit, []string, error) {
 	namespaces, err := listDirs(ctx, s.store, namespacesRoot(s.backupID))
 	if err != nil {
-		return nil, fmt.Errorf("backup %s: %w", s.backupID, err)
+		return nil, nil, fmt.Errorf("backup %s: %w", s.backupID, err)
 	}
 
 	s.stats.namespaces.Store(int64(len(namespaces)))
@@ -601,16 +718,20 @@ func (s *Streamer) units(ctx context.Context) ([]unit, error) {
 
 	for _, namespace := range namespaces {
 		for _, stream := range streams {
+			if skipChange && stream == ChangeStream {
+				continue
+			}
+
 			found, err := s.streamUnits(ctx, namespace, stream)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			units = append(units, found...)
 		}
 	}
 
-	return units, nil
+	return units, namespaces, nil
 }
 
 // streamUnits discovers the units of one stream of one namespace. A stream
@@ -738,8 +859,17 @@ func (s *Streamer) newUnit(ctx context.Context, namespace string, stream Stream,
 // stats counts what a run went through. It is written by every goroutine of a
 // run and read once it is over.
 type stats struct {
-	mu     sync.Mutex
-	issues []ManifestIssue
+	mu         sync.Mutex
+	issues     []ManifestIssue
+	commit     CommitRecord
+	skipChange bool
+	// queryByNS counts, per namespace, the query stream manifests a restore
+	// reads, in total and per partition.
+	queryByNS map[string]*queryManifestCount
+	// changeNodes counts, per namespace, the nodes whose change stream a
+	// restore reads.
+	changeNodes map[string]int
+	empty       []string
 
 	namespaces      atomic.Int64
 	manifestsFound  atomic.Int64
@@ -747,6 +877,7 @@ type stats struct {
 	manifestsFailed atomic.Int64
 	segments        atomic.Int64
 	unrecorded      atomic.Int64
+	superseded      atomic.Int64
 }
 
 // addManifestIssue records a manifest that could not be used, describing the
@@ -766,6 +897,89 @@ func (s *stats) addManifestIssue(namespace, manifestPath string, err error) {
 	}
 }
 
+// queryManifestCount is how many query stream manifests a restore reads for one
+// namespace.
+type queryManifestCount struct {
+	total        int
+	perPartition [segment.PartitionCount]int
+}
+
+// addQueryManifest counts one query stream manifest of a partition and returns
+// how many the partition has so far.
+func (s *stats) addQueryManifest(namespace string, partition int) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.queryByNS == nil {
+		s.queryByNS = make(map[string]*queryManifestCount)
+	}
+
+	count, ok := s.queryByNS[namespace]
+	if !ok {
+		count = &queryManifestCount{}
+		s.queryByNS[namespace] = count
+	}
+
+	count.total++
+	count.perPartition[partition]++
+
+	return count.perPartition[partition]
+}
+
+// queryManifests returns how many query stream manifests a namespace has.
+func (s *stats) queryManifests(namespace string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if count, ok := s.queryByNS[namespace]; ok {
+		return count.total
+	}
+
+	return 0
+}
+
+// addChangeNode counts one node whose change stream a restore reads and
+// returns how many the namespace has so far.
+func (s *stats) addChangeNode(namespace string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.changeNodes == nil {
+		s.changeNodes = make(map[string]int)
+	}
+
+	s.changeNodes[namespace]++
+
+	return s.changeNodes[namespace]
+}
+
+// setEmptyNamespaces records the namespaces a restore finds no query stream
+// manifest for.
+func (s *stats) setEmptyNamespaces(namespaces []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.empty = namespaces
+}
+
+// commitRecord returns the commit record of the backup.
+func (s *stats) commitRecord() CommitRecord {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.commit
+}
+
+// setCommit records the commit record of the backup and whether its change
+// stream is skipped.
+func (s *stats) setCommit(commit *CommitRecord, skipChange bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.commit = *commit
+	s.skipChange = skipChange
+}
+
 // snapshot copies what has been counted so far.
 func (s *stats) snapshot() Stats {
 	s.mu.Lock()
@@ -779,5 +993,10 @@ func (s *stats) snapshot() Stats {
 		ManifestsFailed: s.manifestsFailed.Load(),
 		Segments:        s.segments.Load(),
 		Unrecorded:      s.unrecorded.Load(),
+
+		ManifestsSuperseded: s.superseded.Load(),
+		Commit:              s.commit,
+		EmptyNamespaces:     slices.Clone(s.empty),
+		ChangeStreamSkipped: s.skipChange,
 	}
 }

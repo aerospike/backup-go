@@ -17,16 +17,23 @@ request links for the full detail of any change.
   `RequestBackup` gains `BinList`; `RequestCommon` gains `Path`, `SetList` and `FilterExp`;
   `RequestRestore` gains `BackupIDs`, a comma-separated list sent as the required `backup-ids`,
   `IncrementalPath`, the settings of both modes `RestoreWorkerThreads`, `RestoreDownloadThreads`,
-  `RestoreRPS` and `ExtraTTL`, and `Fuzzy`, the new `RequestFuzzyRestore` with the fuzzy restore
-  settings `AllowUnhosted`, `MaxInflight`, `RetryBaseIntervalMs`, `RetryMultiplier`,
-  `RetryMaxAttempts`, `IgnoreRecordError` and `ApplyMetadataLast`, so that a cold restore cannot
-  set them. `RequestBackup` gains `BackupRPS`, `BackupWorkerThreads`,
+  `RestoreRPS` and `ExtraTTL`, and the fuzzy restore settings `AllowUnhosted`, `MaxInflight`,
+  `RetryBaseIntervalMs`, `RetryMultiplier`, `RetryMaxAttempts`, `IgnoreRecordError` and
+  `ApplyMetadataLast`. `RequestBackup` gains `BackupRPS`, `BackupWorkerThreads`,
   `BackupUploadThreads` and `BackupS3ThroughputTargetGbps`. The new `RequestPrepareRestore`
   carries `HydrateReplica`. An optional field is sent only when it is set: a string when not
   empty, a number when not zero and a pointer when not nil, so the server applies its own default
   otherwise. `RetryBaseIntervalMs` is an `*int`, so that a zero delay can be sent. (BKRS-464)
-- A fuzzy restore request that sets `FilterExp`, which only the cold restore accepts, fails with
-  `ErrInvalidConfig` instead of being sent, as the server rejects it. (BKRS-464)
+- `RequestBackup.Policy` and `RequestRestore.Policy` select the policy of a server-integrated
+  backup and restore, sent as `backup-policy` and `restore-policy`. The typed `BackupPolicy` is
+  `strict`, `best-effort` or `fuzzy`; the typed `RestorePolicy` is `strict`, the cold restore, or
+  `fuzzy`, the restore through writes. An empty policy is not sent, so the server applies its
+  default. A policy the server does not know fails with `ErrInvalidConfig`, and its error names
+  the value. (BKRS-471)
+- A restore request that sets a parameter the rest of the request does not accept fails with
+  `ErrInvalidConfig` instead of being sent, as the server rejects it: `FilterExp` or more than
+  one backup id with the fuzzy policy, a fuzzy restore setting with the strict or the default
+  policy, and `IncrementalPath` with a single backup id. (BKRS-464, BKRS-471)
 - `ServerBackupInfo.OpenRestore` sends `restore-open`, which releases a namespace held by an
   aborted cold restore. (BKRS-464)
 - `ServerBackupInfo.ClearRestoreStorage` sends `restore-clear-storage` to every node whose row of
@@ -80,17 +87,17 @@ request links for the full detail of any change.
   `record_count` fails with `ErrRecordCountMismatch`, reported against the manifest. A manifest
   that records no count, as a change stream manifest does not, is not compared.
 - `ValidationReport.TotalBytes` counts the bytes of the records, the segment frames excluded.
-- **Breaking.** `ServerBackupInfo.GetRestoreStatus` takes the job id besides the namespace and
+- `ServerBackupInfo.GetRestoreStatus` takes the job id besides the namespace and
   returns the merged `*models.ResponseRestoreState` of all nodes instead of a state string. It
   reads the namespace gate from `ns-state`: the job state is in `state` now, so the namespace
   used to be reported READY while its restore was running. `restore-status` is filtered by the
   job id only, so that a node not hosting the namespace reports its row instead of an error; a
   job of another namespace is not found. (BKRS-464)
-- **Breaking.** The untyped namespace gate constants `RestoreStateNone`, `RestoreStatePreparing`,
+- The untyped namespace gate constants `RestoreStateNone`, `RestoreStatePreparing`,
   `RestoreStateReady`, `RestoreStateRestoring`, `RestoreStateFailed` and `NsRestoreStateUnknown`
   are replaced by the typed `NamespaceState` constants, which add `OPENING` and the not hosted
   `-`. The `RestoreState*` names now hold the job states of the `state` field. (BKRS-464)
-- **Breaking.** `ResolveRestoreState(map[string]struct{}) string` resolved namespace gate states;
+- `ResolveRestoreState(map[string]struct{}) string` resolved namespace gate states;
   it is now `ResolveRestoreState([]RestoreState) RestoreState` and resolves job states: FAILED,
   then ABORTING, ABORTED and ACTIVE win, COMPLETE only when every node is COMPLETE, UNKNOWN
   otherwise. The namespace gate states are resolved by the new
@@ -99,21 +106,21 @@ request links for the full detail of any change.
   does not know, RESTORING, PREPARING, OPENING, NONE and READY last, and no state at all yields an
   empty value. The old function reported READY for a state it did not know and for no state at
   all. (BKRS-464)
-- **Breaking.** `ResponseBackupState.RecsIncr` and `RecsChange` are renamed to `RecsQueryIncr`
+- `ResponseBackupState.RecsIncr` and `RecsChange` are renamed to `RecsQueryIncr`
   and `RecsChangeIncr` after the `recs-query-incr` and `recs-change-incr` fields: they used to
   read keys the server no longer reports and were always zero. The job timestamps are parsed in
   the `2026-10-18 01.00.00.123 UTC` layout of the server; they used to be always zero.
   (BKRS-464)
-- **Breaking.** `ServerBackupInfo.PrepareRestore` takes a `*models.RequestPrepareRestore` instead
+- `ServerBackupInfo.PrepareRestore` takes a `*models.RequestPrepareRestore` instead
   of the job id and namespace. (BKRS-464)
-- **Breaking.** `RequestRestore.BackupID` is renamed to `BackupIDs` to match the `backup-ids`
+- `RequestRestore.BackupID` is renamed to `BackupIDs` to match the `backup-ids`
   info parameter. (BKRS-464)
-- **Breaking.** The bool fields of the server-integrated requests are pointers: `NoIndexes` and
+- The bool fields of the server-integrated requests are pointers: `NoIndexes` and
   `NoUDFs`, now in `RequestCommon`. A nil value is not sent. `SetList` and `Path` moved to
   `RequestCommon`, so struct literals that set them change. (BKRS-464)
-- **Breaking.** `RequestRestore.FuzzyRestore` is replaced by `RequestRestore.Fuzzy`, a
-  `*RequestFuzzyRestore`: a nil value selects the cold restore, any other value the fuzzy restore
-  with its settings. (BKRS-464)
+- `RequestRestore.FuzzyRestore` is replaced by `RequestRestore.Policy`:
+  `RestorePolicyFuzzy` selects the fuzzy restore, `RestorePolicyStrict` or an empty policy the
+  cold one. The fuzzy restore settings are fields of `RequestRestore`. (BKRS-464, BKRS-471)
 
 ### Removed
 
@@ -122,9 +129,9 @@ request links for the full detail of any change.
 - `segment.ErrEmptySegment`, `segment.ErrNoRecords` and `segment.ErrBadTailSlack`. An empty or
   cut segment fails with `segment.ErrFrameTruncated`, `segment.ErrBadBodyLength` or
   `segment.ErrTruncatedRecord`; a body is packed tightly, so no tail of any content is accepted.
-- **Breaking.** `RequestCommon.AccessKey` and `RequestCommon.SecretKey`. The server ignores these
+- `RequestCommon.AccessKey` and `RequestCommon.SecretKey`. The server ignores these
   parameters since SERVER-700. (BKRS-464)
-- **Breaking.** `RequestBackup.EnableChangeStream`, which the server no longer accepts. (BKRS-464)
+- `RequestBackup.EnableChangeStream`, which the server no longer accepts. (BKRS-464)
 
 ### Fixed
 

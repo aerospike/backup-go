@@ -16,6 +16,7 @@ package asinfo
 
 import (
 	"fmt"
+	"strings"
 
 	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
 )
@@ -79,7 +80,6 @@ const (
 	paramNoUDFs                 = "no-udfs"
 	paramNodes                  = "nodes"
 	paramHydrateReplica         = "hydrate-replica"
-	paramFuzzyRestore           = "fuzzy-restore"
 	paramAllowUnhosted          = "allow-unhosted"
 	paramMaxInflight            = "max-inflight"
 	paramRetryBaseInterval      = "retry-base-interval"
@@ -96,6 +96,8 @@ const (
 	paramBackupWorkerThreads    = "backup-worker-threads"
 	paramBackupUploadThreads    = "backup-upload-threads"
 	paramBackupS3Throughput     = "backup-s3-throughput-target-gbps"
+	paramBackupPolicy           = "backup-policy"
+	paramRestorePolicy          = "restore-policy"
 )
 
 // jobUnsafeChars must not appear in a value of a backup or restore command, as
@@ -204,7 +206,7 @@ func (c infoCommands) serverBackup(r *infomodels.RequestBackup, jobID string) (s
 
 	addStorageParams(cmd, &r.RequestCommon)
 
-	return cmd.str(paramSetList, r.SetList).
+	cmd.str(paramSetList, r.SetList).
 		str(paramBinList, r.BinList).
 		str(paramModifiedAfter, r.ModifiedAfter).
 		str(paramModifiedBefore, r.ModifiedBefore).
@@ -215,12 +217,15 @@ func (c infoCommands) serverBackup(r *infomodels.RequestBackup, jobID string) (s
 		optNum(paramBackupWorkerThreads, r.BackupWorkerThreads).
 		optNum(paramBackupUploadThreads, r.BackupUploadThreads).
 		optNum(paramBackupS3Throughput, r.BackupS3ThroughputTargetGbps).
-		build()
+		str(paramBackupPolicy, string(r.Policy))
+
+	return buildChecked(cmd,
+		checkPolicy(cmdNameBackup, paramBackupPolicy, r.Policy, knownBackupPolicy))
 }
 
 // serverRestore returns the command that starts the restore job r.JobID from
-// the backups r.BackupIDs: a fuzzy restore if r.Fuzzy is set, a cold one
-// otherwise. A filter set for a fuzzy restore fails with errParamNotApplicable.
+// the backups r.BackupIDs with the policy r.Policy. A parameter that the policy
+// does not accept fails with errParamNotApplicable, see checkRestoreMode.
 func (c infoCommands) serverRestore(r *infomodels.RequestRestore) (string, error) {
 	if err := c.requireIntegratedBackup(cmdNameRestore); err != nil {
 		return "", err
@@ -237,8 +242,8 @@ func (c infoCommands) serverRestore(r *infomodels.RequestRestore) (string, error
 
 	addStorageParams(cmd, &r.RequestCommon)
 
-	// The command is returned only if checkRestoreMode accepts the filter, so
-	// it is added unconditionally.
+	// The command is returned only if checkRestoreMode accepts every parameter
+	// for the policy, so the parameters of both policies are added unconditionally.
 	cmd.str(paramIncrementalPath, r.IncrementalPath).
 		optFlag(paramNoIndexes, r.NoIndexes).
 		optFlag(paramNoUDFs, r.NoUDFs).
@@ -247,52 +252,173 @@ func (c infoCommands) serverRestore(r *infomodels.RequestRestore) (string, error
 		optNum(paramRestoreDownloadThreads, r.RestoreDownloadThreads).
 		optNum(paramRestoreWorkerThreads, r.RestoreWorkerThreads).
 		optNum(paramRestoreRPS, r.RestoreRPS).
-		optNum(paramExtraTTL, r.ExtraTTL)
+		optNum(paramExtraTTL, r.ExtraTTL).
+		str(paramRestorePolicy, string(r.Policy))
 
-	addFuzzyRestoreParams(cmd, r.Fuzzy)
+	addFuzzyOnlyParams(cmd, r)
 
-	restoreCmd, err := cmd.build()
-	modeErr := checkRestoreMode(r)
-
-	switch {
-	case err != nil && modeErr != nil:
-		return "", fmt.Errorf("%w; %w", err, modeErr)
-	case err != nil:
-		return "", err
-	case modeErr != nil:
-		return "", modeErr
-	}
-
-	return restoreCmd, nil
+	return buildChecked(cmd, checkRestoreMode(r))
 }
 
-// addFuzzyRestoreParams selects the fuzzy restore and adds its settings f, if f
-// is set. A nil f leaves the restore cold, the server default.
-func addFuzzyRestoreParams(cmd *infoCmd, f *infomodels.RequestFuzzyRestore) {
-	if f == nil {
-		return
-	}
-
-	cmd.flag(paramFuzzyRestore, true).
-		optFlag(paramAllowUnhosted, f.AllowUnhosted).
-		optNum(paramMaxInflight, f.MaxInflight).
-		optNumPtr(paramRetryBaseInterval, f.RetryBaseIntervalMs).
-		optFloat(paramRetryMultiplier, f.RetryMultiplier).
-		optNum(paramRetryMaxAttempts, f.RetryMaxAttempts).
-		optFlag(paramIgnoreRecordError, f.IgnoreRecordError).
-		optFlag(paramApplyMetadataLast, f.ApplyMetadataLast)
+// addFuzzyOnlyParams adds the parameters of r that only the fuzzy policy
+// accepts. checkRestoreMode finds the ones r sets with it, so every fuzzy only
+// parameter must be added here.
+func addFuzzyOnlyParams(cmd *infoCmd, r *infomodels.RequestRestore) *infoCmd {
+	return cmd.optFlag(paramAllowUnhosted, r.AllowUnhosted).
+		optNum(paramMaxInflight, r.MaxInflight).
+		optNumPtr(paramRetryBaseInterval, r.RetryBaseIntervalMs).
+		optFloat(paramRetryMultiplier, r.RetryMultiplier).
+		optNum(paramRetryMaxAttempts, r.RetryMaxAttempts).
+		optFlag(paramIgnoreRecordError, r.IgnoreRecordError).
+		optFlag(paramApplyMetadataLast, r.ApplyMetadataLast)
 }
 
-// checkRestoreMode returns errParamNotApplicable if r sets the filter, which
-// only the cold restore accepts, for a fuzzy restore. The fuzzy only settings
-// need no check: they are held by r.Fuzzy, so a cold restore cannot set them.
-func checkRestoreMode(r *infomodels.RequestRestore) error {
-	if r.Fuzzy == nil || r.FilterExp == "" {
+// knownBackupPolicy reports whether the server accepts the backup policy p.
+func knownBackupPolicy(p infomodels.BackupPolicy) bool {
+	switch p {
+	case infomodels.BackupPolicyStrict,
+		infomodels.BackupPolicyBestEffort,
+		infomodels.BackupPolicyFuzzy:
+		return true
+	default:
+		return false
+	}
+}
+
+// knownRestorePolicy reports whether the server accepts the restore policy p.
+func knownRestorePolicy(p infomodels.RestorePolicy) bool {
+	switch p {
+	case infomodels.RestorePolicyStrict, infomodels.RestorePolicyFuzzy:
+		return true
+	default:
+		return false
+	}
+}
+
+// checkPolicy returns errUnknownPolicy if policy is set and known rejects it.
+// An empty policy is not sent, so the server applies its default. Unlike the
+// other errors of the commands, the error holds the value: a policy is never a
+// secret, and the value tells which policy name is wrong.
+func checkPolicy[P ~string](cmdName, key string, policy P, known func(P) bool) error {
+	if policy == "" || known(policy) {
 		return nil
 	}
 
-	return paramsErr(errParamNotApplicable, cmdNameRestore+" with "+paramFuzzyRestore+"=true",
-		[]string{paramFilterExp})
+	return fmt.Errorf("%w: %s: %s=%q", errUnknownPolicy, cmdName, key, policy)
+}
+
+// checkRestoreMode returns errUnknownPolicy if r.Policy is unknown, and
+// errParamNotApplicable if r sets a parameter that the rest of r does not
+// accept: see checkPolicyParams and checkIncrementalPath.
+func checkRestoreMode(r *infomodels.RequestRestore) error {
+	err := checkPolicy(cmdNameRestore, paramRestorePolicy, r.Policy, knownRestorePolicy)
+	if err != nil {
+		return err
+	}
+
+	return joinErrs(checkPolicyParams(r), checkIncrementalPath(r))
+}
+
+// checkPolicyParams returns errParamNotApplicable if r sets a parameter that
+// r.Policy does not accept: a strict only parameter for the fuzzy policy, see
+// strictOnlyParams, or a fuzzy only parameter for the strict one. An empty
+// policy is checked as strict, the server default.
+func checkPolicyParams(r *infomodels.RequestRestore) error {
+	if r.Policy == infomodels.RestorePolicyFuzzy {
+		if strictOnly := strictOnlyParams(r); len(strictOnly) > 0 {
+			return notApplicableErr(r.Policy, strictOnly)
+		}
+
+		return nil
+	}
+
+	fuzzyOnly := addFuzzyOnlyParams(newInfoCmd(cmdNameRestore), r).paramKeys()
+	if len(fuzzyOnly) > 0 {
+		return notApplicableErr(r.Policy, fuzzyOnly)
+	}
+
+	return nil
+}
+
+// strictOnlyParams returns the keys of the parameters set in r that only the
+// strict policy accepts, in the order the command sends them. The fuzzy policy
+// restores a single backup, so it rejects more than one backup id.
+func strictOnlyParams(r *infomodels.RequestRestore) []string {
+	var keys []string
+
+	if backupIDCount(r.BackupIDs) > 1 {
+		keys = append(keys, paramBackupIDs)
+	}
+
+	if r.FilterExp != "" {
+		keys = append(keys, paramFilterExp)
+	}
+
+	return keys
+}
+
+// checkIncrementalPath returns errParamNotApplicable if r sets an incremental
+// path for a single backup id, with any policy: the path holds the backups
+// that follow the first one.
+func checkIncrementalPath(r *infomodels.RequestRestore) error {
+	if r.IncrementalPath == "" || backupIDCount(r.BackupIDs) != 1 {
+		return nil
+	}
+
+	return paramsErr(errParamNotApplicable, cmdNameRestore+" with one backup id",
+		[]string{paramIncrementalPath})
+}
+
+// backupIDCount returns the number of ids in the comma-separated list ids, or
+// 0 if the list is empty or invalid. The builder reports such a list, so the
+// checks that count the ids skip it instead of reporting it a second time.
+func backupIDCount(ids string) int {
+	if !commaSeparatedListValid(ids) {
+		return 0
+	}
+
+	return strings.Count(ids, ",") + 1
+}
+
+// notApplicableErr reports the keys of the parameters that the restore policy
+// does not accept. An empty policy is reported as the default strict one.
+func notApplicableErr(policy infomodels.RestorePolicy, keys []string) error {
+	mode := paramRestorePolicy + "=" + string(policy)
+	if policy == "" {
+		mode = "default " + paramRestorePolicy + " (" + string(infomodels.RestorePolicyStrict) + ")"
+	}
+
+	return paramsErr(errParamNotApplicable, cmdNameRestore+" with "+mode, keys)
+}
+
+// buildChecked returns the command built by cmd, or the error of the build
+// joined with checkErr, the result of the checks the builder does not do.
+func buildChecked(cmd *infoCmd, checkErr error) (string, error) {
+	built, err := cmd.build()
+	if err := joinErrs(err, checkErr); err != nil {
+		return "", err
+	}
+
+	return built, nil
+}
+
+// joinErrs returns the errors of errs that are not nil joined into one line,
+// or nil if there are none. Unlike errors.Join, it keeps the error on a single
+// line, as the other errors of the commands are.
+func joinErrs(errs ...error) error {
+	var joined error
+
+	for _, err := range errs {
+		switch {
+		case err == nil:
+		case joined == nil:
+			joined = err
+		default:
+			joined = fmt.Errorf("%w; %w", joined, err)
+		}
+	}
+
+	return joined
 }
 
 // validatePrepareRestore checks everything serverPrepareRestore needs except the

@@ -1734,7 +1734,7 @@ func Test_getUDF_InvalidName(t *testing.T) {
 		giveName string
 	}{
 		{name: "empty name"},
-		{name: "name with separator", giveName: "test.lua;fuzzy-restore=true"},
+		{name: "name with separator", giveName: "test.lua;restore-policy=fuzzy"},
 	}
 
 	ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())

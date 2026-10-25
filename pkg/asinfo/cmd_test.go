@@ -68,11 +68,6 @@ const (
 	testCmdMissingNsAndJobID = "namespace, job-id"
 )
 
-// testPtr returns a pointer to v, for the optional fields of the requests.
-func testPtr[T any](v T) *T {
-	return &v
-}
-
 // testStorage returns request fields with every storage parameter set.
 func testStorage() infomodels.RequestCommon {
 	return infomodels.RequestCommon{
@@ -104,13 +99,13 @@ func testMinimalRestore(policy infomodels.RestorePolicy) *infomodels.RequestRest
 
 // testSetFuzzyParams sets every parameter of r that only the fuzzy policy accepts.
 func testSetFuzzyParams(r *infomodels.RequestRestore) {
-	r.AllowUnhosted = testPtr(true)
+	r.AllowUnhosted = new(true)
 	r.MaxInflight = 400
-	r.RetryBaseIntervalMs = testPtr(250)
+	r.RetryBaseIntervalMs = new(250)
 	r.RetryMultiplier = 1.5
 	r.RetryMaxAttempts = 3
-	r.IgnoreRecordError = testPtr(false)
-	r.ApplyMetadataLast = testPtr(true)
+	r.IgnoreRecordError = new(false)
+	r.ApplyMetadataLast = new(true)
 }
 
 // testPrepareRestore returns a prepare restore request with the required fields set.
@@ -862,8 +857,8 @@ func TestInfoCommands_ServerBackup(t *testing.T) {
 	allFields := testStorage()
 	allFields.SetList = testCmdSetList
 	allFields.FilterExp = testCmdFilterExp
-	allFields.NoIndexes = testPtr(true)
-	allFields.NoUDFs = testPtr(false)
+	allFields.NoIndexes = new(true)
+	allFields.NoUDFs = new(false)
 
 	tests := []struct {
 		name string
@@ -922,7 +917,7 @@ func TestInfoCommands_ServerBackup(t *testing.T) {
 				RequestCommon: infomodels.RequestCommon{
 					Namespace: testCmdNamespace,
 					Storage:   testCmdStorage,
-					NoUDFs:    testPtr(false),
+					NoUDFs:    new(false),
 				},
 			},
 			want: testCmdBackupBase + ";no-udfs=false",
@@ -969,8 +964,8 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 	newRequest := func(policy infomodels.RestorePolicy) *infomodels.RequestRestore {
 		common := testStorage()
 		common.SetList = testCmdSetList
-		common.NoIndexes = testPtr(false)
-		common.NoUDFs = testPtr(true)
+		common.NoIndexes = new(false)
+		common.NoUDFs = new(true)
 
 		return &infomodels.RequestRestore{
 			RequestCommon:          common,
@@ -1004,7 +999,7 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 	minimalFuzzyRequest := testMinimalRestore(infomodels.RestorePolicyFuzzy)
 
 	zeroIntervalRequest := testMinimalRestore(infomodels.RestorePolicyFuzzy)
-	zeroIntervalRequest.RetryBaseIntervalMs = testPtr(0)
+	zeroIntervalRequest.RetryBaseIntervalMs = new(0)
 
 	tests := []struct {
 		name string
@@ -1099,7 +1094,7 @@ func TestInfoCommands_ServerRestorePolicyMismatch(t *testing.T) {
 	defaultWithMaxInflight.MaxInflight = 1
 
 	strictWithZeroInterval := testMinimalRestore(infomodels.RestorePolicyStrict)
-	strictWithZeroInterval.RetryBaseIntervalMs = testPtr(0)
+	strictWithZeroInterval.RetryBaseIntervalMs = new(0)
 
 	fuzzyWithFilterNoJobID := testMinimalRestore(infomodels.RestorePolicyFuzzy)
 	fuzzyWithFilterNoJobID.FilterExp = testCmdFilterExp
@@ -1467,12 +1462,12 @@ func TestInfoCommands_ServerPrepareRestore(t *testing.T) {
 		},
 		{
 			name:               "hydrate replica true",
-			giveHydrateReplica: testPtr(true),
+			giveHydrateReplica: new(true),
 			want:               testCmdPrepareBase + ";hydrate-replica=true" + testCmdNodesParam,
 		},
 		{
 			name:               "hydrate replica false",
-			giveHydrateReplica: testPtr(false),
+			giveHydrateReplica: new(false),
 			want:               testCmdPrepareBase + ";hydrate-replica=false" + testCmdNodesParam,
 		},
 	}

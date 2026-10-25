@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/pkg/server/lister/mocks"
 	"github.com/aerospike/backup-go/pkg/server/lister/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -43,6 +44,10 @@ const (
 	testMetadataFile = "metadata.json"
 	testPrefix       = "backups/" + jobID1
 	testBackupID     = "b1"
+
+	// testStorePrefix is the prefix a lister is created with to reach backups
+	// stored below the root of the bucket.
+	testStorePrefix = "backups"
 )
 
 // listOutput builds a single-page ListObjectsV2 result from common prefixes.
@@ -235,19 +240,100 @@ func TestLister_GetMetadata(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, testBackupID, md.BackupID)
 
-	_, err = l.GetMetadata(t.Context(), "missing")
+	_, err = l.GetMetadata(t.Context(), jobID2)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrMetadataNotFound)
 }
 
+// TestLister_Prefix checks that a lister created with a prefix finds a backup
+// stored under it both by listing and by its bare id, and never doubles the
+// prefix in the key it requests.
+func TestLister_Prefix(t *testing.T) {
+	t.Parallel()
+
+	const storedUnder = testStorePrefix + "/"
+
+	tests := []struct {
+		name   string
+		prefix string
+	}{
+		{name: "prefix without trailing slash", prefix: testStorePrefix},
+		{name: "prefix with trailing slash", prefix: storedUnder},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			wantKey := storedUnder + jobID1 + "/" + testMetadataFile
+
+			m := mocks.NewMockS3API(t)
+			m.EXPECT().ListObjectsV2(mock.Anything, mock.Anything, mock.Anything).
+				Return(listOutput(storedUnder+jobID1+"/"), nil).Once()
+			m.EXPECT().GetObject(mock.Anything, mock.Anything).RunAndReturn(
+				func(_ context.Context, in *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+					assert.Equal(t, wantKey, *in.Key)
+
+					return objectBody(metadataJSON(jobID1)), nil
+				}).Twice()
+
+			l := NewLister(m, "bucket", tt.prefix)
+
+			all, err := l.FetchAllMetadata(t.Context())
+			require.NoError(t, err)
+			require.Len(t, all, 1)
+			assert.Equal(t, jobID1, all[0].BackupID)
+
+			md, err := l.GetMetadata(t.Context(), jobID1)
+			require.NoError(t, err)
+			assert.Equal(t, jobID1, md.BackupID)
+		})
+	}
+}
+
+func TestLister_GetMetadata_InvalidBackupID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		give string
+	}{
+		{name: "empty", give: ""},
+		{name: "prefixed path", give: testStorePrefix + "/" + jobID1},
+		{name: "parent directory", give: "../" + jobID1},
+		{name: "not a job id", give: "logs"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// No expectations: an invalid id must not reach the storage.
+			l := NewLister(mocks.NewMockS3API(t), "bucket", testStorePrefix)
+
+			_, err := l.GetMetadata(t.Context(), tt.give)
+			require.ErrorIs(t, err, ErrInvalidBackupID)
+			assert.ErrorIs(t, err, errclass.ErrInvalidConfig)
+		})
+	}
+}
+
 func TestLister_GetMetadata_ModifiedBounds(t *testing.T) {
+	const (
+		namespace      = "ns"
+		sets           = "s1,s2"
+		modifiedAfter  = "2026-03-16T14:00:00.000Z"
+		modifiedBefore = "2026-03-16T14:20:00.000Z"
+	)
+
 	m := mocks.NewMockS3API(t)
 	m.EXPECT().GetObject(mock.Anything, mock.Anything).RunAndReturn(
 		func(_ context.Context, in *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
 			if *in.Key == jobID1+"/metadata.json" {
-				return objectBody(`{"backup_id":"` + jobID1 + `","namespace":"ns","sets":"s1,s2",` +
-					`"status":"complete","backup_type":"incremental",` +
-					`"modified_after_unix_s":1773669600,"modified_before_unix_s":1773670800}`), nil
+				return objectBody(`{"backup_id":"` + jobID1 + `","namespace":"` + namespace + `",` +
+					`"sets":"` + sets + `","status":"complete","backup_type":"incremental",` +
+					`"modified_after":"` + modifiedAfter + `","modified_after_unix_s":1773669600,` +
+					`"modified_before":"` + modifiedBefore + `","modified_before_unix_s":1773670800}`), nil
 			}
 			return nil, &types.NoSuchKey{}
 		})
@@ -257,11 +343,15 @@ func TestLister_GetMetadata_ModifiedBounds(t *testing.T) {
 	md, err := l.GetMetadata(t.Context(), jobID1)
 	require.NoError(t, err)
 	assert.Equal(t, models.Metadata{
-		BackupID:       jobID1,
-		Namespace:      "ns",
-		Status:         models.MetadataStatusComplete,
-		ModifiedAfter:  1773669600,
-		ModifiedBefore: 1773670800,
+		BackupID:            jobID1,
+		Namespace:           namespace,
+		Sets:                sets,
+		Status:              models.BackupStatusComplete,
+		BackupType:          models.BackupTypeIncremental,
+		ModifiedAfter:       modifiedAfter,
+		ModifiedAfterUnixS:  1773669600,
+		ModifiedBefore:      modifiedBefore,
+		ModifiedBeforeUnixS: 1773670800,
 	}, md)
 }
 
@@ -289,7 +379,7 @@ func TestIsNotFound(t *testing.T) {
 	}
 }
 
-func TestLister_listSnapshotPrefixes(t *testing.T) {
+func TestLister_listBackupIDs(t *testing.T) {
 	t.Parallel()
 
 	const listerPrefix = "backups/"
@@ -316,10 +406,10 @@ func TestLister_listSnapshotPrefixes(t *testing.T) {
 			want:           nil,
 		},
 		{
-			name:           "lister prefix is stripped before matching and kept in the result",
+			name:           "lister prefix is stripped from the result",
 			prefix:         listerPrefix,
 			commonPrefixes: []string{listerPrefix + jobID1 + "/", listerPrefix + "logs/"},
-			want:           []string{listerPrefix + jobID1},
+			want:           []string{jobID1},
 		},
 		{
 			name:           "empty listing",
@@ -338,7 +428,7 @@ func TestLister_listSnapshotPrefixes(t *testing.T) {
 
 			l := NewLister(m, "bucket", tt.prefix)
 
-			got, err := l.listSnapshotPrefixes(t.Context())
+			got, err := l.listBackupIDs(t.Context())
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})

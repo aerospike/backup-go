@@ -647,8 +647,7 @@ func TestValidate_FrameErrorIsNotARecordError(t *testing.T) {
 
 	_, err := Validate(buildRecord(t, defaultSpec()))
 
-	var recErr *RecordError
-	if errors.As(err, &recErr) {
+	if _, ok := errors.AsType[*RecordError](err); ok {
 		t.Fatalf("Validate() error = %v, want a frame error not tied to a record", err)
 	}
 }
@@ -707,8 +706,7 @@ func FuzzValidate(f *testing.F) {
 		stats, err := Validate(data, opts...)
 		require.NotErrorIs(t, err, ErrInvalidPartition)
 
-		var recErr *RecordError
-		if errors.As(err, &recErr) {
+		if recErr, ok := errors.AsType[*RecordError](err); ok {
 			require.GreaterOrEqual(t, recErr.Offset, frameHeaderSize)
 			require.Less(t, recErr.Offset, len(data))
 		}

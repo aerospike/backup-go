@@ -132,12 +132,12 @@ func TestInfoCmd_BuildParams(t *testing.T) {
 		},
 		{
 			name:  "optional flag false is sent",
-			build: func(c *infoCmd) *infoCmd { return c.optFlag(testCmdKey1, testPtr(false)) },
+			build: func(c *infoCmd) *infoCmd { return c.optFlag(testCmdKey1, new(false)) },
 			want:  "cmd:k1=false",
 		},
 		{
 			name:  "optional flag true is sent",
-			build: func(c *infoCmd) *infoCmd { return c.optFlag(testCmdKey1, testPtr(true)) },
+			build: func(c *infoCmd) *infoCmd { return c.optFlag(testCmdKey1, new(true)) },
 			want:  "cmd:k1=true",
 		},
 		{
@@ -157,12 +157,12 @@ func TestInfoCmd_BuildParams(t *testing.T) {
 		},
 		{
 			name:  "optional num pointer zero is sent",
-			build: func(c *infoCmd) *infoCmd { return c.optNumPtr(testCmdKey1, testPtr(0)) },
+			build: func(c *infoCmd) *infoCmd { return c.optNumPtr(testCmdKey1, new(0)) },
 			want:  wantNumZero,
 		},
 		{
 			name:  "optional num pointer is sent",
-			build: func(c *infoCmd) *infoCmd { return c.optNumPtr(testCmdKey1, testPtr(42)) },
+			build: func(c *infoCmd) *infoCmd { return c.optNumPtr(testCmdKey1, new(42)) },
 			want:  wantNum,
 		},
 		{

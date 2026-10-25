@@ -246,10 +246,8 @@ func isRetryableError(err error) bool {
 	}
 
 	// AWS service errors
-	var oe *smithy.OperationError
-	if errors.As(err, &oe) {
-		var httpErr *awshttp.ResponseError
-		if errors.As(oe.Err, &httpErr) {
+	if oe, ok := errors.AsType[*smithy.OperationError](err); ok {
+		if httpErr, ok := errors.AsType[*awshttp.ResponseError](oe.Err); ok {
 			statusCode := httpErr.HTTPStatusCode()
 			// Retry 500, 503, 429.
 			// Sources:

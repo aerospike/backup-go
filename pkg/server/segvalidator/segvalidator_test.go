@@ -452,8 +452,7 @@ func TestSegValidator_BrokenRecordIsLocated(t *testing.T) {
 			issue.RecordIndex, issue.Offset)
 	}
 
-	var recErr *segment.RecordError
-	if !errors.As(issue.Err, &recErr) {
+	if _, ok := errors.AsType[*segment.RecordError](issue.Err); !ok {
 		t.Errorf("issue error = %v, want a *segment.RecordError", issue.Err)
 	}
 

@@ -107,8 +107,7 @@ func shouldThrottle(err error) bool {
 		return false
 	}
 
-	var ae a.Error
-	if errors.As(err, &ae) {
+	if ae, ok := errors.AsType[a.Error](err); ok {
 		return ae.Matches(types.NO_AVAILABLE_CONNECTIONS_TO_NODE) || ae.Matches(types.FAIL_FORBIDDEN)
 	}
 

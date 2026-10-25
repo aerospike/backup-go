@@ -54,6 +54,8 @@ request links for the full detail of any change.
   server older than 8.1 fails with `ErrUnsupported`. Neither is retried, and the error names only
   the offending keys, never their values. `GetRestoreStatus` validates its namespace the same way,
   although `restore-status` does not send it. (BKRS-464)
+- `lister.ErrInvalidBackupID`, of the `ErrInvalidConfig` class, returned by
+  `Lister.GetMetadata` for an argument that is not a backup id. (BKRS-474)
 
 ### Changed
 
@@ -121,6 +123,9 @@ request links for the full detail of any change.
 - `RequestRestore.FuzzyRestore` is replaced by `RequestRestore.Policy`:
   `RestorePolicyFuzzy` selects the fuzzy restore, `RestorePolicyStrict` or an empty policy the
   cold one. The fuzzy restore settings are fields of `RequestRestore`. (BKRS-464, BKRS-471)
+- `Lister.GetMetadata` takes a backup id and looks it up under the lister's prefix, as
+  `FetchAllMetadata` does. Anything that is not a backup id fails with `ErrInvalidBackupID`.
+  (BKRS-474)
 
 ### Removed
 

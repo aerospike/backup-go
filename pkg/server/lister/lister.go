@@ -45,7 +45,7 @@ const (
 	// Callers fetching large lists should raise it via WithConcurrency.
 	defaultConcurrency = 16
 
-	// S3 error.
+	// S3 error codes that mean the object does not exist.
 	s3ErrNotFound  = "NotFound"
 	s3Err404       = "404"
 	s3ErrNoSuchKey = "NoSuchKey"
@@ -55,6 +55,11 @@ const (
 // It belongs to the [errclass.ErrNotFound] class.
 var ErrMetadataNotFound = fmt.Errorf("%w: metadata.json not found", errclass.ErrNotFound)
 
+// ErrInvalidBackupID is returned when GetMetadata is given something that is not
+// a backup id, such as an empty string or a storage path.
+// It belongs to the [errclass.ErrInvalidConfig] class.
+var ErrInvalidBackupID = fmt.Errorf("%w: invalid backup id", errclass.ErrInvalidConfig)
+
 // S3API is an interface for the S3 client.
 type S3API interface {
 	ListObjectsV2(ctx context.Context, in *s3.ListObjectsV2Input, opts ...func(*s3.Options),
@@ -63,8 +68,9 @@ type S3API interface {
 	) (*s3.GetObjectOutput, error)
 }
 
-// Lister provides functionality to list backups from an S3 bucket.
-// It supports listing all snapshots in a given prefix, or a single snapshot.
+// Lister reads the metadata of server-integrated backups from an S3 bucket.
+// Backups are stored one folder per backup id under the lister's prefix; the
+// Lister reads either all of them or one by its id.
 // The concurrency level can be configured. The Lister never prints: it returns
 // metadata to the caller, who decides how to render or log it.
 type Lister struct {
@@ -118,43 +124,31 @@ func NewLister(client S3API, bucket, prefix string, opts ...Option) *Lister {
 	return l
 }
 
-// FetchAllMetadata lists and parses all metadata files under the prefix,
-// sorted by backup id ascending.
+// FetchAllMetadata reads the metadata of every backup under the prefix, sorted
+// by backup id ascending. A backup without metadata has not finished and is
+// skipped; so is one whose metadata cannot be read, with a warning logged.
 func (l *Lister) FetchAllMetadata(ctx context.Context) ([]models.Metadata, error) {
-	snapshots, err := l.listSnapshotPrefixes(ctx)
+	ids, err := l.listBackupIDs(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list snapshots: %w", err)
+		return nil, fmt.Errorf("failed to list backups: %w", err)
 	}
 
-	if len(snapshots) == 0 {
+	if len(ids) == 0 {
 		return nil, nil
 	}
 
-	results := make([]models.Metadata, 0)
+	results := make([]models.Metadata, 0, len(ids))
 
 	var resultsMu sync.Mutex
 
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(l.concurrency)
 
-	for _, s := range snapshots {
+	for _, id := range ids {
 		g.Go(func() error {
-			md, err := l.GetMetadata(gctx, s)
+			md, err := l.GetMetadata(gctx, id)
 			if err != nil {
-				if errors.Is(err, ErrMetadataNotFound) {
-					// Skip not finished backups.
-					return nil
-				}
-
-				// cancellation aborts the whole listing. As we skip errors below, we should doublecheck here.
-				if gctx.Err() != nil {
-					return gctx.Err()
-				}
-
-				l.logger.WarnContext(gctx, "fetch metadata failed",
-					slog.String("prefix", s), slog.Any("error", err))
-				// Skip errors, and log warning.
-				return nil
+				return l.skipBackup(gctx, id, err)
 			}
 
 			resultsMu.Lock()
@@ -177,22 +171,48 @@ func (l *Lister) FetchAllMetadata(ctx context.Context) ([]models.Metadata, error
 	return results, nil
 }
 
-// GetMetadata fetches and parses the metadata for a single backup.
+// skipBackup decides whether failing to read one backup fails the whole
+// listing. Only cancellation does: an unfinished backup is skipped silently and
+// any other error is logged.
+func (l *Lister) skipBackup(ctx context.Context, backupID string, err error) error {
+	switch {
+	case errors.Is(err, ErrMetadataNotFound):
+		return nil
+	case ctx.Err() != nil:
+		return ctx.Err()
+	default:
+		l.logger.WarnContext(ctx, "failed to fetch metadata",
+			slog.String("backupId", backupID), slog.Any("error", err))
+
+		return nil
+	}
+}
+
+// GetMetadata reads the metadata of one backup. backupID is the job id the
+// backup was started with, not a storage path: it is looked up under the
+// lister's prefix. Anything else fails with [ErrInvalidBackupID].
 func (l *Lister) GetMetadata(ctx context.Context, backupID string) (models.Metadata, error) {
+	// A job id holds no slash, so the key cannot leave the prefix.
+	if !asinfo.IsJobID(backupID) {
+		return models.Metadata{}, fmt.Errorf("%w: %q", ErrInvalidBackupID, backupID)
+	}
+
 	data, err := l.fetchOne(ctx, backupID)
 	if err != nil {
-		return models.Metadata{}, fmt.Errorf("failed to get manifest %s: %w", backupID, err)
+		return models.Metadata{}, fmt.Errorf("failed to get metadata of backup %s: %w", backupID, err)
 	}
 
 	var md models.Metadata
 	if err := json.Unmarshal(data, &md); err != nil {
-		return models.Metadata{}, fmt.Errorf("failed to parse metadata: %w", err)
+		return models.Metadata{}, fmt.Errorf("failed to parse metadata of backup %s: %w", backupID, err)
 	}
 
 	return md, nil
 }
 
-func (l *Lister) listSnapshotPrefixes(ctx context.Context) ([]string, error) {
+// listBackupIDs returns the ids of the backup folders under the prefix. Any
+// other folder is skipped.
+func (l *Lister) listBackupIDs(ctx context.Context) ([]string, error) {
 	var out []string
 
 	pg := s3.NewListObjectsV2Paginator(l.client, &s3.ListObjectsV2Input{
@@ -212,22 +232,23 @@ func (l *Lister) listSnapshotPrefixes(ctx context.Context) ([]string, error) {
 				continue
 			}
 
-			name := strings.TrimSuffix(strings.TrimPrefix(*cp.Prefix, l.prefix), "/")
+			id := strings.TrimSuffix(strings.TrimPrefix(*cp.Prefix, l.prefix), "/")
 
-			if !asinfo.IsJobID(name) {
-				l.logger.DebugContext(ctx, "skipping non-snapshot prefix", slog.String("prefix", name))
+			if !asinfo.IsJobID(id) {
+				l.logger.DebugContext(ctx, "skipping non-backup prefix", slog.String("prefix", id))
 				continue
 			}
 
-			out = append(out, strings.TrimSuffix(*cp.Prefix, "/"))
+			out = append(out, id)
 		}
 	}
 
 	return out, nil
 }
 
-func (l *Lister) fetchOne(ctx context.Context, prefix string) ([]byte, error) {
-	key := objectKey(prefix, metadataFileName)
+// fetchOne downloads the metadata file of one backup.
+func (l *Lister) fetchOne(ctx context.Context, backupID string) ([]byte, error) {
+	key := objectKey(l.prefix, backupID, metadataFileName)
 
 	out, err := l.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(l.bucket),

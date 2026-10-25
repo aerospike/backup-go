@@ -556,8 +556,7 @@ func newIssue(seg *streamers.Segment, err error) models.ValidationIssue {
 		RecordIndex: models.UnknownRecordIndex,
 	}
 
-	var recErr *segment.RecordError
-	if errors.As(err, &recErr) {
+	if recErr, ok := errors.AsType[*segment.RecordError](err); ok {
 		issue.RecordIndex = recErr.Index
 		issue.Offset = recErr.Offset
 	}

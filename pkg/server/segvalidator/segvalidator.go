@@ -228,22 +228,63 @@ func (v *SegValidator) Validate(
 	// held no records is backed up into manifests recording nothing, and such a
 	// backup reads back as well as any other. Only a run that came back having
 	// found nothing whatsoever has nothing to report on.
-	if foundNothing(c.checkedSegments.Load(), streamed) {
+	if foundNothing(c.checkedSegments.Load(), &streamed) {
 		return nil, fmt.Errorf("%w: %s", ErrNoSegments, v.streamer.BackupID())
 	}
 
-	return c.report(v.streamer.BackupID(), streamed), nil
+	report := c.report(v.streamer.BackupID(), &streamed)
+
+	if err := report.Commit.Refusal; err != nil {
+		v.logger.WarnContext(ctx, "a restore would refuse the backup",
+			slog.String("backupId", report.BackupID),
+			slog.Any("error", err),
+		)
+	}
+
+	return report, nil
+}
+
+// commitReport describes the commit record the streamer read. The backup is
+// validated for the restore the record itself calls for: a fuzzy backup for a
+// fuzzy restore, any other for a strict one, which refuses a record not shown
+// to be strict.
+func commitReport(streamed *streamers.Stats) models.CommitReport {
+	commit := &streamed.Commit
+
+	// A streamer that did not read the record has nothing to say about it.
+	if commit.State == 0 {
+		return models.CommitReport{ChangeStreamSkipped: streamed.ChangeStreamSkipped}
+	}
+
+	strict := !commit.Fuzzy()
+
+	return models.CommitReport{
+		Refusal:             commit.Refusal(strict),
+		Path:                commit.Path,
+		State:               commit.State.String(),
+		Status:              commit.Status,
+		BackupPolicy:        commit.BackupPolicy,
+		AchievedConsistency: commit.AchievedConsistency,
+		FallbackReason:      commit.FallbackReason,
+		Namespace:           commit.Namespace,
+		BackupType:          commit.BackupType,
+		Strict:              strict,
+		ChangeStreamSkipped: streamed.ChangeStreamSkipped,
+	}
 }
 
 // foundNothing reports whether a run found nothing at all in the storage: no
-// namespace, no manifest and no segment. That is what a backup id nothing was
-// ever written under looks like, and it is the one thing a report cannot
-// describe.
-func foundNothing(checked int64, streamed streamers.Stats) bool {
+// namespace, no manifest and no segment, and no commit record naming a
+// namespace. That is what a backup id nothing was ever written under looks
+// like, and it is the one thing a report cannot describe. A commit record
+// naming a namespace the storage does not hold is a backup a restore refuses,
+// which the report does describe.
+func foundNothing(checked int64, streamed *streamers.Stats) bool {
 	return checked == 0 &&
 		streamed.Namespaces == 0 &&
 		streamed.ManifestsFound == 0 &&
-		streamed.ManifestsFailed == 0
+		streamed.ManifestsFailed == 0 &&
+		len(streamed.EmptyNamespaces) == 0
 }
 
 // checkSegment reads a single segment and records what it found. A segment that
@@ -303,6 +344,12 @@ func (v *SegValidator) parseSegment(
 	var opts []segment.Option
 	if id, ok := seg.Partition(); ok {
 		opts = append(opts, segment.WithPartition(id))
+	}
+
+	// The server refuses a segment whose frame names another stream than the
+	// one whose manifest listed it.
+	if blockType, ok := seg.Stream.BlockType(); ok {
+		opts = append(opts, segment.WithBlockType(blockType))
 	}
 
 	stats, err := segment.Validate(buf.Bytes(), opts...)
@@ -449,7 +496,7 @@ func (c *collector) addManifestIssue(namespace, manifestPath, segmentPath string
 
 // report turns what was collected, together with what the streamer saw on its
 // way, into a report.
-func (c *collector) report(backupID string, streamed streamers.Stats) *models.ValidationReport {
+func (c *collector) report(backupID string, streamed *streamers.Stats) *models.ValidationReport {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -481,10 +528,13 @@ func (c *collector) report(backupID string, streamed streamers.Stats) *models.Va
 		InvalidSegments: invalid,
 		TotalRecords:    c.records.Load(),
 		TotalBytes:      c.parsedBytes.Load(),
+		Commit:          commitReport(streamed),
+		EmptyNamespaces: streamed.EmptyNamespaces,
 		Manifests: models.ManifestReport{
 			Issues:          manifestIssues,
 			Total:           streamed.ManifestsFound,
 			Checked:         streamed.ManifestsRead,
+			Superseded:      streamed.ManifestsSuperseded,
 			CheckedSegments: c.recordedSegments.Load(),
 			MissingSegments: c.missingSegments.Load(),
 			Unrecorded:      c.unrecordedCount.Load(),

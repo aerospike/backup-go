@@ -78,6 +78,8 @@ type nameScanner struct {
 
 // literal consumes c, which an ordinary character of a scanf format must
 // match exactly.
+//
+//nolint:unparam // We should pass c as parameter.
 func (sc *nameScanner) literal(c byte) bool {
 	if sc.rest == "" || sc.rest[0] != c {
 		return false

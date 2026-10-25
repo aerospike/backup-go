@@ -25,6 +25,9 @@ var (
 	// ErrInvalidPartition is returned when Validate is asked to check a
 	// partition no namespace has.
 	ErrInvalidPartition = fmt.Errorf("%w: partition out of range", errclass.ErrInvalidConfig)
+	// ErrInvalidBlockType is returned when Validate is asked to require a
+	// block type the server does not interpret.
+	ErrInvalidBlockType = fmt.Errorf("%w: unknown block type", errclass.ErrInvalidConfig)
 	// ErrRecordCountMismatch is returned when the body holds a different
 	// number of records than the frame footer claims.
 	ErrRecordCountMismatch = fmt.Errorf("%w: record count does not match the frame footer",
@@ -40,6 +43,11 @@ var (
 	ErrUnsupportedFrameFlags   = fmt.Errorf("%w: segment frame critical flags",
 		errclass.ErrUnsupported)
 	ErrUnsupportedBlockType = fmt.Errorf("%w: segment frame block type", errclass.ErrUnsupported)
+	// ErrBlockTypeMismatch is returned for a segment whose frame names the
+	// other stream than the one it is restored as: a segment listed under the
+	// manifests of the wrong stream, which the server refuses to apply.
+	ErrBlockTypeMismatch = fmt.Errorf("%w: segment frame block type does not match its stream",
+		errclass.ErrCorruptData)
 	ErrBadFrameHeaderLength = fmt.Errorf("%w: bad segment frame header length",
 		errclass.ErrCorruptData)
 	ErrBadFrameFooterLength = fmt.Errorf("%w: bad segment frame footer length",

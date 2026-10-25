@@ -61,6 +61,7 @@ type testBackup struct {
 	recorded []string
 }
 
+//nolint:unparam // We should pass id as parameter.
 func newTestBackup(id string) *testBackup {
 	return &testBackup{id: id, files: make(map[string][]byte)}
 }
@@ -230,7 +231,9 @@ func newTestBackupTree(t *testing.T, partitions, segmentsPerPartition, nodes, se
 }
 
 // countingStore counts what a run asks of a storage, so a test can prove that
-// sampling downloads the manifests it samples from and nothing else.
+// sampling downloads the manifests it samples from and nothing else. The commit
+// record every run reads first is not part of the backup data and is not
+// counted as a download.
 type countingStore struct {
 	store
 	listedDirs  atomic.Int64
@@ -252,6 +255,10 @@ func (c *countingStore) listFiles(ctx context.Context, dir string, fn func(file)
 }
 
 func (c *countingStore) open(ctx context.Context, storagePath string) (io.ReadCloser, error) {
+	if path.Base(storagePath) == metadataFile {
+		return c.store.open(ctx, storagePath)
+	}
+
 	c.opened.Add(1)
 	c.openedPaths.Store(storagePath, true)
 

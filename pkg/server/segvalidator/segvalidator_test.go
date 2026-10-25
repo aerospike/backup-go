@@ -34,10 +34,12 @@ import (
 	"github.com/aerospike/backup-go/pkg/server/segvalidator/streamers"
 )
 
-// The ASBK v1 frame around a 64 byte body holding one record.
+// The ASBK v1 frame around a 64 byte body holding one record. The headers of
+// the two streams differ in the block type only.
 const (
-	fixtureFrameHeaderHex = "4153424b01000000010000002000000040000000000000001000000000000000"
-	fixtureFrameFooterHex = "01000000000000000000000000000000"
+	fixtureFrameHeaderHex       = "4153424b01000000010000002000000040000000000000001000000000000000"
+	fixtureChangeFrameHeaderHex = "4153424b01000000020000002000000040000000000000001000000000000000"
+	fixtureFrameFooterHex       = "01000000000000000000000000000000"
 )
 
 // The 64 byte flat record of the segment fixtures, holding set "demo" and a
@@ -53,6 +55,11 @@ const (
 
 // fixtureSegmentHex is a one record segment.
 const fixtureSegmentHex = fixtureFrameHeaderHex +
+	fixtureRecordMagicHex + fixtureRecordFlagsHex + fixtureRecordDigestTailHex +
+	fixtureFrameFooterHex
+
+// fixtureChangeSegmentHex is the same segment as the change stream writes it.
+const fixtureChangeSegmentHex = fixtureChangeFrameHeaderHex +
 	fixtureRecordMagicHex + fixtureRecordFlagsHex + fixtureRecordDigestTailHex +
 	fixtureFrameFooterHex
 
@@ -383,7 +390,7 @@ func TestSegValidator_ChangeStreamIsNotPartitionChecked(t *testing.T) {
 
 	// A change stream segment mixes partitions, so the directory it sits in
 	// says nothing about its records.
-	streamer := newStubStreamer(decodeSegmentHex(t, fixtureSegmentHex), 1)
+	streamer := newStubStreamer(decodeSegmentHex(t, fixtureChangeSegmentHex), 1)
 	streamer.streamKind = streamers.ChangeStream
 	streamer.pathOf = func(n int) string {
 		return fmt.Sprintf("%s/ns/%s/change-stream/BB951D8A16DC7A2/data/p0/s%d.seg",
@@ -882,6 +889,12 @@ func TestSegValidator_EmptyNamespaceOnDisk(t *testing.T) {
 		if err := os.WriteFile(name, []byte(body), 0o600); err != nil {
 			t.Fatalf("write manifest: %v", err)
 		}
+	}
+
+	metadata := `{"backup_id":"` + backupID + `","namespace":"` + namespace +
+		`","status":"complete","achieved_consistency":"strict"}`
+	if err := os.WriteFile(filepath.Join(root, backupID, "metadata.json"), []byte(metadata), 0o600); err != nil {
+		t.Fatalf("write commit record: %v", err)
 	}
 
 	streamer, err := streamers.NewLocal(root, backupID)

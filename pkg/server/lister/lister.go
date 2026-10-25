@@ -271,8 +271,7 @@ func isNotFound(err error) bool {
 		return true
 	}
 
-	var apiErr smithy.APIError
-	if errors.As(err, &apiErr) {
+	if apiErr, ok := errors.AsType[smithy.APIError](err); ok {
 		switch apiErr.ErrorCode() {
 		case s3ErrNoSuchKey, s3ErrNotFound, s3Err404:
 			return true

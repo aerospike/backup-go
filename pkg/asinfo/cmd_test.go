@@ -55,11 +55,6 @@ const (
 	testCmdMissingNsAndJobID = "namespace, job-id"
 )
 
-// testPtr returns a pointer to v, for the optional fields of the requests.
-func testPtr[T any](v T) *T {
-	return &v
-}
-
 // testStorage returns request fields with every storage parameter set.
 func testStorage() infomodels.RequestCommon {
 	return infomodels.RequestCommon{
@@ -822,8 +817,8 @@ func TestInfoCommands_ServerBackup(t *testing.T) {
 	allFields := testStorage()
 	allFields.SetList = testCmdSetList
 	allFields.FilterExp = testCmdFilterExp
-	allFields.NoIndexes = testPtr(true)
-	allFields.NoUDFs = testPtr(false)
+	allFields.NoIndexes = new(true)
+	allFields.NoUDFs = new(false)
 
 	tests := []struct {
 		name string
@@ -865,7 +860,7 @@ func TestInfoCommands_ServerBackup(t *testing.T) {
 				RequestCommon: infomodels.RequestCommon{
 					Namespace: testCmdNamespace,
 					Storage:   testCmdStorage,
-					NoUDFs:    testPtr(false),
+					NoUDFs:    new(false),
 				},
 			},
 			want: testCmdBackupBase + ";no-udfs=false",
@@ -908,8 +903,8 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 	newRequest := func(fuzzy *infomodels.RequestFuzzyRestore) *infomodels.RequestRestore {
 		common := testStorage()
 		common.SetList = testCmdSetList
-		common.NoIndexes = testPtr(false)
-		common.NoUDFs = testPtr(true)
+		common.NoIndexes = new(false)
+		common.NoUDFs = new(true)
 
 		return &infomodels.RequestRestore{
 			RequestCommon:          common,
@@ -947,13 +942,13 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 		{
 			name: "fuzzy restore sends every fuzzy parameter",
 			give: newRequest(&infomodels.RequestFuzzyRestore{
-				AllowUnhosted:       testPtr(true),
+				AllowUnhosted:       new(true),
 				MaxInflight:         400,
-				RetryBaseIntervalMs: testPtr(250),
+				RetryBaseIntervalMs: new(250),
 				RetryMultiplier:     1.5,
 				RetryMaxAttempts:    3,
-				IgnoreRecordError:   testPtr(false),
-				ApplyMetadataLast:   testPtr(true),
+				IgnoreRecordError:   new(false),
+				ApplyMetadataLast:   new(true),
 			}),
 			want: testRestoreHead + testCmdSetListParam + testRestoreLimits + testFuzzyFlag + testFuzzyParams,
 		},
@@ -969,7 +964,7 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 		},
 		{
 			name: "zero retry base interval is sent",
-			give: newMinimalFuzzyRequest(&infomodels.RequestFuzzyRestore{RetryBaseIntervalMs: testPtr(0)}),
+			give: newMinimalFuzzyRequest(&infomodels.RequestFuzzyRestore{RetryBaseIntervalMs: new(0)}),
 			want: testCmdRestoreBase + testFuzzyFlag + ";retry-base-interval=0",
 		},
 	}
@@ -1053,12 +1048,12 @@ func TestInfoCommands_ServerPrepareRestore(t *testing.T) {
 		},
 		{
 			name:               "hydrate replica true",
-			giveHydrateReplica: testPtr(true),
+			giveHydrateReplica: new(true),
 			want:               testCmdPrepareBase + ";hydrate-replica=true" + testCmdNodesParam,
 		},
 		{
 			name:               "hydrate replica false",
-			giveHydrateReplica: testPtr(false),
+			giveHydrateReplica: new(false),
 			want:               testCmdPrepareBase + ";hydrate-replica=false" + testCmdNodesParam,
 		},
 	}

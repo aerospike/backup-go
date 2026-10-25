@@ -30,7 +30,6 @@ import (
 	"github.com/aerospike/backup-go/models"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -273,7 +272,7 @@ func getS3Client(ctx context.Context) (*s3.Client, error) {
 	}
 
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
-		o.BaseEndpoint = ptr.String(endpoint)
+		o.BaseEndpoint = new(endpoint)
 		o.UsePathStyle = true
 	})
 

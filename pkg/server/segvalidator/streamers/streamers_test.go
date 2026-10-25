@@ -61,6 +61,7 @@ type testBackup struct {
 	recorded []string
 }
 
+//nolint:unparam // We should pass id as parameter.
 func newTestBackup(id string) *testBackup {
 	return &testBackup{id: id, files: make(map[string][]byte)}
 }

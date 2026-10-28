@@ -2476,6 +2476,19 @@ func abortRestoreCall(jobID, namespace string) clientCall {
 	}
 }
 
+// prepareRestoreCall calls PrepareRestore for jobID of namespace.
+func prepareRestoreCall(jobID, namespace string) clientCall {
+	return clientCall{
+		name: testMethodPrepareRestore,
+		call: func(ctx context.Context, ic *Client) error {
+			return ic.PrepareRestore(ctx, &infomodels.RequestPrepareRestore{
+				Namespace: namespace,
+				JobID:     jobID,
+			})
+		},
+	}
+}
+
 // openRestoreCall calls OpenRestore for jobID of namespace.
 func openRestoreCall(jobID, namespace string) clientCall {
 	return clientCall{
@@ -2492,15 +2505,7 @@ func integratedBackupClientCalls(jobID, backupID, namespace, storage string) []c
 	return []clientCall{
 		startBackupCall(namespace, storage),
 		startRestoreCall(jobID, backupID, namespace, storage),
-		{
-			name: testMethodPrepareRestore,
-			call: func(ctx context.Context, ic *Client) error {
-				return ic.PrepareRestore(ctx, &infomodels.RequestPrepareRestore{
-					Namespace: namespace,
-					JobID:     jobID,
-				})
-			},
-		},
+		prepareRestoreCall(jobID, namespace),
 		abortBackupCall(jobID),
 		abortRestoreCall(jobID, namespace),
 		openRestoreCall(jobID, namespace),
@@ -2541,6 +2546,7 @@ func TestClient_RetriesAreNotNested(t *testing.T) {
 		startBackupCall(testIntegratedNamespace, testIntegratedStorage),
 		startRestoreCall(testIntegratedJobID, testCmdBackupID, testIntegratedNamespace, testIntegratedStorage),
 		abortBackupCall(testIntegratedJobID),
+		prepareRestoreCall(testIntegratedJobID, testIntegratedNamespace),
 		abortRestoreCall(testIntegratedJobID, testIntegratedNamespace),
 		openRestoreCall(testIntegratedJobID, testIntegratedNamespace),
 		{
@@ -2577,28 +2583,6 @@ func TestClient_RetriesAreNotNested(t *testing.T) {
 			require.Equal(t, testMaxRetries, attempts)
 		})
 	}
-}
-
-// TestClient_PrepareRestore_RetriesWithoutActiveNodes checks that PrepareRestore
-// reads the node list once per attempt. Without an active node the command has
-// no nodes to prepare, so it is never sent to the principal.
-func TestClient_PrepareRestore_RetriesWithoutActiveNodes(t *testing.T) {
-	t.Parallel()
-
-	const testMaxRetries = 3
-
-	mockNodeGetter := mocks.NewMockNodeGetter(t)
-	mockNodeGetter.EXPECT().GetNodes().Return([]*a.Node{{}}).Times(testMaxRetries)
-
-	ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, testMaxRetries))
-
-	err := ic.PrepareRestore(t.Context(), &infomodels.RequestPrepareRestore{
-		Namespace: testIntegratedNamespace,
-		JobID:     testIntegratedJobID,
-	})
-
-	require.ErrorIs(t, err, errMissingCmdParam)
-	require.ErrorContains(t, err, paramNodes)
 }
 
 // TestClient_IntegratedBackupNotSupported checks that the integrated backup methods

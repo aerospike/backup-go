@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aerospike/backup-go/errclass"
 	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
 )
 
@@ -176,50 +175,18 @@ func isRestoreStarted(resp []infomodels.InfoMap, jobID string) bool {
 
 // PrepareRestore starts a restore preparation on the server.
 func (ic *Client) PrepareRestore(ctx context.Context, request *infomodels.RequestPrepareRestore) error {
-	// The node list is read on every attempt, so the command is built inside the
-	// retry loop. Everything else is checked here, as retrying cannot change it.
-	if err := ic.cmds.validatePrepareRestore(request); err != nil {
+	cmd, err := ic.cmds.serverPrepareRestore(request)
+	if err != nil {
 		return fmt.Errorf("failed to build prepare restore command: %w", err)
 	}
 
 	return executeWithRetry(ctx, ic.retryPolicy, func() error {
-		allNodes, err := ic.getNodesString()
-		if err != nil {
-			return fmt.Errorf("failed to get nodes string: %w", err)
-		}
-
-		cmd, err := ic.cmds.serverPrepareRestore(request, allNodes)
-		if err != nil {
-			return fmt.Errorf("failed to build prepare restore command: %w", err)
-		}
-
 		if err := ic.sendToPrincipal(cmd); err != nil {
 			return fmt.Errorf("failed prepare restore: %w", err)
 		}
 
 		return nil
 	})
-}
-
-func (ic *Client) getNodesString() (string, error) {
-	nodes := ic.cluster.GetNodes()
-
-	if len(nodes) == 0 {
-		return "", fmt.Errorf("%w: no nodes available in cluster", errclass.ErrAerospike)
-	}
-
-	var builder strings.Builder
-
-	for _, node := range nodes {
-		if !node.IsActive() {
-			continue
-		}
-
-		builder.WriteString(node.GetName())
-		builder.WriteByte(',')
-	}
-
-	return builder.String(), nil
 }
 
 // GetBackupStatus aggregates server-side backup status across all nodes.

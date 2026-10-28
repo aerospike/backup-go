@@ -78,7 +78,6 @@ const (
 	paramFilterExp              = "filter-exp"
 	paramNoIndexes              = "no-indexes"
 	paramNoUDFs                 = "no-udfs"
-	paramNodes                  = "nodes"
 	paramHydrateReplica         = "hydrate-replica"
 	paramAllowUnhosted          = "allow-unhosted"
 	paramMaxInflight            = "max-inflight"
@@ -421,29 +420,14 @@ func joinErrs(errs ...error) error {
 	return joined
 }
 
-// validatePrepareRestore checks everything serverPrepareRestore needs except the
-// node list, so that a call that can never succeed is rejected before the node
-// list is read.
-func (c infoCommands) validatePrepareRestore(r *infomodels.RequestPrepareRestore) error {
-	if err := c.checkPrepareRestore(r); err != nil {
-		return err
-	}
-
-	_, err := prepareRestoreCmd(r).build()
-
-	return err
-}
-
 // serverPrepareRestore returns the command that prepares namespace r.Namespace
-// on the given comma-separated nodes for the restore job r.JobID.
-func (c infoCommands) serverPrepareRestore(r *infomodels.RequestPrepareRestore, nodes string) (string, error) {
+// for the restore job r.JobID.
+func (c infoCommands) serverPrepareRestore(r *infomodels.RequestPrepareRestore) (string, error) {
 	if err := c.checkPrepareRestore(r); err != nil {
 		return "", err
 	}
 
-	return prepareRestoreCmd(r).
-		required(paramNodes, nodes).
-		build()
+	return prepareRestoreCmd(r).build()
 }
 
 // backupStatus returns the command that reads the state of the backup job jobID.

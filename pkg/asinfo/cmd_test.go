@@ -29,7 +29,6 @@ const (
 	testCmdNamespace = "source-ns"
 	testCmdJobID     = "260922T103653-5xsr"
 	testCmdBackupID  = "260901T000000-abcd"
-	testCmdNodes     = "BB9020011AC4202,BB9030011AC4202"
 	testCmdStorage   = "aws-s3"
 	testCmdBucket    = "backup-bucket"
 	testCmdRegion    = "eu-central-1"
@@ -45,7 +44,6 @@ const (
 	testCmdPrepareBase   = "restore-prepare:namespace=source-ns;job-id=260922T103653-5xsr"
 	testCmdStorageParams = ";path=/backups/source-ns;s3-bucket=backup-bucket;s3-region=eu-central-1;" +
 		"s3-profile=default;s3-endpoint=https://s3.example.com"
-	testCmdNodesParam     = ";nodes=BB9020011AC4202,BB9030011AC4202"
 	testCmdSetListParam   = ";set-list=set1,set2"
 	testCmdFilterExpParam = ";filter-exp=kwGVfwIAAJMEDqNiaW4="
 
@@ -160,9 +158,9 @@ func integratedBackupCalls() []integratedBackupCall {
 		{
 			name: cmdNameRestorePrepare,
 			call: func(c infoCommands) (string, error) {
-				return c.serverPrepareRestore(testPrepareRestore(), testCmdNodes)
+				return c.serverPrepareRestore(testPrepareRestore())
 			},
-			want: testCmdPrepareBase + testCmdNodesParam,
+			want: testCmdPrepareBase,
 		},
 		{
 			name: cmdNameBackupStatus,
@@ -515,9 +513,9 @@ func TestInfoCommands_IntegratedBackupMissingParams(t *testing.T) {
 		{
 			name: cmdNameRestorePrepare,
 			call: func() (string, error) {
-				return cmds.serverPrepareRestore(&infomodels.RequestPrepareRestore{}, "")
+				return cmds.serverPrepareRestore(&infomodels.RequestPrepareRestore{})
 			},
-			wantMissing: "namespace, job-id, nodes",
+			wantMissing: "namespace, job-id",
 		},
 		{
 			name:        cmdNameBackupStatus,
@@ -584,7 +582,7 @@ func TestInfoCommands_NilRequest(t *testing.T) {
 		},
 		{
 			name: cmdNameRestorePrepare,
-			call: func() (string, error) { return cmds.serverPrepareRestore(nil, testCmdNodes) },
+			call: func() (string, error) { return cmds.serverPrepareRestore(nil) },
 		},
 	}
 
@@ -601,7 +599,7 @@ func TestInfoCommands_NilRequest(t *testing.T) {
 	}
 }
 
-func TestInfoCommands_ValidatePrepareRestore(t *testing.T) {
+func TestInfoCommands_ServerPrepareRestoreValidation(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -644,14 +642,16 @@ func TestInfoCommands_ValidatePrepareRestore(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := newInfoCommands(tt.giveVersion).validatePrepareRestore(tt.give)
+			got, err := newInfoCommands(tt.giveVersion).serverPrepareRestore(tt.give)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
+				assert.Empty(t, got)
 
 				return
 			}
 
 			require.NoError(t, err)
+			assert.NotEmpty(t, got)
 		})
 	}
 }
@@ -777,7 +777,7 @@ func TestInfoCommands_InvalidParams(t *testing.T) {
 				return cmds.serverPrepareRestore(&infomodels.RequestPrepareRestore{
 					Namespace: testCmdNamespace,
 					JobID:     value,
-				}, testCmdNodes)
+				})
 			},
 		},
 		{
@@ -1458,17 +1458,17 @@ func TestInfoCommands_ServerPrepareRestore(t *testing.T) {
 	}{
 		{
 			name: "hydrate replica unset is omitted",
-			want: testCmdPrepareBase + testCmdNodesParam,
+			want: testCmdPrepareBase,
 		},
 		{
 			name:               "hydrate replica true",
 			giveHydrateReplica: new(true),
-			want:               testCmdPrepareBase + ";hydrate-replica=true" + testCmdNodesParam,
+			want:               testCmdPrepareBase + ";hydrate-replica=true",
 		},
 		{
 			name:               "hydrate replica false",
 			giveHydrateReplica: new(false),
-			want:               testCmdPrepareBase + ";hydrate-replica=false" + testCmdNodesParam,
+			want:               testCmdPrepareBase + ";hydrate-replica=false",
 		},
 	}
 
@@ -1479,7 +1479,7 @@ func TestInfoCommands_ServerPrepareRestore(t *testing.T) {
 			r := testPrepareRestore()
 			r.HydrateReplica = tt.giveHydrateReplica
 
-			got, err := cmds.serverPrepareRestore(r, testCmdNodes)
+			got, err := cmds.serverPrepareRestore(r)
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)

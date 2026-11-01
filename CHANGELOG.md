@@ -17,7 +17,7 @@ request links for the full detail of any change.
   `RequestBackup` gains `BinList`; `RequestCommon` gains `Path`, `SetList` and `FilterExp`;
   `RequestRestore` gains `BackupIDs`, a comma-separated list sent as the required `backup-ids`,
   `IncrementalPath`, the settings of both modes `RestoreWorkerThreads`, `RestoreDownloadThreads`,
-  `RestoreRPS` and `ExtraTTL`, and the fuzzy restore settings `AllowUnhosted`, `MaxInflight`,
+  `RestoreRPS` and `ExtraTTL`, and the fuzzy restore settings `MaxInflight`,
   `RetryBaseIntervalMs`, `RetryMultiplier`, `RetryMaxAttempts`, `IgnoreRecordError` and
   `ApplyMetadataLast`. `RequestBackup` gains `BackupRPS`, `BackupWorkerThreads`,
   `BackupUploadThreads` and `BackupS3ThroughputTargetGbps`. The new `RequestPrepareRestore`
@@ -31,9 +31,10 @@ request links for the full detail of any change.
   default. A policy the server does not know fails with `ErrInvalidConfig`, and its error names
   the value. (BKRS-471)
 - A restore request that sets a parameter the rest of the request does not accept fails with
-  `ErrInvalidConfig` instead of being sent, as the server rejects it: `FilterExp` or more than
-  one backup id with the fuzzy policy, a fuzzy restore setting with the strict or the default
-  policy, and `IncrementalPath` with a single backup id. (BKRS-464, BKRS-471)
+  `ErrInvalidConfig` instead of being sent, as the server rejects it: a fuzzy restore setting
+  with the strict or the default policy, and `IncrementalPath` with a single backup id. The fuzzy
+  policy accepts `FilterExp` and a list of backup ids, as the server does since SERVER-2082.
+  (BKRS-464, BKRS-471)
 - `ServerBackupInfo.OpenRestore` sends `restore-open`, which releases a namespace held by an
   aborted cold restore. (BKRS-464)
 - `ServerBackupInfo.ClearRestoreStorage` sends `restore-clear-storage` to every node whose row of

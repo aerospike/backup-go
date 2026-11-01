@@ -37,8 +37,8 @@ const (
 	// RestorePolicyStrict selects the cold restore: the partitions of a
 	// prepared namespace are hydrated from strict backups only.
 	RestorePolicyStrict RestorePolicy = "strict"
-	// RestorePolicyFuzzy writes the records of a single backup of any
-	// consistency into the live namespace.
+	// RestorePolicyFuzzy writes the records into the live namespace, from a
+	// single backup of any consistency or from a list of strict backups.
 	RestorePolicyFuzzy RestorePolicy = "fuzzy"
 )
 
@@ -74,13 +74,12 @@ type RequestBackup struct {
 
 // RequestRestore represents a request to start a restore job on the server.
 //
-// Policy selects the restore mode, strict (cold) by default. The parameters of
-// one mode fail the request in the other one, since the server rejects them
-// instead of ignoring them. Only the strict policy accepts FilterExp and more
-// than one id in BackupIDs. Only the fuzzy policy accepts AllowUnhosted,
-// MaxInflight, RetryBaseIntervalMs, RetryMultiplier, RetryMaxAttempts,
-// IgnoreRecordError and ApplyMetadataLast. IncrementalPath needs more than
-// one id in BackupIDs, so only the strict policy accepts it as well.
+// Policy selects the restore mode, strict (cold) by default. Only the fuzzy
+// policy accepts MaxInflight, RetryBaseIntervalMs, RetryMultiplier,
+// RetryMaxAttempts, IgnoreRecordError and ApplyMetadataLast: setting one with
+// another policy fails the request, since the server rejects it instead of
+// ignoring it. Every other parameter applies to both policies.
+// IncrementalPath needs more than one id in BackupIDs.
 type RequestRestore struct {
 	RequestCommon
 	// JobID identifies the restore job. A cold restore must use the job id that
@@ -105,12 +104,10 @@ type RequestRestore struct {
 	ExtraTTL int
 	// Policy selects the restore mode. strict: cold hydration from strict
 	// backups only; the server refuses a fuzzy backup. fuzzy: restore through
-	// writes from a single backup of any consistency. Empty omits the
-	// parameter, so the server default, strict, applies.
+	// writes onto the live namespace, from a single backup of any consistency
+	// or from a list of strict backups. Empty omits the parameter, so the
+	// server default, strict, applies.
 	Policy RestorePolicy
-	// AllowUnhosted allows the restore even if the principal does not host the
-	// namespace.
-	AllowUnhosted *bool
 	// MaxInflight is the maximum number of outstanding writes per node, from 1
 	// to 100000.
 	MaxInflight int
@@ -163,8 +160,7 @@ type RequestCommon struct {
 	Endpoint string
 	// SetList is a comma-separated list of sets.
 	SetList string
-	// FilterExp is a base64-encoded filter expression. A restore accepts it
-	// only with the strict policy, see [RequestRestore].
+	// FilterExp is a base64-encoded filter expression.
 	FilterExp string
 	// NoIndexes skips the secondary indexes.
 	NoIndexes *bool

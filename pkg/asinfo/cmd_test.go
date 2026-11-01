@@ -97,7 +97,6 @@ func testMinimalRestore(policy infomodels.RestorePolicy) *infomodels.RequestRest
 
 // testSetFuzzyParams sets every parameter of r that only the fuzzy policy accepts.
 func testSetFuzzyParams(r *infomodels.RequestRestore) {
-	r.AllowUnhosted = new(true)
 	r.MaxInflight = 400
 	r.RetryBaseIntervalMs = new(250)
 	r.RetryMultiplier = 1.5
@@ -942,19 +941,16 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 	const (
 		testIncrementalPath = "/backups/incr"
 		testRestoreFlags    = ";no-indexes=false;no-udfs=true"
-		// testStrictHead and testFuzzyHead are the parameters of the requests
-		// below that precede the set list, in the order the command adds them.
-		// The fuzzy policy accepts neither several backup ids nor an
-		// incremental path.
-		testStrictHead = "restore:namespace=" + testCmdNamespace + ";job-id=" + testCmdJobID +
+		// testHead is the parameters of the requests below that precede the set
+		// list, in the order the command adds them.
+		testHead = "restore:namespace=" + testCmdNamespace + ";job-id=" + testCmdJobID +
 			";backup-ids=" + testCmdBackupIDsChain + ";object-storage-type=" + testCmdStorage +
 			testCmdStorageParams + ";incremental-path=" + testIncrementalPath + testRestoreFlags
-		testFuzzyHead = testCmdRestoreBase + testCmdStorageParams + testRestoreFlags
 		// testRestoreLimits are the parameters of both modes that follow the filter.
 		testRestoreLimits = ";restore-download-threads=8;restore-worker-threads=16;restore-rps=5000;" +
 			"extra-ttl=3600"
 		// testFuzzyParams are the fuzzy only parameters set by testSetFuzzyParams.
-		testFuzzyParams = ";allow-unhosted=true;max-inflight=400;retry-base-interval=250;" +
+		testFuzzyParams = ";max-inflight=400;retry-base-interval=250;" +
 			"retry-multiplier=1.5;retry-max-attempts=3;ignore-record-error=false;apply-metadata-last=true"
 	)
 
@@ -964,13 +960,15 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 	newRequest := func(policy infomodels.RestorePolicy) *infomodels.RequestRestore {
 		common := testStorage()
 		common.SetList = testCmdSetList
+		common.FilterExp = testCmdFilterExp
 		common.NoIndexes = new(false)
 		common.NoUDFs = new(true)
 
 		return &infomodels.RequestRestore{
 			RequestCommon:          common,
 			JobID:                  testCmdJobID,
-			BackupIDs:              testCmdBackupID,
+			BackupIDs:              testCmdBackupIDsChain,
+			IncrementalPath:        testIncrementalPath,
 			RestoreDownloadThreads: 8,
 			RestoreWorkerThreads:   16,
 			RestoreRPS:             5000,
@@ -979,19 +977,8 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 		}
 	}
 
-	// newStrictRequest returns a request with every parameter of the strict
-	// policy set.
-	newStrictRequest := func(policy infomodels.RestorePolicy) *infomodels.RequestRestore {
-		r := newRequest(policy)
-		r.BackupIDs = testCmdBackupIDsChain
-		r.IncrementalPath = testIncrementalPath
-		r.FilterExp = testCmdFilterExp
-
-		return r
-	}
-
-	strictRequest := newStrictRequest(infomodels.RestorePolicyStrict)
-	defaultRequest := newStrictRequest("")
+	strictRequest := newRequest(infomodels.RestorePolicyStrict)
+	defaultRequest := newRequest("")
 
 	fuzzyRequest := newRequest(infomodels.RestorePolicyFuzzy)
 	testSetFuzzyParams(fuzzyRequest)
@@ -1007,20 +994,21 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 		want string
 	}{
 		{
-			name: "strict policy sends every strict only parameter",
+			name: "strict policy sends every parameter of both policies",
 			give: strictRequest,
-			want: testStrictHead + testCmdSetListParam + testCmdFilterExpParam + testRestoreLimits +
+			want: testHead + testCmdSetListParam + testCmdFilterExpParam + testRestoreLimits +
 				testCmdRestorePolicyStrict,
 		},
 		{
-			name: "empty policy is not sent and accepts every strict only parameter",
+			name: "empty policy is not sent and accepts every parameter of both policies",
 			give: defaultRequest,
-			want: testStrictHead + testCmdSetListParam + testCmdFilterExpParam + testRestoreLimits,
+			want: testHead + testCmdSetListParam + testCmdFilterExpParam + testRestoreLimits,
 		},
 		{
-			name: "fuzzy policy sends every fuzzy only parameter",
+			name: "fuzzy policy sends every parameter",
 			give: fuzzyRequest,
-			want: testFuzzyHead + testCmdSetListParam + testRestoreLimits + testCmdRestorePolicyFuzzy +
+			want: testHead + testCmdSetListParam + testCmdFilterExpParam + testRestoreLimits +
+				testCmdRestorePolicyFuzzy +
 				testFuzzyParams,
 		},
 		{
@@ -1051,10 +1039,6 @@ func TestInfoCommands_ServerRestorePolicyMismatch(t *testing.T) {
 	t.Parallel()
 
 	const (
-		// testFuzzyPrefix starts the report of the strict only parameters set
-		// for the fuzzy policy.
-		testFuzzyPrefix = "restore with restore-policy=fuzzy: "
-		testFuzzyFilter = testFuzzyPrefix + paramFilterExp
 		// testStrictPrefix starts the report of the fuzzy only parameters set
 		// for the strict policy.
 		testStrictPrefix = "restore with restore-policy=strict: "
@@ -1066,26 +1050,15 @@ func TestInfoCommands_ServerRestorePolicyMismatch(t *testing.T) {
 
 	cmds := newInfoCommands(infomodels.AerospikeVersionSupportsIntegratedBackup)
 
-	fuzzyWithFilter := testMinimalRestore(infomodels.RestorePolicyFuzzy)
-	fuzzyWithFilter.FilterExp = testCmdFilterExp
-
-	fuzzyWithBackupIDsChain := testMinimalRestore(infomodels.RestorePolicyFuzzy)
-	fuzzyWithBackupIDsChain.BackupIDs = testCmdBackupIDsChain
-
 	fuzzyWithIncrementalPath := testMinimalRestore(infomodels.RestorePolicyFuzzy)
 	fuzzyWithIncrementalPath.IncrementalPath = testCmdPath
 
 	strictWithIncrementalPath := testMinimalRestore(infomodels.RestorePolicyStrict)
 	strictWithIncrementalPath.IncrementalPath = testCmdPath
 
-	fuzzyWithFilterAndIncrementalPath := testMinimalRestore(infomodels.RestorePolicyFuzzy)
-	fuzzyWithFilterAndIncrementalPath.FilterExp = testCmdFilterExp
-	fuzzyWithFilterAndIncrementalPath.IncrementalPath = testCmdPath
-
-	fuzzyWithStrictParams := testMinimalRestore(infomodels.RestorePolicyFuzzy)
-	fuzzyWithStrictParams.BackupIDs = testCmdBackupIDsChain
-	fuzzyWithStrictParams.IncrementalPath = testCmdPath
-	fuzzyWithStrictParams.FilterExp = testCmdFilterExp
+	strictWithMaxInflightAndIncrementalPath := testMinimalRestore(infomodels.RestorePolicyStrict)
+	strictWithMaxInflightAndIncrementalPath.MaxInflight = 1
+	strictWithMaxInflightAndIncrementalPath.IncrementalPath = testCmdPath
 
 	strictWithFuzzyParams := testMinimalRestore(infomodels.RestorePolicyStrict)
 	testSetFuzzyParams(strictWithFuzzyParams)
@@ -1096,9 +1069,9 @@ func TestInfoCommands_ServerRestorePolicyMismatch(t *testing.T) {
 	strictWithZeroInterval := testMinimalRestore(infomodels.RestorePolicyStrict)
 	strictWithZeroInterval.RetryBaseIntervalMs = new(0)
 
-	fuzzyWithFilterNoJobID := testMinimalRestore(infomodels.RestorePolicyFuzzy)
-	fuzzyWithFilterNoJobID.FilterExp = testCmdFilterExp
-	fuzzyWithFilterNoJobID.JobID = ""
+	strictWithMaxInflightNoJobID := testMinimalRestore(infomodels.RestorePolicyStrict)
+	strictWithMaxInflightNoJobID.MaxInflight = 1
+	strictWithMaxInflightNoJobID.JobID = ""
 
 	tests := []struct {
 		name        string
@@ -1106,21 +1079,6 @@ func TestInfoCommands_ServerRestorePolicyMismatch(t *testing.T) {
 		wantErrText string
 		wantMissing bool
 	}{
-		{
-			name:        "filter expression with fuzzy policy",
-			give:        fuzzyWithFilter,
-			wantErrText: testFuzzyFilter,
-		},
-		{
-			name:        "several backup ids with fuzzy policy",
-			give:        fuzzyWithBackupIDsChain,
-			wantErrText: testFuzzyPrefix + paramBackupIDs,
-		},
-		{
-			name:        "every strict only parameter with fuzzy policy",
-			give:        fuzzyWithStrictParams,
-			wantErrText: testFuzzyPrefix + paramBackupIDs + ", " + paramFilterExp,
-		},
 		{
 			name:        "incremental path for one backup id with fuzzy policy",
 			give:        fuzzyWithIncrementalPath,
@@ -1133,14 +1091,14 @@ func TestInfoCommands_ServerRestorePolicyMismatch(t *testing.T) {
 		},
 		{
 			name: "policy mismatch is reported with the incremental path",
-			give: fuzzyWithFilterAndIncrementalPath,
-			wantErrText: testFuzzyFilter + "; " + errParamNotApplicable.Error() + ": " +
+			give: strictWithMaxInflightAndIncrementalPath,
+			wantErrText: testStrictPrefix + paramMaxInflight + "; " + errParamNotApplicable.Error() + ": " +
 				testIncrementalOneID,
 		},
 		{
 			name: "every fuzzy only parameter with strict policy",
 			give: strictWithFuzzyParams,
-			wantErrText: testStrictPrefix + "allow-unhosted, max-inflight, retry-base-interval, " +
+			wantErrText: testStrictPrefix + "max-inflight, retry-base-interval, " +
 				"retry-multiplier, retry-max-attempts, ignore-record-error, apply-metadata-last",
 		},
 		{
@@ -1155,8 +1113,8 @@ func TestInfoCommands_ServerRestorePolicyMismatch(t *testing.T) {
 		},
 		{
 			name:        "missing parameter is reported with the policy mismatch",
-			give:        fuzzyWithFilterNoJobID,
-			wantErrText: testFuzzyFilter,
+			give:        strictWithMaxInflightNoJobID,
+			wantErrText: testStrictPrefix + paramMaxInflight,
 			wantMissing: true,
 		},
 	}

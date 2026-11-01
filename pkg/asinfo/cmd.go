@@ -79,7 +79,6 @@ const (
 	paramNoIndexes              = "no-indexes"
 	paramNoUDFs                 = "no-udfs"
 	paramHydrateReplica         = "hydrate-replica"
-	paramAllowUnhosted          = "allow-unhosted"
 	paramMaxInflight            = "max-inflight"
 	paramRetryBaseInterval      = "retry-base-interval"
 	paramRetryMultiplier        = "retry-multiplier"
@@ -263,8 +262,7 @@ func (c infoCommands) serverRestore(r *infomodels.RequestRestore) (string, error
 // accepts. checkRestoreMode finds the ones r sets with it, so every fuzzy only
 // parameter must be added here.
 func addFuzzyOnlyParams(cmd *infoCmd, r *infomodels.RequestRestore) *infoCmd {
-	return cmd.optFlag(paramAllowUnhosted, r.AllowUnhosted).
-		optNum(paramMaxInflight, r.MaxInflight).
+	return cmd.optNum(paramMaxInflight, r.MaxInflight).
 		optNumPtr(paramRetryBaseInterval, r.RetryBaseIntervalMs).
 		optFloat(paramRetryMultiplier, r.RetryMultiplier).
 		optNum(paramRetryMaxAttempts, r.RetryMaxAttempts).
@@ -318,16 +316,11 @@ func checkRestoreMode(r *infomodels.RequestRestore) error {
 	return joinErrs(checkPolicyParams(r), checkIncrementalPath(r))
 }
 
-// checkPolicyParams returns errParamNotApplicable if r sets a parameter that
-// r.Policy does not accept: a strict only parameter for the fuzzy policy, see
-// strictOnlyParams, or a fuzzy only parameter for the strict one. An empty
-// policy is checked as strict, the server default.
+// checkPolicyParams returns errParamNotApplicable if r sets a fuzzy only
+// parameter for a policy other than fuzzy. An empty policy is checked as
+// strict, the server default. The fuzzy policy accepts every parameter.
 func checkPolicyParams(r *infomodels.RequestRestore) error {
 	if r.Policy == infomodels.RestorePolicyFuzzy {
-		if strictOnly := strictOnlyParams(r); len(strictOnly) > 0 {
-			return notApplicableErr(r.Policy, strictOnly)
-		}
-
 		return nil
 	}
 
@@ -337,23 +330,6 @@ func checkPolicyParams(r *infomodels.RequestRestore) error {
 	}
 
 	return nil
-}
-
-// strictOnlyParams returns the keys of the parameters set in r that only the
-// strict policy accepts, in the order the command sends them. The fuzzy policy
-// restores a single backup, so it rejects more than one backup id.
-func strictOnlyParams(r *infomodels.RequestRestore) []string {
-	var keys []string
-
-	if backupIDCount(r.BackupIDs) > 1 {
-		keys = append(keys, paramBackupIDs)
-	}
-
-	if r.FilterExp != "" {
-		keys = append(keys, paramFilterExp)
-	}
-
-	return keys
 }
 
 // checkIncrementalPath returns errParamNotApplicable if r sets an incremental

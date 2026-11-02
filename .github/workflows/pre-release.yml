@@ -1,0 +1,292 @@
+name: Publish backup-go Module to JFrog (Shared Workflows)
+
+# Publishes the backup-go Go module to JFrog Artifactory and starts the release bundle
+# lifecycle:
+#
+#   prepare -> delete-existing-bundle -> publish (build -> sign -> deploy)
+#           -> create-release-bundle -> promote-bundle-to-test
+#
+# The workflow runs only on manual dispatch. The version is resolved as follows:
+#   - `version` input set: release of that tag (the tag must exist).
+#   - dispatched from a tag: release of that tag.
+#   - dispatched from a branch: test build of the branch head, versioned
+#     v0.0.0-<branch name>, without promotion to TEST.
+#
+# The build step packs the module zip from the git tag with tools/modzip (golang.org/x/mod/zip,
+# the same code the Go module proxy uses), so the module hash matches the h1: sum consumers get
+# from proxy.golang.org. The shared deploy stage content-detects the Go module zip and uploads
+# it, with generated .mod and .info sidecars and the .asc signature, to
+# `${JF_PROJECT}-go-dev-local` in the GOPROXY layout:
+#
+#   github.com/aerospike/backup-go/@v/<version>.{zip,zip.asc,mod,info}
+#
+# Per DevOps policy, automated promotion stops at TEST. TEST -> STAGE -> PREVIEW is done with
+# promote-to-preview.yml (or the JFrog UI), PREVIEW -> PROD with promote-to-prod.yml (or the
+# JFrog UI). The GitHub Release is created manually, see scripts/prepare-release.sh.
+#
+# Required repository variables (same values as in aerospike/absctl):
+#   JF_PROJECT          JFrog project key ("database")
+#   JF_ARTIFACTORY_URL  JFrog platform URL
+#   JF_OIDC_PROVIDER    JFrog OIDC provider name
+#   JF_OIDC_AUDIENCE    JFrog OIDC audience
+# Required secrets (organization level): GPG_SECRET_KEY, GPG_PUBLIC_KEY, GPG_PASS.
+# The JFrog OIDC identity mapping must trust this repository.
+#
+# NOTE: every aerospike/shared-workflows `uses: ...@<sha>` below is pinned to v5.0.0.
+# The `env` context isn't available in `with:` for reusable-workflow-call jobs, so
+# gh-workflows-ref can't be centralized here: bump the sha and the "v5.0.0" gh-workflows-ref
+# value together by hand.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: >-
+          Version tag to publish (must already exist, e.g. v0.13.0). Leave empty to use the
+          tag the workflow is dispatched from, or to make a test build of the branch.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  BUNDLE_NAME: backup-go
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Resolve and validate the version tag
+  # ---------------------------------------------------------------------------
+
+  prepare:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      revision: ${{ steps.resolve.outputs.revision }}
+      promote: ${{ steps.resolve.outputs.promote }}
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Resolve version
+        id: resolve
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          # TODO(workflow-test): remove once the workflow is verified.
+          # Test build of a branch: the version is v0.0.0-<branch name> so it never sorts above
+          # a real release. The branch name is lowercased (the Go proxy protocol escapes upper
+          # case letters in versions, which would not match the uploaded path) and every
+          # character that is not allowed in a semver pre-release identifier becomes "-".
+          if [ -z "$INPUT_VERSION" ] && [ "$REF_TYPE" = "branch" ]; then
+            suffix="$(printf '%s' "$REF_NAME" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9-]+/-/g; s/^-+//; s/-+$//')"
+            version="v0.0.0-${suffix}"
+
+            if [ -z "$suffix" ] || ! echo "$version" | grep -qE '^v0\.0\.0-[0-9a-z-]+$'; then
+              echo "::error::Cannot derive a test version from branch '$REF_NAME'."
+              exit 1
+            fi
+
+            {
+              echo "version=$version"
+              echo "revision=$SHA"
+              echo "promote=false"
+            } >> "$GITHUB_OUTPUT"
+            echo "Test build: \`$version\` from \`$REF_NAME\` (\`$SHA\`), no promotion to TEST." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          version="${INPUT_VERSION:-$REF_NAME}"
+
+          if ! echo "$version" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::Version '$version' is not a valid semver tag (expected vMAJOR.MINOR.PATCH[-prerelease])."
+            exit 1
+          fi
+
+          if ! git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
+            echo "::error::Tag '$version' does not exist in this repository."
+            exit 1
+          fi
+
+          {
+            echo "version=$version"
+            echo "revision=$version"
+            echo "promote=true"
+          } >> "$GITHUB_OUTPUT"
+          echo "Release build: \`$version\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # Clear the DEV bundle so a re-run cannot quietly overwrite a released version
+  # ---------------------------------------------------------------------------
+  #
+  # Artifacts are addressed by version, so re-running this workflow for a tag redeploys over the
+  # previous bits, and a promoted bundle locks the dev-local artifacts it references. Deleting
+  # the DEV bundle first makes re-running an un-promoted release safe. The action refuses to
+  # delete a bundle already promoted past DEV, so the job fails fast exactly when a re-run must
+  # not replace what QE or customers already have.
+
+  delete-existing-bundle:
+    needs: [prepare]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Login to JFrog
+        uses: step-security/setup-jfrog-cli@53aeacb709fce45d0baf69a13ec3342f7e2d71a9 # v5.1.0
+        env:
+          JF_URL: ${{ vars.JF_ARTIFACTORY_URL }}
+          JF_PROJECT: ${{ vars.JF_PROJECT }}
+        with:
+          oidc-provider-name: ${{ vars.JF_OIDC_PROVIDER }}
+          oidc-audience: ${{ vars.JF_OIDC_AUDIENCE }}
+
+      - name: Delete existing DEV release bundle
+        id: delete-bundle
+        uses: aerospike/shared-workflows/.github/actions/delete-release-bundle@b4b1e9dc89314a2d542f9d6fe0ee150ad06f9860 # v5.0.0
+        with:
+          bundle-name: ${{ env.BUNDLE_NAME }}
+          version: ${{ needs.prepare.outputs.version }}
+          jf-project: ${{ vars.JF_PROJECT }}
+
+      - name: Summarize
+        if: always()
+        env:
+          EXISTED: ${{ steps.delete-bundle.outputs.existed }}
+          BUNDLE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          {
+            echo "### DEV release bundle pre-flight"
+            if [ "$EXISTED" = "true" ]; then
+              echo "Removed the existing DEV bundle for \`${BUNDLE_VERSION}\` so this run can redeploy it."
+            else
+              echo "No existing bundle for \`${BUNDLE_VERSION}\`; nothing to clear."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # Go module zip: build -> sign -> deploy
+  # ---------------------------------------------------------------------------
+
+  publish:
+    needs: [prepare, delete-existing-bundle]
+    permissions:
+      contents: read
+      id-token: write
+    uses: aerospike/shared-workflows/.github/workflows/reusable_artifacts-cicd.yaml@b4b1e9dc89314a2d542f9d6fe0ee150ad06f9860 # v5.0.0
+    with:
+      gh-workflows-ref: v5.0.0
+      jf-url: ${{ vars.JF_ARTIFACTORY_URL }}
+      jf-project: ${{ vars.JF_PROJECT }}
+      jf-build-name: backup-go
+      oidc-provider-name: ${{ vars.JF_OIDC_PROVIDER }}
+      oidc-audience: ${{ vars.JF_OIDC_AUDIENCE }}
+      version: ${{ needs.prepare.outputs.version }}
+      build-type: release
+      gh-source-ref: ${{ needs.prepare.outputs.revision }}
+      gh-artifact-directory: dist
+      build-env: VERSION=${{ needs.prepare.outputs.version }};REVISION=${{ needs.prepare.outputs.revision }}
+      # tools/modzip is a nested module, so it is run with -C and given absolute paths.
+      # The go directive of tools/modzip/go.mod makes the runner's Go fetch the matching
+      # toolchain (GOTOOLCHAIN=auto).
+      build-script: |
+        set -euo pipefail
+        go -C tools/modzip run . -version "$VERSION" -revision "$REVISION" -repo "$PWD" -out "$PWD/dist"
+        ls -la dist
+    secrets:
+      gpg-private-key: ${{ secrets.GPG_SECRET_KEY }}
+      gpg-public-key: ${{ secrets.GPG_PUBLIC_KEY }}
+      gpg-key-pass: ${{ secrets.GPG_PASS }}
+
+  # ---------------------------------------------------------------------------
+  # Release bundle
+  # ---------------------------------------------------------------------------
+
+  create-release-bundle:
+    needs: [prepare, publish]
+    permissions:
+      contents: read
+      id-token: write
+    uses: aerospike/shared-workflows/.github/workflows/reusable_create-release-bundle.yaml@b4b1e9dc89314a2d542f9d6fe0ee150ad06f9860 # v5.0.0
+    with:
+      gh-workflows-ref: v5.0.0
+      jf-url: ${{ vars.JF_ARTIFACTORY_URL }}
+      jf-project: ${{ vars.JF_PROJECT }}
+      oidc-provider-name: ${{ vars.JF_OIDC_PROVIDER }}
+      oidc-audience: ${{ vars.JF_OIDC_AUDIENCE }}
+      jf-bundle-name: backup-go
+      version: ${{ needs.prepare.outputs.version }}
+      jf-build-names: ${{ needs.publish.outputs.jf-build-name }}:${{ needs.publish.outputs.jf-build-id }}
+
+  # ---------------------------------------------------------------------------
+  # Promote to TEST (Gate 1: DEV -> TEST, developer-owned)
+  # ---------------------------------------------------------------------------
+
+  promote-bundle-to-test:
+    needs: [prepare, create-release-bundle]
+    # Test builds of a branch are never promoted.
+    if: needs.prepare.outputs.promote == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      BUNDLE_VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Login to JFrog
+        uses: step-security/setup-jfrog-cli@53aeacb709fce45d0baf69a13ec3342f7e2d71a9 # v5.1.0
+        env:
+          JF_URL: ${{ vars.JF_ARTIFACTORY_URL }}
+          JF_PROJECT: ${{ vars.JF_PROJECT }}
+        with:
+          oidc-provider-name: ${{ vars.JF_OIDC_PROVIDER }}
+          oidc-audience: ${{ vars.JF_OIDC_AUDIENCE }}
+
+      - name: Promote release bundle to TEST
+        uses: aerospike/shared-workflows/.github/actions/promote-release-bundle@b4b1e9dc89314a2d542f9d6fe0ee150ad06f9860 # v5.0.0
+        with:
+          bundle-name: ${{ env.BUNDLE_NAME }}
+          version: ${{ env.BUNDLE_VERSION }}
+          environment: TEST
+          jf-project: ${{ vars.JF_PROJECT }}
+
+      - name: Summarize promotion
+        if: always()
+        env:
+          JF_PROJECT: ${{ vars.JF_PROJECT }}
+        run: |
+          {
+            echo "### Promoted to JFrog TEST"
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Bundle name | \`${BUNDLE_NAME}\` |"
+            echo "| Bundle version | \`${BUNDLE_VERSION}\` |"
+            echo "| JFrog project | \`${JF_PROJECT}\` |"
+            echo ""
+            echo "Next: QE validates the module from JFrog TEST, then promotes to STAGE via promote-to-preview.yml (environment STAGE) or the JFrog UI."
+          } >> "$GITHUB_STEP_SUMMARY"

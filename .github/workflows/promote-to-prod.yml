@@ -1,0 +1,73 @@
+name: Promote backup-go Release Bundle to PROD
+
+# Promotes a backup-go release bundle from PREVIEW to PROD. This is an alternative to doing the
+# same promotion via the JFrog UI; either works. No GitHub-side approval gate is enforced here,
+# so only a PM/EM should run it, once PREVIEW is validated.
+#
+# See pre-release.yml for the required repository variables.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release bundle version currently in PREVIEW to promote to PROD (e.g. v0.13.0)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  promote-to-prod:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      BUNDLE_NAME: backup-go
+      BUNDLE_VERSION: ${{ inputs.version }}
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Login to JFrog
+        uses: step-security/setup-jfrog-cli@53aeacb709fce45d0baf69a13ec3342f7e2d71a9 # v5.1.0
+        env:
+          JF_URL: ${{ vars.JF_ARTIFACTORY_URL }}
+          JF_PROJECT: ${{ vars.JF_PROJECT }}
+        with:
+          oidc-provider-name: ${{ vars.JF_OIDC_PROVIDER }}
+          oidc-audience: ${{ vars.JF_OIDC_AUDIENCE }}
+
+      - name: Promote release bundle to PROD
+        id: promote
+        uses: aerospike/shared-workflows/.github/actions/promote-release-bundle@b4b1e9dc89314a2d542f9d6fe0ee150ad06f9860 # v5.0.0
+        with:
+          bundle-name: ${{ env.BUNDLE_NAME }}
+          version: ${{ env.BUNDLE_VERSION }}
+          environment: PROD
+          jf-project: ${{ vars.JF_PROJECT }}
+
+      - name: Summarize promotion
+        if: always()
+        env:
+          JF_PROJECT: ${{ vars.JF_PROJECT }}
+          OUTCOME: ${{ steps.promote.outcome }}
+        run: |
+          if [ "$OUTCOME" != "success" ]; then
+            echo "### Promotion of \`${BUNDLE_VERSION}\` to JFrog PROD failed (outcome: ${OUTCOME}); see the step log." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          {
+            echo "### Promoted to JFrog PROD"
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Bundle name | \`${BUNDLE_NAME}\` |"
+            echo "| Bundle version | \`${BUNDLE_VERSION}\` |"
+            echo "| JFrog project | \`${JF_PROJECT}\` |"
+            echo ""
+            echo "Next: create the GitHub Release manually (see scripts/prepare-release.sh)."
+          } >> "$GITHUB_STEP_SUMMARY"

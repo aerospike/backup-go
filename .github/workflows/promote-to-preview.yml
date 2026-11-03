@@ -1,0 +1,90 @@
+name: Promote backup-go Release Bundle (STAGE or PREVIEW)
+
+# Promotes an already-created backup-go release bundle to STAGE or PREVIEW. This is an
+# alternative to doing the same promotion via the JFrog UI; either works. No GitHub-side
+# approval gate is enforced here: anyone who can trigger workflow_dispatch on this repo can run
+# it, so treat it the same as JFrog UI access and only run it once the prior stage is validated.
+#
+#   TEST  --(target STAGE)-->   STAGE
+#   STAGE --(target PREVIEW)--> PREVIEW
+#
+# See pre-release.yml for the required repository variables.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release bundle version to promote (e.g. v0.13.0)
+        required: true
+        type: string
+      environment:
+        description: Promotion target, STAGE (from TEST, QE/dev) or PREVIEW (from STAGE, Product)
+        required: true
+        type: choice
+        default: STAGE
+        options:
+          - STAGE
+          - PREVIEW
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      BUNDLE_NAME: backup-go
+      BUNDLE_VERSION: ${{ inputs.version }}
+      TARGET_ENV: ${{ inputs.environment }}
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Login to JFrog
+        uses: step-security/setup-jfrog-cli@53aeacb709fce45d0baf69a13ec3342f7e2d71a9 # v5.1.0
+        env:
+          JF_URL: ${{ vars.JF_ARTIFACTORY_URL }}
+          JF_PROJECT: ${{ vars.JF_PROJECT }}
+        with:
+          oidc-provider-name: ${{ vars.JF_OIDC_PROVIDER }}
+          oidc-audience: ${{ vars.JF_OIDC_AUDIENCE }}
+
+      - name: Promote release bundle
+        id: promote
+        uses: aerospike/shared-workflows/.github/actions/promote-release-bundle@b4b1e9dc89314a2d542f9d6fe0ee150ad06f9860 # v5.0.0
+        with:
+          bundle-name: ${{ env.BUNDLE_NAME }}
+          version: ${{ env.BUNDLE_VERSION }}
+          environment: ${{ env.TARGET_ENV }}
+          jf-project: ${{ vars.JF_PROJECT }}
+
+      - name: Summarize promotion
+        if: always()
+        env:
+          JF_PROJECT: ${{ vars.JF_PROJECT }}
+          OUTCOME: ${{ steps.promote.outcome }}
+        run: |
+          if [ "$OUTCOME" != "success" ]; then
+            echo "### Promotion of \`${BUNDLE_VERSION}\` to JFrog ${TARGET_ENV} failed (outcome: ${OUTCOME}); see the step log." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          {
+            echo "### Promoted to JFrog ${TARGET_ENV}"
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Bundle name | \`${BUNDLE_NAME}\` |"
+            echo "| Bundle version | \`${BUNDLE_VERSION}\` |"
+            echo "| JFrog project | \`${JF_PROJECT}\` |"
+            echo ""
+            if [ "${TARGET_ENV}" = "STAGE" ]; then
+              echo "Next: a PM/EM promotes to PREVIEW (via promote-to-preview.yml with environment PREVIEW, or the JFrog UI)."
+            else
+              echo "Next: a PM/EM promotes to PROD (via promote-to-prod.yml or the JFrog UI)."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

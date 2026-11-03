@@ -101,6 +101,15 @@ func ResolveNamespaceState(states []NamespaceState) NamespaceState {
 		})
 }
 
+// HeldReason tells why a node holds its namespace at PREPARING without
+// advancing, the held-reason field of the restore-status info response.
+type HeldReason string
+
+// HeldReasonTruncateStateLive is a namespace that holds truncate state, which
+// would filter out the restored records. The restore never clears it: the
+// operator undoes the truncate with the command the node's log names.
+const HeldReasonTruncateStateLive HeldReason = "truncate-state-live"
+
 // ClearState is the storage clear state of a cold restore on a node, the clear
 // field of the restore-status info response.
 type ClearState string

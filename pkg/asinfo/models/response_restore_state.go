@@ -42,6 +42,7 @@ const (
 	fieldClusterKey         = "cluster-key"
 	fieldDone               = "done"
 	fieldClear              = "clear"
+	fieldHeldReason         = "held-reason"
 	fieldClearZeroedBytes   = "clear-zeroed-bytes"
 	fieldClearMs            = "clear-ms"
 
@@ -133,6 +134,9 @@ type ResponseRestoreState struct {
 	ClearZeroedBytes uint64
 	// ClearMs is the wall time of the last completed clear, in milliseconds.
 	ClearMs uint64
+	// HeldReason is reported by a node that holds its namespace at PREPARING
+	// until the operator acts, and is empty otherwise.
+	HeldReason HeldReason
 
 	// Fuzzy restore fields. With more than one backup id, the coverage counters
 	// are for the entry of BackupEntry.
@@ -181,6 +185,7 @@ func NewResponseRestoreState(im []InfoMap) *ResponseRestoreState {
 			BackupID:    r[fieldBackupID],
 			ClusterKey:  r[fieldClusterKey],
 			Clear:       ClearState(r[fieldClear]),
+			HeldReason:  HeldReason(r[fieldHeldReason]),
 			StartTime:   parseInfoTime(r[fieldStartTime]),
 			FinishTime:  parseInfoTime(r[fieldFinishTime]),
 		}
@@ -306,6 +311,7 @@ func (s *ResponseRestoreState) isBehind(n *ResponseRestoreState) bool {
 func (s *ResponseRestoreState) add(n *ResponseRestoreState) {
 	s.ErrorReason = cmp.Or(s.ErrorReason, n.ErrorReason)
 	s.AbortOrigin = cmp.Or(s.AbortOrigin, n.AbortOrigin)
+	s.HeldReason = cmp.Or(s.HeldReason, n.HeldReason)
 	s.ClusterKey = cmp.Or(s.ClusterKey, n.ClusterKey)
 	s.StartTime = earliestTime(s.StartTime, n.StartTime)
 	s.FinishTime = latestTime(s.FinishTime, n.FinishTime)

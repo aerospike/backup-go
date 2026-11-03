@@ -57,6 +57,12 @@ request links for the full detail of any change.
   although `restore-status` does not send it. (BKRS-464)
 - `lister.ErrInvalidBackupID`, of the `ErrInvalidConfig` class, returned by
   `Lister.GetMetadata` for an argument that is not a backup id. (BKRS-474)
+- `asinfo.ResponseError` is the error of an `ERROR` reply to an info command: the server got the
+  command and refused it. `Code` is the result code the reply carries. It is of the
+  `ErrAerospike` class and keeps the error text of before.
+- `ResponseRestoreState.HeldReason` reports the `held-reason` of `restore-status`.
+  `HeldReasonTruncateStateLive` is a node that holds its namespace at `PREPARING` because the
+  namespace holds truncate state, which the operator has to undo.
 
 ### Changed
 
@@ -141,6 +147,10 @@ request links for the full detail of any change.
 
 ### Fixed
 
+- `ServerBackupInfo.PrepareRestore` returns a refusal no retry can change at once instead of
+  retrying it under the whole retry policy: invalid parameters, an unknown namespace, and a
+  precondition the operator has to fix, such as truncate state or another restore holding the
+  namespace. A refusal for a passing cluster change is still retried.
 - Restore progress reached 100% early on compressed backups and then stopped reporting. Progress
   divided the bytes decoded after decryption and decompression by the stored size of the backup
   files, so a backup compressed 5:1 reported 100% about a fifth of the way through, and printed

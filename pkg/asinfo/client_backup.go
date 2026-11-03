@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aerospike/aerospike-client-go/v8/types"
 	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
 )
 
@@ -173,7 +174,17 @@ func isRestoreStarted(resp []infomodels.InfoMap, jobID string) bool {
 	return status != nil && status.JobID == jobID && status.IsStarted()
 }
 
-// PrepareRestore starts a restore preparation on the server.
+// prepareRestoreFinalCodes are the result codes of the restore-prepare
+// refusals that no retry can change: invalid parameters, an unknown namespace,
+// and a precondition the operator has to fix, such as truncate state or
+// another restore holding the namespace. The server answers a passing cluster
+// change with another code, which is retried.
+var prepareRestoreFinalCodes = []types.ResultCode{
+	types.PARAMETER_ERROR, types.INVALID_NAMESPACE, types.FAIL_FORBIDDEN,
+}
+
+// PrepareRestore starts a restore preparation on the server. A refusal no
+// retry can change is returned at once, see [prepareRestoreFinalCodes].
 func (ic *Client) PrepareRestore(ctx context.Context, request *infomodels.RequestPrepareRestore) error {
 	cmd, err := ic.cmds.serverPrepareRestore(request)
 	if err != nil {
@@ -182,7 +193,7 @@ func (ic *Client) PrepareRestore(ctx context.Context, request *infomodels.Reques
 
 	return executeWithRetry(ctx, ic.retryPolicy, func() error {
 		if err := ic.sendToPrincipal(cmd); err != nil {
-			return fmt.Errorf("failed prepare restore: %w", err)
+			return finalIfRefused(fmt.Errorf("failed prepare restore: %w", err), prepareRestoreFinalCodes...)
 		}
 
 		return nil

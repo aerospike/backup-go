@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/aerospike/aerospike-client-go/v8/types"
 	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/models"
 	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
@@ -74,10 +75,79 @@ func parseResultResponse(cmd string, result map[string]string) (string, error) {
 	}
 
 	if strings.Contains(v, errCmdRespPrefix) {
-		return "", fmt.Errorf("%w: command %s failed: %s", errclass.ErrAerospike, redactCmd(cmd), redactCmd(v))
+		return "", newResponseError(cmd, v)
 	}
 
 	return v, nil
+}
+
+// ResponseError is an ERROR reply to an info command: the server got the
+// command and refused it. It is of the [errclass.ErrAerospike] class.
+type ResponseError struct {
+	Command  string
+	Response string
+	// Code is the result code of an ERROR:<code>:<message> reply, or zero for
+	// a reply that carries none.
+	Code types.ResultCode
+}
+
+func newResponseError(cmd, response string) *ResponseError {
+	return &ResponseError{
+		Command:  redactCmd(cmd),
+		Response: redactCmd(response),
+		Code:     responseCode(response),
+	}
+}
+
+func (e *ResponseError) Error() string {
+	return fmt.Sprintf("%s: command %s failed: %s", errclass.ErrAerospike, e.Command, e.Response)
+}
+
+func (e *ResponseError) Unwrap() error {
+	return errclass.ErrAerospike
+}
+
+// responseCode returns the result code of an ERROR:<code>:<message> reply, or
+// zero.
+func responseCode(response string) types.ResultCode {
+	rest, ok := strings.CutPrefix(response, errCmdRespPrefix+":")
+	if !ok {
+		return 0
+	}
+
+	code, _, _ := strings.Cut(rest, ":")
+
+	n, err := strconv.Atoi(code)
+	if err != nil {
+		return 0
+	}
+
+	return types.ResultCode(n)
+}
+
+// finalError is an error no retry can change: [executeWithRetry] returns it
+// at once.
+type finalError struct {
+	err error
+}
+
+func (e finalError) Error() string {
+	return e.err.Error()
+}
+
+func (e finalError) Unwrap() error {
+	return e.err
+}
+
+// finalIfRefused marks err final when the server refused the command with one
+// of codes.
+func finalIfRefused(err error, codes ...types.ResultCode) error {
+	var refusal *ResponseError
+	if errors.As(err, &refusal) && slices.Contains(codes, refusal.Code) {
+		return finalError{err: err}
+	}
+
+	return err
 }
 
 func (ic *Client) requestSIndexes(node infoGetter, namespace string, noWarn bool,
@@ -466,12 +536,28 @@ func parseUDFGetResponse(resp string) (infomodels.InfoMap, error) {
 	return parseInfoObject(resp, infoObjSep, infoKVSep)
 }
 
+// executeWithRetry runs command under policy. A final error, see
+// [finalIfRefused], ends the retries and is returned as it is.
 func executeWithRetry(ctx context.Context, policy *models.RetryPolicy, command func() error) error {
 	if policy == nil {
 		return fmt.Errorf("%w: retry policy cannot be nil", errclass.ErrInvalidConfig)
 	}
 
-	return policy.Do(ctx, command)
+	var final finalError
+
+	err := policy.Do(ctx, func() error {
+		err := command()
+		if errors.As(err, &final) {
+			return nil // ends the retries; final.err is returned below.
+		}
+
+		return err
+	})
+	if final.err != nil {
+		return final.err
+	}
+
+	return err
 }
 
 // retryValue runs command under the retry policy and returns the value of its

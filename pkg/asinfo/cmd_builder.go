@@ -30,6 +30,16 @@ const (
 	// cmdUnsafeChars must not appear in a value: ";" would split it into extra
 	// parameters, "\n" into extra commands of the info request.
 	cmdUnsafeChars = ";\n"
+
+	// idMaxLen is the maximum length of a job id or a backup id.
+	idMaxLen = 20
+	// idListMaxLen is the maximum number of ids of a backup id list.
+	idListMaxLen = 32
+	// idForbiddenChars must not appear in a job id or a backup id.
+	idForbiddenChars = "|:;=/ "
+	// idForbiddenSeq must not appear in a job id or a backup id: the id names
+	// a directory or a key prefix of the backup.
+	idForbiddenSeq = ".."
 )
 
 // infoCmd builds an info command in the form "name:key1=value1;key2=value2".
@@ -79,16 +89,29 @@ func (c *infoCmd) required(key, value string) *infoCmd {
 	return c
 }
 
-// requiredCommaList adds the parameter like required, and records it as invalid
-// if value is not a comma-separated list with no empty elements.
-func (c *infoCmd) requiredCommaList(key, value string) *infoCmd {
+// jobID adds the job id parameter like required, and records it as invalid if
+// value is not a valid id, see [validID].
+func (c *infoCmd) jobID(key, value string) *infoCmd {
+	if value != "" && !validID(value) {
+		c.invalid = append(c.invalid, key)
+
+		return c
+	}
+
+	return c.required(key, value)
+}
+
+// requiredIDList adds the parameter like required, and records it as invalid
+// if value is not a comma-separated list of 1 to idListMaxLen distinct valid
+// ids, see [validID].
+func (c *infoCmd) requiredIDList(key, value string) *infoCmd {
 	if value == "" {
 		c.missing = append(c.missing, key)
 
 		return c
 	}
 
-	if !commaSeparatedListValid(value) {
+	if !validIDList(value) {
 		c.invalid = append(c.invalid, key)
 
 		return c
@@ -97,6 +120,44 @@ func (c *infoCmd) requiredCommaList(key, value string) *infoCmd {
 	c.add(key, value)
 
 	return c
+}
+
+// validIDList reports whether value is a comma-separated list of 1 to
+// idListMaxLen distinct valid ids, see [validID].
+func validIDList(value string) bool {
+	ids := strings.Split(value, ",")
+	if len(ids) > idListMaxLen || slices.ContainsFunc(ids, func(id string) bool { return !validID(id) }) {
+		return false
+	}
+
+	seen := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		if _, ok := seen[id]; ok {
+			return false
+		}
+
+		seen[id] = struct{}{}
+	}
+
+	return true
+}
+
+// validID reports whether id is a job id or a backup id the server accepts:
+// 1 to idMaxLen printable ASCII characters, with none of idForbiddenChars and
+// no idForbiddenSeq.
+func validID(id string) bool {
+	if id == "" || len(id) > idMaxLen ||
+		strings.ContainsAny(id, idForbiddenChars) || strings.Contains(id, idForbiddenSeq) {
+		return false
+	}
+
+	for i := range len(id) {
+		if id[i] < ' ' || id[i] > '~' {
+			return false
+		}
+	}
+
+	return true
 }
 
 // commaSeparatedListValid reports whether value is a comma-separated list with

@@ -25,7 +25,17 @@ const (
 	// infoNoValue is emitted by the server in place of a value that is not
 	// set, e.g. the finish-time of a running job.
 	infoNoValue = "-"
+	// infoNoName is emitted by the server in place of the job id or the
+	// namespace of a stub row, a job that failed before its parameters were
+	// known.
+	infoNoName = "(none)"
 )
+
+// knownName reports whether name, the job id or the namespace of a status row,
+// is set: a stub row reports "(none)" or "-" in place of it.
+func knownName(name string) bool {
+	return name != "" && name != infoNoName && name != infoNoValue
+}
 
 // Keys shared by the backup-status and restore-status info responses. Optional
 // fields appear and disappear depending on the job state, so a response must be
@@ -38,6 +48,8 @@ const (
 	fieldFinishTime  = "finish-time"
 	fieldErrorReason = "error-reason"
 	fieldAbortOrigin = "abort-origin"
+	fieldRecsPerSec  = "recs-per-sec"
+	fieldLastLapMs   = "last-lap-ms"
 )
 
 // AbortOrigin tells what aborted a backup or restore job.
@@ -51,6 +63,77 @@ const (
 	// AbortOriginCluster is an abort caused by a cluster event.
 	AbortOriginCluster AbortOrigin = "cluster"
 )
+
+// Consistency is the consistency of a backup: the achieved-consistency field
+// of the backup-status info response, and the source-consistency field of the
+// restore-status info response. It is empty while the server reports none.
+type Consistency string
+
+const (
+	// ConsistencyStrict is a backup of every record as of a common point.
+	ConsistencyStrict Consistency = "strict"
+	// ConsistencyFuzzy is a backup of the base scan only, every record as of its
+	// own scan, with no common point.
+	ConsistencyFuzzy Consistency = "fuzzy"
+
+	// consistencyUnknown holds the place of the values this package does not
+	// know in consistencyPriority. The server never reports it.
+	consistencyUnknown Consistency = "<unknown>"
+)
+
+// consistencyPriority orders the consistencies for [ResolveConsistency].
+// Lower index = higher priority.
+var consistencyPriority = []Consistency{
+	ConsistencyFuzzy,
+	consistencyUnknown,
+	ConsistencyStrict,
+}
+
+// ResolveConsistency picks a single consistency out of the values reported by
+// the nodes, so that the cluster is only reported strict when no node reports
+// less. The nodes that report none are skipped. The values are resolved by
+// priority: fuzzy, then a value this package does not know (it cannot be
+// proven to be strict), and strict last. An empty value is returned when no
+// node reports one.
+func ResolveConsistency(values []Consistency) Consistency {
+	return resolveByPriority(values, consistencyPriority, consistencyUnknown,
+		func(c Consistency) bool { return c == "" })
+}
+
+// infoValue returns the value of key, or an empty string if the server reports
+// it as not set.
+func infoValue(r InfoMap, key string) string {
+	v := r[key]
+	if v == infoNoValue {
+		return ""
+	}
+
+	return v
+}
+
+// parseOptionalUint64 returns the value of key, or nil if it is missing,
+// reported as not set, or unparsable.
+func parseOptionalUint64(r InfoMap, key string) *uint64 {
+	v, ok, err := r.ParseUint64(key)
+	if !ok || err != nil {
+		return nil
+	}
+
+	return &v
+}
+
+// maxOptional returns the larger of two optional values, ignoring a nil one.
+// The result never aliases b, so a merged status does not share memory with
+// the status of a node.
+func maxOptional(a, b *uint64) *uint64 {
+	if b == nil || (a != nil && *a >= *b) {
+		return a
+	}
+
+	v := *b
+
+	return &v
+}
 
 // infoField binds a key of an info response to the struct field it fills.
 type infoField[T any] struct {
@@ -107,4 +190,15 @@ func latestTime(a, b time.Time) time.Time {
 	}
 
 	return a
+}
+
+// firstKnownName returns current if it is a known name, see [knownName], and
+// next otherwise, so that a merged status takes the job id and the namespace
+// from the first row that is not a stub.
+func firstKnownName(current, next string) string {
+	if knownName(current) {
+		return current
+	}
+
+	return next
 }

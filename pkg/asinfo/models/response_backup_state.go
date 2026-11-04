@@ -55,6 +55,10 @@ const (
 	fieldUploadQCap                   = "upload-q-cap"
 	fieldBuffersInUse                 = "buffers-in-use"
 	fieldTotalBuffersAllocated        = "total-buffers-allocated"
+	fieldBackupPolicy                 = "backup-policy"
+	fieldAchievedConsistency          = "achieved-consistency"
+	fieldFallbackReason               = "fallback-reason"
+	fieldBuffersScanCap               = "buffers-scan-cap"
 )
 
 type BackupState string
@@ -147,6 +151,16 @@ type ResponseBackupState struct {
 	BackupUploadThreads uint32
 	// BackupS3ThroughputTargetGbps is the effective S3 throughput target per node.
 	BackupS3ThroughputTargetGbps uint32
+	// Policy is the effective backup policy. It is empty on a node that holds
+	// no parameters of the job.
+	Policy BackupPolicy
+	// AchievedConsistency is the consistency the backup achieved. It is empty
+	// until the backup commits.
+	AchievedConsistency Consistency
+	// FallbackReason tells why a best-effort backup fell back to fuzzy. It is
+	// only reported once the backup committed fuzzy, or while its outcome is
+	// open and it is not aborting.
+	FallbackReason string
 
 	// RecsBackedUp is the sum of RecsBase, RecsQueryIncr and RecsChangeIncr. It
 	// counts durable records over all three lines rather than distinct records,
@@ -167,9 +181,8 @@ type ResponseBackupState struct {
 	BytesQueryIncr uint64
 	// BytesChangeIncr counts bytes of the writes captured during the backup.
 	BytesChangeIncr uint64
-	// RecsFiltered counts records dropped by the filter expression or by an
-	// empty bin list projection. With either set, it also counts migrating
-	// records that could not be filtered and were dropped.
+	// RecsFiltered counts records excluded by the set list, the modified
+	// time range or the filter expression.
 	RecsFiltered uint64
 	// RecsDegenerate counts captured writes with no set name or no bins.
 	RecsDegenerate uint64
@@ -190,7 +203,8 @@ type ResponseBackupState struct {
 	PartitionsOwned uint32
 	// PartitionsScanned counts partitions already scanned.
 	PartitionsScanned uint32
-	// PartitionsCountPending counts partitions not complete yet.
+	// PartitionsCountPending counts owned partitions whose base count is not
+	// known yet. While it is not zero, RecsBase under-reports.
 	PartitionsCountPending uint32
 
 	// ProgressPct is 0-50 for the base scan, 50-95 for the incremental scan,
@@ -214,6 +228,14 @@ type ResponseBackupState struct {
 	BuffersInUse uint64
 	// TotalBuffersAllocated is the number of buffers allocated.
 	TotalBuffersAllocated uint64
+	// BuffersScanCap is the number of buffers in use at which the scan waits.
+	BuffersScanCap uint64
+	// RecsPerSec is the record rate over the window of the byte rates.
+	RecsPerSec uint64
+	// LastLapMs is how long ago the job monitor finished its last lap, in
+	// milliseconds. A growing value shows a blocked monitor. It is nil once the
+	// monitor stopped, or before its first lap.
+	LastLapMs *uint64
 }
 
 // NewResponseBackupState builds a ResponseBackupState from the first
@@ -226,13 +248,17 @@ func NewResponseBackupState(im []InfoMap) *ResponseBackupState {
 		}
 
 		status := &ResponseBackupState{
-			JobID:       r[fieldJobID],
-			Namespace:   r[fieldNamespace],
-			ErrorReason: r[fieldErrorReason],
-			State:       BackupState(state),
-			AbortOrigin: AbortOrigin(r[fieldAbortOrigin]),
-			StartTime:   parseInfoTime(r[fieldStartTime]),
-			FinishTime:  parseInfoTime(r[fieldFinishTime]),
+			JobID:               r[fieldJobID],
+			Namespace:           r[fieldNamespace],
+			ErrorReason:         r[fieldErrorReason],
+			State:               BackupState(state),
+			AbortOrigin:         AbortOrigin(r[fieldAbortOrigin]),
+			Policy:              BackupPolicy(infoValue(r, fieldBackupPolicy)),
+			AchievedConsistency: Consistency(infoValue(r, fieldAchievedConsistency)),
+			FallbackReason:      infoValue(r, fieldFallbackReason),
+			StartTime:           parseInfoTime(r[fieldStartTime]),
+			FinishTime:          parseInfoTime(r[fieldFinishTime]),
+			LastLapMs:           parseOptionalUint64(r, fieldLastLapMs),
 		}
 
 		status.parseFields(r)
@@ -268,6 +294,8 @@ func (s *ResponseBackupState) parseFields(r InfoMap) {
 		infoFieldOf(fieldUploadQCap, &s.UploadQCap),
 		infoFieldOf(fieldBuffersInUse, &s.BuffersInUse),
 		infoFieldOf(fieldTotalBuffersAllocated, &s.TotalBuffersAllocated),
+		infoFieldOf(fieldBuffersScanCap, &s.BuffersScanCap),
+		infoFieldOf(fieldRecsPerSec, &s.RecsPerSec),
 	)
 
 	parseInfoFields(r, InfoMap.ParseUint32,
@@ -292,42 +320,62 @@ func (s *ResponseBackupState) parseFields(r InfoMap) {
 }
 
 // ResolveBackupState returns the combined backup state across nodes.
-// Terminal states win over lifecycle states: FAILED on any node makes the whole
-// job failed, and a requested abort makes it ABORTING until the last node has
-// reached ABORTED. Otherwise the earliest lifecycle state among all nodes is
-// returned, because the job as a whole is only as far as its slowest node.
+//
+// A job with FAILED, ABORTING or ABORTED on any node is unusable: it is
+// ABORTING while any node is not terminal yet, a state this package does not
+// know included, and once every node is terminal it is FAILED if any node
+// failed, and ABORTED otherwise. Otherwise a state this package does not know,
+// UNKNOWN included, makes the whole job UNKNOWN, and the earliest lifecycle
+// state among all nodes is returned otherwise, because the job as a whole is
+// only as far as its slowest node: it is COMPLETE only when every node is
+// COMPLETE.
 func ResolveBackupState(states []BackupState) BackupState {
 	switch {
-	case slices.Contains(states, BackupStateFailed):
-		return BackupStateFailed
-	case slices.Contains(states, BackupStateAborting):
-		return BackupStateAborting
-	case slices.Contains(states, BackupStateAborted):
-		return BackupStateAborted
+	case len(states) == 0:
+		return BackupStateUnknown
+	case slices.ContainsFunc(states, isBackupStateStopping):
+		switch {
+		case !all(states, isBackupStateTerminal):
+			return BackupStateAborting
+		case slices.Contains(states, BackupStateFailed):
+			return BackupStateFailed
+		default:
+			return BackupStateAborted
+		}
+	case !all(states, isBackupStateLifecycle):
+		return BackupStateUnknown
 	}
 
-	var (
-		resolved     BackupState
-		resolvedRank = len(backupStateOrder)
-	)
+	resolved := states[0]
+	resolvedRank, _ := backupStateRank(resolved)
 
-	for _, state := range states {
-		rank, ok := backupStateRank(state)
-		if !ok {
-			continue
-		}
-
-		if rank < resolvedRank {
+	for _, state := range states[1:] {
+		if rank, _ := backupStateRank(state); rank < resolvedRank {
 			resolvedRank = rank
 			resolved = state
 		}
 	}
 
-	if resolvedRank == len(backupStateOrder) {
-		return BackupStateUnknown
-	}
-
 	return resolved
+}
+
+// isBackupStateStopping reports whether state is one of the states of a job
+// that stops without completing: FAILED, ABORTING or ABORTED.
+func isBackupStateStopping(state BackupState) bool {
+	return state == BackupStateFailed || state == BackupStateAborting || state == BackupStateAborted
+}
+
+// isBackupStateTerminal reports whether state is terminal on its node:
+// COMPLETE, FAILED or ABORTED.
+func isBackupStateTerminal(state BackupState) bool {
+	return state == BackupStateComplete || state == BackupStateFailed || state == BackupStateAborted
+}
+
+// isBackupStateLifecycle reports whether state is one of backupStateOrder.
+func isBackupStateLifecycle(state BackupState) bool {
+	_, ok := backupStateRank(state)
+
+	return ok
 }
 
 func backupStateRank(state BackupState) (int, bool) {
@@ -341,10 +389,14 @@ func backupStateRank(state BackupState) (int, bool) {
 }
 
 // MergeResponseBackupStates combines per-node backup status responses into a
-// single cluster-wide view. Counters and gauges are summed, the effective
-// limits, the same on every node, are taken as their maximum, StartTime is the
-// earliest timestamp across nodes, FinishTime is the latest, and ErrorReason
-// and AbortOrigin are the first ones reported by any node.
+// single cluster-wide view. Counters, rates and gauges are summed, the
+// effective limits, the same on every node, are taken as their maximum,
+// LastLapMs is the oldest lap, AchievedConsistency is resolved with
+// [ResolveConsistency], StartTime is the earliest timestamp across nodes,
+// FinishTime is the latest, or zero while any node has not finished, JobID and
+// Namespace are the first ones reported by a row that is not a stub, and the
+// other strings (Policy, FallbackReason, ErrorReason, AbortOrigin) are the
+// first ones reported by any node.
 func MergeResponseBackupStates(statuses []*ResponseBackupState) *ResponseBackupState {
 	valid := make([]*ResponseBackupState, 0, len(statuses))
 
@@ -358,17 +410,20 @@ func MergeResponseBackupStates(statuses []*ResponseBackupState) *ResponseBackupS
 		return nil
 	}
 
-	merged := &ResponseBackupState{
-		JobID:     valid[0].JobID,
-		Namespace: valid[0].Namespace,
-	}
+	merged := &ResponseBackupState{}
 
 	states := make([]BackupState, 0, len(valid))
+	consistencies := make([]Consistency, 0, len(valid))
 
-	var progressWeightedSum float64
+	var (
+		progressWeightedSum float64
+		unfinished          bool
+	)
 
 	for _, status := range valid {
+		unfinished = unfinished || status.FinishTime.IsZero()
 		states = append(states, status.State)
+		consistencies = append(consistencies, status.AchievedConsistency)
 
 		merged.add(status)
 
@@ -377,7 +432,12 @@ func MergeResponseBackupStates(statuses []*ResponseBackupState) *ResponseBackupS
 		}
 	}
 
+	if unfinished {
+		merged.FinishTime = time.Time{}
+	}
+
 	merged.State = ResolveBackupState(states)
+	merged.AchievedConsistency = ResolveConsistency(consistencies)
 
 	// Each node reports its own progress-pct for the partitions it owns.
 	// Those percentages aren't equally sized slices of the cluster job
@@ -391,10 +451,15 @@ func MergeResponseBackupStates(statuses []*ResponseBackupState) *ResponseBackupS
 
 // add merges the figures of a single node into s, see [MergeResponseBackupStates].
 func (s *ResponseBackupState) add(n *ResponseBackupState) {
+	s.JobID = firstKnownName(s.JobID, n.JobID)
+	s.Namespace = firstKnownName(s.Namespace, n.Namespace)
 	s.ErrorReason = cmp.Or(s.ErrorReason, n.ErrorReason)
 	s.AbortOrigin = cmp.Or(s.AbortOrigin, n.AbortOrigin)
+	s.Policy = cmp.Or(s.Policy, n.Policy)
+	s.FallbackReason = cmp.Or(s.FallbackReason, n.FallbackReason)
 	s.StartTime = earliestTime(s.StartTime, n.StartTime)
 	s.FinishTime = latestTime(s.FinishTime, n.FinishTime)
+	s.LastLapMs = maxOptional(s.LastLapMs, n.LastLapMs)
 
 	s.BackupRPS = max(s.BackupRPS, n.BackupRPS)
 	s.BackupWorkerThreads = max(s.BackupWorkerThreads, n.BackupWorkerThreads)
@@ -430,4 +495,6 @@ func (s *ResponseBackupState) add(n *ResponseBackupState) {
 	s.UploadQCap += n.UploadQCap
 	s.BuffersInUse += n.BuffersInUse
 	s.TotalBuffersAllocated += n.TotalBuffersAllocated
+	s.BuffersScanCap += n.BuffersScanCap
+	s.RecsPerSec += n.RecsPerSec
 }

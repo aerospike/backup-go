@@ -1294,63 +1294,6 @@ func (_c *MockInfoGetter_OpenRestore_Call) RunAndReturn(run func(ctx context.Con
 	return _c
 }
 
-// PrepareRestore provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) PrepareRestore(ctx context.Context, request *models.RequestPrepareRestore) error {
-	ret := _mock.Called(ctx, request)
-
-	if len(ret) == 0 {
-		panic("no return value specified for PrepareRestore")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.RequestPrepareRestore) error); ok {
-		r0 = returnFunc(ctx, request)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockInfoGetter_PrepareRestore_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PrepareRestore'
-type MockInfoGetter_PrepareRestore_Call struct {
-	*mock.Call
-}
-
-// PrepareRestore is a helper method to define mock.On call
-//   - ctx context.Context
-//   - request *models.RequestPrepareRestore
-func (_e *MockInfoGetter_Expecter) PrepareRestore(ctx any, request any) *MockInfoGetter_PrepareRestore_Call {
-	return &MockInfoGetter_PrepareRestore_Call{Call: _e.mock.On("PrepareRestore", ctx, request)}
-}
-
-func (_c *MockInfoGetter_PrepareRestore_Call) Run(run func(ctx context.Context, request *models.RequestPrepareRestore)) *MockInfoGetter_PrepareRestore_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 *models.RequestPrepareRestore
-		if args[1] != nil {
-			arg1 = args[1].(*models.RequestPrepareRestore)
-		}
-		run(
-			arg0,
-			arg1,
-		)
-	})
-	return _c
-}
-
-func (_c *MockInfoGetter_PrepareRestore_Call) Return(err error) *MockInfoGetter_PrepareRestore_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockInfoGetter_PrepareRestore_Call) RunAndReturn(run func(ctx context.Context, request *models.RequestPrepareRestore) error) *MockInfoGetter_PrepareRestore_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // StartBackup provides a mock function for the type MockInfoGetter
 func (_mock *MockInfoGetter) StartBackup(ctx context.Context, request *models.RequestBackup) (string, error) {
 	ret := _mock.Called(ctx, request)

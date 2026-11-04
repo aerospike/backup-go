@@ -11,6 +11,83 @@ request links for the full detail of any change.
 
 ## [Unreleased]
 
+The server-integrated backup and restore info commands are aligned with the server
+specification of the `backup*` and `restore*` commands. The feature is a server preview and
+unreleased, so its API changes without a deprecation period. (BKRS-494)
+
+### Added
+
+- `RequestBackup.NoConfig` sends `no-config`, which stops the nodes from uploading their config
+  file with the backup. (BKRS-494)
+- `RequestRestore.HydrateReplica` sends `hydrate-replica` with the restore command. Only the
+  strict (cold) policy accepts it; setting it with the fuzzy policy fails with
+  `ErrInvalidConfig`. (BKRS-494)
+- The typed `StorageType` with `StorageTypeFS`, `StorageTypeFA`, `StorageTypeAWS` and
+  `StorageTypeAWSS3`. (BKRS-494)
+- The typed `Consistency` (`ConsistencyStrict`, `ConsistencyFuzzy`) and `ResolveConsistency`,
+  which reports `fuzzy` if any node does. `ResponseBackupState` reports `Policy`,
+  `AchievedConsistency`, `FallbackReason`, `RecsPerSec`, `BuffersScanCap` and `LastLapMs`.
+  `ResponseRestoreState` reports `SourceConsistency`, `RecsPerSec`, `LastLapMs`, `ProgressPct`,
+  the record counters `Total`, `Applied`, `Deletes`, `Filtered`, `FilteredNotOurs` and `Failed`
+  for both modes, `PendingQDepth`, `PendingQCap`, `HeldReason`, `MaxInflight` and
+  `IgnoreRecordError`. (BKRS-494)
+- `ResponseRestoreState.IsFinished` reports a job that is terminal on the node, and
+  `ResponseRestoreState.HasNamespace` reports a row that names its namespace, as a stub row may
+  not. (BKRS-494)
+- `NamespaceStateUnknown` for `ns-state=UNKNOWN`. (BKRS-494)
+- Client-side checks of rules the server enforces, failing with `ErrInvalidConfig` before the
+  command is sent and without a retry: (BKRS-494)
+  - every job id and backup id is 1 to 20 printable ASCII characters, with no `|`, `:`, `;`, `=`,
+    `/`, space or `..`;
+  - `backup-ids` holds 1 to 32 distinct ids;
+  - a backup with a policy other than strict on `fs` / `fa` storage;
+  - a fuzzy restore on `fs` / `fa` storage;
+  - `ApplyMetadataLast` on a fuzzy restore with both `NoIndexes` and `NoUDFs` set.
+
+### Changed
+
+- A cold restore is started by `StartRestore` alone: the server gates and prepares the namespace
+  on every node and starts the restore once every node is READY. (BKRS-494)
+- `RequestCommon.Storage` is a `StorageType` instead of a `string`. (BKRS-494)
+- `RequestRestore.RetryMaxAttempts` is an `*int`, the number of retries per record, so that `0`
+  (no retry) can be sent; `nil` lets the server apply its default of 5. (BKRS-494)
+- `StartBackup` and `StartRestore` check the job status before they report a failure when the
+  server answers `ERROR:9` (not acknowledged in time) or `ERROR:1` (start not confirmed), as for
+  an unanswered request: the job may have started. A later attempt refused because the job id is
+  in use is then confirmed by the job status instead of failing. (BKRS-494)
+- `StartRestore` takes a row of the job id as proof of the start only if it matches the
+  namespace and the mode of the request, and, for a finished row, only if the job started after
+  the first attempt was sent, give or take a minute of clock difference. A row left by an earlier
+  job with the same id is no longer taken for the new one. (BKRS-494)
+- The merged state of `ResolveBackupState` and `ResolveRestoreState`: FAILED, ABORTING or
+  ABORTED on any node makes the job ABORTING while any node is not terminal, then FAILED if any
+  node failed, and ABORTED otherwise. A state the package does not know, UNKNOWN included, no
+  longer resolves to COMPLETE or hides a failure. (BKRS-494)
+- The merged status of `MergeResponseBackupStates` and `MergeResponseRestoreStates`:
+  `FinishTime` is zero while any node has not finished; `JobID` and `Namespace` are taken from
+  the first row that is not a stub. `ResponseRestoreState.PidsInScope` is summed across nodes, so
+  it counts each hydrated copy of a partition; `Failed` includes the records tolerated by
+  `IgnoreRecordError`; `Applied` includes the durable deletes. (BKRS-494)
+- `GetRestoreStatus` merges the stub rows (a job that never got its parameters, or the
+  placeholder of a restarted node), so a node that failed before its parameters were known is
+  not lost. A row of another namespace reports the job as not found. (BKRS-494)
+- `NamespaceStateNotHosted` is renamed `NamespaceStateStub`: `ns-state=-` is reported by a stub
+  row. (BKRS-494)
+- The cluster principal is read from `paxos_principal` in the statistics, and from
+  `cluster_principal` when it is missing. (BKRS-494)
+- `backup-status` and `restore-status` replies are parsed by key, without the secret agent
+  handling of other info replies, so a namespace or a job id named `secrets` no longer breaks the
+  row. (BKRS-494)
+
+### Removed
+
+- `ServerBackupInfo.PrepareRestore`, `asinfo.Client.PrepareRestore` and
+  `RequestPrepareRestore`: the server no longer has `restore-prepare`. (BKRS-494)
+- `ResponseRestoreState.IsStarted` and the fields `Ignored`, `Skipped`, `HandedOff`, `Read` and
+  `Deleted`, which `restore-status` no longer reports. (BKRS-494)
+- The redaction of info command values in errors: no parameter of the server carries a secret,
+  as each node resolves its object storage credentials itself. (BKRS-494)
+
 ## [0.13.0] - 2026-11-03
 
 ### Added

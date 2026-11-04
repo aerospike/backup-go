@@ -47,7 +47,6 @@ const (
 	cmdNameBackup              = "backup"
 	cmdNameBackupStatus        = "backup-status"
 	cmdNameBackupAbort         = "backup-abort"
-	cmdNameRestorePrepare      = "restore-prepare"
 	cmdNameRestore             = "restore"
 	cmdNameRestoreStatus       = "restore-status"
 	cmdNameRestoreAbort        = "restore-abort"
@@ -78,6 +77,7 @@ const (
 	paramFilterExp              = "filter-exp"
 	paramNoIndexes              = "no-indexes"
 	paramNoUDFs                 = "no-udfs"
+	paramNoConfig               = "no-config"
 	paramHydrateReplica         = "hydrate-replica"
 	paramMaxInflight            = "max-inflight"
 	paramRetryBaseInterval      = "retry-base-interval"
@@ -200,7 +200,7 @@ func (c infoCommands) serverBackup(r *infomodels.RequestBackup, jobID string) (s
 
 	cmd := newInfoCmd(cmdNameBackup, jobUnsafeChars).
 		required(paramNamespace, r.Namespace).
-		required(paramJobID, jobID)
+		jobID(paramJobID, jobID)
 
 	addStorageParams(cmd, &r.RequestCommon)
 
@@ -211,14 +211,42 @@ func (c infoCommands) serverBackup(r *infomodels.RequestBackup, jobID string) (s
 		str(paramFilterExp, r.FilterExp).
 		optFlag(paramNoIndexes, r.NoIndexes).
 		optFlag(paramNoUDFs, r.NoUDFs).
+		optFlag(paramNoConfig, r.NoConfig).
 		optNum(paramBackupRPS, r.BackupRPS).
 		optNum(paramBackupWorkerThreads, r.BackupWorkerThreads).
 		optNum(paramBackupUploadThreads, r.BackupUploadThreads).
 		optNum(paramBackupS3Throughput, r.BackupS3ThroughputTargetGbps).
 		str(paramBackupPolicy, string(r.Policy))
 
-	return buildChecked(cmd,
-		checkPolicy(cmdNameBackup, paramBackupPolicy, r.Policy, knownBackupPolicy))
+	return buildChecked(cmd, joinErrs(
+		checkPolicy(cmdNameBackup, paramBackupPolicy, r.Policy, knownBackupPolicy),
+		checkBackupStorage(r)))
+}
+
+// checkBackupStorage returns errParamNotApplicable if r asks for a policy that
+// may commit a fuzzy backup, best-effort or fuzzy, on a file system storage.
+// An empty policy is accepted: the server default is strict.
+func checkBackupStorage(r *infomodels.RequestBackup) error {
+	if !isFileSystemStorage(r.Storage) ||
+		(r.Policy != infomodels.BackupPolicyBestEffort && r.Policy != infomodels.BackupPolicyFuzzy) {
+		return nil
+	}
+
+	return storageNotApplicableErr(cmdNameBackup, paramBackupPolicy, r.Storage)
+}
+
+// isFileSystemStorage reports whether storage is a file system storage type,
+// which only a strict backup and a cold restore accept: a fuzzy backup or
+// restore needs an object store.
+func isFileSystemStorage(storage infomodels.StorageType) bool {
+	return storage == infomodels.StorageTypeFS || storage == infomodels.StorageTypeFA
+}
+
+// storageNotApplicableErr reports that the command cmdName does not accept the
+// policy it sends as policyKey on the file system storage storage.
+func storageNotApplicableErr(cmdName, policyKey string, storage infomodels.StorageType) error {
+	return paramsErr(errParamNotApplicable,
+		cmdName+" with "+paramObjectStorageType+"="+string(storage), []string{policyKey})
 }
 
 // serverRestore returns the command that starts the restore job r.JobID from
@@ -235,8 +263,8 @@ func (c infoCommands) serverRestore(r *infomodels.RequestRestore) (string, error
 
 	cmd := newInfoCmd(cmdNameRestore, jobUnsafeChars).
 		required(paramNamespace, r.Namespace).
-		required(paramJobID, r.JobID).
-		requiredCommaList(paramBackupIDs, r.BackupIDs)
+		jobID(paramJobID, r.JobID).
+		requiredIDList(paramBackupIDs, r.BackupIDs)
 
 	addStorageParams(cmd, &r.RequestCommon)
 
@@ -254,6 +282,7 @@ func (c infoCommands) serverRestore(r *infomodels.RequestRestore) (string, error
 		str(paramRestorePolicy, string(r.Policy))
 
 	addFuzzyOnlyParams(cmd, r)
+	addColdOnlyParams(cmd, r)
 
 	return buildChecked(cmd, checkRestoreMode(r))
 }
@@ -265,9 +294,16 @@ func addFuzzyOnlyParams(cmd *infoCmd, r *infomodels.RequestRestore) *infoCmd {
 	return cmd.optNum(paramMaxInflight, r.MaxInflight).
 		optNumPtr(paramRetryBaseInterval, r.RetryBaseIntervalMs).
 		optFloat(paramRetryMultiplier, r.RetryMultiplier).
-		optNum(paramRetryMaxAttempts, r.RetryMaxAttempts).
+		optNumPtr(paramRetryMaxAttempts, r.RetryMaxAttempts).
 		optFlag(paramIgnoreRecordError, r.IgnoreRecordError).
 		optFlag(paramApplyMetadataLast, r.ApplyMetadataLast)
+}
+
+// addColdOnlyParams adds the parameters of r that only the strict (cold)
+// policy accepts. checkRestoreMode finds the ones r sets with another policy,
+// so every cold only parameter must be added here.
+func addColdOnlyParams(cmd *infoCmd, r *infomodels.RequestRestore) *infoCmd {
+	return cmd.optFlag(paramHydrateReplica, r.HydrateReplica)
 }
 
 // knownBackupPolicy reports whether the server accepts the backup policy p.
@@ -306,27 +342,62 @@ func checkPolicy[P ~string](cmdName, key string, policy P, known func(P) bool) e
 
 // checkRestoreMode returns errUnknownPolicy if r.Policy is unknown, and
 // errParamNotApplicable if r sets a parameter that the rest of r does not
-// accept: see checkPolicyParams and checkIncrementalPath.
+// accept: see checkPolicyParams, checkIncrementalPath, checkRestoreStorage and
+// checkMetadataApply.
 func checkRestoreMode(r *infomodels.RequestRestore) error {
 	err := checkPolicy(cmdNameRestore, paramRestorePolicy, r.Policy, knownRestorePolicy)
 	if err != nil {
 		return err
 	}
 
-	return joinErrs(checkPolicyParams(r), checkIncrementalPath(r))
+	return joinErrs(checkPolicyParams(r), checkIncrementalPath(r), checkRestoreStorage(r),
+		checkMetadataApply(r))
 }
 
-// checkPolicyParams returns errParamNotApplicable if r sets a fuzzy only
-// parameter for a policy other than fuzzy. An empty policy is checked as
-// strict, the server default. The fuzzy policy accepts every parameter.
-func checkPolicyParams(r *infomodels.RequestRestore) error {
-	if r.Policy == infomodels.RestorePolicyFuzzy {
+// checkRestoreStorage returns errParamNotApplicable if r asks for the fuzzy
+// policy on a file system storage.
+func checkRestoreStorage(r *infomodels.RequestRestore) error {
+	if r.Policy != infomodels.RestorePolicyFuzzy || !isFileSystemStorage(r.Storage) {
 		return nil
 	}
 
-	fuzzyOnly := addFuzzyOnlyParams(newInfoCmd(cmdNameRestore), r).paramKeys()
-	if len(fuzzyOnly) > 0 {
-		return notApplicableErr(r.Policy, fuzzyOnly)
+	return storageNotApplicableErr(cmdNameRestore, paramRestorePolicy, r.Storage)
+}
+
+// checkMetadataApply returns errParamNotApplicable if r sets ApplyMetadataLast,
+// whatever its value, while skipping both the secondary indexes and the UDFs:
+// nothing is left to apply. It checks the fuzzy policy only, since the other
+// policies reject ApplyMetadataLast anyway, see checkPolicyParams.
+func checkMetadataApply(r *infomodels.RequestRestore) error {
+	if r.Policy != infomodels.RestorePolicyFuzzy || r.ApplyMetadataLast == nil ||
+		!isTrue(r.NoIndexes) || !isTrue(r.NoUDFs) {
+		return nil
+	}
+
+	return paramsErr(errParamNotApplicable,
+		cmdNameRestore+" with "+paramNoIndexes+"=true and "+paramNoUDFs+"=true",
+		[]string{paramApplyMetadataLast})
+}
+
+// isTrue reports whether the optional flag b is set to true.
+func isTrue(b *bool) bool {
+	return b != nil && *b
+}
+
+// checkPolicyParams returns errParamNotApplicable if r sets a fuzzy only
+// parameter for a policy other than fuzzy, or a cold only parameter for the
+// fuzzy policy. An empty policy is checked as strict, the server default.
+func checkPolicyParams(r *infomodels.RequestRestore) error {
+	var rejected []string
+
+	if r.Policy == infomodels.RestorePolicyFuzzy {
+		rejected = addColdOnlyParams(newInfoCmd(cmdNameRestore), r).paramKeys()
+	} else {
+		rejected = addFuzzyOnlyParams(newInfoCmd(cmdNameRestore), r).paramKeys()
+	}
+
+	if len(rejected) > 0 {
+		return notApplicableErr(r.Policy, rejected)
 	}
 
 	return nil
@@ -396,16 +467,6 @@ func joinErrs(errs ...error) error {
 	return joined
 }
 
-// serverPrepareRestore returns the command that prepares namespace r.Namespace
-// for the restore job r.JobID.
-func (c infoCommands) serverPrepareRestore(r *infomodels.RequestPrepareRestore) (string, error) {
-	if err := c.checkPrepareRestore(r); err != nil {
-		return "", err
-	}
-
-	return prepareRestoreCmd(r).build()
-}
-
 // backupStatus returns the command that reads the state of the backup job jobID.
 func (c infoCommands) backupStatus(jobID string) (string, error) {
 	if err := c.requireIntegratedBackup(cmdNameBackupStatus); err != nil {
@@ -413,7 +474,7 @@ func (c infoCommands) backupStatus(jobID string) (string, error) {
 	}
 
 	return newInfoCmd(cmdNameBackupStatus, jobUnsafeChars).
-		required(paramJobID, jobID).
+		jobID(paramJobID, jobID).
 		build()
 }
 
@@ -427,7 +488,7 @@ func (c infoCommands) restoreStatus(jobID string) (string, error) {
 	}
 
 	return newInfoCmd(cmdNameRestoreStatus, jobUnsafeChars).
-		required(paramJobID, jobID).
+		jobID(paramJobID, jobID).
 		build()
 }
 
@@ -448,7 +509,7 @@ func (c infoCommands) backupAbort(jobID string) (string, error) {
 	}
 
 	return newInfoCmd(cmdNameBackupAbort, jobUnsafeChars).
-		required(paramJobID, jobID).
+		jobID(paramJobID, jobID).
 		build()
 }
 
@@ -460,7 +521,7 @@ func (c infoCommands) restoreAbort(ns, jobID string) (string, error) {
 
 	return newInfoCmd(cmdNameRestoreAbort, jobUnsafeChars).
 		required(paramNamespace, ns).
-		required(paramJobID, jobID).
+		jobID(paramJobID, jobID).
 		build()
 }
 
@@ -473,12 +534,13 @@ func (c infoCommands) restoreOpen(ns, jobID string) (string, error) {
 
 	return newInfoCmd(cmdNameRestoreOpen, jobUnsafeChars).
 		required(paramNamespace, ns).
-		required(paramJobID, jobID).
+		jobID(paramJobID, jobID).
 		build()
 }
 
 // restoreClearStorage returns the command that clears the storage of namespace
-// ns on the node it is sent to, for the cold restore job jobID being prepared.
+// ns on the node it is sent to, for the cold restore job jobID while the node
+// prepares the namespace.
 func (c infoCommands) restoreClearStorage(ns, jobID string) (string, error) {
 	if err := c.requireIntegratedBackup(cmdNameRestoreClearStorage); err != nil {
 		return "", err
@@ -486,36 +548,14 @@ func (c infoCommands) restoreClearStorage(ns, jobID string) (string, error) {
 
 	return newInfoCmd(cmdNameRestoreClearStorage, jobUnsafeChars).
 		required(paramNamespace, ns).
-		required(paramJobID, jobID).
+		jobID(paramJobID, jobID).
 		build()
-}
-
-// checkPrepareRestore checks that the server supports the restore preparation
-// and that the request is set.
-func (c infoCommands) checkPrepareRestore(r *infomodels.RequestPrepareRestore) error {
-	if err := c.requireIntegratedBackup(cmdNameRestorePrepare); err != nil {
-		return err
-	}
-
-	if r == nil {
-		return fmt.Errorf("%w: %s", errNilRequest, cmdNameRestorePrepare)
-	}
-
-	return nil
-}
-
-// prepareRestoreCmd returns the restore-prepare command without the node list.
-func prepareRestoreCmd(r *infomodels.RequestPrepareRestore) *infoCmd {
-	return newInfoCmd(cmdNameRestorePrepare, jobUnsafeChars).
-		required(paramNamespace, r.Namespace).
-		required(paramJobID, r.JobID).
-		optFlag(paramHydrateReplica, r.HydrateReplica)
 }
 
 // addStorageParams adds the object storage parameters shared by the backup and
 // restore commands.
 func addStorageParams(cmd *infoCmd, r *infomodels.RequestCommon) {
-	cmd.required(paramObjectStorageType, r.Storage).
+	cmd.required(paramObjectStorageType, string(r.Storage)).
 		str(paramPath, r.Path).
 		str(paramS3Bucket, r.Bucket).
 		str(paramS3Region, r.Region).

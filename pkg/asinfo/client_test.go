@@ -2015,6 +2015,13 @@ func TestClient_parseResultResponse(t *testing.T) {
 			errMsg:   "command testCommand failed: ERROR: command failed",
 		},
 		{
+			name:     "Command exists with a successful response holding ERROR",
+			cmd:      "testCommand",
+			input:    map[string]string{"testCommand": "job-id=1:error-reason=S3 ERROR:2:slow down"},
+			expected: "job-id=1:error-reason=S3 ERROR:2:slow down",
+			errMsg:   "",
+		},
+		{
 			name:     "Command not found in map",
 			cmd:      "missingCommand",
 			input:    map[string]string{"testCommand": "success"},
@@ -2091,7 +2098,7 @@ func TestClient_AbortServerBackup(t *testing.T) {
 // Shared by the AbortRestore tests below.
 const (
 	testAbortRestoreNamespace = "source-ns1"
-	testAbortRestoreJobID     = "260922T103653-5xsr"
+	testAbortRestoreJobID     = testCmdJobID
 )
 
 // TestClient_AbortRestore covers the failure paths reachable without a live cluster.
@@ -2276,9 +2283,9 @@ func TestClient_getBackupStatusByNode(t *testing.T) {
 	t.Parallel()
 
 	const (
-		testJobID       = "260922T103653-5xsr"
+		testJobID       = testCmdJobID
 		testNamespace   = "source-ns1"
-		backupStatusCmd = "backup-status:job-id=" + testJobID
+		backupStatusCmd = testBackupStatusCmd
 	)
 
 	const runningStatus = "job-id=260922T103653-5xsr:ns=source-ns1:state=INCR_SCAN_ACTIVE:" +
@@ -2413,7 +2420,6 @@ const (
 
 	testMethodStartBackup         = "StartBackup"
 	testMethodStartRestore        = "StartRestore"
-	testMethodPrepareRestore      = "PrepareRestore"
 	testMethodAbortBackup         = "AbortBackup"
 	testMethodAbortRestore        = "AbortRestore"
 	testMethodOpenRestore         = "OpenRestore"
@@ -2429,7 +2435,7 @@ type clientCall struct {
 }
 
 // startBackupCall calls StartBackup with the given request fields.
-func startBackupCall(namespace, storage string) clientCall {
+func startBackupCall(namespace string, storage infomodels.StorageType) clientCall {
 	return clientCall{
 		name: testMethodStartBackup,
 		call: func(ctx context.Context, ic *Client) error {
@@ -2443,7 +2449,7 @@ func startBackupCall(namespace, storage string) clientCall {
 }
 
 // startRestoreCall calls StartRestore with the given request fields.
-func startRestoreCall(jobID, backupID, namespace, storage string) clientCall {
+func startRestoreCall(jobID, backupID, namespace string, storage infomodels.StorageType) clientCall {
 	return clientCall{
 		name: testMethodStartRestore,
 		call: func(ctx context.Context, ic *Client) error {
@@ -2476,19 +2482,6 @@ func abortRestoreCall(jobID, namespace string) clientCall {
 	}
 }
 
-// prepareRestoreCall calls PrepareRestore for jobID of namespace.
-func prepareRestoreCall(jobID, namespace string) clientCall {
-	return clientCall{
-		name: testMethodPrepareRestore,
-		call: func(ctx context.Context, ic *Client) error {
-			return ic.PrepareRestore(ctx, &infomodels.RequestPrepareRestore{
-				Namespace: namespace,
-				JobID:     jobID,
-			})
-		},
-	}
-}
-
 // openRestoreCall calls OpenRestore for jobID of namespace.
 func openRestoreCall(jobID, namespace string) clientCall {
 	return clientCall{
@@ -2501,11 +2494,11 @@ func openRestoreCall(jobID, namespace string) clientCall {
 
 // integratedBackupClientCalls returns every integrated backup method of Client
 // called with the given arguments.
-func integratedBackupClientCalls(jobID, backupID, namespace, storage string) []clientCall {
+func integratedBackupClientCalls(jobID, backupID, namespace string, storage infomodels.StorageType,
+) []clientCall {
 	return []clientCall{
 		startBackupCall(namespace, storage),
 		startRestoreCall(jobID, backupID, namespace, storage),
-		prepareRestoreCall(jobID, namespace),
 		abortBackupCall(jobID),
 		abortRestoreCall(jobID, namespace),
 		openRestoreCall(jobID, namespace),
@@ -2546,7 +2539,6 @@ func TestClient_RetriesAreNotNested(t *testing.T) {
 		startBackupCall(testIntegratedNamespace, testIntegratedStorage),
 		startRestoreCall(testIntegratedJobID, testCmdBackupID, testIntegratedNamespace, testIntegratedStorage),
 		abortBackupCall(testIntegratedJobID),
-		prepareRestoreCall(testIntegratedJobID, testIntegratedNamespace),
 		abortRestoreCall(testIntegratedJobID, testIntegratedNamespace),
 		openRestoreCall(testIntegratedJobID, testIntegratedNamespace),
 		{
@@ -2634,13 +2626,24 @@ func TestClient_IntegratedBackupMissingParams(t *testing.T) {
 
 // Shared by the restore status tests below.
 const (
-	testRestoreJobID          = "260922T103653-5xsr"
+	testRestoreJobID          = testCmdJobID
 	testRestoreNamespace      = "source-ns1"
 	testRestoreOtherNamespace = "source-ns2"
 	testRestoreStatusCmd      = "restore-status:job-id=" + testRestoreJobID
+	testBackupStatusCmd       = "backup-status:job-id=" + testRestoreJobID
 	testNodeA                 = "BB9020011AC4202"
 	testNodeB                 = "BB9030011AC4202"
 	testNodeC                 = "BB9040011AC4202"
+
+	// testRestoreJobOnNode starts the error of a node that does not know the
+	// restore job; the name of the node follows.
+	testRestoreJobOnNode = "restore job " + testRestoreJobID + " on node "
+	// testNoRestoreJob is the answer of a node that does not know the restore job.
+	testNoRestoreJob = errCmdRespPrefix + ":2:no restore job " + testRestoreJobID
+	// testStatusUnavailable is the note of a start error whose status lookup failed.
+	testStatusUnavailable = "status unavailable"
+	// testNoBackupJob is the answer of a node that does not know the backup job.
+	testNoBackupJob = errCmdRespPrefix + ":2:no backup job " + testRestoreJobID
 )
 
 // statusNodeAnswer describes the answers of a mocked node to the restore
@@ -2744,6 +2747,24 @@ func TestClearRestoreStorage(t *testing.T) {
 			},
 		},
 		{
+			name: "stub row is skipped",
+			nodes: []statusNodeAnswer{
+				{
+					name:       testNodeA,
+					active:     true,
+					statusResp: coldRow(testRestoreNamespace, infomodels.ClearStateRequired),
+					clearResp:  testAccepted,
+				},
+				{
+					name:   testNodeB,
+					active: true,
+					// Even a stub row that reports a clear is not sent one: it is
+					// not the row of a namespace waiting for a clear.
+					statusResp: coldRow("(none)", infomodels.ClearStateRequired),
+				},
+			},
+		},
+		{
 			name: "refused clear does not stop the other nodes",
 			nodes: []statusNodeAnswer{
 				{
@@ -2783,11 +2804,11 @@ func TestClearRestoreStorage(t *testing.T) {
 				{
 					name:       testNodeA,
 					active:     true,
-					statusResp: errCmdRespPrefix + ":2:no restore job " + testRestoreJobID,
+					statusResp: testNoRestoreJob,
 				},
 			},
 			wantErrIs:   ErrNotFound,
-			wantErrText: "restore job " + testRestoreJobID + " on node " + testNodeA,
+			wantErrText: testRestoreJobOnNode + testNodeA,
 		},
 		{
 			name: "job unknown on one node does not stop the clear of the others",
@@ -2795,7 +2816,7 @@ func TestClearRestoreStorage(t *testing.T) {
 				{
 					name:       testNodeA,
 					active:     true,
-					statusResp: errCmdRespPrefix + ":2:no restore job " + testRestoreJobID,
+					statusResp: testNoRestoreJob,
 				},
 				{
 					name:       testNodeB,
@@ -2805,7 +2826,7 @@ func TestClearRestoreStorage(t *testing.T) {
 				},
 			},
 			wantErrIs:   ErrNotFound,
-			wantErrText: "restore job " + testRestoreJobID + " on node " + testNodeA,
+			wantErrText: testRestoreJobOnNode + testNodeA,
 		},
 		{
 			name: "job of another namespace",
@@ -2913,93 +2934,164 @@ func TestClient_RestoreStatusInvalidNamespace(t *testing.T) {
 }
 
 // Test_isRestoreStarted covers the matrix that decides whether the server
-// accepted a restore start command. A fuzzy job exists only once it was started,
-// a cold job from its preparation on, so a cold job counts as started only with
-// its effective limits set or its namespace restoring or opening. A row of
-// another job id is never taken for the current one.
+// accepted a restore start command. The server reports a job, cold or fuzzy,
+// only once its restore command was accepted, so a row of the job confirms
+// the start, whatever its state. The job id is chosen by the caller and the
+// server keeps the rows of finished jobs, so a row of another job id,
+// namespace or mode, or a finished row that started before the first send, is
+// never taken for the current one.
 func Test_isRestoreStarted(t *testing.T) {
 	t.Parallel()
 
 	const (
-		testJobID   = "260922T103653-5xsr"
-		testOtherID = "260922T090000-abcd"
+		testJobID     = testCmdJobID
+		testNamespace = "source-ns1"
+		testOtherNs   = "other-ns"
 
-		keyJobID         = "job-id"
-		keyKind          = "kind"
-		keyState         = "state"
-		keyNsState       = "ns-state"
-		keyWorkerThreads = "restore-worker-threads"
+		keyJobID     = "job-id"
+		keyNs        = "ns"
+		keyKind      = "kind"
+		keyState     = "state"
+		keyNsState   = "ns-state"
+		keyStartTime = "start-time"
 
-		threadsNotSet = "0"
-		threadsSet    = "8"
+		// testStartedAfter, testStartedWithinSkew and testStartedBefore are
+		// start times after, just before and long before firstSent.
+		testStartedAfter      = "2026-11-04 12.00.05.000 UTC"
+		testStartedWithinSkew = "2026-11-04 11.59.30.000 UTC"
+		testStartedBefore     = "2026-11-04 10.00.00.000 UTC"
 	)
+
+	firstSent := time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC)
 
 	cold := string(infomodels.RestoreKindCold)
 	fuzzy := string(infomodels.RestoreKindFuzzy)
 	active := string(infomodels.RestoreStateActive)
 
+	coldRequest := &infomodels.RequestRestore{
+		RequestCommon: infomodels.RequestCommon{Namespace: testNamespace},
+		JobID:         testJobID,
+	}
+	strictRequest := &infomodels.RequestRestore{
+		RequestCommon: infomodels.RequestCommon{Namespace: testNamespace},
+		JobID:         testJobID,
+		Policy:        infomodels.RestorePolicyStrict,
+	}
+	fuzzyRequest := &infomodels.RequestRestore{
+		RequestCommon: infomodels.RequestCommon{Namespace: testNamespace},
+		JobID:         testJobID,
+		Policy:        infomodels.RestorePolicyFuzzy,
+	}
+
+	coldRow := func(nsState infomodels.NamespaceState) []infomodels.InfoMap {
+		return []infomodels.InfoMap{{keyJobID: testJobID, keyNs: testNamespace, keyKind: cold,
+			keyState: active, keyNsState: string(nsState)}}
+	}
+
+	finishedRow := func(state infomodels.RestoreState, startTime string) []infomodels.InfoMap {
+		row := infomodels.InfoMap{keyJobID: testJobID, keyNs: testNamespace, keyKind: cold,
+			keyState: string(state), keyNsState: string(infomodels.NamespaceStateFailed)}
+		if startTime != "" {
+			row[keyStartTime] = startTime
+		}
+
+		return []infomodels.InfoMap{row}
+	}
+
 	tests := []struct {
-		name string
-		give []infomodels.InfoMap
-		want bool
+		giveRequest *infomodels.RequestRestore
+		name        string
+		give        []infomodels.InfoMap
+		want        bool
 	}{
 		{
-			name: "fuzzy job",
-			give: []infomodels.InfoMap{{keyJobID: testJobID, keyKind: fuzzy, keyState: active,
-				keyNsState: string(infomodels.NamespaceStateNone)}},
+			name:        "fuzzy job",
+			giveRequest: fuzzyRequest,
+			give: []infomodels.InfoMap{{keyJobID: testJobID, keyNs: testNamespace, keyKind: fuzzy,
+				keyState: active, keyNsState: string(infomodels.NamespaceStateNone)}},
 			want: true,
 		},
 		{
-			name: "cold job prepared and still preparing",
-			give: []infomodels.InfoMap{{keyJobID: testJobID, keyKind: cold, keyState: active,
-				keyWorkerThreads: threadsNotSet, keyNsState: string(infomodels.NamespaceStatePreparing)}},
-			want: false,
+			name:        "cold job preparing",
+			giveRequest: coldRequest,
+			give:        coldRow(infomodels.NamespaceStatePreparing),
+			want:        true,
 		},
 		{
-			name: "cold job prepared and ready",
-			give: []infomodels.InfoMap{{keyJobID: testJobID, keyKind: cold, keyState: active,
-				keyWorkerThreads: threadsNotSet, keyNsState: string(infomodels.NamespaceStateReady)}},
-			want: false,
+			name:        "cold job ready",
+			giveRequest: coldRequest,
+			give:        coldRow(infomodels.NamespaceStateReady),
+			want:        true,
 		},
 		{
-			name: "cold job restoring",
-			give: []infomodels.InfoMap{{keyJobID: testJobID, keyKind: cold, keyState: active,
-				keyWorkerThreads: threadsSet, keyNsState: string(infomodels.NamespaceStateRestoring)}},
+			name:        "cold job restoring with the strict policy",
+			giveRequest: strictRequest,
+			give:        coldRow(infomodels.NamespaceStateRestoring),
+			want:        true,
+		},
+		{
+			name:        "cold job aborted after the first send",
+			giveRequest: coldRequest,
+			give:        finishedRow(infomodels.RestoreStateAborted, testStartedAfter),
+			want:        true,
+		},
+		{
+			name:        "finished job started within the clock skew",
+			giveRequest: coldRequest,
+			give:        finishedRow(infomodels.RestoreStateFailed, testStartedWithinSkew),
+			want:        true,
+		},
+		{
+			name:        "finished row of an earlier job with the same id",
+			giveRequest: coldRequest,
+			give:        finishedRow(infomodels.RestoreStateComplete, testStartedBefore),
+			want:        false,
+		},
+		{
+			name:        "finished row without a start time",
+			giveRequest: coldRequest,
+			give:        finishedRow(infomodels.RestoreStateFailed, ""),
+			want:        false,
+		},
+		{
+			name:        "live row started before the first send",
+			giveRequest: coldRequest,
+			give: []infomodels.InfoMap{{keyJobID: testJobID, keyNs: testNamespace, keyKind: cold,
+				keyState: active, keyNsState: string(infomodels.NamespaceStateRestoring),
+				keyStartTime: testStartedBefore}},
 			want: true,
 		},
 		{
-			name: "cold job restoring without limits reported",
-			give: []infomodels.InfoMap{{keyJobID: testJobID, keyKind: cold, keyState: active,
-				keyNsState: string(infomodels.NamespaceStateRestoring)}},
-			want: true,
-		},
-		{
-			name: "cold job complete and opening",
-			give: []infomodels.InfoMap{{keyJobID: testJobID, keyKind: cold,
-				keyState: string(infomodels.RestoreStateComplete), keyNsState: string(infomodels.NamespaceStateOpening)}},
-			want: true,
-		},
-		{
-			name: "cold job started and aborted",
-			give: []infomodels.InfoMap{{keyJobID: testJobID, keyKind: cold,
-				keyState: string(infomodels.RestoreStateAborted), keyWorkerThreads: threadsSet,
-				keyNsState: string(infomodels.NamespaceStateFailed)}},
-			want: true,
-		},
-		{
-			name: "row of another job",
-			give: []infomodels.InfoMap{{keyJobID: testOtherID, keyKind: fuzzy, keyState: active}},
+			name:        "row of another job",
+			giveRequest: fuzzyRequest,
+			give: []infomodels.InfoMap{{keyJobID: testOtherJobID, keyNs: testNamespace, keyKind: fuzzy,
+				keyState: active}},
 			want: false,
 		},
 		{
-			name: "response carries no state",
-			give: []infomodels.InfoMap{{keyJobID: testJobID, keyKind: fuzzy}},
+			name:        "row of another namespace",
+			giveRequest: coldRequest,
+			give: []infomodels.InfoMap{{keyJobID: testJobID, keyNs: testOtherNs, keyKind: cold,
+				keyState: active}},
 			want: false,
 		},
 		{
-			name: "empty response",
-			give: nil,
-			want: false,
+			name:        "row of another mode",
+			giveRequest: fuzzyRequest,
+			give:        coldRow(infomodels.NamespaceStateRestoring),
+			want:        false,
+		},
+		{
+			name:        "response carries no state",
+			giveRequest: fuzzyRequest,
+			give:        []infomodels.InfoMap{{keyJobID: testJobID, keyNs: testNamespace, keyKind: fuzzy}},
+			want:        false,
+		},
+		{
+			name:        "empty response",
+			giveRequest: coldRequest,
+			give:        nil,
+			want:        false,
 		},
 	}
 
@@ -3007,7 +3099,7 @@ func Test_isRestoreStarted(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, tt.want, isRestoreStarted(tt.give, testJobID))
+			assert.Equal(t, tt.want, isRestoreStarted(tt.give, tt.giveRequest, firstSent))
 		})
 	}
 }
@@ -3020,23 +3112,32 @@ func TestClient_sendStartBackup(t *testing.T) {
 	t.Parallel()
 
 	const (
-		testJobID     = "260922T103653-5xsr"
+		testJobID     = testCmdJobID
 		testNamespace = "source-ns1"
 		testStartCmd  = "backup:namespace=" + testNamespace + ";job-id=" + testJobID
 		testAccepted  = "ok"
-		statusCmd     = "backup-status:job-id=" + testJobID
+		statusCmd     = testBackupStatusCmd
+		testRejected  = errCmdRespPrefix + ":26:backup job " + testJobID +
+			": this job-id is in use - poll backup-status, or pick another job-id"
+		testTimedOut = errCmdRespPrefix + ":9:backup job " + testJobID +
+			": started, but not acknowledged by every node within 5000 ms - poll backup-status"
+		testUnconfirmed = errCmdRespPrefix + ":1:backup job " + testJobID +
+			": start could not be confirmed - check backup-status before retrying"
 	)
 
 	runningStatus := fmt.Sprintf("job-id=%s:ns=%s:state=INCR_SCAN_ACTIVE", testJobID, testNamespace)
 	failedStatus := fmt.Sprintf("job-id=%s:ns=%s:state=FAILED", testJobID, testNamespace)
 
 	tests := []struct {
-		startErr   a.Error
-		statusErr  a.Error
-		wantErrIs  error
-		name       string
-		startResp  string
-		statusResp string
+		startErr         a.Error
+		statusErr        a.Error
+		wantErrIs        error
+		name             string
+		startResp        string
+		statusResp       string
+		wantErrText      string
+		wantErrNotText   string
+		unansweredBefore bool
 	}{
 		{
 			name:      "start accepted",
@@ -3058,15 +3159,46 @@ func TestClient_sendStartBackup(t *testing.T) {
 			wantErrIs: a.ErrNetTimeout,
 		},
 		{
-			name:      "start failed and the status is unavailable",
-			startErr:  a.ErrNetTimeout,
-			statusErr: a.ErrNetwork,
-			wantErrIs: a.ErrNetTimeout,
+			name:        "start failed and the status is unavailable",
+			startErr:    a.ErrNetTimeout,
+			statusErr:   a.ErrNetwork,
+			wantErrIs:   a.ErrNetTimeout,
+			wantErrText: testStatusUnavailable,
 		},
 		{
-			name:      "start response reports an error",
-			startResp: errCmdRespPrefix + ": backup already running",
-			wantErrIs: errclass.ErrAerospike,
+			name:           "start failed and the node does not know the job",
+			startErr:       a.ErrNetTimeout,
+			statusResp:     testNoBackupJob,
+			wantErrIs:      a.ErrNetTimeout,
+			wantErrNotText: testStatusUnavailable,
+		},
+		{
+			name:       "start response reports an error and the status is not read",
+			startResp:  testRejected,
+			statusResp: runningStatus,
+			wantErrIs:  errclass.ErrAerospike,
+		},
+		{
+			name:             "start response reports an error after an unanswered attempt",
+			startResp:        testRejected,
+			statusResp:       runningStatus,
+			unansweredBefore: true,
+		},
+		{
+			name:       "start not acknowledged in time but the job is running",
+			startResp:  testTimedOut,
+			statusResp: runningStatus,
+		},
+		{
+			name:       "start not confirmed but the job is running",
+			startResp:  testUnconfirmed,
+			statusResp: runningStatus,
+		},
+		{
+			name:       "start not acknowledged in time and the node does not know the job",
+			startResp:  testTimedOut,
+			statusResp: testNoBackupJob,
+			wantErrIs:  errclass.ErrAerospike,
 		},
 	}
 
@@ -3083,10 +3215,16 @@ func TestClient_sendStartBackup(t *testing.T) {
 				Return(map[string]string{statusCmd: tt.statusResp}, tt.statusErr).Maybe()
 
 			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
+			attempts := startAttempts{unanswered: tt.unansweredBefore}
 
-			err := ic.sendStartBackup(node, testStartCmd, statusCmd)
+			err := ic.sendStartBackup(node, testStartCmd, statusCmd, &attempts)
 			if tt.wantErrIs != nil {
 				require.ErrorIs(t, err, tt.wantErrIs)
+				require.ErrorContains(t, err, tt.wantErrText)
+
+				if tt.wantErrNotText != "" {
+					assert.NotContains(t, err.Error(), tt.wantErrNotText)
+				}
 
 				return
 			}
@@ -3103,29 +3241,41 @@ func TestClient_sendStartRestore(t *testing.T) {
 	t.Parallel()
 
 	const (
-		testJobID     = "260922T103653-5xsr"
+		testJobID     = testCmdJobID
 		testNamespace = "source-ns1"
 		testStartCmd  = "restore:namespace=" + testNamespace + ";job-id=" + testJobID
 		testAccepted  = "ok"
-		statusCmd     = "restore-status:job-id=" + testJobID
+		statusCmd     = testRestoreStatusCmd
+		testRejected  = errCmdRespPrefix + ":22:restore: job-id=" + testJobID + " was used before - use a new job-id"
+		testTimedOut  = errCmdRespPrefix + ":9:restore: composite publish timed out"
 		// testColdStatus is the restore-status row of a cold job, see Test_isRestoreStarted.
-		testColdStatus = "job-id=%s:ns=%s:kind=cold:state=ACTIVE:restore-worker-threads=%d:ns-state=%s"
+		testColdStatus = "job-id=%s:ns=%s:kind=cold:state=ACTIVE:restore-worker-threads=8:ns-state=%s"
 	)
 
 	restoringStatus := fmt.Sprintf(testColdStatus,
-		testJobID, testNamespace, 8, infomodels.NamespaceStateRestoring)
-	preparedStatus := fmt.Sprintf(testColdStatus,
-		testJobID, testNamespace, 0, infomodels.NamespaceStateReady)
+		testJobID, testNamespace, infomodels.NamespaceStateRestoring)
+	preparingStatus := fmt.Sprintf(testColdStatus,
+		testJobID, testNamespace, infomodels.NamespaceStatePreparing)
 	otherJobStatus := fmt.Sprintf(testColdStatus,
-		"260922T090000-abcd", testNamespace, 8, infomodels.NamespaceStateRestoring)
+		testOtherJobID, testNamespace, infomodels.NamespaceStateRestoring)
+	otherNsStatus := fmt.Sprintf(testColdStatus,
+		testJobID, "other-ns", infomodels.NamespaceStateRestoring)
+
+	request := &infomodels.RequestRestore{
+		RequestCommon: infomodels.RequestCommon{Namespace: testNamespace},
+		JobID:         testJobID,
+	}
 
 	tests := []struct {
-		startErr   a.Error
-		statusErr  a.Error
-		wantErrIs  error
-		name       string
-		startResp  string
-		statusResp string
+		startErr         a.Error
+		statusErr        a.Error
+		wantErrIs        error
+		name             string
+		startResp        string
+		statusResp       string
+		wantErrText      string
+		wantErrNotText   string
+		unansweredBefore bool
 	}{
 		{
 			name:      "start accepted",
@@ -3137,10 +3287,9 @@ func TestClient_sendStartRestore(t *testing.T) {
 			statusResp: restoringStatus,
 		},
 		{
-			name:       "start failed and the cold job is only prepared",
+			name:       "start failed but the cold job is preparing",
 			startErr:   a.ErrNetTimeout,
-			statusResp: preparedStatus,
-			wantErrIs:  a.ErrNetTimeout,
+			statusResp: preparingStatus,
 		},
 		{
 			name:       "start failed and the running restore belongs to another job",
@@ -3149,10 +3298,41 @@ func TestClient_sendStartRestore(t *testing.T) {
 			wantErrIs:  a.ErrNetTimeout,
 		},
 		{
-			name:      "start failed and the status is unavailable",
-			startErr:  a.ErrNetTimeout,
-			statusErr: a.ErrNetwork,
-			wantErrIs: a.ErrNetTimeout,
+			name:        "start failed and the status is unavailable",
+			startErr:    a.ErrNetTimeout,
+			statusErr:   a.ErrNetwork,
+			wantErrIs:   a.ErrNetTimeout,
+			wantErrText: testStatusUnavailable,
+		},
+		{
+			name:           "start failed and the node does not know the job",
+			startErr:       a.ErrNetTimeout,
+			statusResp:     testNoRestoreJob,
+			wantErrIs:      a.ErrNetTimeout,
+			wantErrNotText: testStatusUnavailable,
+		},
+		{
+			name:       "start response reports an error and the status is not read",
+			startResp:  testRejected,
+			statusResp: restoringStatus,
+			wantErrIs:  errclass.ErrAerospike,
+		},
+		{
+			name:             "start response reports an error after an unanswered attempt",
+			startResp:        testRejected,
+			statusResp:       restoringStatus,
+			unansweredBefore: true,
+		},
+		{
+			name:       "start not acknowledged in time but the job is running",
+			startResp:  testTimedOut,
+			statusResp: restoringStatus,
+		},
+		{
+			name:       "start not acknowledged in time and the row is of another namespace",
+			startResp:  testTimedOut,
+			statusResp: otherNsStatus,
+			wantErrIs:  errclass.ErrAerospike,
 		},
 	}
 
@@ -3167,13 +3347,144 @@ func TestClient_sendStartRestore(t *testing.T) {
 				Return(map[string]string{statusCmd: tt.statusResp}, tt.statusErr).Maybe()
 
 			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
+			attempts := startAttempts{unanswered: tt.unansweredBefore}
 
-			err := ic.sendStartRestore(node, testStartCmd, statusCmd, testJobID)
+			err := ic.sendStartRestore(node, testStartCmd, statusCmd, request, &attempts)
 			if tt.wantErrIs != nil {
 				require.ErrorIs(t, err, tt.wantErrIs)
+				require.ErrorContains(t, err, tt.wantErrText)
+
+				if tt.wantErrNotText != "" {
+					assert.NotContains(t, err.Error(), tt.wantErrNotText)
+				}
 
 				return
 			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+// Test_startAttempts_record checks that an attempt with an unknown outcome, one
+// that went unanswered or that the server could not confirm, keeps the job
+// possibly accepted for every later attempt, and that any other error answered
+// by the server alone never does.
+func Test_startAttempts_record(t *testing.T) {
+	t.Parallel()
+
+	answered := &cmdRespError{code: 4, err: errclass.ErrAerospike}
+	unanswered := fmt.Errorf("%w: %w", errclass.ErrAerospike, a.ErrNetTimeout)
+	timedOut := &cmdRespError{code: cmdRespCodeTimeout, err: errclass.ErrAerospike}
+	unconfirmed := &cmdRespError{code: cmdRespCodeUnknown, err: errclass.ErrAerospike}
+
+	tests := []struct {
+		name string
+		give []error
+		want []bool
+	}{
+		{name: "answered only", give: []error{answered, answered}, want: []bool{false, false}},
+		{name: "unanswered first", give: []error{unanswered, answered}, want: []bool{true, true}},
+		{name: "unanswered later", give: []error{answered, unanswered, answered}, want: []bool{false, true, true}},
+		{name: "not acknowledged in time", give: []error{timedOut, answered}, want: []bool{true, true}},
+		{name: "not confirmed", give: []error{answered, unconfirmed}, want: []bool{false, true}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var attempts startAttempts
+
+			got := make([]bool, 0, len(tt.give))
+			for _, err := range tt.give {
+				got = append(got, attempts.record(err))
+			}
+
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// TestStartWithRetry checks a start whose first attempt timed out after the
+// server accepted the job, run through the retry loop of the start commands:
+// the retry is refused by the server because the job id is in use, and the
+// state of the job, shared through the attempts of the call, confirms the
+// start.
+func TestStartWithRetry(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testBackupStartCmd  = "backup:job-id=" + testRestoreJobID
+		testRestoreStartCmd = "restore:job-id=" + testRestoreJobID
+		// testBackupInUse and testRestoreUsed are the replies of the server to
+		// a job id it already holds a job for.
+		testBackupInUse = errCmdRespPrefix + ":22:backup: job-id=" + testRestoreJobID +
+			" is in use or was used before - use a new job-id"
+		testRestoreUsed = errCmdRespPrefix + ":22:restore: job-id=" + testRestoreJobID +
+			" was used before - use a new job-id"
+	)
+
+	tests := []struct {
+		send       func(ic *Client, node infoGetter, attempts *startAttempts) error
+		name       string
+		startCmd   string
+		statusCmd  string
+		notFound   string
+		rejected   string
+		statusResp string
+	}{
+		{
+			name:       "backup",
+			startCmd:   testBackupStartCmd,
+			statusCmd:  testBackupStatusCmd,
+			notFound:   testNoBackupJob,
+			rejected:   testBackupInUse,
+			statusResp: "job-id=" + testRestoreJobID + ":ns=" + testRestoreNamespace + ":state=BASE_SCAN_ACTIVE",
+			send: func(ic *Client, node infoGetter, attempts *startAttempts) error {
+				return ic.sendStartBackup(node, testBackupStartCmd, testBackupStatusCmd, attempts)
+			},
+		},
+		{
+			name:      "restore",
+			startCmd:  testRestoreStartCmd,
+			statusCmd: testRestoreStatusCmd,
+			notFound:  testNoRestoreJob,
+			rejected:  testRestoreUsed,
+			statusResp: "job-id=" + testRestoreJobID + ":ns=" + testRestoreNamespace +
+				":kind=cold:state=ACTIVE:ns-state=PREPARING",
+			send: func(ic *Client, node infoGetter, attempts *startAttempts) error {
+				request := &infomodels.RequestRestore{
+					RequestCommon: infomodels.RequestCommon{Namespace: testRestoreNamespace},
+					JobID:         testRestoreJobID,
+				}
+
+				return ic.sendStartRestore(node, testRestoreStartCmd, testRestoreStatusCmd, request, attempts)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			node := mocks.NewMockinfoGetter(t)
+			node.EXPECT().RequestInfo(testInfoPolicy, []string{tt.startCmd}).
+				Return(nil, a.ErrNetTimeout).Once()
+			node.EXPECT().RequestInfo(testInfoPolicy, []string{tt.statusCmd}).
+				Return(map[string]string{tt.statusCmd: tt.notFound}, nil).Once()
+			node.EXPECT().RequestInfo(testInfoPolicy, []string{tt.startCmd}).
+				Return(map[string]string{tt.startCmd: tt.rejected}, nil).Once()
+			node.EXPECT().RequestInfo(testInfoPolicy, []string{tt.statusCmd}).
+				Return(map[string]string{tt.statusCmd: tt.statusResp}, nil).Once()
+
+			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
+			policy := models.NewRetryPolicy(time.Millisecond, 1, 2)
+			principal := func() (infoGetter, error) { return node, nil }
+
+			err := startWithRetry(t.Context(), policy, principal, func(n infoGetter, attempts *startAttempts) error {
+				return tt.send(ic, n, attempts)
+			})
 
 			require.NoError(t, err)
 		})
@@ -3187,8 +3498,12 @@ func TestClient_sendStartRestore(t *testing.T) {
 func TestGetRestoreStatus(t *testing.T) {
 	t.Parallel()
 
-	// testStatusRow is the restore-status row of a cold job.
-	const testStatusRow = "job-id=%s:ns=%s:kind=cold:state=%s:ns-state=%s:ttl-extended=%d"
+	const (
+		// testStatusRow is the restore-status row of a cold job.
+		testStatusRow = "job-id=%s:ns=%s:kind=cold:state=%s:ns-state=%s:ttl-extended=%d"
+		// testNoName is the namespace of a stub row.
+		testNoName = "(none)"
+	)
 
 	statusRow := func(ns string, state infomodels.RestoreState, nsState infomodels.NamespaceState,
 		ttlExtended int,
@@ -3219,7 +3534,7 @@ func TestGetRestoreStatus(t *testing.T) {
 					statusResp: statusRow(testRestoreNamespace, infomodels.RestoreStateActive,
 						infomodels.NamespaceStatePreparing, 20),
 				},
-				{name: testNodeB},
+				{name: testNodeC},
 			},
 			want: &infomodels.ResponseRestoreState{
 				JobID:       testRestoreJobID,
@@ -3231,18 +3546,18 @@ func TestGetRestoreStatus(t *testing.T) {
 			},
 		},
 		{
-			name: "node that does not host the namespace",
+			name: "stub row with no namespace is merged",
 			nodes: []statusNodeAnswer{
 				{
 					name:   testNodeA,
 					active: true,
-					statusResp: statusRow(testRestoreNamespace, infomodels.RestoreStateActive,
-						infomodels.NamespaceStateNotHosted, 0),
+					statusResp: statusRow(testNoName, infomodels.RestoreStateFailed,
+						infomodels.NamespaceStateStub, 0),
 				},
 				{
 					name:   testNodeB,
 					active: true,
-					statusResp: statusRow(testRestoreNamespace, infomodels.RestoreStateActive,
+					statusResp: statusRow(testRestoreNamespace, infomodels.RestoreStateFailed,
 						infomodels.NamespaceStateReady, 0),
 				},
 			},
@@ -3250,8 +3565,32 @@ func TestGetRestoreStatus(t *testing.T) {
 				JobID:     testRestoreJobID,
 				Namespace: testRestoreNamespace,
 				Kind:      infomodels.RestoreKindCold,
-				State:     infomodels.RestoreStateActive,
+				State:     infomodels.RestoreStateFailed,
 				NsState:   infomodels.NamespaceStateReady,
+			},
+		},
+		{
+			name: "stub row keeps a live job from looking complete",
+			nodes: []statusNodeAnswer{
+				{
+					name:   testNodeA,
+					active: true,
+					statusResp: statusRow(testRestoreNamespace, infomodels.RestoreStateComplete,
+						infomodels.NamespaceStateOpening, 0),
+				},
+				{
+					name:   testNodeB,
+					active: true,
+					statusResp: statusRow(testNoName, infomodels.RestoreStateFailed,
+						infomodels.NamespaceStateStub, 0),
+				},
+			},
+			want: &infomodels.ResponseRestoreState{
+				JobID:     testRestoreJobID,
+				Namespace: testRestoreNamespace,
+				Kind:      infomodels.RestoreKindCold,
+				State:     infomodels.RestoreStateFailed,
+				NsState:   infomodels.NamespaceStateOpening,
 			},
 		},
 		{
@@ -3259,6 +3598,25 @@ func TestGetRestoreStatus(t *testing.T) {
 			nodes: []statusNodeAnswer{
 				{
 					name:   testNodeA,
+					active: true,
+					statusResp: statusRow(testRestoreOtherNamespace, infomodels.RestoreStateActive,
+						infomodels.NamespaceStateReady, 0),
+				},
+			},
+			wantErrIs:   ErrNotFound,
+			wantErrText: testRestoreNamespace,
+		},
+		{
+			name: "job of another namespace on one node only",
+			nodes: []statusNodeAnswer{
+				{
+					name:   testNodeA,
+					active: true,
+					statusResp: statusRow(testRestoreNamespace, infomodels.RestoreStateActive,
+						infomodels.NamespaceStateReady, 0),
+				},
+				{
+					name:   testNodeB,
 					active: true,
 					statusResp: statusRow(testRestoreOtherNamespace, infomodels.RestoreStateActive,
 						infomodels.NamespaceStateReady, 0),
@@ -3279,11 +3637,38 @@ func TestGetRestoreStatus(t *testing.T) {
 				{
 					name:       testNodeB,
 					active:     true,
-					statusResp: errCmdRespPrefix + ":2:no restore job " + testRestoreJobID,
+					statusResp: testNoRestoreJob,
 				},
 			},
 			wantErrIs:   ErrNotFound,
-			wantErrText: "restore job " + testRestoreJobID + " on node " + testNodeB,
+			wantErrText: testRestoreJobOnNode + testNodeB,
+		},
+		{
+			name: "node that reports no row of the job",
+			nodes: []statusNodeAnswer{
+				{
+					name:   testNodeA,
+					active: true,
+					statusResp: statusRow(testRestoreNamespace, infomodels.RestoreStateActive,
+						infomodels.NamespaceStateReady, 0),
+				},
+				{name: testNodeB, active: true},
+			},
+			wantErrIs:   ErrNotFound,
+			wantErrText: testRestoreJobOnNode + testNodeB,
+		},
+		{
+			name: "error other than not found stops the merge",
+			nodes: []statusNodeAnswer{
+				{
+					name:       testNodeA,
+					active:     true,
+					statusResp: errCmdRespPrefix + ":20:unknown namespace " + testRestoreNamespace,
+				},
+			},
+			wantErrIs:    errclass.ErrAerospike,
+			wantErrNotIs: ErrNotFound,
+			wantErrText:  testNodeA,
 		},
 		{
 			name: "node request failed",
@@ -3311,6 +3696,105 @@ func TestGetRestoreStatus(t *testing.T) {
 			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
 
 			got, err := getRestoreStatus(ic, nodes, testRestoreStatusCmd, testRestoreNamespace, testRestoreJobID)
+			if tt.wantErrIs != nil {
+				require.ErrorIs(t, err, tt.wantErrIs)
+				require.ErrorContains(t, err, tt.wantErrText)
+
+				if tt.wantErrNotIs != nil {
+					require.NotErrorIs(t, err, tt.wantErrNotIs)
+				}
+
+				assert.Nil(t, got)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// TestGetBackupStatus checks how the backup status rows of the nodes are
+// collected: the inactive nodes are skipped, and the job is not found when any
+// active node does not know it.
+func TestGetBackupStatus(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testBackupJobID     = testRestoreJobID
+		testBackupNamespace = testRestoreNamespace
+		testBackupJobOnNode = "backup job " + testBackupJobID + " on node "
+		// testBackupRow is the backup-status row of a running job.
+		testBackupRow = "job-id=" + testBackupJobID + ":ns=" + testBackupNamespace +
+			":state=BASE_SCAN_ACTIVE:recs-base=%d"
+	)
+
+	tests := []struct {
+		name         string
+		nodes        []statusNodeAnswer
+		want         *infomodels.ResponseBackupState
+		wantErrIs    error
+		wantErrNotIs error
+		wantErrText  string
+	}{
+		{
+			name: "rows of the active nodes are merged",
+			nodes: []statusNodeAnswer{
+				{name: testNodeA, active: true, statusResp: fmt.Sprintf(testBackupRow, 10)},
+				{name: testNodeB, active: true, statusResp: fmt.Sprintf(testBackupRow, 20)},
+				{name: testNodeC},
+			},
+			want: &infomodels.ResponseBackupState{
+				JobID:     testBackupJobID,
+				Namespace: testBackupNamespace,
+				State:     infomodels.BackupStateBaseScanActive,
+				RecsBase:  30,
+			},
+		},
+		{
+			name: "node that does not know the job",
+			nodes: []statusNodeAnswer{
+				{name: testNodeA, active: true, statusResp: fmt.Sprintf(testBackupRow, 10)},
+				{name: testNodeB, active: true, statusResp: testNoBackupJob},
+			},
+			wantErrIs:   ErrNotFound,
+			wantErrText: testBackupJobOnNode + testNodeB,
+		},
+		{
+			name: "node that reports no row of the job",
+			nodes: []statusNodeAnswer{
+				{name: testNodeA, active: true, statusResp: fmt.Sprintf(testBackupRow, 10)},
+				{name: testNodeB, active: true},
+			},
+			wantErrIs:   ErrNotFound,
+			wantErrText: testBackupJobOnNode + testNodeB,
+		},
+		{
+			name: "node request failed",
+			nodes: []statusNodeAnswer{
+				{name: testNodeA, active: true, statusErr: a.ErrNetwork},
+			},
+			wantErrIs:    errclass.ErrAerospike,
+			wantErrNotIs: ErrNotFound,
+			wantErrText:  testNodeA,
+		},
+		{
+			name:      "no active nodes",
+			nodes:     []statusNodeAnswer{{name: testNodeA}},
+			wantErrIs: ErrNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			nodes := newStatusNodeMocks(t, tt.nodes, testBackupStatusCmd, "")
+
+			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
+
+			got, err := getBackupStatus(ic, nodes, testBackupStatusCmd, testBackupJobID)
 			if tt.wantErrIs != nil {
 				require.ErrorIs(t, err, tt.wantErrIs)
 				require.ErrorContains(t, err, tt.wantErrText)

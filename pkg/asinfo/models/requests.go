@@ -34,12 +34,29 @@ type RestorePolicy string
 
 // Restore policies the server accepts.
 const (
-	// RestorePolicyStrict selects the cold restore: the partitions of a
-	// prepared namespace are hydrated from strict backups only.
+	// RestorePolicyStrict selects the cold restore: the namespace is gated
+	// and emptied on every node, then its partitions are hydrated from strict
+	// backups only.
 	RestorePolicyStrict RestorePolicy = "strict"
 	// RestorePolicyFuzzy writes the records into the live namespace, from a
 	// single backup of any consistency or from a list of strict backups.
 	RestorePolicyFuzzy RestorePolicy = "fuzzy"
+)
+
+// StorageType is the object storage type of a backup, see [RequestCommon.Storage].
+type StorageType string
+
+// Object storage types the server accepts.
+const (
+	// StorageTypeFS is a local or mounted file system of each node. Only a
+	// strict backup and a cold restore accept it.
+	StorageTypeFS StorageType = "fs"
+	// StorageTypeFA is the same storage as StorageTypeFS.
+	StorageTypeFA StorageType = "fa"
+	// StorageTypeAWS is Amazon S3 or an S3-compatible storage.
+	StorageTypeAWS StorageType = "aws"
+	// StorageTypeAWSS3 is the same storage as StorageTypeAWS.
+	StorageTypeAWSS3 StorageType = "aws-s3"
 )
 
 // RequestBackup represents a request to start a backup job on the server.
@@ -68,22 +85,31 @@ type RequestBackup struct {
 	BackupS3ThroughputTargetGbps int
 	// Policy is how consistent the backup must be: strict, best-effort or
 	// fuzzy, see [BackupPolicy]. Empty omits the parameter, so the server
-	// default applies.
+	// default, strict, applies.
 	Policy BackupPolicy
+	// NoConfig skips the upload of the config file of each node, as it is on
+	// disk when the backup finishes. The server uploads it by default.
+	NoConfig *bool
 }
 
 // RequestRestore represents a request to start a restore job on the server.
 //
 // Policy selects the restore mode, strict (cold) by default. Only the fuzzy
 // policy accepts MaxInflight, RetryBaseIntervalMs, RetryMultiplier,
-// RetryMaxAttempts, IgnoreRecordError and ApplyMetadataLast: setting one with
-// another policy fails the request, since the server rejects it instead of
-// ignoring it. Every other parameter applies to both policies.
-// IncrementalPath needs more than one id in BackupIDs.
+// RetryMaxAttempts, IgnoreRecordError and ApplyMetadataLast, and only the
+// strict one accepts HydrateReplica: setting one with another policy fails
+// the request, since the server rejects it instead of ignoring it. Every other
+// parameter applies to both policies. IncrementalPath needs more than one id
+// in BackupIDs.
+//
+// A cold restore is started by this single request: the server gates and
+// prepares the namespace on every node and starts the restore once every node
+// is ready. A node whose storage is not empty waits until it is cleared, see
+// [ResponseRestoreState.Clear].
 type RequestRestore struct {
 	RequestCommon
-	// JobID identifies the restore job. A cold restore must use the job id that
-	// was passed to the restore preparation.
+	// JobID identifies the restore job. The server refuses a job id that was
+	// used before.
 	JobID string
 	// BackupIDs is a comma-separated list of backup ids to restore from: a full
 	// backup first, then its incremental backups in chronological order.
@@ -117,24 +143,18 @@ type RequestRestore struct {
 	RetryBaseIntervalMs *int
 	// RetryMultiplier is the backoff multiplier of the retry delay, at least 1.0.
 	RetryMultiplier float64
-	// RetryMaxAttempts is the maximum number of attempts per record, the first
-	// one included. Zero omits the parameter, so the server default of 5
-	// applies; use 1 for no retry.
-	RetryMaxAttempts int
+	// RetryMaxAttempts is the number of retries per record after its first
+	// failed write, 0 for none. It is a pointer because zero differs from the
+	// server default of 5; nil omits the parameter.
+	RetryMaxAttempts *int
 	// IgnoreRecordError continues the restore on errors of individual records.
 	IgnoreRecordError *bool
 	// ApplyMetadataLast creates the secondary indexes and UDFs after the records
 	// instead of before.
 	ApplyMetadataLast *bool
-}
-
-// RequestPrepareRestore represents a request to prepare a cold restore on the server.
-type RequestPrepareRestore struct {
-	// Namespace is the target namespace.
-	Namespace string
-	// JobID identifies the restore job; the restore must be started with the same id.
-	JobID string
-	// HydrateReplica restores all replicas when true, and only the master when false.
+	// HydrateReplica restores every replica of each partition when true, the
+	// server default, and only the master when false. Which one a namespace
+	// allows depends on its replication factor and consistency mode.
 	HydrateReplica *bool
 }
 
@@ -146,8 +166,8 @@ type RequestPrepareRestore struct {
 type RequestCommon struct {
 	// Namespace is the namespace to back up or to restore into.
 	Namespace string
-	// Storage is the object storage type, such as "fs" or "aws-s3".
-	Storage string
+	// Storage is the object storage type, see [StorageType].
+	Storage StorageType
 	// Path is the directory for a file system storage, or the key prefix for S3.
 	Path string
 	// Bucket is the S3 bucket name.

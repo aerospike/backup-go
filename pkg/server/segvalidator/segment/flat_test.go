@@ -75,7 +75,8 @@ func TestParseFlatHeader(t *testing.T) {
 func TestParseFlatHeader_TooShort(t *testing.T) {
 	t.Parallel()
 
-	if _, err := parseFlatHeader(make([]byte, flatRecordHdrSize-1)); !errors.Is(err, ErrHeaderTooShort) {
+	_, err := parseFlatHeader(make([]byte, flatRecordHdrSize-1))
+	if !errors.Is(err, ErrHeaderTooShort) {
 		t.Fatalf("parseFlatHeader() error = %v, want %v", err, ErrHeaderTooShort)
 	}
 }
@@ -644,8 +645,9 @@ func TestSkipBin(t *testing.T) {
 			wantNext: 1,
 		},
 		{
-			name:     "metadata with a last update time",
-			data:     append([]byte{binHasMeta | binHasLUT}, append(make([]byte, binLUTSize), particleTypeNull)...),
+			name: "metadata with a last update time",
+			data: append([]byte{binHasMeta | binHasLUT},
+				append(make([]byte, binLUTSize), particleTypeNull)...),
 			wantNext: 7,
 		},
 		{

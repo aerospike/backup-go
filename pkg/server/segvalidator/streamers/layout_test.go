@@ -20,6 +20,8 @@ import (
 	"math/rand/v2"
 	"strings"
 	"testing"
+
+	"github.com/aerospike/backup-go/pkg/server/segvalidator/segment"
 )
 
 // realManifest is shaped like the manifest a server writes, fields the
@@ -30,7 +32,7 @@ const realManifest = `{
   "partition_id": 935,
   "format_version": 1,
   "node_id": "BB951D8A16DC7A2",
-  "checksum_algorithm": "crc32",
+  "checksum_algorithm": "crc32c",
   "entry_count": 2,
   "update_time": 525347837866,
   "regime": 7,
@@ -88,8 +90,15 @@ func TestDecodeManifest(t *testing.T) {
 		t.Fatalf("decodeManifest() recorded %d segments, want 2", len(segments))
 	}
 
-	if segments[0].Size != 326752 || !strings.HasSuffix(segments[0].SegmentName, "7-0000181178352-db526a.seg") {
+	if segments[0].Size == nil || *segments[0].Size != 326752 ||
+		!strings.HasSuffix(segments[0].SegmentName, "7-0000181178352-db526a.seg") {
 		t.Errorf("first segment = %+v, want the one the manifest names first", segments[0])
+	}
+
+	// The second segment records no count, which reads as zero.
+	if segments[0].RecordCount != testRecordCount || segments[1].RecordCount != 0 {
+		t.Errorf("record counts = %d and %d, want %d and 0",
+			segments[0].RecordCount, segments[1].RecordCount, testRecordCount)
 	}
 }
 
@@ -252,6 +261,48 @@ func TestManifestSegment_Resolve(t *testing.T) {
 
 			if got != tt.want {
 				t.Errorf("resolve() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestManifestSegment_Check(t *testing.T) {
+	t.Parallel()
+
+	size := int64(64)
+	checksum := testChecksum
+	// An empty checksum is still one the manifest wrote down: the server
+	// takes it as a zero and fails the segment against it, not the entry.
+	empty := ""
+
+	tests := []struct {
+		name    string
+		give    manifestSegment
+		wantErr bool
+	}{
+		{name: "size and checksum", give: manifestSegment{Size: &size, Checksum: &checksum}},
+		{name: "empty checksum", give: manifestSegment{Size: &size, Checksum: &empty}},
+		{name: "no size", give: manifestSegment{Checksum: &checksum}, wantErr: true},
+		{name: "no checksum", give: manifestSegment{Size: &size}, wantErr: true},
+		{name: "neither", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.give.check()
+
+			if !tt.wantErr {
+				if err != nil {
+					t.Fatalf("check() error = %v", err)
+				}
+
+				return
+			}
+
+			if !errors.Is(err, ErrManifestUnusable) {
+				t.Fatalf("check() error = %v, want ErrManifestUnusable", err)
 			}
 		})
 	}
@@ -506,6 +557,112 @@ func TestReadKey(t *testing.T) {
 
 			if key != tt.wantKey {
 				t.Fatalf("readKey() = %q, want %q", key, tt.wantKey)
+			}
+		})
+	}
+}
+
+func TestSegment_Partition(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testQueryData  = "519118324/ns/test/query-stream/data/"
+		testChangeData = "519118324/ns/test/change-stream/BB951D8A16DC7A2/data/"
+		testSegment    = "/7-0000181178352-db526a.seg"
+		testPartition  = "p935"
+		testManifests  = "519118324/ns/test/query-stream/manifest/"
+		testManifestID = "-7-0000181178352-db526a.json"
+		// testManifestPartition is a partition other than the one of the
+		// directory, so a test tells which of the two was taken.
+		testManifestPartition = "12"
+	)
+
+	queryPartition := testQueryData + testPartition + testSegment
+	manifestOfPartition := testManifests + testManifestPartition + testManifestID
+
+	tests := []struct {
+		name   string
+		give   Segment
+		wantID int
+		wantOK bool
+	}{
+		{
+			name:   "query stream partition",
+			give:   Segment{Stream: QueryStream, Path: queryPartition},
+			wantID: 935,
+			wantOK: true,
+		},
+		{
+			name:   "manifest partition outranks the directory",
+			give:   Segment{Stream: QueryStream, Path: queryPartition, Manifest: manifestOfPartition},
+			wantID: 12,
+			wantOK: true,
+		},
+		{
+			name: "manifest the server skips assigns no partition",
+			give: Segment{
+				Stream:   QueryStream,
+				Path:     queryPartition,
+				Manifest: testManifests + "manifest.json",
+			},
+		},
+		{
+			name: "change stream manifest mixes partitions",
+			give: Segment{
+				Stream:   ChangeStream,
+				Path:     testChangeData + testPartition + testSegment,
+				Manifest: manifestOfPartition,
+			},
+		},
+		{
+			name:   "first partition",
+			give:   Segment{Stream: QueryStream, Path: testQueryData + "p0" + testSegment},
+			wantID: 0,
+			wantOK: true,
+		},
+		{
+			name:   "last partition",
+			give:   Segment{Stream: QueryStream, Path: testQueryData + "p4095" + testSegment},
+			wantID: segment.PartitionCount - 1,
+			wantOK: true,
+		},
+		{
+			name: "partition out of range",
+			give: Segment{Stream: QueryStream, Path: testQueryData + "p4096" + testSegment},
+		},
+		{
+			name: "leading zero",
+			give: Segment{Stream: QueryStream, Path: testQueryData + "p01" + testSegment},
+		},
+		{
+			name: "explicit sign",
+			give: Segment{Stream: QueryStream, Path: testQueryData + "p+1" + testSegment},
+		},
+		{
+			name: "negative id",
+			give: Segment{Stream: QueryStream, Path: testQueryData + "p-1" + testSegment},
+		},
+		{
+			name: "not a number",
+			give: Segment{Stream: QueryStream, Path: testQueryData + "px" + testSegment},
+		},
+		{
+			name: "no partition directory",
+			give: Segment{Stream: QueryStream, Path: testQueryData + "loose.seg"},
+		},
+		{
+			name: "change stream mixes partitions",
+			give: Segment{Stream: ChangeStream, Path: testChangeData + testPartition + testSegment},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			id, ok := tt.give.Partition()
+			if id != tt.wantID || ok != tt.wantOK {
+				t.Fatalf("Partition() = (%d, %v), want (%d, %v)", id, ok, tt.wantID, tt.wantOK)
 			}
 		})
 	}

@@ -51,10 +51,10 @@ import (
 // segment of a backup instead of a random sample.
 const CheckAll = 0
 
-// segmentSizeLimit is the hard upper bound of a single segment payload. It is
-// also the largest record a flat header can describe, so anything above it
-// cannot be a valid segment.
-const segmentSizeLimit = segment.MaxRecordSize
+// segmentSizeLimit is the hard upper bound of a single segment object. The
+// server refuses to fetch anything larger for a restore, whatever its frame
+// says, so anything above it cannot be a valid segment.
+const segmentSizeLimit = segment.MaxSegmentSize
 
 // defaultMaxIssues is the number of failures a report describes before it
 // starts counting them only.
@@ -66,17 +66,26 @@ var (
 	// backup id that does not exist looks like. A backup that holds no segment
 	// because the namespace held no records is reported, not refused.
 	ErrNoSegments = fmt.Errorf("%w: no segments found for backup", errclass.ErrNotFound)
-	// ErrSegmentTooLarge is returned for a segment bigger than any record a
-	// flat header can describe.
+	// ErrSegmentTooLarge is returned for a segment bigger than the server
+	// fetches for a restore.
 	ErrSegmentTooLarge = fmt.Errorf("%w: segment is too large", errclass.ErrCorruptData)
 	// ErrSizeMismatch is returned for a segment whose stored size is not the
 	// one its manifest records.
-	ErrSizeMismatch = fmt.Errorf("%w: segment size does not match the manifest", errclass.ErrCorruptData)
+	ErrSizeMismatch = fmt.Errorf("%w: segment size does not match the manifest",
+		errclass.ErrCorruptData)
 	// ErrChecksumMismatch is returned for a segment whose bytes do not
 	// checksum to what its manifest records. It is the only check that catches
 	// a segment whose contents rotted without its structure breaking.
-	ErrChecksumMismatch = fmt.Errorf("%w: segment checksum does not match the manifest", errclass.ErrCorruptData)
+	ErrChecksumMismatch = fmt.Errorf("%w: segment checksum does not match the manifest",
+		errclass.ErrCorruptData)
+	// ErrRecordCountMismatch is returned for a segment that parses, but holds a
+	// different number of records than its manifest records.
+	ErrRecordCountMismatch = fmt.Errorf("%w: segment record count does not match the manifest",
+		errclass.ErrCorruptData)
 )
+
+// castagnoliTable computes the CRC-32C the server checksums segments with.
+var castagnoliTable = crc32.MakeTable(crc32.Castagnoli)
 
 // Streamer names the segments of one backup and opens them. It is what a
 // streamers.Streamer does, named here because this is where it is used.
@@ -176,7 +185,9 @@ func NewSegValidator(streamer Streamer, opts ...Option) (*SegValidator, error) {
 // Anything wrong with a segment is recorded in the report rather than aborting
 // the run; only a canceled context and a storage that stops answering stop it
 // early.
-func (v *SegValidator) Validate(ctx context.Context, sampleSize int) (*models.ValidationReport, error) {
+func (v *SegValidator) Validate(
+	ctx context.Context, sampleSize int,
+) (*models.ValidationReport, error) {
 	c := newCollector(v.maxIssues)
 
 	// The streamer fills a channel a pool of workers drains, so a slow check
@@ -217,22 +228,63 @@ func (v *SegValidator) Validate(ctx context.Context, sampleSize int) (*models.Va
 	// held no records is backed up into manifests recording nothing, and such a
 	// backup reads back as well as any other. Only a run that came back having
 	// found nothing whatsoever has nothing to report on.
-	if foundNothing(c.checkedSegments.Load(), streamed) {
+	if foundNothing(c.checkedSegments.Load(), &streamed) {
 		return nil, fmt.Errorf("%w: %s", ErrNoSegments, v.streamer.BackupID())
 	}
 
-	return c.report(v.streamer.BackupID(), streamed), nil
+	report := c.report(v.streamer.BackupID(), &streamed)
+
+	if err := report.Commit.Refusal; err != nil {
+		v.logger.WarnContext(ctx, "a restore would refuse the backup",
+			slog.String("backupId", report.BackupID),
+			slog.Any("error", err),
+		)
+	}
+
+	return report, nil
+}
+
+// commitReport describes the commit record the streamer read. The backup is
+// validated for the restore the record itself calls for: a fuzzy backup for a
+// fuzzy restore, any other for a strict one, which refuses a record not shown
+// to be strict.
+func commitReport(streamed *streamers.Stats) models.CommitReport {
+	commit := &streamed.Commit
+
+	// A streamer that did not read the record has nothing to say about it.
+	if commit.State == 0 {
+		return models.CommitReport{ChangeStreamSkipped: streamed.ChangeStreamSkipped}
+	}
+
+	strict := !commit.Fuzzy()
+
+	return models.CommitReport{
+		Refusal:             commit.Refusal(strict),
+		Path:                commit.Path,
+		State:               commit.State.String(),
+		Status:              commit.Status,
+		BackupPolicy:        commit.BackupPolicy,
+		AchievedConsistency: commit.AchievedConsistency,
+		FallbackReason:      commit.FallbackReason,
+		Namespace:           commit.Namespace,
+		BackupType:          commit.BackupType,
+		Strict:              strict,
+		ChangeStreamSkipped: streamed.ChangeStreamSkipped,
+	}
 }
 
 // foundNothing reports whether a run found nothing at all in the storage: no
-// namespace, no manifest and no segment. That is what a backup id nothing was
-// ever written under looks like, and it is the one thing a report cannot
-// describe.
-func foundNothing(checked int64, streamed streamers.Stats) bool {
+// namespace, no manifest and no segment, and no commit record naming a
+// namespace. That is what a backup id nothing was ever written under looks
+// like, and it is the one thing a report cannot describe. A commit record
+// naming a namespace the storage does not hold is a backup a restore refuses,
+// which the report does describe.
+func foundNothing(checked int64, streamed *streamers.Stats) bool {
 	return checked == 0 &&
 		streamed.Namespaces == 0 &&
 		streamed.ManifestsFound == 0 &&
-		streamed.ManifestsFailed == 0
+		streamed.ManifestsFailed == 0 &&
+		len(streamed.EmptyNamespaces) == 0
 }
 
 // checkSegment reads a single segment and records what it found. A segment that
@@ -256,7 +308,9 @@ func (v *SegValidator) checkSegment(ctx context.Context, seg *streamers.Segment,
 
 // parseSegment downloads one segment and walks its records. Partial statistics
 // are returned together with the error.
-func (v *SegValidator) parseSegment(ctx context.Context, seg *streamers.Segment) (segment.Stats, error) {
+func (v *SegValidator) parseSegment(
+	ctx context.Context, seg *streamers.Segment,
+) (segment.Stats, error) {
 	body, err := v.streamer.OpenSegment(ctx, seg)
 	if err != nil {
 		return segment.Stats{}, fmt.Errorf("failed to open segment: %w", err)
@@ -287,7 +341,28 @@ func (v *SegValidator) parseSegment(ctx context.Context, seg *streamers.Segment)
 		return segment.Stats{}, err
 	}
 
-	return segment.Validate(buf.Bytes())
+	var opts []segment.Option
+	if id, ok := seg.Partition(); ok {
+		opts = append(opts, segment.WithPartition(id))
+	}
+
+	// The server refuses a segment whose frame names another stream than the
+	// one whose manifest listed it.
+	if blockType, ok := seg.Stream.BlockType(); ok {
+		opts = append(opts, segment.WithBlockType(blockType))
+	}
+
+	stats, err := segment.Validate(buf.Bytes(), opts...)
+	if err != nil {
+		return stats, err
+	}
+
+	if seg.RecordCount != 0 && int64(stats.RecordCount) != seg.RecordCount {
+		return stats, fmt.Errorf("%w: recorded %d, parsed %d",
+			ErrRecordCountMismatch, seg.RecordCount, stats.RecordCount)
+	}
+
+	return stats, nil
 }
 
 // checkAgainstManifest compares a segment with what the manifest that named it
@@ -302,15 +377,12 @@ func checkAgainstManifest(seg *streamers.Segment, payload []byte) error {
 		return nil
 	}
 
-	if seg.Size > 0 && int64(len(payload)) != seg.Size {
+	if int64(len(payload)) != seg.Size {
 		return fmt.Errorf("%w: recorded %d bytes, stored %d", ErrSizeMismatch, seg.Size, len(payload))
 	}
 
-	if seg.Checksum == "" {
-		return nil
-	}
-
-	if sum := fmt.Sprintf("%08x", crc32.ChecksumIEEE(payload)); !strings.EqualFold(sum, seg.Checksum) {
+	sum := fmt.Sprintf("%08x", crc32.Checksum(payload, castagnoliTable))
+	if !strings.EqualFold(sum, seg.Checksum) {
 		return fmt.Errorf("%w: recorded %s, stored %s", ErrChecksumMismatch, seg.Checksum, sum)
 	}
 
@@ -326,16 +398,15 @@ type collector struct {
 	manifestIssues []models.ManifestIssue
 	maxIssues      int
 
-	unrecorded        []string
-	checkedSegments   atomic.Int64
-	invalidSegments   atomic.Int64
-	recordedSegments  atomic.Int64
-	unrecordedCount   atomic.Int64
-	missingSegments   atomic.Int64
-	manifestProblems  atomic.Int64
-	records           atomic.Int64
-	parsedBytes       atomic.Int64
-	skippedCompressed atomic.Int64
+	unrecorded       []string
+	checkedSegments  atomic.Int64
+	invalidSegments  atomic.Int64
+	recordedSegments atomic.Int64
+	unrecordedCount  atomic.Int64
+	missingSegments  atomic.Int64
+	manifestProblems atomic.Int64
+	records          atomic.Int64
+	parsedBytes      atomic.Int64
 }
 
 // newCollector creates a collector describing at most maxIssues failures of
@@ -349,7 +420,6 @@ func (c *collector) addSegment(seg *streamers.Segment, stats segment.Stats, err 
 	c.checkedSegments.Add(1)
 	c.records.Add(int64(stats.RecordCount))
 	c.parsedBytes.Add(int64(stats.ByteCount))
-	c.skippedCompressed.Add(int64(stats.SkippedCompressed))
 
 	if seg.Manifest != "" {
 		c.recordedSegments.Add(1)
@@ -389,7 +459,8 @@ func (c *collector) addSegment(seg *streamers.Segment, stats segment.Stats, err 
 func isManifestFailure(err error) bool {
 	return errors.Is(err, streamers.ErrSegmentMissing) ||
 		errors.Is(err, ErrSizeMismatch) ||
-		errors.Is(err, ErrChecksumMismatch)
+		errors.Is(err, ErrChecksumMismatch) ||
+		errors.Is(err, ErrRecordCountMismatch)
 }
 
 // addUnrecorded records one segment the storage holds that no manifest names,
@@ -425,7 +496,7 @@ func (c *collector) addManifestIssue(namespace, manifestPath, segmentPath string
 
 // report turns what was collected, together with what the streamer saw on its
 // way, into a report.
-func (c *collector) report(backupID string, streamed streamers.Stats) *models.ValidationReport {
+func (c *collector) report(backupID string, streamed *streamers.Stats) *models.ValidationReport {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -449,19 +520,21 @@ func (c *collector) report(backupID string, streamed streamers.Stats) *models.Va
 	}
 
 	return &models.ValidationReport{
-		BackupID:          backupID,
-		Issues:            c.issues,
-		TotalSegments:     streamed.Segments,
-		CheckedSegments:   checked,
-		ValidSegments:     checked - invalid,
-		InvalidSegments:   invalid,
-		TotalRecords:      c.records.Load(),
-		TotalBytes:        c.parsedBytes.Load(),
-		SkippedCompressed: c.skippedCompressed.Load(),
+		BackupID:        backupID,
+		Issues:          c.issues,
+		TotalSegments:   streamed.Segments,
+		CheckedSegments: checked,
+		ValidSegments:   checked - invalid,
+		InvalidSegments: invalid,
+		TotalRecords:    c.records.Load(),
+		TotalBytes:      c.parsedBytes.Load(),
+		Commit:          commitReport(streamed),
+		EmptyNamespaces: streamed.EmptyNamespaces,
 		Manifests: models.ManifestReport{
 			Issues:          manifestIssues,
 			Total:           streamed.ManifestsFound,
 			Checked:         streamed.ManifestsRead,
+			Superseded:      streamed.ManifestsSuperseded,
 			CheckedSegments: c.recordedSegments.Load(),
 			MissingSegments: c.missingSegments.Load(),
 			Unrecorded:      c.unrecordedCount.Load(),
@@ -483,8 +556,7 @@ func newIssue(seg *streamers.Segment, err error) models.ValidationIssue {
 		RecordIndex: models.UnknownRecordIndex,
 	}
 
-	var recErr *segment.RecordError
-	if errors.As(err, &recErr) {
+	if recErr, ok := errors.AsType[*segment.RecordError](err); ok {
 		issue.RecordIndex = recErr.Index
 		issue.Offset = recErr.Offset
 	}

@@ -45,6 +45,9 @@ const goldenRatio = 0x9E37_79B9_7F4A_7C15
 // The sample is spread over the namespaces and streams of the backup: every one
 // of them is asked for its share of n, and what one of them cannot give is
 // asked of the next.
+//
+// As in StreamAll, the commit record is read first and decides whether the
+// change stream is part of the backup.
 func (s *Streamer) StreamSample(ctx context.Context, n int, out chan<- Segment) error {
 	defer close(out)
 
@@ -52,7 +55,7 @@ func (s *Streamer) StreamSample(ctx context.Context, n int, out chan<- Segment) 
 		return nil
 	}
 
-	units, err := s.units(ctx)
+	units, _, err := s.restoredUnits(ctx)
 	if err != nil {
 		return err
 	}
@@ -207,31 +210,22 @@ func (s *Streamer) sampleUnit(ctx context.Context, u *unit, quota int, seed uint
 // It reads names, not manifests: one listing of a directory that holds one
 // manifest per partition is enough to pick from, and the ones picked are the
 // only ones downloaded.
+// A change stream is picked from the manifests a restore reads, which for a
+// node is its newest manifest only.
 func (s *Streamer) sampleManifests(ctx context.Context, u *unit, quota int, rnd *rand.Rand) ([]file, error) {
 	// One manifest per segment of the quota covers as many partitions as the
 	// quota can, which is what keeps a sample from coming out of a handful of
 	// them. A manifest is a few hundred bytes against the segments it leads to,
 	// so reading one per segment checked costs next to nothing.
 	picked := newReservoir[file](max(quota, 1), rnd)
-	scanned := 0
 
-	err := s.store.listFiles(ctx, u.manifests(), func(f file) error {
-		if !isManifest(f.Path) {
-			return nil
-		}
-
+	err := s.listManifests(ctx, u, s.options.scanLimit, func(f file) error {
 		picked.offer(f)
-		s.stats.manifestsFound.Add(1)
-
-		scanned++
-		if scanned >= s.options.scanLimit {
-			return errStopListing
-		}
 
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("list manifests of %s: %w", u.manifests(), err)
+		return nil, err
 	}
 
 	return picked.result(), nil
@@ -297,6 +291,10 @@ func (s *Streamer) sampleFromManifests(ctx context.Context, u *unit, manifests [
 // records.
 func (s *Streamer) sampleManifest(ctx context.Context, u *unit, m file, quota int, rnd *rand.Rand,
 ) ([]Segment, error) {
+	if err := u.checkManifestName(m); err != nil {
+		return nil, err
+	}
+
 	body, err := s.store.open(ctx, m.Path)
 	if err != nil {
 		return nil, err
@@ -306,7 +304,13 @@ func (s *Streamer) sampleManifest(ctx context.Context, u *unit, m file, quota in
 	recorded := newReservoir[manifestSegment](quota, rnd)
 	header := manifestHeader{Namespace: u.namespace}
 
+	// Every entry is checked, not only the picked ones: the server aborts the
+	// restore on a malformed entry wherever it sits.
 	err = decodeManifest(body, &header, func(seg manifestSegment) error {
+		if err := seg.check(); err != nil {
+			return err
+		}
+
 		recorded.offer(seg)
 
 		return nil

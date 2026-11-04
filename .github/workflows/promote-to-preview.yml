@@ -55,6 +55,7 @@ jobs:
           oidc-audience: ${{ vars.JF_OIDC_AUDIENCE }}
 
       - name: Promote release bundle
+        id: promote
         uses: aerospike/shared-workflows/.github/actions/promote-release-bundle@b4b1e9dc89314a2d542f9d6fe0ee150ad06f9860 # v5.0.0
         with:
           bundle-name: ${{ env.BUNDLE_NAME }}
@@ -66,7 +67,13 @@ jobs:
         if: always()
         env:
           JF_PROJECT: ${{ vars.JF_PROJECT }}
+          OUTCOME: ${{ steps.promote.outcome }}
         run: |
+          if [ "$OUTCOME" != "success" ]; then
+            echo "### Promotion of \`${BUNDLE_VERSION}\` to JFrog ${TARGET_ENV} failed (outcome: ${OUTCOME}); see the step log." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
           {
             echo "### Promoted to JFrog ${TARGET_ENV}"
             echo "| Field | Value |"

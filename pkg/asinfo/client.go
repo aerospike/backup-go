@@ -72,6 +72,19 @@ var (
 	errReplicationFactorNotFound = fmt.Errorf("%w: replication factor not found", errclass.ErrAerospike)
 	errParseRecordInfo           = fmt.Errorf("%w: failed to parse record info request", errclass.ErrAerospike)
 	errUDFMissingFilename        = fmt.Errorf("%w: udf-list response missing filename", errclass.ErrAerospike)
+	errCommandNotSupported       = fmt.Errorf("%w: info command not supported by server version",
+		errclass.ErrUnsupported)
+	errMissingCmdParam = fmt.Errorf("%w: info command missing required parameter",
+		errclass.ErrInvalidConfig)
+	errInvalidCmdParam = fmt.Errorf("%w: info command parameter value contains separator",
+		errclass.ErrInvalidConfig)
+	errNilRequest = fmt.Errorf("%w: nil request", errclass.ErrInvalidConfig)
+	// errParamNotApplicable reports a parameter that the rest of the request,
+	// such as the restore policy, does not accept: the server rejects it
+	// instead of ignoring it.
+	errParamNotApplicable = fmt.Errorf("%w: info command parameter does not apply to the request",
+		errclass.ErrInvalidConfig)
+	errUnknownPolicy = fmt.Errorf("%w: info command policy is unknown", errclass.ErrInvalidConfig)
 
 	secretAgentValRegex = regexp.MustCompile(`(.+?)=secrets:(.+?):(.+?)`)
 )
@@ -94,7 +107,7 @@ type Client struct {
 	cluster     NodeGetter
 	policy      *a.InfoPolicy
 	retryPolicy *models.RetryPolicy
-	cmdDict     map[int]string
+	cmds        infoCommands
 	logger      *slog.Logger
 }
 
@@ -124,7 +137,7 @@ func NewClient(
 		return nil, fmt.Errorf("failed to get aerospike version: %w", err)
 	}
 
-	ic.cmdDict = newCmdDict(v)
+	ic.cmds = newInfoCommands(v)
 
 	return ic, nil
 }

@@ -11,6 +11,145 @@ request links for the full detail of any change.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-03
+
+### Added
+
+- Server-integrated backup and restore requests carry every parameter of the server commands.
+  `RequestBackup` gains `BinList`; `RequestCommon` gains `Path`, `SetList` and `FilterExp`;
+  `RequestRestore` gains `BackupIDs`, a comma-separated list sent as the required `backup-ids`,
+  `IncrementalPath`, the settings of both modes `RestoreWorkerThreads`, `RestoreDownloadThreads`,
+  `RestoreRPS` and `ExtraTTL`, and the fuzzy restore settings `MaxInflight`,
+  `RetryBaseIntervalMs`, `RetryMultiplier`, `RetryMaxAttempts`, `IgnoreRecordError` and
+  `ApplyMetadataLast`. `RequestBackup` gains `BackupRPS`, `BackupWorkerThreads`,
+  `BackupUploadThreads` and `BackupS3ThroughputTargetGbps`. The new `RequestPrepareRestore`
+  carries `HydrateReplica`. An optional field is sent only when it is set: a string when not
+  empty, a number when not zero and a pointer when not nil, so the server applies its own default
+  otherwise. `RetryBaseIntervalMs` is an `*int`, so that a zero delay can be sent. (BKRS-464)
+- `RequestBackup.Policy` and `RequestRestore.Policy` select the policy of a server-integrated
+  backup and restore, sent as `backup-policy` and `restore-policy`. The typed `BackupPolicy` is
+  `strict`, `best-effort` or `fuzzy`; the typed `RestorePolicy` is `strict`, the cold restore, or
+  `fuzzy`, the restore through writes. An empty policy is not sent, so the server applies its
+  default. A policy the server does not know fails with `ErrInvalidConfig`, and its error names
+  the value. (BKRS-471)
+- A restore request that sets a parameter the rest of the request does not accept fails with
+  `ErrInvalidConfig` instead of being sent, as the server rejects it: a fuzzy restore setting
+  with the strict or the default policy, and `IncrementalPath` with a single backup id. The fuzzy
+  policy accepts `FilterExp` and a list of backup ids, as the server does since SERVER-2082.
+  (BKRS-464, BKRS-471)
+- `ServerBackupInfo.OpenRestore` sends `restore-open`, which releases a namespace held by an
+  aborted cold restore. (BKRS-464)
+- `ServerBackupInfo.ClearRestoreStorage` sends `restore-clear-storage` to every node whose row of
+  a cold restore being prepared reports `clear=required`, so that its SSD namespace storage is
+  cleared in place and can reach READY without a node restart. Unlike the other restore commands
+  it is sent to each such node, not to the principal; a node that is already clearing or needs no
+  clear is skipped, so a retry never clears a node twice, and a failing node does not stop the
+  others. `ResponseRestoreState` reports `Clear`, `ClearZeroedBytes` and `ClearMs`; the typed
+  `ClearState` is resolved across nodes by `ResolveClearState`, which reports `required` if any
+  node requires a clear. (BKRS-464)
+- `ResponseBackupState` reports every field of `backup-status`: the effective limits, the byte
+  counters, `AbortOrigin` and the upload pipeline diagnostics. (BKRS-464)
+- `ResponseRestoreState`, the status of a restore job with every field of `restore-status`, and
+  the typed `RestoreState`, `RestoreKind`, `NamespaceState` and `AbortOrigin`. (BKRS-464)
+- Info commands are validated before they are sent. A missing required parameter, a nil request,
+  a malformed comma-separated `backup-ids` value (empty elements), or a value containing `;` or a
+  newline (and `|` for the backup and restore commands) fails with `ErrInvalidConfig`, and a
+  server older than 8.1 fails with `ErrUnsupported`. Neither is retried, and the error names only
+  the offending keys, never their values. `GetRestoreStatus` validates its namespace the same way,
+  although `restore-status` does not send it. (BKRS-464)
+- `lister.ErrInvalidBackupID`, of the `ErrInvalidConfig` class, returned by
+  `Lister.GetMetadata` for an argument that is not a backup id. (BKRS-474)
+
+### Changed
+
+- `pkg/server/segvalidator` reads segments in the format the server writes now, an ASBK frame
+  around the records, and checks each one the way the server does before it restores it: the
+  frame header, a body that is not empty, at most 8 MiB and rblock aligned, the record count in
+  the frame footer, and every record of the body. A segment without a frame, written by an
+  earlier server build, is reported as invalid, and so is an object larger than the 8 MiB plus
+  48 bytes the server fetches (`segment.MaxSegmentSize`).
+- A record fails its segment when its end marker is not in its last rblock
+  (`segment.ErrFrameContentMismatch`), when it is compressed (`segment.ErrCompressedRecord`; it
+  used to be skipped), and, in the query stream, when its digest places it in a partition other
+  than the one the server restores the segment into (`segment.ErrWrongPartition`). That
+  partition is read from the name of the manifest naming the segment, as the server reads it,
+  or from the `p<id>` directory of a segment no manifest names. `segment.Validate` takes options
+  for it, `segment.WithPartition`, and `streamers.Segment.Partition` reports it.
+- A query stream manifest whose name the server cannot parse as
+  `{pid}-{regime}-{timestamp}-{uuid}.json` is reported with `streamers.ErrManifestUnusable`, and
+  the segments it names are reported as recorded by no manifest: the server skips such a
+  manifest on restore.
+- The checksum a manifest records for a segment is checked as CRC-32C of the whole segment
+  object, which is what the server writes and checks on restore. It used to be checked as IEEE
+  CRC-32, and only when the manifest declared `"checksum_algorithm": "crc32"`, so the checksums
+  of the backups the server writes now were never checked. The declared algorithm is not read,
+  as the server does not read it either.
+- A manifest recording a segment without a `size` or a `checksum`, or with either written as
+  `null`, is reported with `streamers.ErrManifestUnusable`, as the server aborts the restore on
+  such an entry. The recorded size and checksum of every segment a manifest names are now always
+  compared: a recorded size of zero and an empty checksum used to skip the comparison.
+- A segment that parses but holds a different number of records than its manifest records as
+  `record_count` fails with `ErrRecordCountMismatch`, reported against the manifest. A manifest
+  that records no count, as a change stream manifest does not, is not compared.
+- `ValidationReport.TotalBytes` counts the bytes of the records, the segment frames excluded.
+- `ServerBackupInfo.GetRestoreStatus` takes the job id besides the namespace and
+  returns the merged `*models.ResponseRestoreState` of all nodes instead of a state string. It
+  reads the namespace gate from `ns-state`: the job state is in `state` now, so the namespace
+  used to be reported READY while its restore was running. `restore-status` is filtered by the
+  job id only, so that a node not hosting the namespace reports its row instead of an error; a
+  job of another namespace is not found. (BKRS-464)
+- The untyped namespace gate constants `RestoreStateNone`, `RestoreStatePreparing`,
+  `RestoreStateReady`, `RestoreStateRestoring`, `RestoreStateFailed` and `NsRestoreStateUnknown`
+  are replaced by the typed `NamespaceState` constants, which add `OPENING` and the not hosted
+  `-`. The `RestoreState*` names now hold the job states of the `state` field. (BKRS-464)
+- `ResolveRestoreState(map[string]struct{}) string` resolved namespace gate states;
+  it is now `ResolveRestoreState([]RestoreState) RestoreState` and resolves job states: FAILED,
+  then ABORTING, ABORTED and ACTIVE win, COMPLETE only when every node is COMPLETE, UNKNOWN
+  otherwise. The namespace gate states are resolved by the new
+  `ResolveNamespaceState([]NamespaceState) NamespaceState`, which skips the nodes not hosting the
+  namespace and reports READY only when every other node is READY: FAILED wins, then a state it
+  does not know, RESTORING, PREPARING, OPENING, NONE and READY last, and no state at all yields an
+  empty value. The old function reported READY for a state it did not know and for no state at
+  all. (BKRS-464)
+- `ResponseBackupState.RecsIncr` and `RecsChange` are renamed to `RecsQueryIncr`
+  and `RecsChangeIncr` after the `recs-query-incr` and `recs-change-incr` fields: they used to
+  read keys the server no longer reports and were always zero. The job timestamps are parsed in
+  the `2026-10-18 01.00.00.123 UTC` layout of the server; they used to be always zero.
+  (BKRS-464)
+- `ServerBackupInfo.PrepareRestore` takes a `*models.RequestPrepareRestore` instead
+  of the job id and namespace. (BKRS-464)
+- `RequestRestore.BackupID` is renamed to `BackupIDs` to match the `backup-ids`
+  info parameter. (BKRS-464)
+- The bool fields of the server-integrated requests are pointers: `NoIndexes` and
+  `NoUDFs`, now in `RequestCommon`. A nil value is not sent. `SetList` and `Path` moved to
+  `RequestCommon`, so struct literals that set them change. (BKRS-464)
+- `RequestRestore.FuzzyRestore` is replaced by `RequestRestore.Policy`:
+  `RestorePolicyFuzzy` selects the fuzzy restore, `RestorePolicyStrict` or an empty policy the
+  cold one. The fuzzy restore settings are fields of `RequestRestore`. (BKRS-464, BKRS-471)
+- `Lister.GetMetadata` takes a backup id and looks it up under the lister's prefix, as
+  `FetchAllMetadata` does. Anything that is not a backup id fails with `ErrInvalidBackupID`.
+  (BKRS-474)
+
+### Removed
+
+- `ValidationReport.SkippedCompressed` and `segment.Stats.SkippedCompressed`: a compressed
+  record now fails its segment.
+- `segment.ErrEmptySegment`, `segment.ErrNoRecords` and `segment.ErrBadTailSlack`. An empty or
+  cut segment fails with `segment.ErrFrameTruncated`, `segment.ErrBadBodyLength` or
+  `segment.ErrTruncatedRecord`; a body is packed tightly, so no tail of any content is accepted.
+- `RequestCommon.AccessKey` and `RequestCommon.SecretKey`. The server ignores these
+  parameters since SERVER-700. (BKRS-464)
+- `RequestBackup.EnableChangeStream`, which the server no longer accepts. (BKRS-464)
+
+### Fixed
+
+- Restore progress reached 100% early on compressed backups and then stopped reporting. Progress
+  divided the bytes decoded after decryption and decompression by the stored size of the backup
+  files, so a backup compressed 5:1 reported 100% about a fifth of the way through, and printed
+  nothing for the rest of the restore. Progress now counts the bytes read from storage, which are
+  in the same unit as the file sizes. The new `RestoreStats.StorageBytesRead` counter holds them;
+  `TotalBytesRead` still counts decoded bytes. (BKRS-459)
+
 ## [0.12.0] - 2026-09-28
 
 ### Added
@@ -640,7 +779,8 @@ repository alongside the library.
 
 Initial release.
 
-[Unreleased]: https://github.com/aerospike/backup-go/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/aerospike/backup-go/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/aerospike/backup-go/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/aerospike/backup-go/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/aerospike/backup-go/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/aerospike/backup-go/compare/v0.10.0...v0.11.0

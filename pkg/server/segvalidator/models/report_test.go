@@ -14,7 +14,13 @@
 
 package models
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
+
+// errRefused is a reason a restore refuses a backup.
+var errRefused = errors.New("backup was aborted")
 
 func TestValidationReport_Failed(t *testing.T) {
 	t.Parallel()
@@ -45,6 +51,18 @@ func TestValidationReport_Failed(t *testing.T) {
 			// Segments nothing recorded are reported, not counted as failures.
 			name:   "unrecorded segments alone",
 			report: ValidationReport{CheckedSegments: 10, ValidSegments: 10, Manifests: ManifestReport{Unrecorded: 3}},
+			want:   false,
+		},
+		{
+			// Every segment reads back and a restore still refuses to start.
+			name:   "a restore would refuse the backup",
+			report: ValidationReport{CheckedSegments: 10, ValidSegments: 10, Commit: CommitReport{Refusal: errRefused}},
+			want:   true,
+		},
+		{
+			// Superseded manifests are never read by a restore.
+			name:   "superseded manifests alone",
+			report: ValidationReport{CheckedSegments: 10, ValidSegments: 10, Manifests: ManifestReport{Superseded: 2}},
 			want:   false,
 		},
 	}

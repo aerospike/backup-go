@@ -18,6 +18,8 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -188,4 +190,60 @@ func TestReader_Close(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCountingReader_Read(t *testing.T) {
+	t.Parallel()
+
+	const payload = "the quick brown fox jumps over the lazy dog"
+
+	tests := []struct {
+		name        string
+		giveCounter *atomic.Uint64
+		wantCount   uint64
+	}{
+		{
+			name:        "with counter",
+			giveCounter: &atomic.Uint64{},
+			wantCount:   uint64(len(payload)),
+		},
+		{
+			name: "nil counter",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			reader := NewCountingReader(io.NopCloser(strings.NewReader(payload)), tt.giveCounter)
+
+			data, err := io.ReadAll(reader)
+			require.NoError(t, err)
+			assert.Equal(t, payload, string(data))
+			assert.Equal(t, tt.wantCount, loadCounter(tt.giveCounter))
+		})
+	}
+}
+
+// loadCounter returns the value of counter, or 0 if counter is nil.
+func loadCounter(counter *atomic.Uint64) uint64 {
+	if counter == nil {
+		return 0
+	}
+
+	return counter.Load()
+}
+
+func TestCountingReader_Close(t *testing.T) {
+	t.Parallel()
+
+	closeErr := errors.New("close error")
+
+	reader := NewCountingReader(&mockReadCloser{
+		readFunc:  func(_ []byte) (n int, err error) { return 0, io.EOF },
+		closeFunc: func() error { return closeErr },
+	}, nil)
+
+	require.ErrorIs(t, reader.Close(), closeErr)
 }

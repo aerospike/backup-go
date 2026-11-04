@@ -102,7 +102,7 @@ func drain(run func(chan<- Segment) error) error {
 
 	go func() { done <- run(out) }()
 
-	for range out { //nolint:revive // The segments are drained, not inspected.
+	for range out {
 	}
 
 	return <-done
@@ -394,7 +394,7 @@ func TestStreamAll_ManifestThatCannotBeReadAgain(t *testing.T) {
 		st.failOpen = func(storagePath string) error {
 			// The first read is the one that streams the manifest; the second
 			// is the one that reconciles the directory it recorded.
-			if isManifest(storagePath) && opened.Add(1) > 1 {
+			if isManifest(storagePath) && path.Base(storagePath) != metadataFile && opened.Add(1) > 1 {
 				return errStorage
 			}
 
@@ -609,8 +609,8 @@ func TestStreaming_ManifestNamingASegmentOutsideTheStorage(t *testing.T) {
 	t.Parallel()
 
 	b := newTestBackupTree(t, 1, 2, 0, 0)
-	b.put(b.manifestPath(0), testManifest(testNS, 0, []manifestSegment{
-		{SegmentName: "../../elsewhere/evil.seg", Size: 64},
+	b.put(b.manifestPath(0), testManifest(testNS, 0, []testSegment{
+		{name: "../../elsewhere/evil.seg", size: 64},
 	}))
 
 	for _, name := range []string{"all", "sample"} {
@@ -733,10 +733,11 @@ func TestStreamAll_ManifestThatBreaksHalfway(t *testing.T) {
 	b := newTestBackup(testBackupID)
 	b.put(good, segmentBody(64))
 	b.put(path.Join(root, dataDir, "p0", "extra.seg"), segmentBody(32))
-	b.put(path.Join(root, manifestDir, "0-7-0000181197010.json"), testManifest(testNS, 0, []manifestSegment{
-		{SegmentName: good, Size: 64},
-		{SegmentName: "../../elsewhere/evil.seg", Size: 64},
-	}))
+	b.put(path.Join(root, manifestDir, fmt.Sprintf(testManifestName, 0, 0)),
+		testManifest(testNS, 0, []testSegment{
+			{name: good, size: 64},
+			{name: "../../elsewhere/evil.seg", size: 64},
+		}))
 
 	rootDir := t.TempDir()
 	writeBackup(t, rootDir, b)

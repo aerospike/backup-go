@@ -87,7 +87,9 @@ func PrintBackupEstimate(
 // PrintRestoreEstimate prints the restore progress.
 // The progress is printed every second.
 // The progress is printed only when the total file size is greater than 0.
-// The progress is printed only when the written number of bytes is greater than 0.
+// The progress is printed only when the number of bytes read from storage is greater than 0.
+// Progress is the number of bytes read from storage, as stored, divided by getSize, so both
+// sides are in the same unit for compressed and encrypted backups.
 func PrintRestoreEstimate(
 	ctx context.Context,
 	stats *models.RestoreStats,
@@ -111,7 +113,7 @@ func PrintRestoreEstimate(
 				continue
 			}
 
-			done := stats.GetTotalBytesRead()
+			done := stats.GetStorageBytesRead()
 			if done == 0 {
 				continue
 			}

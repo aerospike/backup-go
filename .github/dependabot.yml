@@ -16,4 +16,4 @@ updates:
     directory: /
     target-branch: dev
     schedule:
-      interval: daily
+      interval: "weekly"

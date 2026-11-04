@@ -7,7 +7,7 @@ tag receives security fixes; there are no maintenance branches for older tags.
 
 | Version | Supported |
 | --- | --- |
-| `v0.11.1` (latest tag) | :white_check_mark: |
+| `v0.13.0` (latest tag) | :white_check_mark: |
 | Any earlier tag | :x: |
 
 If you are on an older tag, upgrade to the latest one to pick up a fix. Check the

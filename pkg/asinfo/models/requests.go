@@ -108,9 +108,6 @@ type RequestBackup struct {
 // [ResponseRestoreState.Clear].
 type RequestRestore struct {
 	RequestCommon
-	// JobID identifies the restore job. The server refuses a job id that was
-	// used before.
-	JobID string
 	// BackupIDs is a comma-separated list of backup ids to restore from: a full
 	// backup first, then its incremental backups in chronological order.
 	BackupIDs string

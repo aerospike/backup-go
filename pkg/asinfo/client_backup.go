@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/aerospike/backup-go/models"
 	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
@@ -57,8 +56,6 @@ func (ic *Client) StartBackup(ctx context.Context, request *infomodels.RequestBa
 // by an earlier backup of the same namespace cannot be seen here. statusCmd must
 // be the backup-status command for that job id.
 func (ic *Client) sendStartBackup(node infoGetter, cmd, statusCmd string, attempts *startAttempts) error {
-	attempts.sending(time.Now())
-
 	_, startErr := ic.requestByNode(node, cmd)
 	if startErr == nil {
 		return nil
@@ -119,25 +116,27 @@ func (ic *Client) AbortRestore(ctx context.Context, namespace, backupID string) 
 	})
 }
 
-// StartRestore starts a restore job on the server.
-//
-// The server refuses a job id used before, except for a repeat of a live cold
-// restore with exactly the same parameters, which it accepts as a no-op.
-func (ic *Client) StartRestore(ctx context.Context, request *infomodels.RequestRestore) error {
-	cmd, err := ic.cmds.serverRestore(request)
+// StartRestore starts a restore job on the server and returns its job id,
+// which is generated once per call.
+func (ic *Client) StartRestore(ctx context.Context, request *infomodels.RequestRestore) (string, error) {
+	jobID := newJobID()
+
+	cmd, err := ic.cmds.serverRestore(request, jobID)
 	if err != nil {
-		return fmt.Errorf("failed to build restore command: %w", err)
+		return "", fmt.Errorf("failed to build restore command: %w", err)
 	}
 
-	statusCmd, err := ic.cmds.restoreStatus(request.JobID)
+	statusCmd, err := ic.cmds.restoreStatus(jobID)
 	if err != nil {
-		return fmt.Errorf("failed to build restore status command: %w", err)
+		return "", fmt.Errorf("failed to build restore status command: %w", err)
 	}
 
-	return startWithRetry(ctx, ic.retryPolicy, ic.getPrincipalNode,
+	err = startWithRetry(ctx, ic.retryPolicy, ic.getPrincipalNode,
 		func(node infoGetter, attempts *startAttempts) error {
-			return ic.sendStartRestore(node, cmd, statusCmd, request, attempts)
+			return ic.sendStartRestore(node, cmd, statusCmd, attempts)
 		})
+
+	return jobID, err
 }
 
 // startWithRetry sends a start command with send to the node returned by
@@ -164,16 +163,12 @@ func startWithRetry(ctx context.Context, policy *models.RetryPolicy, principal f
 //
 // The request can time out after the server has already accepted the job, so a
 // failure is not conclusive while this attempt or an earlier one may have
-// reached the server: the state the server holds for the job id of request then
-// decides whether the command arrived, see [startAttempts.record]. The job id
-// is chosen by the caller, so a row of it only confirms the start if it is the
-// row of this request, see [isRestoreStarted]. statusCmd must be the
-// restore-status command for the job.
-func (ic *Client) sendStartRestore(node infoGetter, cmd, statusCmd string,
-	request *infomodels.RequestRestore, attempts *startAttempts,
-) error {
-	attempts.sending(time.Now())
-
+// reached the server: the state of this very job id then decides whether the
+// command arrived, see [startAttempts.record]. The status is looked up by
+// job id, which is generated once per [Client.StartRestore] call, so state left
+// by an earlier restore of the same namespace cannot be seen here. statusCmd
+// must be the restore-status command for that job id.
+func (ic *Client) sendStartRestore(node infoGetter, cmd, statusCmd string, attempts *startAttempts) error {
 	_, startErr := ic.requestByNode(node, cmd)
 	if startErr == nil {
 		return nil
@@ -193,7 +188,9 @@ func (ic *Client) sendStartRestore(node infoGetter, cmd, statusCmd string,
 			startErr, statusErr)
 	}
 
-	if isRestoreStarted(resp, request, attempts.firstSent) {
+	// Any state means the server got the command. What the job does next is
+	// reported by [Client.GetRestoreStatus] and is not decided here.
+	if infomodels.NewResponseRestoreState(resp) != nil {
 		return nil
 	}
 
@@ -202,18 +199,9 @@ func (ic *Client) sendStartRestore(node infoGetter, cmd, statusCmd string,
 
 // startAttempts tracks the attempts of one start command across its retries.
 type startAttempts struct {
-	// firstSent is when the first attempt was sent.
-	firstSent time.Time
 	// unanswered is true once an attempt failed with an unknown outcome, such
 	// as on a timeout: the server may have accepted the job.
 	unanswered bool
-}
-
-// sending records that an attempt is sent at now.
-func (a *startAttempts) sending(now time.Time) {
-	if a.firstSent.IsZero() {
-		a.firstSent = now
-	}
 }
 
 // record records the failure err of an attempt and reports whether the server
@@ -228,46 +216,6 @@ func (a *startAttempts) record(err error) (mayBeAccepted bool) {
 	}
 
 	return a.unanswered
-}
-
-// startClockSkew is the clock difference between the client and the server
-// nodes that [isRestoreStarted] tolerates.
-const startClockSkew = time.Minute
-
-// isRestoreStarted reports whether the response confirms the server accepted the
-// start command of request, first sent at firstSent: the server reports a job
-// only once its restore command was accepted, so a row of the job proves it.
-//
-// The caller chooses the job id, and the server keeps the row of a finished
-// job, so the row must be the one of this request. It must match the job id,
-// the namespace and the mode of request, and a finished row must have started
-// after firstSent, give or take startClockSkew: a row left by an earlier job
-// with the same job id is never taken for this one. What the job does after
-// that is reported by [Client.GetRestoreStatus].
-func isRestoreStarted(resp []infomodels.InfoMap, request *infomodels.RequestRestore, firstSent time.Time) bool {
-	status := infomodels.NewResponseRestoreState(resp)
-	if status == nil ||
-		status.JobID != request.JobID ||
-		status.Namespace != request.Namespace ||
-		status.Kind != restoreKindOf(request.Policy) {
-		return false
-	}
-
-	if !status.IsFinished() {
-		return true
-	}
-
-	return !status.StartTime.IsZero() && !status.StartTime.Before(firstSent.Add(-startClockSkew))
-}
-
-// restoreKindOf returns the restore mode the server runs for policy: cold for
-// the strict policy, its default, and fuzzy for the fuzzy one.
-func restoreKindOf(policy infomodels.RestorePolicy) infomodels.RestoreKind {
-	if policy == infomodels.RestorePolicyFuzzy {
-		return infomodels.RestoreKindFuzzy
-	}
-
-	return infomodels.RestoreKindCold
 }
 
 // GetBackupStatus aggregates server-side backup status across all nodes. The

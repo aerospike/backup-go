@@ -55,10 +55,12 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
   server answers `ERROR:9` (not acknowledged in time) or `ERROR:1` (start not confirmed), as for
   an unanswered request: the job may have started. A later attempt refused because the job id is
   in use is then confirmed by the job status instead of failing. (BKRS-494)
-- `StartRestore` takes a row of the job id as proof of the start only if it matches the
-  namespace and the mode of the request, and, for a finished row, only if the job started after
-  the first attempt was sent, give or take a minute of clock difference. A row left by an earlier
-  job with the same id is no longer taken for the new one. (BKRS-494)
+- `StartRestore` generates the job id itself, as `StartBackup` does, and returns it:
+  `ServerBackupInfo.StartRestore` and `asinfo.Client.StartRestore` return `(string, error)`.
+  The id is new on every call and is returned even when the start fails, as the server may have
+  accepted the job; use it with `GetRestoreStatus`, `AbortRestore`, `OpenRestore` and
+  `ClearRestoreStorage`. A start that fails with an unknown outcome is confirmed by any row of
+  the job id, as for a backup. (BKRS-494)
 - The merged state of `ResolveBackupState` and `ResolveRestoreState`: FAILED, ABORTING or
   ABORTED on any node makes the job ABORTING while any node is not terminal, then FAILED if any
   node failed, and ABORTED otherwise. A state the package does not know, UNKNOWN included, no
@@ -83,6 +85,7 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
 
 - `ServerBackupInfo.PrepareRestore`, `asinfo.Client.PrepareRestore` and
   `RequestPrepareRestore`: the server no longer has `restore-prepare`. (BKRS-494)
+- `RequestRestore.JobID`: `StartRestore` generates the job id. (BKRS-494)
 - `ResponseRestoreState.IsStarted` and the fields `Ignored`, `Skipped`, `HandedOff`, `Read` and
   `Deleted`, which `restore-status` no longer reports. (BKRS-494)
 - The redaction of info command values in errors: no parameter of the server carries a secret,

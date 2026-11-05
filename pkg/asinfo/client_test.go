@@ -2782,7 +2782,7 @@ func TestClearRestoreStorage(t *testing.T) {
 	const (
 		testNodeD    = "BB9050011AC4202"
 		testAccepted = "ok"
-		clearCmd     = "restore-clear-storage:namespace=" + testRestoreNamespace + ";job-id=" + testRestoreJobID
+		clearCmd     = "restore-clear-storage:namespace=" + testRestoreNamespace
 		// testColdRow is the restore-status row of a cold job being prepared.
 		testColdRow = "job-id=%s:ns=%s:kind=cold:state=ACTIVE:ns-state=PREPARING:clear=%s"
 		// testFuzzyRow is the restore-status row of a fuzzy job, which has no clear field.

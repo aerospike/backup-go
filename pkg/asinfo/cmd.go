@@ -539,16 +539,15 @@ func (c infoCommands) restoreOpen(ns, jobID string) (string, error) {
 }
 
 // restoreClearStorage returns the command that clears the storage of namespace
-// ns on the node it is sent to, for the cold restore job jobID while the node
-// prepares the namespace.
-func (c infoCommands) restoreClearStorage(ns, jobID string) (string, error) {
+// ns on the node it is sent to, while the node prepares the namespace for a
+// cold restore.
+func (c infoCommands) restoreClearStorage(ns string) (string, error) {
 	if err := c.requireIntegratedBackup(cmdNameRestoreClearStorage); err != nil {
 		return "", err
 	}
 
 	return newInfoCmd(cmdNameRestoreClearStorage, jobUnsafeChars).
 		required(paramNamespace, ns).
-		jobID(paramJobID, jobID).
 		build()
 }
 

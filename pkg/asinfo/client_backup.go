@@ -438,7 +438,7 @@ func (ic *Client) ClearRestoreStorage(ctx context.Context, namespace, jobID stri
 		return fmt.Errorf("failed to build restore status command: %w", err)
 	}
 
-	cmd, err := ic.cmds.restoreClearStorage(namespace, jobID)
+	cmd, err := ic.cmds.restoreClearStorage(namespace)
 	if err != nil {
 		return fmt.Errorf("failed to build restore clear storage command: %w", err)
 	}

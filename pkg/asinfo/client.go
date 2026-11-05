@@ -29,6 +29,31 @@ import (
 const errCmdRespPrefix = "ERROR"
 
 const (
+	// statPaxosPrincipal is the statistics key of the cluster principal node id.
+	statPaxosPrincipal = "paxos_principal"
+	// statClusterPrincipal is the statistics key of the same node id as
+	// statPaxosPrincipal.
+	statClusterPrincipal = "cluster_principal"
+)
+
+const (
+	// cmdRespCodeUnknown is the result code of an error response that reports
+	// an internal error, or a start the server could not confirm
+	// (AS_ERR_UNKNOWN).
+	cmdRespCodeUnknown = 1
+	// cmdRespCodeNotFound is the result code of an error response that reports
+	// the requested object as not found (AS_ERR_NOT_FOUND).
+	cmdRespCodeNotFound = 2
+	// cmdRespCodeTimeout is the result code of an error response that reports
+	// a command not acknowledged by every node in time (AS_ERR_TIMEOUT). The
+	// command may have taken effect.
+	cmdRespCodeTimeout = 9
+	// cmdRespNoCode stands for the result code of an error response that
+	// carries none.
+	cmdRespNoCode = -1
+)
+
+const (
 	indexTypeDefault   = "default"
 	indexTypeNone      = "none"
 	indexTypeList      = "list"
@@ -228,7 +253,7 @@ func (ic *Client) requestRandomNodeOnce(cmd string) (string, error) {
 func parseCmdResponse(cmd string, resp map[string]string) (string, error) {
 	result, err := parseResultResponse(cmd, resp)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse %s info response: %w", redactCmd(cmd), err)
+		return "", fmt.Errorf("failed to parse %s info response: %w", cmd, err)
 	}
 
 	return result, nil
@@ -240,7 +265,7 @@ func (ic *Client) requestByNodeName(nodeName, cmd string) (string, error) {
 	node, aErr := ic.cluster.GetNodeByName(nodeName)
 	if aErr != nil {
 		return "", fmt.Errorf("%w: failed to get node %s for command %s: %w",
-			errclass.ErrAerospike, nodeName, redactCmd(cmd), aErr)
+			errclass.ErrAerospike, nodeName, cmd, aErr)
 	}
 
 	return ic.requestByNode(node, cmd)
@@ -283,9 +308,20 @@ func (ic *Client) getPrincipalName() (string, error) {
 		return "", fmt.Errorf("failed to get cluster statistics: %w", err)
 	}
 
-	principal, ok := searchInInfoResponse(stats, "cluster_principal")
+	return principalFromStatistics(stats)
+}
+
+// principalFromStatistics returns the node id of the cluster principal from a
+// statistics info response. The server names it paxos_principal;
+// cluster_principal, which holds the same node id, is read if it is missing.
+func principalFromStatistics(stats []infomodels.InfoMap) (string, error) {
+	principal, ok := searchInInfoResponse(stats, statPaxosPrincipal)
 	if !ok {
-		return "", fmt.Errorf("%w: cluster key not found in statistics", errclass.ErrAerospike)
+		principal, ok = searchInInfoResponse(stats, statClusterPrincipal)
+	}
+
+	if !ok {
+		return "", fmt.Errorf("%w: cluster principal not found in statistics", errclass.ErrAerospike)
 	}
 
 	if principal == "" {

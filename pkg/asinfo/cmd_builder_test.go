@@ -404,8 +404,8 @@ func TestCommaSeparatedListValid(t *testing.T) {
 	t.Parallel()
 
 	const (
-		testListSingleID  = "260901T000000-abcd"
-		testListMultiple  = "260901T000000-abcd,260901T000001-efgh"
+		testListSingleID  = testCmdBackupID
+		testListMultiple  = testCmdBackupID + ",260901T000001-efgh"
 		testListCommaOnly = ","
 		testListEmptyPart = "a,,b"
 		testListLeading   = ",a"
@@ -434,13 +434,14 @@ func TestCommaSeparatedListValid(t *testing.T) {
 	}
 }
 
-func TestInfoCmd_RequiredCommaList(t *testing.T) {
+func TestInfoCmd_RequiredIDList(t *testing.T) {
 	t.Parallel()
 
 	const (
 		testListValue      = "id1,id2"
 		testListWant       = "cmd:k1=id1,id2"
 		testListInvalid    = "id1,"
+		testListBadID      = "id1,a:b"
 		testListInvalidKey = "cmd: k1"
 	)
 
@@ -468,13 +469,19 @@ func TestInfoCmd_RequiredCommaList(t *testing.T) {
 			wantErr:     errInvalidCmdParam,
 			wantErrText: testListInvalidKey,
 		},
+		{
+			name:        "invalid id in the list",
+			giveValue:   testListBadID,
+			wantErr:     errInvalidCmdParam,
+			wantErrText: testListInvalidKey,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := newInfoCmd(testCmdName).requiredCommaList(testCmdKey1, tt.giveValue).build()
+			got, err := newInfoCmd(testCmdName).requiredIDList(testCmdKey1, tt.giveValue).build()
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 				require.ErrorIs(t, err, errclass.ErrInvalidConfig)
@@ -486,6 +493,84 @@ func TestInfoCmd_RequiredCommaList(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestInfoCmd_JobID(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testJobValue   = testCmdBackupID
+		testJobWant    = "cmd:k1=" + testJobValue
+		testJobBad     = "a/b"
+		testJobBadText = "cmd: k1"
+	)
+
+	tests := []struct {
+		name        string
+		giveValue   string
+		want        string
+		wantErr     error
+		wantErrText string
+	}{
+		{name: "valid id", giveValue: testJobValue, want: testJobWant},
+		{name: "missing id", giveValue: "", wantErr: errMissingCmdParam, wantErrText: testErrKey1},
+		{name: "invalid id", giveValue: testJobBad, wantErr: errInvalidCmdParam, wantErrText: testJobBadText},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := newInfoCmd(testCmdName).jobID(testCmdKey1, tt.giveValue).build()
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				require.ErrorIs(t, err, errclass.ErrInvalidConfig)
+				require.ErrorContains(t, err, tt.wantErrText)
+				assert.Empty(t, got)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// TestValidID checks the job id and backup id rules of the server: 1 to 20
+// printable ASCII characters, none of "|:;=/" or a space, and no "..".
+func TestValidID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		give string
+		want bool
+	}{
+		{name: "generated id", give: testCmdBackupID, want: true},
+		{name: "single character", give: "a", want: true},
+		{name: "maximum length", give: "12345678901234567890", want: true},
+		{name: "single dot", give: "a.b", want: true},
+		{name: "empty", give: "", want: false},
+		{name: "too long", give: "123456789012345678901", want: false},
+		{name: "pipe", give: "a|b", want: false},
+		{name: "colon", give: "a:b", want: false},
+		{name: "semicolon", give: "a;b", want: false},
+		{name: "equals sign", give: "a=b", want: false},
+		{name: "slash", give: "a/b", want: false},
+		{name: "space", give: "a b", want: false},
+		{name: "double dot", give: "a..b", want: false},
+		{name: "control character", give: "a\tb", want: false},
+		{name: "non ASCII", give: "a\u00e9", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, validID(tt.give))
 		})
 	}
 }

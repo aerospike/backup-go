@@ -387,7 +387,7 @@ func (ic *Client) getPrimaryPartitions(node, namespace string) ([]int, error) {
 
 	result, err := ic.requestByNodeName(node, cmd)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get by node command: %s: %w", redactCmd(cmd), err)
+		return nil, fmt.Errorf("failed to get by node command: %s: %w", cmd, err)
 	}
 
 	var base64Res string

@@ -249,10 +249,10 @@ func storageNotApplicableErr(cmdName, policyKey string, storage infomodels.Stora
 		cmdName+" with "+paramObjectStorageType+"="+string(storage), []string{policyKey})
 }
 
-// serverRestore returns the command that starts the restore job r.JobID from
+// serverRestore returns the command that starts the restore job jobID from
 // the backups r.BackupIDs with the policy r.Policy. A parameter that the policy
 // does not accept fails with errParamNotApplicable, see checkRestoreMode.
-func (c infoCommands) serverRestore(r *infomodels.RequestRestore) (string, error) {
+func (c infoCommands) serverRestore(r *infomodels.RequestRestore, jobID string) (string, error) {
 	if err := c.requireIntegratedBackup(cmdNameRestore); err != nil {
 		return "", err
 	}
@@ -263,7 +263,7 @@ func (c infoCommands) serverRestore(r *infomodels.RequestRestore) (string, error
 
 	cmd := newInfoCmd(cmdNameRestore, jobUnsafeChars).
 		required(paramNamespace, r.Namespace).
-		jobID(paramJobID, r.JobID).
+		jobID(paramJobID, jobID).
 		requiredIDList(paramBackupIDs, r.BackupIDs)
 
 	addStorageParams(cmd, &r.RequestCommon)

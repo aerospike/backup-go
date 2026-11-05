@@ -2449,15 +2449,16 @@ func startBackupCall(namespace string, storage infomodels.StorageType) clientCal
 }
 
 // startRestoreCall calls StartRestore with the given request fields.
-func startRestoreCall(jobID, backupID, namespace string, storage infomodels.StorageType) clientCall {
+func startRestoreCall(backupID, namespace string, storage infomodels.StorageType) clientCall {
 	return clientCall{
 		name: testMethodStartRestore,
 		call: func(ctx context.Context, ic *Client) error {
-			return ic.StartRestore(ctx, &infomodels.RequestRestore{
+			_, err := ic.StartRestore(ctx, &infomodels.RequestRestore{
 				RequestCommon: infomodels.RequestCommon{Namespace: namespace, Storage: storage},
-				JobID:         jobID,
 				BackupIDs:     backupID,
 			})
+
+			return err
 		},
 	}
 }
@@ -2498,7 +2499,7 @@ func integratedBackupClientCalls(jobID, backupID, namespace string, storage info
 ) []clientCall {
 	return []clientCall{
 		startBackupCall(namespace, storage),
-		startRestoreCall(jobID, backupID, namespace, storage),
+		startRestoreCall(backupID, namespace, storage),
 		abortBackupCall(jobID),
 		abortRestoreCall(jobID, namespace),
 		openRestoreCall(jobID, namespace),
@@ -2527,6 +2528,91 @@ func integratedBackupClientCalls(jobID, backupID, namespace string, storage info
 	}
 }
 
+// startJobCall calls a Client method that starts a job and returns its job id.
+type startJobCall struct {
+	call func(ctx context.Context, ic *Client, namespace string) (string, error)
+	name string
+}
+
+// startJobCalls returns the Client methods that start a job, StartBackup and
+// StartRestore, called for namespace with the other required fields set.
+func startJobCalls() []startJobCall {
+	return []startJobCall{
+		{
+			name: testMethodStartBackup,
+			call: func(ctx context.Context, ic *Client, namespace string) (string, error) {
+				return ic.StartBackup(ctx, &infomodels.RequestBackup{
+					RequestCommon: infomodels.RequestCommon{Namespace: namespace, Storage: testIntegratedStorage},
+				})
+			},
+		},
+		{
+			name: testMethodStartRestore,
+			call: func(ctx context.Context, ic *Client, namespace string) (string, error) {
+				return ic.StartRestore(ctx, &infomodels.RequestRestore{
+					RequestCommon: infomodels.RequestCommon{Namespace: namespace, Storage: testIntegratedStorage},
+					BackupIDs:     testCmdBackupID,
+				})
+			},
+		},
+	}
+}
+
+// TestClient_StartJobID checks that StartBackup and StartRestore generate a new
+// job id on every call and return it even when the start fails on the cluster,
+// so that the caller can look the job up by it: the server may have accepted
+// the job before the start failed.
+func TestClient_StartJobID(t *testing.T) {
+	t.Parallel()
+
+	const testCalls = 3
+
+	for _, tt := range startJobCalls() {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockNodeGetter := mocks.NewMockNodeGetter(t)
+			mockNodeGetter.EXPECT().GetRandomNode().Return(nil, a.ErrInvalidParam).Times(testCalls)
+
+			ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, 1))
+
+			ids := make(map[string]struct{}, testCalls)
+
+			for range testCalls {
+				id, err := tt.call(t.Context(), ic, testIntegratedNamespace)
+
+				require.ErrorIs(t, err, errclass.ErrAerospike)
+				require.True(t, IsJobID(id), "generated id has an unexpected form: %q", id)
+
+				ids[id] = struct{}{}
+			}
+
+			assert.Len(t, ids, testCalls)
+		})
+	}
+}
+
+// TestClient_StartJobIDInvalidRequest checks that StartBackup and StartRestore
+// return no job id for a request rejected before any node is asked: no job can
+// exist then. The mocked cluster has no expectations, so any request to it
+// fails the test.
+func TestClient_StartJobIDInvalidRequest(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range startJobCalls() {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
+
+			id, err := tt.call(t.Context(), ic, "")
+
+			require.ErrorIs(t, err, errMissingCmdParam)
+			assert.Empty(t, id)
+		})
+	}
+}
+
 // TestClient_RetriesAreNotNested guards the commands that look the cluster principal
 // up before sending their own command. Both the lookup and the command used to be
 // retried separately, which multiplied the attempts and the total backoff.
@@ -2537,7 +2623,7 @@ func TestClient_RetriesAreNotNested(t *testing.T) {
 
 	tests := []clientCall{
 		startBackupCall(testIntegratedNamespace, testIntegratedStorage),
-		startRestoreCall(testIntegratedJobID, testCmdBackupID, testIntegratedNamespace, testIntegratedStorage),
+		startRestoreCall(testCmdBackupID, testIntegratedNamespace, testIntegratedStorage),
 		abortBackupCall(testIntegratedJobID),
 		abortRestoreCall(testIntegratedJobID, testIntegratedNamespace),
 		openRestoreCall(testIntegratedJobID, testIntegratedNamespace),
@@ -2933,177 +3019,6 @@ func TestClient_RestoreStatusInvalidNamespace(t *testing.T) {
 	}
 }
 
-// Test_isRestoreStarted covers the matrix that decides whether the server
-// accepted a restore start command. The server reports a job, cold or fuzzy,
-// only once its restore command was accepted, so a row of the job confirms
-// the start, whatever its state. The job id is chosen by the caller and the
-// server keeps the rows of finished jobs, so a row of another job id,
-// namespace or mode, or a finished row that started before the first send, is
-// never taken for the current one.
-func Test_isRestoreStarted(t *testing.T) {
-	t.Parallel()
-
-	const (
-		testJobID     = testCmdJobID
-		testNamespace = "source-ns1"
-		testOtherNs   = "other-ns"
-
-		keyJobID     = "job-id"
-		keyNs        = "ns"
-		keyKind      = "kind"
-		keyState     = "state"
-		keyNsState   = "ns-state"
-		keyStartTime = "start-time"
-
-		// testStartedAfter, testStartedWithinSkew and testStartedBefore are
-		// start times after, just before and long before firstSent.
-		testStartedAfter      = "2026-11-04 12.00.05.000 UTC"
-		testStartedWithinSkew = "2026-11-04 11.59.30.000 UTC"
-		testStartedBefore     = "2026-11-04 10.00.00.000 UTC"
-	)
-
-	firstSent := time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC)
-
-	cold := string(infomodels.RestoreKindCold)
-	fuzzy := string(infomodels.RestoreKindFuzzy)
-	active := string(infomodels.RestoreStateActive)
-
-	coldRequest := &infomodels.RequestRestore{
-		RequestCommon: infomodels.RequestCommon{Namespace: testNamespace},
-		JobID:         testJobID,
-	}
-	strictRequest := &infomodels.RequestRestore{
-		RequestCommon: infomodels.RequestCommon{Namespace: testNamespace},
-		JobID:         testJobID,
-		Policy:        infomodels.RestorePolicyStrict,
-	}
-	fuzzyRequest := &infomodels.RequestRestore{
-		RequestCommon: infomodels.RequestCommon{Namespace: testNamespace},
-		JobID:         testJobID,
-		Policy:        infomodels.RestorePolicyFuzzy,
-	}
-
-	coldRow := func(nsState infomodels.NamespaceState) []infomodels.InfoMap {
-		return []infomodels.InfoMap{{keyJobID: testJobID, keyNs: testNamespace, keyKind: cold,
-			keyState: active, keyNsState: string(nsState)}}
-	}
-
-	finishedRow := func(state infomodels.RestoreState, startTime string) []infomodels.InfoMap {
-		row := infomodels.InfoMap{keyJobID: testJobID, keyNs: testNamespace, keyKind: cold,
-			keyState: string(state), keyNsState: string(infomodels.NamespaceStateFailed)}
-		if startTime != "" {
-			row[keyStartTime] = startTime
-		}
-
-		return []infomodels.InfoMap{row}
-	}
-
-	tests := []struct {
-		giveRequest *infomodels.RequestRestore
-		name        string
-		give        []infomodels.InfoMap
-		want        bool
-	}{
-		{
-			name:        "fuzzy job",
-			giveRequest: fuzzyRequest,
-			give: []infomodels.InfoMap{{keyJobID: testJobID, keyNs: testNamespace, keyKind: fuzzy,
-				keyState: active, keyNsState: string(infomodels.NamespaceStateNone)}},
-			want: true,
-		},
-		{
-			name:        "cold job preparing",
-			giveRequest: coldRequest,
-			give:        coldRow(infomodels.NamespaceStatePreparing),
-			want:        true,
-		},
-		{
-			name:        "cold job ready",
-			giveRequest: coldRequest,
-			give:        coldRow(infomodels.NamespaceStateReady),
-			want:        true,
-		},
-		{
-			name:        "cold job restoring with the strict policy",
-			giveRequest: strictRequest,
-			give:        coldRow(infomodels.NamespaceStateRestoring),
-			want:        true,
-		},
-		{
-			name:        "cold job aborted after the first send",
-			giveRequest: coldRequest,
-			give:        finishedRow(infomodels.RestoreStateAborted, testStartedAfter),
-			want:        true,
-		},
-		{
-			name:        "finished job started within the clock skew",
-			giveRequest: coldRequest,
-			give:        finishedRow(infomodels.RestoreStateFailed, testStartedWithinSkew),
-			want:        true,
-		},
-		{
-			name:        "finished row of an earlier job with the same id",
-			giveRequest: coldRequest,
-			give:        finishedRow(infomodels.RestoreStateComplete, testStartedBefore),
-			want:        false,
-		},
-		{
-			name:        "finished row without a start time",
-			giveRequest: coldRequest,
-			give:        finishedRow(infomodels.RestoreStateFailed, ""),
-			want:        false,
-		},
-		{
-			name:        "live row started before the first send",
-			giveRequest: coldRequest,
-			give: []infomodels.InfoMap{{keyJobID: testJobID, keyNs: testNamespace, keyKind: cold,
-				keyState: active, keyNsState: string(infomodels.NamespaceStateRestoring),
-				keyStartTime: testStartedBefore}},
-			want: true,
-		},
-		{
-			name:        "row of another job",
-			giveRequest: fuzzyRequest,
-			give: []infomodels.InfoMap{{keyJobID: testOtherJobID, keyNs: testNamespace, keyKind: fuzzy,
-				keyState: active}},
-			want: false,
-		},
-		{
-			name:        "row of another namespace",
-			giveRequest: coldRequest,
-			give: []infomodels.InfoMap{{keyJobID: testJobID, keyNs: testOtherNs, keyKind: cold,
-				keyState: active}},
-			want: false,
-		},
-		{
-			name:        "row of another mode",
-			giveRequest: fuzzyRequest,
-			give:        coldRow(infomodels.NamespaceStateRestoring),
-			want:        false,
-		},
-		{
-			name:        "response carries no state",
-			giveRequest: fuzzyRequest,
-			give:        []infomodels.InfoMap{{keyJobID: testJobID, keyNs: testNamespace, keyKind: fuzzy}},
-			want:        false,
-		},
-		{
-			name:        "empty response",
-			giveRequest: coldRequest,
-			give:        nil,
-			want:        false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			assert.Equal(t, tt.want, isRestoreStarted(tt.give, tt.giveRequest, firstSent))
-		})
-	}
-}
-
 // TestClient_sendStartBackup checks the error plumbing of the backup start. A
 // start that failed must either be confirmed by the state of its own job id or
 // be reported with its original cause: the cause used to be replaced by the
@@ -3235,36 +3150,32 @@ func TestClient_sendStartBackup(t *testing.T) {
 }
 
 // TestClient_sendStartRestore checks the error plumbing of the restore start.
-// See TestClient_sendStartBackup for the cause that used to be lost, and
-// Test_isRestoreStarted for the state matrix behind the confirmation.
+// See TestClient_sendStartBackup for the cause that used to be lost.
 func TestClient_sendStartRestore(t *testing.T) {
 	t.Parallel()
 
 	const (
-		testJobID     = testCmdJobID
-		testNamespace = "source-ns1"
-		testStartCmd  = "restore:namespace=" + testNamespace + ";job-id=" + testJobID
-		testAccepted  = "ok"
-		statusCmd     = testRestoreStatusCmd
-		testRejected  = errCmdRespPrefix + ":22:restore: job-id=" + testJobID + " was used before - use a new job-id"
-		testTimedOut  = errCmdRespPrefix + ":9:restore: composite publish timed out"
-		// testColdStatus is the restore-status row of a cold job, see Test_isRestoreStarted.
-		testColdStatus = "job-id=%s:ns=%s:kind=cold:state=ACTIVE:restore-worker-threads=8:ns-state=%s"
+		testJobID       = testCmdJobID
+		testNamespace   = "source-ns1"
+		testStartCmd    = "restore:namespace=" + testNamespace + ";job-id=" + testJobID
+		testAccepted    = "ok"
+		statusCmd       = testRestoreStatusCmd
+		testRejected    = errCmdRespPrefix + ":22:restore: job-id=" + testJobID + " was used before - use a new job-id"
+		testTimedOut    = errCmdRespPrefix + ":9:restore: composite publish timed out"
+		testUnconfirmed = errCmdRespPrefix + ":1:restore: job-id=" + testJobID +
+			": start could not be confirmed - check restore-status before retrying"
+		// testColdStatus is the restore-status row of a cold job.
+		testColdStatus = "job-id=%s:ns=%s:kind=cold:state=%s:restore-worker-threads=8:ns-state=%s"
 	)
 
-	restoringStatus := fmt.Sprintf(testColdStatus,
-		testJobID, testNamespace, infomodels.NamespaceStateRestoring)
-	preparingStatus := fmt.Sprintf(testColdStatus,
-		testJobID, testNamespace, infomodels.NamespaceStatePreparing)
-	otherJobStatus := fmt.Sprintf(testColdStatus,
-		testOtherJobID, testNamespace, infomodels.NamespaceStateRestoring)
-	otherNsStatus := fmt.Sprintf(testColdStatus,
-		testJobID, "other-ns", infomodels.NamespaceStateRestoring)
-
-	request := &infomodels.RequestRestore{
-		RequestCommon: infomodels.RequestCommon{Namespace: testNamespace},
-		JobID:         testJobID,
-	}
+	restoringStatus := fmt.Sprintf(testColdStatus, testJobID, testNamespace,
+		infomodels.RestoreStateActive, infomodels.NamespaceStateRestoring)
+	preparingStatus := fmt.Sprintf(testColdStatus, testJobID, testNamespace,
+		infomodels.RestoreStateActive, infomodels.NamespaceStatePreparing)
+	failedStatus := fmt.Sprintf(testColdStatus, testJobID, testNamespace,
+		infomodels.RestoreStateFailed, infomodels.NamespaceStateFailed)
+	fuzzyStatus := fmt.Sprintf("job-id=%s:ns=%s:kind=fuzzy:state=%s", testJobID, testNamespace,
+		infomodels.RestoreStateActive)
 
 	tests := []struct {
 		startErr         a.Error
@@ -3292,10 +3203,19 @@ func TestClient_sendStartRestore(t *testing.T) {
 			statusResp: preparingStatus,
 		},
 		{
-			name:       "start failed and the running restore belongs to another job",
+			name:       "start failed but the fuzzy job is running",
 			startErr:   a.ErrNetTimeout,
-			statusResp: otherJobStatus,
-			wantErrIs:  a.ErrNetTimeout,
+			statusResp: fuzzyStatus,
+		},
+		{
+			name:       "start failed and the job already failed on the server",
+			startErr:   a.ErrNetTimeout,
+			statusResp: failedStatus,
+		},
+		{
+			name:      "start failed and the server holds no state for the job",
+			startErr:  a.ErrNetTimeout,
+			wantErrIs: a.ErrNetTimeout,
 		},
 		{
 			name:        "start failed and the status is unavailable",
@@ -3329,9 +3249,14 @@ func TestClient_sendStartRestore(t *testing.T) {
 			statusResp: restoringStatus,
 		},
 		{
-			name:       "start not acknowledged in time and the row is of another namespace",
+			name:       "start not confirmed but the job is running",
+			startResp:  testUnconfirmed,
+			statusResp: restoringStatus,
+		},
+		{
+			name:       "start not acknowledged in time and the node does not know the job",
 			startResp:  testTimedOut,
-			statusResp: otherNsStatus,
+			statusResp: testNoRestoreJob,
 			wantErrIs:  errclass.ErrAerospike,
 		},
 	}
@@ -3343,13 +3268,15 @@ func TestClient_sendStartRestore(t *testing.T) {
 			node := mocks.NewMockinfoGetter(t)
 			node.EXPECT().RequestInfo(testInfoPolicy, []string{testStartCmd}).
 				Return(map[string]string{testStartCmd: tt.startResp}, tt.startErr).Once()
+			// Registered for the job id command only: any other status lookup has
+			// no matching expectation and fails the test.
 			node.EXPECT().RequestInfo(testInfoPolicy, []string{statusCmd}).
 				Return(map[string]string{statusCmd: tt.statusResp}, tt.statusErr).Maybe()
 
 			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
 			attempts := startAttempts{unanswered: tt.unansweredBefore}
 
-			err := ic.sendStartRestore(node, testStartCmd, statusCmd, request, &attempts)
+			err := ic.sendStartRestore(node, testStartCmd, statusCmd, &attempts)
 			if tt.wantErrIs != nil {
 				require.ErrorIs(t, err, tt.wantErrIs)
 				require.ErrorContains(t, err, tt.wantErrText)
@@ -3454,12 +3381,7 @@ func TestStartWithRetry(t *testing.T) {
 			statusResp: "job-id=" + testRestoreJobID + ":ns=" + testRestoreNamespace +
 				":kind=cold:state=ACTIVE:ns-state=PREPARING",
 			send: func(ic *Client, node infoGetter, attempts *startAttempts) error {
-				request := &infomodels.RequestRestore{
-					RequestCommon: infomodels.RequestCommon{Namespace: testRestoreNamespace},
-					JobID:         testRestoreJobID,
-				}
-
-				return ic.sendStartRestore(node, testRestoreStartCmd, testRestoreStatusCmd, request, attempts)
+				return ic.sendStartRestore(node, testRestoreStartCmd, testRestoreStatusCmd, attempts)
 			},
 		},
 	}

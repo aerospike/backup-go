@@ -502,20 +502,29 @@ func (_c *MockServerBackupInfo_StartBackup_Call) RunAndReturn(run func(ctx conte
 }
 
 // StartRestore provides a mock function for the type MockServerBackupInfo
-func (_mock *MockServerBackupInfo) StartRestore(ctx context.Context, request *models.RequestRestore) error {
+func (_mock *MockServerBackupInfo) StartRestore(ctx context.Context, request *models.RequestRestore) (string, error) {
 	ret := _mock.Called(ctx, request)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StartRestore")
 	}
 
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.RequestRestore) error); ok {
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.RequestRestore) (string, error)); ok {
+		return returnFunc(ctx, request)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.RequestRestore) string); ok {
 		r0 = returnFunc(ctx, request)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(string)
 	}
-	return r0
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *models.RequestRestore) error); ok {
+		r1 = returnFunc(ctx, request)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
 }
 
 // MockServerBackupInfo_StartRestore_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StartRestore'
@@ -548,12 +557,12 @@ func (_c *MockServerBackupInfo_StartRestore_Call) Run(run func(ctx context.Conte
 	return _c
 }
 
-func (_c *MockServerBackupInfo_StartRestore_Call) Return(err error) *MockServerBackupInfo_StartRestore_Call {
-	_c.Call.Return(err)
+func (_c *MockServerBackupInfo_StartRestore_Call) Return(s string, err error) *MockServerBackupInfo_StartRestore_Call {
+	_c.Call.Return(s, err)
 	return _c
 }
 
-func (_c *MockServerBackupInfo_StartRestore_Call) RunAndReturn(run func(ctx context.Context, request *models.RequestRestore) error) *MockServerBackupInfo_StartRestore_Call {
+func (_c *MockServerBackupInfo_StartRestore_Call) RunAndReturn(run func(ctx context.Context, request *models.RequestRestore) (string, error)) *MockServerBackupInfo_StartRestore_Call {
 	_c.Call.Return(run)
 	return _c
 }

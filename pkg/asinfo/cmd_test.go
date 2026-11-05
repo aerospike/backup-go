@@ -99,7 +99,6 @@ func testCmdMinimalCommon() infomodels.RequestCommon {
 func testMinimalRestore(policy infomodels.RestorePolicy) *infomodels.RequestRestore {
 	return &infomodels.RequestRestore{
 		RequestCommon: testCmdMinimalCommon(),
-		JobID:         testCmdJobID,
 		BackupIDs:     testCmdBackupID,
 		Policy:        policy,
 	}
@@ -158,9 +157,8 @@ func integratedBackupCalls() []integratedBackupCall {
 						Namespace: testCmdNamespace,
 						Storage:   testCmdStorage,
 					},
-					JobID:     testCmdJobID,
 					BackupIDs: testCmdBackupID,
-				})
+				}, testCmdJobID)
 			},
 			want: testCmdRestoreBase,
 		},
@@ -508,7 +506,7 @@ func TestInfoCommands_IntegratedBackupMissingParams(t *testing.T) {
 		{
 			name: cmdNameRestore,
 			call: func() (string, error) {
-				return cmds.serverRestore(&infomodels.RequestRestore{})
+				return cmds.serverRestore(&infomodels.RequestRestore{}, "")
 			},
 			wantMissing: "namespace, job-id, backup-ids, object-storage-type",
 		},
@@ -573,7 +571,7 @@ func TestInfoCommands_NilRequest(t *testing.T) {
 		},
 		{
 			name: cmdNameRestore,
-			call: func() (string, error) { return cmds.serverRestore(nil) },
+			call: func() (string, error) { return cmds.serverRestore(nil, testCmdJobID) },
 		},
 	}
 
@@ -663,9 +661,8 @@ func TestInfoCommands_InvalidParams(t *testing.T) {
 				Storage:   testCmdStorage,
 				Path:      path,
 			},
-			JobID:     testCmdJobID,
 			BackupIDs: backupIDs,
-		})
+		}, testCmdJobID)
 	}
 
 	const (
@@ -902,7 +899,6 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 
 		return &infomodels.RequestRestore{
 			RequestCommon:          common,
-			JobID:                  testCmdJobID,
 			BackupIDs:              testCmdBackupIDsChain,
 			IncrementalPath:        testIncrementalPath,
 			RestoreDownloadThreads: 8,
@@ -982,7 +978,7 @@ func TestInfoCommands_ServerRestore(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := cmds.serverRestore(tt.give)
+			got, err := cmds.serverRestore(tt.give, testCmdJobID)
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
@@ -1041,9 +1037,9 @@ func TestInfoCommands_ServerRestorePolicyMismatch(t *testing.T) {
 	strictWithZeroInterval := testMinimalRestore(infomodels.RestorePolicyStrict)
 	strictWithZeroInterval.RetryBaseIntervalMs = new(0)
 
-	strictWithMaxInflightNoJobID := testMinimalRestore(infomodels.RestorePolicyStrict)
-	strictWithMaxInflightNoJobID.MaxInflight = 1
-	strictWithMaxInflightNoJobID.JobID = ""
+	strictWithMaxInflightNoNamespace := testMinimalRestore(infomodels.RestorePolicyStrict)
+	strictWithMaxInflightNoNamespace.MaxInflight = 1
+	strictWithMaxInflightNoNamespace.Namespace = ""
 
 	tests := []struct {
 		name        string
@@ -1105,7 +1101,7 @@ func TestInfoCommands_ServerRestorePolicyMismatch(t *testing.T) {
 		},
 		{
 			name:        "missing parameter is reported with the policy mismatch",
-			give:        strictWithMaxInflightNoJobID,
+			give:        strictWithMaxInflightNoNamespace,
 			wantErrText: testStrictPrefix + paramMaxInflight,
 			wantMissing: true,
 		},
@@ -1115,7 +1111,7 @@ func TestInfoCommands_ServerRestorePolicyMismatch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := cmds.serverRestore(tt.give)
+			got, err := cmds.serverRestore(tt.give, testCmdJobID)
 
 			require.ErrorIs(t, err, errParamNotApplicable)
 			require.ErrorIs(t, err, errclass.ErrInvalidConfig)
@@ -1146,7 +1142,7 @@ func TestInfoCommands_ServerRestoreFuzzyInvalidBackupIDs(t *testing.T) {
 			r := testMinimalRestore(infomodels.RestorePolicyFuzzy)
 			r.BackupIDs = tt.give
 
-			got, err := cmds.serverRestore(r)
+			got, err := cmds.serverRestore(r, testCmdJobID)
 
 			require.ErrorIs(t, err, errInvalidCmdParam)
 			require.NotErrorIs(t, err, errParamNotApplicable)
@@ -1253,8 +1249,8 @@ func TestInfoCommands_UnknownPolicy(t *testing.T) {
 	restoreWithFilter := testMinimalRestore(testUnknownPolicy)
 	restoreWithFilter.FilterExp = testCmdFilterExp
 
-	restoreNoJobID := testMinimalRestore(testUnknownPolicy)
-	restoreNoJobID.JobID = ""
+	restoreNoNamespace := testMinimalRestore(testUnknownPolicy)
+	restoreNoNamespace.Namespace = ""
 
 	tests := []struct {
 		name        string
@@ -1276,23 +1272,23 @@ func TestInfoCommands_UnknownPolicy(t *testing.T) {
 		{
 			name: "restore",
 			call: func() (string, error) {
-				return cmds.serverRestore(testMinimalRestore(testUnknownPolicy))
+				return cmds.serverRestore(testMinimalRestore(testUnknownPolicy), testCmdJobID)
 			},
 			wantErrText: testRestorePolicyErr,
 		},
 		{
 			name:        "restore with fuzzy only parameters",
-			call:        func() (string, error) { return cmds.serverRestore(restoreWithFuzzyParams) },
+			call:        func() (string, error) { return cmds.serverRestore(restoreWithFuzzyParams, testCmdJobID) },
 			wantErrText: testRestorePolicyErr,
 		},
 		{
 			name:        "restore with filter expression",
-			call:        func() (string, error) { return cmds.serverRestore(restoreWithFilter) },
+			call:        func() (string, error) { return cmds.serverRestore(restoreWithFilter, testCmdJobID) },
 			wantErrText: testRestorePolicyErr,
 		},
 		{
 			name:        "restore with missing parameter",
-			call:        func() (string, error) { return cmds.serverRestore(restoreNoJobID) },
+			call:        func() (string, error) { return cmds.serverRestore(restoreNoNamespace, testCmdJobID) },
 			wantErrText: testRestorePolicyErr,
 			wantMissing: true,
 		},
@@ -1518,7 +1514,7 @@ func TestInfoCommands_ServerRestoreAccepted(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := cmds.serverRestore(tt.give)
+			got, err := cmds.serverRestore(tt.give, testCmdJobID)
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
@@ -1558,10 +1554,7 @@ func TestInfoCommands_InvalidJobID(t *testing.T) {
 		{
 			name: cmdNameRestore,
 			build: func(id string) (string, error) {
-				r := testMinimalRestore("")
-				r.JobID = id
-
-				return cmds.serverRestore(r)
+				return cmds.serverRestore(testMinimalRestore(""), id)
 			},
 		},
 		{name: cmdNameBackupStatus, build: cmds.backupStatus},
@@ -1636,7 +1629,7 @@ func TestInfoCommands_InvalidBackupIDs(t *testing.T) {
 			r := testMinimalRestore("")
 			r.BackupIDs = tt.give
 
-			got, err := cmds.serverRestore(r)
+			got, err := cmds.serverRestore(r, testCmdJobID)
 			if tt.wantErr {
 				require.ErrorIs(t, err, errInvalidCmdParam)
 				require.ErrorContains(t, err, paramBackupIDs)

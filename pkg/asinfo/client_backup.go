@@ -37,8 +37,8 @@ func (ic *Client) StartBackup(ctx context.Context, request *infomodels.RequestBa
 		return "", fmt.Errorf("failed to build backup status command: %w", err)
 	}
 
-	err = startWithRetry(ctx, ic.retryPolicy, ic.getPrincipalNode,
-		func(node infoGetter, attempts *startAttempts) error {
+	err = retryOnPrincipal(ctx, ic.retryPolicy, ic.getPrincipalNode,
+		func(node infoGetter, attempts *retryAttempts) error {
 			return ic.sendStartBackup(node, cmd, statusCmd, attempts)
 		})
 
@@ -51,11 +51,11 @@ func (ic *Client) StartBackup(ctx context.Context, request *infomodels.RequestBa
 // The request can time out after the server has already accepted the job, so a
 // failure is not conclusive while this attempt or an earlier one may have
 // reached the server: the state of this very job id then decides whether the
-// command arrived, see [startAttempts.record]. The status is looked up by
+// command arrived, see [retryAttempts.record]. The status is looked up by
 // job id, which is generated once per [Client.StartBackup] call, so state left
 // by an earlier backup of the same namespace cannot be seen here. statusCmd must
 // be the backup-status command for that job id.
-func (ic *Client) sendStartBackup(node infoGetter, cmd, statusCmd string, attempts *startAttempts) error {
+func (ic *Client) sendStartBackup(node infoGetter, cmd, statusCmd string, attempts *retryAttempts) error {
 	_, startErr := ic.requestByNode(node, cmd)
 	if startErr == nil {
 		return nil
@@ -131,22 +131,23 @@ func (ic *Client) StartRestore(ctx context.Context, request *infomodels.RequestR
 		return "", fmt.Errorf("failed to build restore status command: %w", err)
 	}
 
-	err = startWithRetry(ctx, ic.retryPolicy, ic.getPrincipalNode,
-		func(node infoGetter, attempts *startAttempts) error {
+	err = retryOnPrincipal(ctx, ic.retryPolicy, ic.getPrincipalNode,
+		func(node infoGetter, attempts *retryAttempts) error {
 			return ic.sendStartRestore(node, cmd, statusCmd, attempts)
 		})
 
 	return jobID, err
 }
 
-// startWithRetry sends a start command with send to the node returned by
-// principal, under policy. Every attempt shares one startAttempts, so that an
+// retryOnPrincipal sends a command whose effect may outlive a failed attempt,
+// such as a job start or a restore open, with send to the node returned by
+// principal, under policy. Every attempt shares one retryAttempts, so that an
 // attempt with an unknown outcome is still taken into account by the later
-// ones, see [startAttempts.record].
-func startWithRetry(ctx context.Context, policy *models.RetryPolicy, principal func() (infoGetter, error),
-	send func(node infoGetter, attempts *startAttempts) error,
+// ones, see [retryAttempts.record].
+func retryOnPrincipal(ctx context.Context, policy *models.RetryPolicy, principal func() (infoGetter, error),
+	send func(node infoGetter, attempts *retryAttempts) error,
 ) error {
-	var attempts startAttempts
+	var attempts retryAttempts
 
 	return executeWithRetry(ctx, policy, func() error {
 		node, err := principal()
@@ -164,11 +165,11 @@ func startWithRetry(ctx context.Context, policy *models.RetryPolicy, principal f
 // The request can time out after the server has already accepted the job, so a
 // failure is not conclusive while this attempt or an earlier one may have
 // reached the server: the state of this very job id then decides whether the
-// command arrived, see [startAttempts.record]. The status is looked up by
+// command arrived, see [retryAttempts.record]. The status is looked up by
 // job id, which is generated once per [Client.StartRestore] call, so state left
 // by an earlier restore of the same namespace cannot be seen here. statusCmd
 // must be the restore-status command for that job id.
-func (ic *Client) sendStartRestore(node infoGetter, cmd, statusCmd string, attempts *startAttempts) error {
+func (ic *Client) sendStartRestore(node infoGetter, cmd, statusCmd string, attempts *retryAttempts) error {
 	_, startErr := ic.requestByNode(node, cmd)
 	if startErr == nil {
 		return nil
@@ -197,20 +198,21 @@ func (ic *Client) sendStartRestore(node infoGetter, cmd, statusCmd string, attem
 	return fmt.Errorf("failed to start restore: %w", startErr)
 }
 
-// startAttempts tracks the attempts of one start command across its retries.
-type startAttempts struct {
+// retryAttempts tracks the attempts of one command across its retries, for a
+// command whose effect may outlive a failed attempt, see [retryOnPrincipal].
+type retryAttempts struct {
 	// unanswered is true once an attempt failed with an unknown outcome, such
-	// as on a timeout: the server may have accepted the job.
+	// as on a timeout: the server may have applied the command.
 	unanswered bool
 }
 
 // record records the failure err of an attempt and reports whether the server
-// may have accepted the job, on this attempt or an earlier one. An answered
+// may have applied the command, on this attempt or an earlier one. An answered
 // error is conclusive for its own attempt, except the ones the server returns
-// when the start may have taken effect, see [mayHaveTakenEffect]. So after a
-// conclusive error, such as for a job id in use, the job may only exist if an
-// earlier attempt had an unknown outcome.
-func (a *startAttempts) record(err error) (mayBeAccepted bool) {
+// when the command may have taken effect, see [mayHaveTakenEffect]. So after a
+// conclusive error, such as for a job id in use, the command may only have
+// taken effect if an earlier attempt had an unknown outcome.
+func (a *retryAttempts) record(err error) (mayHaveApplied bool) {
 	if mayHaveTakenEffect(err) {
 		a.unanswered = true
 	}
@@ -293,21 +295,50 @@ func (ic *Client) getBackupStatusByNode(node infoGetter, cmd string) ([]infomode
 	return infoResponse, nil
 }
 
-// OpenRestore releases the namespace held by the aborted cold restore job jobID on
+// OpenRestore releases namespace held by a failed or aborted cold restore on
 // the server, opening it to clients with the data the restore had written.
-func (ic *Client) OpenRestore(ctx context.Context, namespace, jobID string) error {
-	cmd, err := ic.cmds.restoreOpen(namespace, jobID)
+// A retry answered as not found after an attempt with an unknown outcome is
+// taken as success, see [Client.sendOpenRestore].
+func (ic *Client) OpenRestore(ctx context.Context, namespace string) error {
+	cmd, err := ic.cmds.restoreOpen(namespace)
 	if err != nil {
 		return fmt.Errorf("failed to build restore open command: %w", err)
 	}
 
-	return executeWithRetry(ctx, ic.retryPolicy, func() error {
-		if err := ic.sendToPrincipal(cmd); err != nil {
-			return fmt.Errorf("failed to open restore: %w", err)
-		}
+	return retryOnPrincipal(ctx, ic.retryPolicy, ic.getPrincipalNode,
+		func(node infoGetter, attempts *retryAttempts) error {
+			return ic.sendOpenRestore(node, cmd, attempts)
+		})
+}
 
+// sendOpenRestore sends the restore open command cmd to node and reports
+// whether the namespace is open.
+//
+// The server answers not found when nothing gates the namespace, which is also
+// its answer to a repeat of an open that succeeded. So a not found answer means
+// the namespace is open if an earlier attempt of the same call may have reached
+// the server, see [retryAttempts.record]: the attempt timed out, went
+// unanswered, or the server could not confirm that every node acknowledged it.
+// Otherwise it is returned as an error, since nothing was there to open.
+//
+// An unavailable answer is conclusive: either nothing was done (SMD not settled
+// yet) or only some keys were deleted (more keys than one command takes), and
+// the retry deletes the rest. A not found answer after it means that the gating
+// node of a remaining key has not reported it yet, so the namespace may still
+// be gated on that node.
+func (ic *Client) sendOpenRestore(node infoGetter, cmd string, attempts *retryAttempts) error {
+	_, err := ic.requestByNode(node, cmd)
+	if err == nil {
 		return nil
-	})
+	}
+
+	// A not found answer is conclusive itself, so record reports only whether
+	// an earlier attempt may have taken effect.
+	if attempts.record(err) && isNotFoundResp(err) {
+		return nil
+	}
+
+	return fmt.Errorf("failed to open restore: %w", err)
 }
 
 // GetRestoreStatus aggregates the status of the restore job jobID of namespace

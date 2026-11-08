@@ -36,7 +36,7 @@ type ClusterInfo interface {
 	GetSIndexInfo(ctx context.Context, namespace string) (models.SIndexInfo, error)
 	GetPrimaryPartitions(ctx context.Context, node, namespace string) ([]int, error)
 	GetPendingMigrations(ctx context.Context, namespace string) (uint64, error)
-	GetClusterStable(ctx context.Context, namespace string) (bool, error)
+	GetClusterStable(ctx context.Context, namespace string, ignoreMigrations bool) (bool, error)
 }
 
 // ServerBackupInfo provides server-side backup and restore job control.

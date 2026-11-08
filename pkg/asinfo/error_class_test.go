@@ -31,6 +31,7 @@ func TestErrorClasses(t *testing.T) {
 	}{
 		{name: "replication factor zero", err: ErrReplicationFactorZero, class: errclass.ErrAerospike},
 		{name: "no node", err: ErrNoNode, class: errclass.ErrNotFound},
+		{name: "cluster unstable", err: ErrClusterUnstable, class: errclass.ErrAerospike},
 		{name: "not found", err: ErrNotFound, class: errclass.ErrNotFound},
 		{name: "invalid sindex type", err: ErrInvalidSIndexType, class: errclass.ErrCorruptData},
 		{name: "no info commands", err: errNoInfoCommands, class: errclass.ErrInvalidConfig},

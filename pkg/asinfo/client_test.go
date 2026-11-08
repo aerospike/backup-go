@@ -2630,7 +2630,7 @@ func TestClient_RetriesAreNotNested(t *testing.T) {
 		{
 			name: "GetClusterStable",
 			call: func(ctx context.Context, ic *Client) error {
-				_, err := ic.GetClusterStable(ctx, testIntegratedNamespace)
+				_, err := ic.GetClusterStable(ctx, testIntegratedNamespace, false)
 
 				return err
 			},
@@ -3987,4 +3987,133 @@ func TestGetBackupStatus(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+// Shared by the checkClusterStable tests below.
+const (
+	testStableNamespace = "stable-ns"
+	testClusterID       = "6F2A1C3B9D4E"
+	testUnstableResp    = errCmdRespPrefix + "::unstable-cluster"
+)
+
+// TestCheckClusterStable checks that every node is asked for its stable status,
+// and that the check stops at the first node that fails or answers with another
+// cluster key: the nodes after it are never asked. Only another cluster key
+// makes the cluster unstable, so that callers can tell it from a failing node.
+func TestCheckClusterStable(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testStableCmd      = "cluster-stable:size=3;ignore-migrations=false;namespace=" + testStableNamespace
+		testOtherClusterID = "1A2B3C4D5E6F"
+	)
+
+	// nodeAnswer describes the answer of a mocked node to testStableCmd. A node
+	// that is not asked has no expectations, so asking it fails the test.
+	type nodeAnswer struct {
+		err   a.Error
+		name  string
+		resp  string
+		asked bool
+	}
+
+	tests := []struct {
+		name         string
+		give         []nodeAnswer
+		want         bool
+		wantErr      error
+		wantErrNode  string
+		wantUnstable bool
+	}{
+		{
+			name: "all nodes stable",
+			give: []nodeAnswer{
+				{name: testNodeA, resp: testClusterID, asked: true},
+				{name: testNodeB, resp: testClusterID, asked: true},
+				{name: testNodeC, resp: testClusterID, asked: true},
+			},
+			want: true,
+		},
+		{
+			name: "node with another cluster key",
+			give: []nodeAnswer{
+				{name: testNodeA, resp: testClusterID, asked: true},
+				{name: testNodeB, resp: testOtherClusterID, asked: true},
+				{name: testNodeC},
+			},
+			wantErr:      ErrClusterUnstable,
+			wantErrNode:  testNodeB,
+			wantUnstable: true,
+		},
+		{
+			name: "node request failing",
+			give: []nodeAnswer{
+				{name: testNodeA, err: a.ErrNetwork, asked: true},
+				{name: testNodeB},
+				{name: testNodeC},
+			},
+			wantErr:     errclass.ErrAerospike,
+			wantErrNode: testNodeA,
+		},
+		{
+			name: "node answering error",
+			give: []nodeAnswer{
+				{name: testNodeA, resp: testClusterID, asked: true},
+				{name: testNodeB, resp: testUnstableResp, asked: true},
+				{name: testNodeC},
+			},
+			wantErr:     errclass.ErrAerospike,
+			wantErrNode: testNodeB,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			nodes := make([]*mocks.MockstatusNode, 0, len(tt.give))
+
+			for _, n := range tt.give {
+				m := mocks.NewMockstatusNode(t)
+				m.EXPECT().GetName().Return(n.name).Maybe()
+
+				if n.asked {
+					m.EXPECT().RequestInfo(testInfoPolicy, []string{testStableCmd}).
+						Return(map[string]string{testStableCmd: n.resp}, n.err).Once()
+				}
+
+				nodes = append(nodes, m)
+			}
+
+			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
+
+			got, err := checkClusterStable(ic, nodes, testStableCmd, testClusterID)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				require.ErrorContains(t, err, tt.wantErrNode)
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.wantUnstable, errors.Is(err, ErrClusterUnstable))
+		})
+	}
+}
+
+// TestClient_GetClusterStableNoNodes checks that a cluster without nodes is not
+// reported stable and that no node is asked for statistics: the mocked cluster
+// expects only the node list, so any other request fails the test.
+func TestClient_GetClusterStableNoNodes(t *testing.T) {
+	t.Parallel()
+
+	mockNodeGetter := mocks.NewMockNodeGetter(t)
+	mockNodeGetter.EXPECT().GetNodes().Return(nil).Once()
+
+	ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, 0))
+
+	got, err := ic.GetClusterStable(t.Context(), testStableNamespace, false)
+
+	require.ErrorIs(t, err, errNoNodesAvailable)
+	assert.False(t, got)
 }

@@ -96,6 +96,15 @@ var (
 	// not accepted, while an open may still have taken partial effect.
 	ErrOutcomeUnknown = fmt.Errorf("%w: command outcome unknown", errclass.ErrAerospike)
 
+	// ErrClusterUnstable is wrapped by the error of [Client.GetClusterStable]
+	// when a node answers with a cluster key other than the one of the cluster:
+	// the cluster is changing and the check may succeed later. Any other
+	// failure of the check, including an error answered by a node, does not
+	// wrap it. If the context is canceled between attempts, the error wraps both
+	// the context error and the error of the last attempt, so check the context
+	// error first.
+	ErrClusterUnstable = fmt.Errorf("%w: cluster is not stable", errclass.ErrAerospike)
+
 	// Static internal errors. Kept as package-level sentinels so they can be
 	// matched with errors.Is and satisfy err113/perfsprint linters.
 	errNoInfoCommands = fmt.Errorf("%w: no info commands provided or command not supported",

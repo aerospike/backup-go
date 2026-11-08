@@ -293,17 +293,30 @@ func TestInfoCommands_AllVersions(t *testing.T) {
 		},
 		{
 			name: "cluster stable",
-			call: func() (string, error) { return cmds.clusterStable(testClusterSize, testCmdNamespace) },
+			call: func() (string, error) {
+				return cmds.clusterStable(testClusterSize, testCmdNamespace, false)
+			},
 			want: "cluster-stable:size=3;ignore-migrations=false;namespace=source-ns",
 		},
 		{
-			name:    "cluster stable without namespace",
-			call:    func() (string, error) { return cmds.clusterStable(testClusterSize, "") },
+			name: "cluster stable ignoring migrations",
+			call: func() (string, error) {
+				return cmds.clusterStable(testClusterSize, testCmdNamespace, true)
+			},
+			want: "cluster-stable:size=3;ignore-migrations=true;namespace=source-ns",
+		},
+		{
+			name: "cluster stable without namespace",
+			call: func() (string, error) {
+				return cmds.clusterStable(testClusterSize, "", false)
+			},
 			wantErr: errMissingCmdParam,
 		},
 		{
-			name:    "cluster stable with separator",
-			call:    func() (string, error) { return cmds.clusterStable(testClusterSize, testUnsafeValue) },
+			name: "cluster stable with separator",
+			call: func() (string, error) {
+				return cmds.clusterStable(testClusterSize, testUnsafeValue, false)
+			},
 			wantErr: errInvalidCmdParam,
 		},
 	}

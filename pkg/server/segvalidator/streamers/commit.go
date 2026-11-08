@@ -212,7 +212,7 @@ func (c *CommitRecord) Refusal(strict bool) error {
 // readCommit reads the commit record of the backup. Anything wrong with the
 // record is described by what is returned; only a canceled context is an error.
 func (s *Streamer) readCommit(ctx context.Context) (CommitRecord, error) {
-	record := CommitRecord{Path: path.Join(s.backupID, metadataFile)}
+	record := CommitRecord{Path: path.Join(s.dir, metadataFile)}
 
 	data, err := s.readMetadata(ctx, record.Path)
 	if ctxErr := ctx.Err(); ctxErr != nil {

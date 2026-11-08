@@ -17,6 +17,8 @@ package models
 import (
 	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // errRefused is a reason a restore refuses a backup.
@@ -71,9 +73,7 @@ func TestValidationReport_Failed(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := tt.report.Failed(); got != tt.want {
-				t.Fatalf("Failed() = %v, want %v", got, tt.want)
-			}
+			require.Equal(t, tt.want, tt.report.Failed())
 		})
 	}
 }
@@ -113,9 +113,7 @@ func TestValidationReport_Truncated(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := tt.report.Truncated(); got != tt.want {
-				t.Fatalf("Truncated() = %v, want %v", got, tt.want)
-			}
+			require.Equal(t, tt.want, tt.report.Truncated())
 		})
 	}
 }
@@ -149,9 +147,7 @@ func TestManifestReport_Truncated(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := tt.report.Truncated(); got != tt.want {
-				t.Fatalf("Truncated() = %v, want %v", got, tt.want)
-			}
+			require.Equal(t, tt.want, tt.report.Truncated())
 		})
 	}
 }

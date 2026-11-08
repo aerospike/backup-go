@@ -21,13 +21,22 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"slices"
 	"strconv"
 	"strings"
 
+	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/models"
 	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
+)
+
+// Operations of a [net.OpError] that fail before the server can run a request,
+// see [notSent].
+const (
+	netOpDial  = "dial"
+	netOpWrite = "write"
 )
 
 // Separators of the info response format. Most commands separate objects with
@@ -160,14 +169,29 @@ func cmdRespErrorCode(resp string) int {
 // mayHaveTakenEffect reports whether the failure err of a command leaves its
 // outcome unknown: the command got no answer, such as on a network timeout, or
 // the server answered that it could not confirm the command
-// (AS_ERR_TIMEOUT, AS_ERR_UNKNOWN). Any other answered error is conclusive.
+// (AS_ERR_TIMEOUT, AS_ERR_UNKNOWN). Any other answered error is conclusive, and
+// so is a failure before the command could reach the server, see [notSent].
 func mayHaveTakenEffect(err error) bool {
-	var respErr *cmdRespError
-	if !errors.As(err, &respErr) {
+	if respErr, ok := errors.AsType[*cmdRespError](err); ok {
+		return respErr.code == cmdRespCodeTimeout || respErr.code == cmdRespCodeUnknown
+	}
+
+	return !notSent(err)
+}
+
+// notSent reports whether the failure err of an info command happened before
+// the server could run the command: the client got no connection to the node,
+// or could not write the request in full. The server runs only a request it
+// has read in full. Any other failure, such as a timeout while waiting for the
+// answer, may come after the server ran the command.
+func notSent(err error) bool {
+	if errors.Is(err, a.ErrConnectionPoolEmpty) || errors.Is(err, a.ErrServerNotAvailable) {
 		return true
 	}
 
-	return respErr.code == cmdRespCodeTimeout || respErr.code == cmdRespCodeUnknown
+	var opErr *net.OpError
+
+	return errors.As(err, &opErr) && (opErr.Op == netOpDial || opErr.Op == netOpWrite)
 }
 
 // isNotFoundResp reports whether err is the server answering an info command

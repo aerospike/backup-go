@@ -88,6 +88,14 @@ var (
 	// class, not the class itself, so matching it stays specific to this package.
 	ErrNotFound = fmt.Errorf("%w: info not found", errclass.ErrNotFound)
 
+	// ErrOutcomeUnknown is wrapped by the error of a failed command whose
+	// effect the server may have applied anyway, such as after a timeout: a job
+	// start ([Client.StartBackup], [Client.StartRestore]) or a restore open
+	// ([Client.OpenRestore]). The outcome should then be checked with a status
+	// command. Without it, the failure is the server's own answer: a start was
+	// not accepted, while an open may still have taken partial effect.
+	ErrOutcomeUnknown = fmt.Errorf("%w: command outcome unknown", errclass.ErrAerospike)
+
 	// Static internal errors. Kept as package-level sentinels so they can be
 	// matched with errors.Is and satisfy err113/perfsprint linters.
 	errNoInfoCommands = fmt.Errorf("%w: no info commands provided or command not supported",

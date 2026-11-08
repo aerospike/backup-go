@@ -23,7 +23,10 @@ import (
 	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
 )
 
-// StartBackup starts a backup job on the server.
+// StartBackup starts a backup job on the server and returns its job id, which
+// is generated once per call. The job id is returned with every error after the
+// command is built, but a failed start names a job that may exist only if the
+// error wraps [ErrOutcomeUnknown].
 func (ic *Client) StartBackup(ctx context.Context, request *infomodels.RequestBackup) (string, error) {
 	jobID := newJobID()
 
@@ -117,7 +120,9 @@ func (ic *Client) AbortRestore(ctx context.Context, namespace, backupID string) 
 }
 
 // StartRestore starts a restore job on the server and returns its job id,
-// which is generated once per call.
+// which is generated once per call. The job id is returned with every error
+// after the command is built, but a failed start names a job that may exist
+// only if the error wraps [ErrOutcomeUnknown].
 func (ic *Client) StartRestore(ctx context.Context, request *infomodels.RequestRestore) (string, error) {
 	jobID := newJobID()
 
@@ -144,12 +149,16 @@ func (ic *Client) StartRestore(ctx context.Context, request *infomodels.RequestR
 // principal, under policy. Every attempt shares one retryAttempts, so that an
 // attempt with an unknown outcome is still taken into account by the later
 // ones, see [retryAttempts.record].
+//
+// A failure wraps [ErrOutcomeUnknown] if any attempt may have reached the
+// server: the server may still apply such a command after it answered, so even
+// a later lookup that finds no effect does not rule it out.
 func retryOnPrincipal(ctx context.Context, policy *models.RetryPolicy, principal func() (infoGetter, error),
 	send func(node infoGetter, attempts *retryAttempts) error,
 ) error {
 	var attempts retryAttempts
 
-	return executeWithRetry(ctx, policy, func() error {
+	err := executeWithRetry(ctx, policy, func() error {
 		node, err := principal()
 		if err != nil {
 			return fmt.Errorf("failed to get cluster principal: %w", err)
@@ -157,6 +166,11 @@ func retryOnPrincipal(ctx context.Context, policy *models.RetryPolicy, principal
 
 		return send(node, &attempts)
 	})
+	if err != nil && attempts.unanswered {
+		return fmt.Errorf("%w: %w", ErrOutcomeUnknown, err)
+	}
+
+	return err
 }
 
 // sendStartRestore sends the restore start command to node and reports whether the
@@ -298,7 +312,8 @@ func (ic *Client) getBackupStatusByNode(node infoGetter, cmd string) ([]infomode
 // OpenRestore releases namespace held by a failed or aborted cold restore on
 // the server, opening it to clients with the data the restore had written.
 // A retry answered as not found after an attempt with an unknown outcome is
-// taken as success, see [Client.sendOpenRestore].
+// taken as success, see [Client.sendOpenRestore]. A failure wraps
+// [ErrOutcomeUnknown] if the namespace may have been opened anyway.
 func (ic *Client) OpenRestore(ctx context.Context, namespace string) error {
 	cmd, err := ic.cmds.restoreOpen(namespace)
 	if err != nil {

@@ -18,8 +18,12 @@ import (
 	"bytes"
 	"fmt"
 	"log/slog"
+	"net"
+	"os"
+	"syscall"
 	"testing"
 
+	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/asinfo/mocks"
@@ -219,12 +223,20 @@ func Test_isNotFoundResp(t *testing.T) {
 func Test_mayHaveTakenEffect(t *testing.T) {
 	t.Parallel()
 
-	const testCmd = testRestoreStatusCmd
+	const (
+		testCmd    = testRestoreStatusCmd
+		testNetTCP = "tcp"
+	)
 
 	respErr := func(resp string) error {
 		_, err := parseResultResponse(testCmd, map[string]string{testCmd: resp})
 
 		return fmt.Errorf("failed to start restore: %w", err)
+	}
+
+	// netErr wraps a client failure the way requestByNode does.
+	netErr := func(err error) error {
+		return fmt.Errorf("failed to start restore: %w: %w", errclass.ErrAerospike, err)
 	}
 
 	tests := []struct {
@@ -247,6 +259,25 @@ func Test_mayHaveTakenEffect(t *testing.T) {
 			want: false,
 		},
 		{name: "error without a code", give: respErr(testErrNoCode), want: false},
+		{name: "network timeout", give: netErr(a.ErrNetTimeout), want: true},
+		{name: "no connection to the node", give: netErr(a.ErrConnectionPoolEmpty), want: false},
+		{name: "connection limit reached", give: netErr(a.ErrTooManyConnectionsForNode), want: false},
+		{name: "node not available", give: netErr(a.ErrServerNotAvailable), want: false},
+		{
+			name: "connection refused",
+			give: netErr(&net.OpError{Op: netOpDial, Net: testNetTCP, Err: syscall.ECONNREFUSED}),
+			want: false,
+		},
+		{
+			name: "request not written in full",
+			give: netErr(&net.OpError{Op: netOpWrite, Net: testNetTCP, Err: syscall.EPIPE}),
+			want: false,
+		},
+		{
+			name: "answer not read",
+			give: netErr(&net.OpError{Op: "read", Net: testNetTCP, Err: os.ErrDeadlineExceeded}),
+			want: true,
+		},
 	}
 
 	for _, tt := range tests {

@@ -3418,6 +3418,120 @@ func TestRetryOnPrincipal(t *testing.T) {
 	}
 }
 
+// TestRetryOnPrincipal_OutcomeUnknown checks that a failed command wraps
+// ErrOutcomeUnknown exactly when an attempt may have reached the server, so
+// that the caller does not send the operator after a job the server refused or
+// never got.
+func TestRetryOnPrincipal_OutcomeUnknown(t *testing.T) {
+	t.Parallel()
+
+	refused := &cmdRespError{code: 4, err: errclass.ErrAerospike}
+	timedOut := &cmdRespError{code: cmdRespCodeTimeout, err: errclass.ErrAerospike}
+	unanswered := fmt.Errorf("%w: %w", errclass.ErrAerospike, a.ErrNetTimeout)
+	notConnected := fmt.Errorf("%w: %w", errclass.ErrAerospike, a.ErrConnectionPoolEmpty)
+	noPrincipal := fmt.Errorf("%w: no principal", errclass.ErrAerospike)
+
+	tests := []struct {
+		name string
+		// give holds one send result per attempt; noPrincipal stands for a
+		// failed principal lookup, which sends nothing.
+		give        []error
+		wantErr     bool
+		wantUnknown bool
+	}{
+		{name: "applied", give: []error{nil}},
+		{name: "applied after an unanswered attempt", give: []error{unanswered, nil}},
+		{name: "refused", give: []error{refused, refused}, wantErr: true},
+		{name: "principal not found", give: []error{noPrincipal, noPrincipal}, wantErr: true},
+		{name: "not connected", give: []error{notConnected, refused}, wantErr: true},
+		{name: "unanswered", give: []error{unanswered, unanswered}, wantErr: true, wantUnknown: true},
+		{name: "not acknowledged in time", give: []error{timedOut, refused}, wantErr: true, wantUnknown: true},
+		{name: "principal lost after an unanswered attempt", give: []error{unanswered, noPrincipal},
+			wantErr: true, wantUnknown: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			node := mocks.NewMockinfoGetter(t)
+			policy := models.NewRetryPolicy(time.Millisecond, 1, uint(len(tt.give)))
+
+			var attempt int
+
+			principal := func() (infoGetter, error) {
+				if errors.Is(tt.give[attempt], noPrincipal) {
+					attempt++
+
+					return nil, noPrincipal
+				}
+
+				return node, nil
+			}
+
+			err := retryOnPrincipal(t.Context(), policy, principal, func(_ infoGetter, attempts *retryAttempts) error {
+				sendErr := tt.give[attempt]
+				attempt++
+
+				if sendErr != nil {
+					attempts.record(sendErr)
+				}
+
+				return sendErr
+			})
+
+			require.Len(t, tt.give, attempt)
+
+			if !tt.wantErr {
+				require.NoError(t, err)
+
+				return
+			}
+
+			require.ErrorIs(t, err, errclass.ErrAerospike)
+
+			if tt.wantUnknown {
+				assert.ErrorIs(t, err, ErrOutcomeUnknown)
+
+				return
+			}
+
+			assert.NotErrorIs(t, err, ErrOutcomeUnknown)
+		})
+	}
+}
+
+// TestRetryOnPrincipal_OutcomeUnknownCanceled checks that a command canceled
+// while it waits to retry an unanswered attempt still wraps ErrOutcomeUnknown,
+// next to the cancellation.
+func TestRetryOnPrincipal_OutcomeUnknownCanceled(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	t.Cleanup(cancel)
+
+	node := mocks.NewMockinfoGetter(t)
+	// The backoff outlasts the test, so only the cancellation ends the wait.
+	policy := models.NewRetryPolicy(time.Hour, 1, 2)
+	principal := func() (infoGetter, error) { return node, nil }
+
+	var sent int
+
+	err := retryOnPrincipal(ctx, policy, principal, func(_ infoGetter, attempts *retryAttempts) error {
+		sent++
+
+		sendErr := fmt.Errorf("%w: %w", errclass.ErrAerospike, a.ErrNetTimeout)
+		attempts.record(sendErr)
+		cancel()
+
+		return sendErr
+	})
+
+	require.Equal(t, 1, sent)
+	require.ErrorIs(t, err, context.Canceled)
+	assert.ErrorIs(t, err, ErrOutcomeUnknown)
+}
+
 // TestClient_sendOpenRestore checks that a not found answer to restore-open is
 // taken as an open namespace only after an attempt with an unknown outcome.
 func TestClient_sendOpenRestore(t *testing.T) {

@@ -187,9 +187,9 @@ func integratedBackupCalls() []integratedBackupCall {
 		{
 			name: cmdNameRestoreOpen,
 			call: func(c infoCommands) (string, error) {
-				return c.restoreOpen(testCmdNamespace, testCmdJobID)
+				return c.restoreOpen(testCmdNamespace)
 			},
-			want: "restore-open:namespace=source-ns;job-id=260922T103653-5xsr",
+			want: "restore-open:namespace=source-ns",
 		},
 		{
 			name: cmdNameRestoreClearStorage,
@@ -532,8 +532,8 @@ func TestInfoCommands_IntegratedBackupMissingParams(t *testing.T) {
 		},
 		{
 			name:        cmdNameRestoreOpen,
-			call:        func() (string, error) { return cmds.restoreOpen("", "") },
-			wantMissing: testCmdMissingNsAndJobID,
+			call:        func() (string, error) { return cmds.restoreOpen("") },
+			wantMissing: paramNamespace,
 		},
 		{
 			name:        cmdNameRestoreClearStorage,
@@ -722,9 +722,9 @@ func TestInfoCommands_InvalidParams(t *testing.T) {
 			call:      func(value string) (string, error) { return cmds.restoreAbort(testCmdNamespace, value) },
 		},
 		{
-			name:      "restore open job id with pipe",
+			name:      "restore open namespace with pipe",
 			giveValue: testPipeValue,
-			call:      func(value string) (string, error) { return cmds.restoreOpen(testCmdNamespace, value) },
+			call:      cmds.restoreOpen,
 		},
 		{
 			name:      "restore clear storage namespace with pipe",
@@ -1562,12 +1562,6 @@ func TestInfoCommands_InvalidJobID(t *testing.T) {
 			name: cmdNameRestoreAbort,
 			build: func(id string) (string, error) {
 				return cmds.restoreAbort(testCmdNamespace, id)
-			},
-		},
-		{
-			name: cmdNameRestoreOpen,
-			build: func(id string) (string, error) {
-				return cmds.restoreOpen(testCmdNamespace, id)
 			},
 		},
 	}

@@ -2483,12 +2483,12 @@ func abortRestoreCall(jobID, namespace string) clientCall {
 	}
 }
 
-// openRestoreCall calls OpenRestore for jobID of namespace.
-func openRestoreCall(jobID, namespace string) clientCall {
+// openRestoreCall calls OpenRestore for namespace.
+func openRestoreCall(namespace string) clientCall {
 	return clientCall{
 		name: testMethodOpenRestore,
 		call: func(ctx context.Context, ic *Client) error {
-			return ic.OpenRestore(ctx, namespace, jobID)
+			return ic.OpenRestore(ctx, namespace)
 		},
 	}
 }
@@ -2502,7 +2502,7 @@ func integratedBackupClientCalls(jobID, backupID, namespace string, storage info
 		startRestoreCall(backupID, namespace, storage),
 		abortBackupCall(jobID),
 		abortRestoreCall(jobID, namespace),
-		openRestoreCall(jobID, namespace),
+		openRestoreCall(namespace),
 		{
 			name: testMethodClearRestoreStorage,
 			call: func(ctx context.Context, ic *Client) error {
@@ -2626,7 +2626,7 @@ func TestClient_RetriesAreNotNested(t *testing.T) {
 		startRestoreCall(testCmdBackupID, testIntegratedNamespace, testIntegratedStorage),
 		abortBackupCall(testIntegratedJobID),
 		abortRestoreCall(testIntegratedJobID, testIntegratedNamespace),
-		openRestoreCall(testIntegratedJobID, testIntegratedNamespace),
+		openRestoreCall(testIntegratedNamespace),
 		{
 			name: "GetClusterStable",
 			call: func(ctx context.Context, ic *Client) error {
@@ -2717,9 +2717,14 @@ const (
 	testRestoreOtherNamespace = "source-ns2"
 	testRestoreStatusCmd      = "restore-status:job-id=" + testRestoreJobID
 	testBackupStatusCmd       = "backup-status:job-id=" + testRestoreJobID
-	testNodeA                 = "BB9020011AC4202"
-	testNodeB                 = "BB9030011AC4202"
-	testNodeC                 = "BB9040011AC4202"
+	testRestoreOpenCmd        = "restore-open:namespace=" + testRestoreNamespace
+	// testRestoreNotGated is the reply of the server to restore-open when
+	// nothing gates the namespace, also to a repeat of an open that succeeded.
+	testRestoreNotGated = errCmdRespPrefix + ":2:restore-open: no restore gates ns=" + testRestoreNamespace +
+		" - retry once gated nodes report"
+	testNodeA = "BB9020011AC4202"
+	testNodeB = "BB9030011AC4202"
+	testNodeC = "BB9040011AC4202"
 
 	// testRestoreJobOnNode starts the error of a node that does not know the
 	// restore job; the name of the node follows.
@@ -3130,7 +3135,7 @@ func TestClient_sendStartBackup(t *testing.T) {
 				Return(map[string]string{statusCmd: tt.statusResp}, tt.statusErr).Maybe()
 
 			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
-			attempts := startAttempts{unanswered: tt.unansweredBefore}
+			attempts := retryAttempts{unanswered: tt.unansweredBefore}
 
 			err := ic.sendStartBackup(node, testStartCmd, statusCmd, &attempts)
 			if tt.wantErrIs != nil {
@@ -3274,7 +3279,7 @@ func TestClient_sendStartRestore(t *testing.T) {
 				Return(map[string]string{statusCmd: tt.statusResp}, tt.statusErr).Maybe()
 
 			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
-			attempts := startAttempts{unanswered: tt.unansweredBefore}
+			attempts := retryAttempts{unanswered: tt.unansweredBefore}
 
 			err := ic.sendStartRestore(node, testStartCmd, statusCmd, &attempts)
 			if tt.wantErrIs != nil {
@@ -3293,11 +3298,11 @@ func TestClient_sendStartRestore(t *testing.T) {
 	}
 }
 
-// Test_startAttempts_record checks that an attempt with an unknown outcome, one
+// Test_retryAttempts_record checks that an attempt with an unknown outcome, one
 // that went unanswered or that the server could not confirm, keeps the job
 // possibly accepted for every later attempt, and that any other error answered
 // by the server alone never does.
-func Test_startAttempts_record(t *testing.T) {
+func Test_retryAttempts_record(t *testing.T) {
 	t.Parallel()
 
 	answered := &cmdRespError{code: 4, err: errclass.ErrAerospike}
@@ -3321,7 +3326,7 @@ func Test_startAttempts_record(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var attempts startAttempts
+			var attempts retryAttempts
 
 			got := make([]bool, 0, len(tt.give))
 			for _, err := range tt.give {
@@ -3333,12 +3338,12 @@ func Test_startAttempts_record(t *testing.T) {
 	}
 }
 
-// TestStartWithRetry checks a start whose first attempt timed out after the
+// TestRetryOnPrincipal checks a start whose first attempt timed out after the
 // server accepted the job, run through the retry loop of the start commands:
 // the retry is refused by the server because the job id is in use, and the
 // state of the job, shared through the attempts of the call, confirms the
 // start.
-func TestStartWithRetry(t *testing.T) {
+func TestRetryOnPrincipal(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -3353,7 +3358,7 @@ func TestStartWithRetry(t *testing.T) {
 	)
 
 	tests := []struct {
-		send       func(ic *Client, node infoGetter, attempts *startAttempts) error
+		send       func(ic *Client, node infoGetter, attempts *retryAttempts) error
 		name       string
 		startCmd   string
 		statusCmd  string
@@ -3368,7 +3373,7 @@ func TestStartWithRetry(t *testing.T) {
 			notFound:   testNoBackupJob,
 			rejected:   testBackupInUse,
 			statusResp: "job-id=" + testRestoreJobID + ":ns=" + testRestoreNamespace + ":state=BASE_SCAN_ACTIVE",
-			send: func(ic *Client, node infoGetter, attempts *startAttempts) error {
+			send: func(ic *Client, node infoGetter, attempts *retryAttempts) error {
 				return ic.sendStartBackup(node, testBackupStartCmd, testBackupStatusCmd, attempts)
 			},
 		},
@@ -3380,7 +3385,7 @@ func TestStartWithRetry(t *testing.T) {
 			rejected:  testRestoreUsed,
 			statusResp: "job-id=" + testRestoreJobID + ":ns=" + testRestoreNamespace +
 				":kind=cold:state=ACTIVE:ns-state=PREPARING",
-			send: func(ic *Client, node infoGetter, attempts *startAttempts) error {
+			send: func(ic *Client, node infoGetter, attempts *retryAttempts) error {
 				return ic.sendStartRestore(node, testRestoreStartCmd, testRestoreStatusCmd, attempts)
 			},
 		},
@@ -3404,9 +3409,143 @@ func TestStartWithRetry(t *testing.T) {
 			policy := models.NewRetryPolicy(time.Millisecond, 1, 2)
 			principal := func() (infoGetter, error) { return node, nil }
 
-			err := startWithRetry(t.Context(), policy, principal, func(n infoGetter, attempts *startAttempts) error {
+			err := retryOnPrincipal(t.Context(), policy, principal, func(n infoGetter, attempts *retryAttempts) error {
 				return tt.send(ic, n, attempts)
 			})
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+// TestClient_sendOpenRestore checks that a not found answer to restore-open is
+// taken as an open namespace only after an attempt with an unknown outcome.
+func TestClient_sendOpenRestore(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testOpened  = "ok"
+		testRunning = errCmdRespPrefix + ":4:restore-open: job-id=" + testRestoreJobID +
+			" is running - restore-abort it first"
+	)
+
+	tests := []struct {
+		openErr          a.Error
+		wantErrIs        error
+		name             string
+		openResp         string
+		unansweredBefore bool
+	}{
+		{
+			name:     "opened",
+			openResp: testOpened,
+		},
+		{
+			name:      "nothing gates the namespace",
+			openResp:  testRestoreNotGated,
+			wantErrIs: errclass.ErrAerospike,
+		},
+		{
+			name:             "nothing gates the namespace after an unanswered attempt",
+			openResp:         testRestoreNotGated,
+			unansweredBefore: true,
+		},
+		{
+			name:             "refused after an unanswered attempt",
+			openResp:         testRunning,
+			unansweredBefore: true,
+			wantErrIs:        errclass.ErrAerospike,
+		},
+		{
+			name:      "unanswered",
+			openErr:   a.ErrNetTimeout,
+			wantErrIs: a.ErrNetTimeout,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			node := mocks.NewMockinfoGetter(t)
+			node.EXPECT().RequestInfo(testInfoPolicy, []string{testRestoreOpenCmd}).
+				Return(map[string]string{testRestoreOpenCmd: tt.openResp}, tt.openErr).Once()
+
+			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
+			attempts := retryAttempts{unanswered: tt.unansweredBefore}
+
+			err := ic.sendOpenRestore(node, testRestoreOpenCmd, &attempts)
+			if tt.wantErrIs != nil {
+				require.ErrorIs(t, err, tt.wantErrIs)
+
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+// TestOpenRestoreWithRetry checks an open whose retry finds nothing to open,
+// run through the retry loop. The open is done if the first attempt may have
+// deleted the key, but not after a partial open, whose retry deletes the rest.
+func TestOpenRestoreWithRetry(t *testing.T) {
+	t.Parallel()
+
+	const (
+		// testTimedOut is the reply after the key was deleted but not every
+		// node acknowledged the delete in time.
+		testTimedOut = errCmdRespPrefix + ":9:restore-open not acknowledged by all nodes - retry"
+		// testPartial is the reply when there were more keys than one command
+		// deletes.
+		testPartial = errCmdRespPrefix + ":11:restore-open: opened 8 of 9 on ns=" + testRestoreNamespace +
+			" - retry for the rest"
+	)
+
+	tests := []struct {
+		firstErr  a.Error
+		wantErrIs error
+		name      string
+		firstResp string
+	}{
+		{
+			name:      "not acknowledged in time",
+			firstResp: testTimedOut,
+		},
+		{
+			name:     "unanswered",
+			firstErr: a.ErrNetTimeout,
+		},
+		{
+			name:      "partial open",
+			firstResp: testPartial,
+			wantErrIs: errclass.ErrAerospike,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			node := mocks.NewMockinfoGetter(t)
+			node.EXPECT().RequestInfo(testInfoPolicy, []string{testRestoreOpenCmd}).
+				Return(map[string]string{testRestoreOpenCmd: tt.firstResp}, tt.firstErr).Once()
+			node.EXPECT().RequestInfo(testInfoPolicy, []string{testRestoreOpenCmd}).
+				Return(map[string]string{testRestoreOpenCmd: testRestoreNotGated}, nil).Once()
+
+			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
+			policy := models.NewRetryPolicy(time.Millisecond, 1, 2)
+			principal := func() (infoGetter, error) { return node, nil }
+
+			err := retryOnPrincipal(t.Context(), policy, principal,
+				func(n infoGetter, attempts *retryAttempts) error {
+					return ic.sendOpenRestore(n, testRestoreOpenCmd, attempts)
+				})
+			if tt.wantErrIs != nil {
+				require.ErrorIs(t, err, tt.wantErrIs)
+
+				return
+			}
 
 			require.NoError(t, err)
 		})

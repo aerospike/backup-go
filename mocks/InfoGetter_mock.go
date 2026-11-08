@@ -1232,16 +1232,16 @@ func (_c *MockInfoGetter_GetVersion_Call) RunAndReturn(run func(ctx context.Cont
 }
 
 // OpenRestore provides a mock function for the type MockInfoGetter
-func (_mock *MockInfoGetter) OpenRestore(ctx context.Context, namespace string, jobID string) error {
-	ret := _mock.Called(ctx, namespace, jobID)
+func (_mock *MockInfoGetter) OpenRestore(ctx context.Context, namespace string) error {
+	ret := _mock.Called(ctx, namespace)
 
 	if len(ret) == 0 {
 		panic("no return value specified for OpenRestore")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
-		r0 = returnFunc(ctx, namespace, jobID)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = returnFunc(ctx, namespace)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1256,12 +1256,11 @@ type MockInfoGetter_OpenRestore_Call struct {
 // OpenRestore is a helper method to define mock.On call
 //   - ctx context.Context
 //   - namespace string
-//   - jobID string
-func (_e *MockInfoGetter_Expecter) OpenRestore(ctx any, namespace any, jobID any) *MockInfoGetter_OpenRestore_Call {
-	return &MockInfoGetter_OpenRestore_Call{Call: _e.mock.On("OpenRestore", ctx, namespace, jobID)}
+func (_e *MockInfoGetter_Expecter) OpenRestore(ctx any, namespace any) *MockInfoGetter_OpenRestore_Call {
+	return &MockInfoGetter_OpenRestore_Call{Call: _e.mock.On("OpenRestore", ctx, namespace)}
 }
 
-func (_c *MockInfoGetter_OpenRestore_Call) Run(run func(ctx context.Context, namespace string, jobID string)) *MockInfoGetter_OpenRestore_Call {
+func (_c *MockInfoGetter_OpenRestore_Call) Run(run func(ctx context.Context, namespace string)) *MockInfoGetter_OpenRestore_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1271,14 +1270,9 @@ func (_c *MockInfoGetter_OpenRestore_Call) Run(run func(ctx context.Context, nam
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
-		var arg2 string
-		if args[2] != nil {
-			arg2 = args[2].(string)
-		}
 		run(
 			arg0,
 			arg1,
-			arg2,
 		)
 	})
 	return _c
@@ -1289,7 +1283,7 @@ func (_c *MockInfoGetter_OpenRestore_Call) Return(err error) *MockInfoGetter_Ope
 	return _c
 }
 
-func (_c *MockInfoGetter_OpenRestore_Call) RunAndReturn(run func(ctx context.Context, namespace string, jobID string) error) *MockInfoGetter_OpenRestore_Call {
+func (_c *MockInfoGetter_OpenRestore_Call) RunAndReturn(run func(ctx context.Context, namespace string) error) *MockInfoGetter_OpenRestore_Call {
 	_c.Call.Return(run)
 	return _c
 }

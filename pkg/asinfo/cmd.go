@@ -525,16 +525,16 @@ func (c infoCommands) restoreAbort(ns, jobID string) (string, error) {
 		build()
 }
 
-// restoreOpen returns the command that releases namespace ns held by the
-// aborted cold restore job jobID.
-func (c infoCommands) restoreOpen(ns, jobID string) (string, error) {
+// restoreOpen returns the command that releases namespace ns held by a failed
+// or aborted cold restore. A namespace has at most one restore job, so the
+// server finds the job by the namespace.
+func (c infoCommands) restoreOpen(ns string) (string, error) {
 	if err := c.requireIntegratedBackup(cmdNameRestoreOpen); err != nil {
 		return "", err
 	}
 
 	return newInfoCmd(cmdNameRestoreOpen, jobUnsafeChars).
 		required(paramNamespace, ns).
-		jobID(paramJobID, jobID).
 		build()
 }
 

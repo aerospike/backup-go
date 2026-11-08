@@ -373,16 +373,16 @@ func (_c *MockServerBackupInfo_GetRestoreStatus_Call) RunAndReturn(run func(ctx 
 }
 
 // OpenRestore provides a mock function for the type MockServerBackupInfo
-func (_mock *MockServerBackupInfo) OpenRestore(ctx context.Context, namespace string, jobID string) error {
-	ret := _mock.Called(ctx, namespace, jobID)
+func (_mock *MockServerBackupInfo) OpenRestore(ctx context.Context, namespace string) error {
+	ret := _mock.Called(ctx, namespace)
 
 	if len(ret) == 0 {
 		panic("no return value specified for OpenRestore")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
-		r0 = returnFunc(ctx, namespace, jobID)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = returnFunc(ctx, namespace)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -397,12 +397,11 @@ type MockServerBackupInfo_OpenRestore_Call struct {
 // OpenRestore is a helper method to define mock.On call
 //   - ctx context.Context
 //   - namespace string
-//   - jobID string
-func (_e *MockServerBackupInfo_Expecter) OpenRestore(ctx any, namespace any, jobID any) *MockServerBackupInfo_OpenRestore_Call {
-	return &MockServerBackupInfo_OpenRestore_Call{Call: _e.mock.On("OpenRestore", ctx, namespace, jobID)}
+func (_e *MockServerBackupInfo_Expecter) OpenRestore(ctx any, namespace any) *MockServerBackupInfo_OpenRestore_Call {
+	return &MockServerBackupInfo_OpenRestore_Call{Call: _e.mock.On("OpenRestore", ctx, namespace)}
 }
 
-func (_c *MockServerBackupInfo_OpenRestore_Call) Run(run func(ctx context.Context, namespace string, jobID string)) *MockServerBackupInfo_OpenRestore_Call {
+func (_c *MockServerBackupInfo_OpenRestore_Call) Run(run func(ctx context.Context, namespace string)) *MockServerBackupInfo_OpenRestore_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -412,14 +411,9 @@ func (_c *MockServerBackupInfo_OpenRestore_Call) Run(run func(ctx context.Contex
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
-		var arg2 string
-		if args[2] != nil {
-			arg2 = args[2].(string)
-		}
 		run(
 			arg0,
 			arg1,
-			arg2,
 		)
 	})
 	return _c
@@ -430,7 +424,7 @@ func (_c *MockServerBackupInfo_OpenRestore_Call) Return(err error) *MockServerBa
 	return _c
 }
 
-func (_c *MockServerBackupInfo_OpenRestore_Call) RunAndReturn(run func(ctx context.Context, namespace string, jobID string) error) *MockServerBackupInfo_OpenRestore_Call {
+func (_c *MockServerBackupInfo_OpenRestore_Call) RunAndReturn(run func(ctx context.Context, namespace string) error) *MockServerBackupInfo_OpenRestore_Call {
 	_c.Call.Return(run)
 	return _c
 }

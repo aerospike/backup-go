@@ -43,7 +43,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/pkg/server/segvalidator/segment"
 	"golang.org/x/sync/errgroup"
 )
@@ -169,11 +168,17 @@ type Stats struct {
 // One backup is validated at a time, so the backup is fixed when the streamer
 // is created and every path it produces belongs to it.
 type Streamer struct {
-	store    store
-	logger   *slog.Logger
+	store  store
+	logger *slog.Logger
+	// backupID names the directory of the backup.
 	backupID string
-	stats    stats
-	options  Options
+	// prefix is the path the backup was written under, empty for a backup at
+	// the root of the storage.
+	prefix string
+	// dir locates the directory of the backup, prefix and backupID joined.
+	dir     string
+	stats   stats
+	options Options
 }
 
 // Options are the settings of a Streamer.
@@ -195,6 +200,16 @@ func WithLogger(logger *slog.Logger) Option {
 		if logger != nil {
 			s.logger = logger
 		}
+	}
+}
+
+// WithPath sets the path the backup was written under, relative to the root of
+// the storage: the prefix of its keys in a bucket, or a directory below the root
+// directory of a local storage. Surrounding slashes are ignored. By default the
+// backup sits at the root of the storage.
+func WithPath(prefix string) Option {
+	return func(s *Streamer) {
+		s.prefix = prefix
 	}
 }
 
@@ -229,8 +244,8 @@ func WithSeed(seed uint64) Option {
 
 // newStreamer creates a streamer over one backup of a storage.
 func newStreamer(st store, backupID string, opts ...Option) (*Streamer, error) {
-	if backupID == "" {
-		return nil, fmt.Errorf("%w: backup id must not be empty", errclass.ErrInvalidConfig)
+	if err := checkBackupID(backupID); err != nil {
+		return nil, err
 	}
 
 	s := &Streamer{
@@ -249,6 +264,14 @@ func newStreamer(st store, backupID string, opts ...Option) (*Streamer, error) {
 	for _, opt := range opts {
 		opt(s)
 	}
+
+	prefix, err := cleanPrefix(s.prefix)
+	if err != nil {
+		return nil, err
+	}
+
+	s.prefix = prefix
+	s.dir = path.Join(prefix, backupID)
 
 	return s, nil
 }
@@ -355,7 +378,7 @@ func (s *Streamer) checkEmptyNamespaces(namespaces []string) {
 // queryManifestDir locates the directory a restore lists the query stream
 // manifests of a namespace in.
 func (s *Streamer) queryManifestDir(namespace string) string {
-	return path.Join(streamRoot(s.backupID, namespace, QueryStream), manifestDir)
+	return path.Join(streamRoot(s.dir, namespace, QueryStream), manifestDir)
 }
 
 // countQueryManifest counts a query stream manifest a restore reads, which is
@@ -589,6 +612,9 @@ type unit struct {
 	stream    Stream
 	// root holds the data and manifest directories.
 	root string
+	// prefix is the path the backup was written under, which the segment
+	// paths a manifest records start from.
+	prefix string
 	// partitions are the directories the segments are grouped in, or a single
 	// empty name for a stream whose segments are walked as one directory.
 	partitions []string
@@ -654,7 +680,7 @@ func (u *unit) checkManifestName(m file) error {
 // manifest promised of it, which is what a validator compares the storage
 // against, and it is a segment whether or not the storage still holds it.
 func (u *unit) segmentOfRecord(m file, header manifestHeader, recorded manifestSegment) (Segment, error) {
-	segmentPath, err := recorded.resolve(u.data(), header.Partition)
+	segmentPath, err := recorded.resolve(u.prefix, u.data(), header.Partition)
 	if err != nil {
 		return Segment{}, err
 	}
@@ -707,9 +733,9 @@ func (s *Streamer) restoredUnits(ctx context.Context) (units []unit, namespaces 
 // depend on the number of segments: one listing names the namespaces, one names
 // the streams, and one names the partitions of a stream.
 func (s *Streamer) units(ctx context.Context, skipChange bool) ([]unit, []string, error) {
-	namespaces, err := listDirs(ctx, s.store, namespacesRoot(s.backupID))
+	namespaces, err := listDirs(ctx, s.store, namespacesRoot(s.dir))
 	if err != nil {
-		return nil, nil, fmt.Errorf("backup %s: %w", s.backupID, err)
+		return nil, nil, fmt.Errorf("backup %s: %w", s.dir, err)
 	}
 
 	s.stats.namespaces.Store(int64(len(namespaces)))
@@ -738,7 +764,7 @@ func (s *Streamer) units(ctx context.Context, skipChange bool) ([]unit, []string
 // holding its data directory itself is one unit; a stream holding a directory
 // per node is one unit per node.
 func (s *Streamer) streamUnits(ctx context.Context, namespace string, stream Stream) ([]unit, error) {
-	root := streamRoot(s.backupID, namespace, stream)
+	root := streamRoot(s.dir, namespace, stream)
 
 	children, err := listDirs(ctx, s.store, root)
 	if err != nil {
@@ -815,7 +841,7 @@ func isUnit(children []string) bool {
 // writes them, or sitting in the data directory itself, as a change stream
 // does.
 func (s *Streamer) newUnit(ctx context.Context, namespace string, stream Stream, root string) (unit, error) {
-	u := unit{namespace: namespace, stream: stream, root: root}
+	u := unit{namespace: namespace, stream: stream, root: root, prefix: s.prefix}
 	flat := false
 
 	err := s.store.listLevel(ctx, u.data(), func(entry levelEntry) error {

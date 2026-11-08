@@ -181,7 +181,7 @@ func (s *Streamer) changeManifests(ctx context.Context, u *unit, limit int) ([]f
 // restores, which fails the restore of its change stream.
 func (s *Streamer) countChangeNode(u *unit) {
 	if n := s.stats.addChangeNode(u.namespace); n == maxChangeNodes+1 {
-		s.stats.addManifestIssue(u.namespace, streamRoot(s.backupID, u.namespace, ChangeStream),
+		s.stats.addManifestIssue(u.namespace, streamRoot(s.dir, u.namespace, ChangeStream),
 			fmt.Errorf("%w: change stream of more than %d nodes, the server restores at most %d",
 				ErrManifestUnusable, maxChangeNodes, maxChangeNodes))
 	}

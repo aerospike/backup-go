@@ -109,15 +109,53 @@ var ErrNoQueryManifests = fmt.Errorf("%w: namespace has no query stream manifest
 // something that cannot be located in the storage.
 var ErrManifestUnusable = fmt.Errorf("%w: manifest cannot be read", errclass.ErrCorruptData)
 
-// namespacesRoot locates the directory naming the namespaces of the backup.
-func namespacesRoot(backupID string) string {
-	return path.Join(backupID, namespacesDir)
+// namespacesRoot locates the directory naming the namespaces of the backup
+// whose directory is backupDir.
+func namespacesRoot(backupDir string) string {
+	return path.Join(backupDir, namespacesDir)
 }
 
-// streamRoot locates the directory of one stream of one namespace. What sits
-// below it is discovered rather than assumed.
-func streamRoot(backupID, namespace string, stream Stream) string {
-	return path.Join(backupID, namespacesDir, namespace, string(stream))
+// streamRoot locates the directory of one stream of one namespace of the backup
+// whose directory is backupDir. What sits below it is discovered rather than
+// assumed.
+func streamRoot(backupDir, namespace string, stream Stream) string {
+	return path.Join(backupDir, namespacesDir, namespace, string(stream))
+}
+
+// cleanPrefix normalizes the path a backup was written under. The path is
+// relative to the root of the storage, so surrounding slashes are dropped, and
+// a path leading out of the storage is refused.
+func cleanPrefix(prefix string) (string, error) {
+	cleaned := path.Clean(strings.Trim(prefix, "/"))
+
+	switch {
+	case cleaned == ".":
+		return "", nil
+	case leavesRoot(cleaned):
+		return "", fmt.Errorf("%w: path %q points outside the storage", errclass.ErrInvalidConfig, prefix)
+	default:
+		return cleaned, nil
+	}
+}
+
+// leavesRoot reports whether a clean relative path leads out of the directory
+// it is relative to.
+func leavesRoot(cleaned string) bool {
+	return cleaned == ".." || strings.HasPrefix(cleaned, "../")
+}
+
+// checkBackupID refuses a backup id that is not the name of a single
+// directory. The path a backup was written under is given apart from its id.
+func checkBackupID(backupID string) error {
+	switch {
+	case backupID == "":
+		return fmt.Errorf("%w: backup id must not be empty", errclass.ErrInvalidConfig)
+	case backupID == "." || leavesRoot(backupID) || strings.Contains(backupID, "/"):
+		return fmt.Errorf("%w: backup id %q must name a single directory, a path goes to WithPath",
+			errclass.ErrInvalidConfig, backupID)
+	default:
+		return nil
+	}
 }
 
 // isSegment reports whether a listed file is a segment. A data directory is
@@ -344,11 +382,12 @@ func (m manifestSegment) check() error {
 // resolve turns the name a manifest records into the path of the segment in the
 // storage.
 //
-// A manifest names a segment by its path from the root of the storage, the
-// backup id included. A name without a slash is taken to be a file name in the
+// A manifest names a segment by its path from the path the backup was written
+// under, prefix, the backup id included: the server leaves its own path out of
+// what it records. A name without a slash is taken to be a file name in the
 // data directory of the partition the manifest belongs to, so that a manifest
 // written the short way is still usable.
-func (m manifestSegment) resolve(data, partition string) (string, error) {
+func (m manifestSegment) resolve(prefix, data, partition string) (string, error) {
 	name := strings.TrimSpace(m.SegmentName)
 
 	switch {
@@ -356,11 +395,11 @@ func (m manifestSegment) resolve(data, partition string) (string, error) {
 		return "", fmt.Errorf("%w: it records a segment without a name", ErrManifestUnusable)
 	case strings.Contains(name, "/"):
 		cleaned := path.Clean(name)
-		if path.IsAbs(cleaned) || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		if path.IsAbs(cleaned) || leavesRoot(cleaned) {
 			return "", fmt.Errorf("%w: segment %q points outside the storage", ErrManifestUnusable, name)
 		}
 
-		return cleaned, nil
+		return path.Join(prefix, cleaned), nil
 	default:
 		return path.Join(data, partition, name), nil
 	}

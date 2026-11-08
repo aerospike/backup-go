@@ -16,8 +16,10 @@ package segment
 
 import (
 	"encoding/binary"
-	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // The parsers below are reached through Validate only for the fields the
@@ -44,9 +46,7 @@ func TestParseFlatHeader(t *testing.T) {
 	writeLutGen(data, wantGeneration, wantLUT)
 
 	hdr, err := parseFlatHeader(data)
-	if err != nil {
-		t.Fatalf("parseFlatHeader() unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	want := flatHeader{
 		lastUpdateTime: wantLUT,
@@ -63,22 +63,15 @@ func TestParseFlatHeader(t *testing.T) {
 		hasExtraFlags:  true,
 	}
 
-	if hdr != want {
-		t.Fatalf("parseFlatHeader() = %+v, want %+v", hdr, want)
-	}
-
-	if got := hdr.recordSize(); got != int(wantNRBlocks+1)*rblockSize {
-		t.Errorf("recordSize() = %d, want %d", got, int(wantNRBlocks+1)*rblockSize)
-	}
+	require.Equal(t, want, hdr)
+	assert.Equal(t, int(wantNRBlocks+1)*rblockSize, hdr.recordSize())
 }
 
 func TestParseFlatHeader_TooShort(t *testing.T) {
 	t.Parallel()
 
 	_, err := parseFlatHeader(make([]byte, flatRecordHdrSize-1))
-	if !errors.Is(err, ErrHeaderTooShort) {
-		t.Fatalf("parseFlatHeader() error = %v, want %v", err, ErrHeaderTooShort)
-	}
+	require.ErrorIs(t, err, ErrHeaderTooShort)
 }
 
 func TestReadExtraFlags(t *testing.T) {
@@ -134,21 +127,15 @@ func TestReadExtraFlags(t *testing.T) {
 			flags, next, err := readExtraFlags(tt.data, 0, len(tt.data))
 
 			if tt.wantErr != nil {
-				if !errors.Is(err, tt.wantErr) {
-					t.Fatalf("readExtraFlags() error = %v, want %v", err, tt.wantErr)
-				}
+				require.ErrorIs(t, err, tt.wantErr)
 
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("readExtraFlags() unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
-			if flags != tt.wantFlags || next != tt.wantNext {
-				t.Fatalf("readExtraFlags() = (0x%02x, %d), want (0x%02x, %d)",
-					flags, next, tt.wantFlags, tt.wantNext)
-			}
+			require.Equal(t, tt.wantFlags, flags)
+			require.Equal(t, tt.wantNext, next)
 		})
 	}
 }
@@ -204,20 +191,15 @@ func TestReadSetName(t *testing.T) {
 			name, next, err := readSetName(tt.data, 0, len(tt.data))
 
 			if tt.wantErr != nil {
-				if !errors.Is(err, tt.wantErr) {
-					t.Fatalf("readSetName() error = %v, want %v", err, tt.wantErr)
-				}
+				require.ErrorIs(t, err, tt.wantErr)
 
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("readSetName() unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
-			if string(name) != tt.wantName || next != tt.wantNext {
-				t.Fatalf("readSetName() = (%q, %d), want (%q, %d)", name, next, tt.wantName, tt.wantNext)
-			}
+			require.Equal(t, tt.wantName, string(name))
+			require.Equal(t, tt.wantNext, next)
 		})
 	}
 }
@@ -275,21 +257,15 @@ func TestReadKey(t *testing.T) {
 			key, next, err := readKey(tt.data, 0, len(tt.data))
 
 			if tt.wantErr != nil {
-				if !errors.Is(err, tt.wantErr) {
-					t.Fatalf("readKey() error = %v, want %v", err, tt.wantErr)
-				}
+				require.ErrorIs(t, err, tt.wantErr)
 
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("readKey() unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
-			if len(key) != tt.wantKey || next != tt.wantNext {
-				t.Fatalf("readKey() = (%d bytes, %d), want (%d bytes, %d)",
-					len(key), next, tt.wantKey, tt.wantNext)
-			}
+			require.Len(t, key, tt.wantKey)
+			require.Equal(t, tt.wantNext, next)
 		})
 	}
 }
@@ -340,21 +316,15 @@ func TestReadBinCount(t *testing.T) {
 			count, next, err := readBinCount(tt.data, 0, len(tt.data))
 
 			if tt.wantErr != nil {
-				if !errors.Is(err, tt.wantErr) {
-					t.Fatalf("readBinCount() error = %v, want %v", err, tt.wantErr)
-				}
+				require.ErrorIs(t, err, tt.wantErr)
 
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("readBinCount() unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
-			if count != tt.wantCount || next != tt.wantNext {
-				t.Fatalf("readBinCount() = (%d, %d), want (%d, %d)",
-					count, next, tt.wantCount, tt.wantNext)
-			}
+			require.Equal(t, tt.wantCount, count)
+			require.Equal(t, tt.wantNext, next)
 		})
 	}
 }
@@ -365,9 +335,8 @@ func TestReadUintvar_TooLong(t *testing.T) {
 	// Five continuation groups carry 35 bits, which no longer fit a uint32.
 	data := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0x00}
 
-	if _, _, err := readUintvar(data, 0, len(data)); !errors.Is(err, ErrUintvarTooLong) {
-		t.Fatalf("readUintvar() error = %v, want %v", err, ErrUintvarTooLong)
-	}
+	_, _, err := readUintvar(data, 0, len(data))
+	require.ErrorIs(t, err, ErrUintvarTooLong)
 }
 
 func TestUnpackMeta(t *testing.T) {
@@ -400,33 +369,14 @@ func TestUnpackMeta(t *testing.T) {
 	}
 
 	meta, err := unpackMeta(fullHdr, full, 0, len(full))
-	if err != nil {
-		t.Fatalf("unpackMeta() unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if meta.mrtID != mrtID {
-		t.Errorf("mrtID = 0x%016x, want 0x%016x", meta.mrtID, mrtID)
-	}
-
-	if meta.voidTime != voidTime {
-		t.Errorf("voidTime = 0x%08x, want 0x%08x", meta.voidTime, voidTime)
-	}
-
-	if string(meta.setName) != testSetName {
-		t.Errorf("setName = %q, want %q", meta.setName, testSetName)
-	}
-
-	if string(meta.key) != "kv" {
-		t.Errorf("key = %q, want %q", meta.key, "kv")
-	}
-
-	if meta.nBins != 3 {
-		t.Errorf("nBins = %d, want 3", meta.nBins)
-	}
-
-	if meta.end != len(full) {
-		t.Errorf("end = %d, want %d", meta.end, len(full))
-	}
+	assert.Equal(t, mrtID, meta.mrtID, "mrtID")
+	assert.Equal(t, voidTime, meta.voidTime, "voidTime")
+	assert.Equal(t, testSetName, string(meta.setName), "setName")
+	assert.Equal(t, "kv", string(meta.key), "key")
+	assert.Equal(t, uint32(3), meta.nBins, "nBins")
+	assert.Equal(t, len(full), meta.end, "end")
 }
 
 func TestUnpackMeta_Errors(t *testing.T) {
@@ -517,9 +467,8 @@ func TestUnpackMeta_Errors(t *testing.T) {
 				end = len(tt.data)
 			}
 
-			if _, err := unpackMeta(tt.hdr, tt.data, tt.off, end); !errors.Is(err, tt.wantErr) {
-				t.Fatalf("unpackMeta() error = %v, want %v", err, tt.wantErr)
-			}
+			_, err := unpackMeta(tt.hdr, tt.data, tt.off, end)
+			require.ErrorIs(t, err, tt.wantErr)
 		})
 	}
 }
@@ -612,20 +561,14 @@ func TestCheckBins(t *testing.T) {
 			got, err := checkBins(tt.data, tt.off, end, tt.nBins)
 
 			if tt.wantErr != nil {
-				if !errors.Is(err, tt.wantErr) {
-					t.Fatalf("checkBins() error = %v, want %v", err, tt.wantErr)
-				}
+				require.ErrorIs(t, err, tt.wantErr)
 
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("checkBins() unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
-			if got != tt.wantEnd {
-				t.Fatalf("checkBins() = %d, want %d", got, tt.wantEnd)
-			}
+			require.Equal(t, tt.wantEnd, got)
 		})
 	}
 }
@@ -680,20 +623,14 @@ func TestSkipBin(t *testing.T) {
 			next, err := skipBin(tt.data, 0, len(tt.data))
 
 			if tt.wantErr != nil {
-				if !errors.Is(err, tt.wantErr) {
-					t.Fatalf("skipBin() error = %v, want %v", err, tt.wantErr)
-				}
+				require.ErrorIs(t, err, tt.wantErr)
 
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("skipBin() unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
-			if next != tt.wantNext {
-				t.Fatalf("skipBin() = %d, want %d", next, tt.wantNext)
-			}
+			require.Equal(t, tt.wantNext, next)
 		})
 	}
 }
@@ -767,20 +704,14 @@ func TestSkipBinMeta(t *testing.T) {
 			next, err := skipBinMeta(0, tt.end, tt.flags)
 
 			if tt.wantErr != nil {
-				if !errors.Is(err, tt.wantErr) {
-					t.Fatalf("skipBinMeta() error = %v, want %v", err, tt.wantErr)
-				}
+				require.ErrorIs(t, err, tt.wantErr)
 
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("skipBinMeta() unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
-			if next != tt.wantNext {
-				t.Fatalf("skipBinMeta() = %d, want %d", next, tt.wantNext)
-			}
+			require.Equal(t, tt.wantNext, next)
 		})
 	}
 }
@@ -919,20 +850,14 @@ func TestSkipParticle(t *testing.T) {
 			next, err := skipParticle(tt.data, 0, len(tt.data))
 
 			if tt.wantErr != nil {
-				if !errors.Is(err, tt.wantErr) {
-					t.Fatalf("skipParticle() error = %v, want %v", err, tt.wantErr)
-				}
+				require.ErrorIs(t, err, tt.wantErr)
 
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("skipParticle() unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
-			if next != tt.wantNext {
-				t.Fatalf("skipParticle() = %d, want %d", next, tt.wantNext)
-			}
+			require.Equal(t, tt.wantNext, next)
 		})
 	}
 }
@@ -944,13 +869,8 @@ func TestSkipInteger_AcceptedSizes(t *testing.T) {
 		data := append([]byte{particleTypeInteger, byte(size)}, make([]byte, size)...)
 
 		next, err := skipInteger(data, 0, len(data))
-		if err != nil {
-			t.Fatalf("skipInteger() of a %d byte integer: %v", size, err)
-		}
-
-		if next != integerHdrSize+size {
-			t.Errorf("skipInteger() = %d, want %d", next, integerHdrSize+size)
-		}
+		require.NoError(t, err, "skipInteger() of a %d byte integer", size)
+		assert.Equal(t, integerHdrSize+size, next)
 	}
 }
 
@@ -961,12 +881,7 @@ func TestSkipBool_Values(t *testing.T) {
 		data := []byte{particleTypeBool, v}
 
 		next, err := skipBool(data, 0, len(data))
-		if err != nil {
-			t.Fatalf("skipBool() of %d: %v", v, err)
-		}
-
-		if next != boolSize {
-			t.Errorf("skipBool() = %d, want %d", next, boolSize)
-		}
+		require.NoError(t, err, "skipBool() of %d", v)
+		assert.Equal(t, boolSize, next)
 	}
 }

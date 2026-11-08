@@ -43,6 +43,11 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
   - a backup with a policy other than strict on `fs` / `fa` storage;
   - a fuzzy restore on `fs` / `fa` storage;
   - `ApplyMetadataLast` on a fuzzy restore with both `NoIndexes` and `NoUDFs` set.
+- `streamers.WithPath` locates a backup written under a path (the `path` of the backup
+  command): the prefix of its keys in a bucket, or a directory below the root directory of a
+  local storage. Surrounding slashes are ignored, and a path leading out of the storage fails
+  with `ErrInvalidConfig`. Without it the backup is looked for at the root of the storage.
+  (BKRS-487)
 
 ### Changed
 
@@ -80,6 +85,10 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
 - `backup-status` and `restore-status` replies are parsed by key, without the secret agent
   handling of other info replies, so a namespace or a job id named `secrets` no longer breaks the
   row. (BKRS-494)
+- The backup id given to `streamers.NewS3` and `streamers.NewLocal` names the backup directory
+  only. An id holding a `/`, or `.` or `..`, fails with `ErrInvalidConfig`: the path the backup
+  was written under is given with `streamers.WithPath`. `Streamer.BackupID` reports the id
+  without the path. (BKRS-487)
 
 ### Removed
 
@@ -90,6 +99,14 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
   `Deleted`, which `restore-status` no longer reports. (BKRS-494)
 - The redaction of info command values in errors: no parameter of the server carries a secret,
   as each node resolves its object storage credentials itself. (BKRS-494)
+
+### Fixed
+
+- `pkg/server/segvalidator` reported every segment of a backup written under a path as missing:
+  a manifest names its segments from that path down, leaving the path out, and the segments were
+  looked for at the root of the storage. The segments a manifest names are now located below the
+  path given with `streamers.WithPath`, so they are checked, and segments no manifest names are
+  found again. (BKRS-487)
 
 ## [0.13.0] - 2026-11-03
 

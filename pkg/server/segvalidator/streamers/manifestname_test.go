@@ -18,6 +18,8 @@ import (
 	"testing"
 
 	"github.com/aerospike/backup-go/pkg/server/segvalidator/segment"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -120,10 +122,8 @@ func TestPartitionOfManifest(t *testing.T) {
 			t.Parallel()
 
 			id, ok := partitionOfManifest(tt.give)
-			if id != tt.wantID || ok != tt.wantOK {
-				t.Fatalf("partitionOfManifest() = (%d, %v), want (%d, %v)",
-					id, ok, tt.wantID, tt.wantOK)
-			}
+			assert.Equal(t, tt.wantID, id)
+			assert.Equal(t, tt.wantOK, ok)
 		})
 	}
 }
@@ -140,11 +140,13 @@ func FuzzPartitionOfManifest(f *testing.F) {
 	f.Fuzz(func(t *testing.T, name string) {
 		id, ok := partitionOfManifest(name)
 
-		switch {
-		case ok && (id < 0 || id >= segment.PartitionCount):
-			t.Fatalf("partitionOfManifest(%q) = %d, outside the partitions", name, id)
-		case !ok && id != 0:
-			t.Fatalf("partitionOfManifest(%q) = (%d, false), want no partition", name, id)
+		if !ok {
+			require.Zero(t, id, "partitionOfManifest(%q) = (%d, false), want no partition", name, id)
+
+			return
 		}
+
+		require.GreaterOrEqual(t, id, 0, "partitionOfManifest(%q) outside the partitions", name)
+		require.Less(t, id, segment.PartitionCount, "partitionOfManifest(%q) beyond the partitions", name)
 	})
 }

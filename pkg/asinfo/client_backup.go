@@ -377,7 +377,7 @@ func (ic *Client) GetRestoreStatus(ctx context.Context, namespace, jobID string,
 	})
 }
 
-// statusNode is the part of a cluster node the status commands use.
+// statusNode is the part of a cluster node the status and cluster-stable commands use.
 type statusNode interface {
 	infoGetter
 	IsActive() bool

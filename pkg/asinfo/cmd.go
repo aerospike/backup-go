@@ -148,11 +148,12 @@ func (c infoCommands) udfGet(filename string) (string, error) {
 }
 
 // clusterStable returns the command that checks that the cluster of the given
-// size is stable for namespace ns.
-func (c infoCommands) clusterStable(size int, ns string) (string, error) {
+// size is stable for namespace ns. If ignoreMigrations is true, the cluster is
+// reported stable even while migrations are in progress.
+func (c infoCommands) clusterStable(size int, ns string, ignoreMigrations bool) (string, error) {
 	return newInfoCmd(cmdNameClusterStable).
 		num(paramSize, size).
-		flag(paramIgnoreMigrations, false).
+		flag(paramIgnoreMigrations, ignoreMigrations).
 		required(paramNamespace, ns).
 		build()
 }

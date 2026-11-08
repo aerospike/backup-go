@@ -582,8 +582,11 @@ func (ic *Client) getEffectiveReplicationFactor(node infoGetter, cmd string,
 }
 
 // GetClusterStable checks the stability of a cluster within the specified namespace and retries on transient errors.
-// Returns a boolean indicating the stability status and an error if the operation fails after retries.
-func (ic *Client) GetClusterStable(ctx context.Context, namespace string) (bool, error) {
+// Every node of the cluster is asked and must report the same cluster key. If ignoreMigrations is true,
+// migrations in progress do not make the cluster unstable.
+// Returns true if the cluster is stable. Otherwise, it returns false and an error, which wraps
+// [ErrClusterUnstable] if a node reported another cluster key after the last retry.
+func (ic *Client) GetClusterStable(ctx context.Context, namespace string, ignoreMigrations bool) (bool, error) {
 	// The cluster size is read on every attempt, so the command is built inside
 	// the retry loop. Everything else is checked here, as retrying cannot change it.
 	if err := ic.cmds.validateClusterStable(namespace); err != nil {
@@ -591,13 +594,18 @@ func (ic *Client) GetClusterStable(ctx context.Context, namespace string) (bool,
 	}
 
 	return retryValue(ctx, ic.retryPolicy, func() (bool, error) {
-		return ic.getClusterStable(namespace)
+		return ic.getClusterStable(namespace, ignoreMigrations)
 	})
 }
 
-func (ic *Client) getClusterStable(namespace string) (bool, error) {
+func (ic *Client) getClusterStable(namespace string, ignoreMigrations bool) (bool, error) {
 	nodes := ic.cluster.GetNodes()
 	nodesNum := len(nodes)
+
+	// No node could confirm the cluster key, so an empty cluster is never stable.
+	if nodesNum == 0 {
+		return false, errNoNodesAvailable
+	}
 
 	stats, err := ic.getStatistics()
 	if err != nil {
@@ -609,19 +617,29 @@ func (ic *Client) getClusterStable(namespace string) (bool, error) {
 		return false, fmt.Errorf("%w: cluster key not found in statistics", errclass.ErrAerospike)
 	}
 
-	cmd, err := ic.cmds.clusterStable(nodesNum, namespace)
+	cmd, err := ic.cmds.clusterStable(nodesNum, namespace, ignoreMigrations)
 	if err != nil {
 		return false, fmt.Errorf("failed to build cluster stable command: %w", err)
 	}
 
+	return checkClusterStable(ic, nodes, cmd, clusterKey)
+}
+
+// checkClusterStable sends cmd to every node and reports the cluster stable only
+// if each of them answers with clusterKey. It stops at the first node that fails
+// or answers with another key. Unlike the status commands, it does not skip the
+// inactive nodes: such a node fails the check, so that it is retried. The
+// caller makes sure that nodes is not empty.
+func checkClusterStable[N statusNode](ic *Client, nodes []N, cmd, clusterKey string) (bool, error) {
 	for _, node := range nodes {
-		result, err := ic.requestRandomNodeOnce(cmd)
+		result, err := ic.requestByNode(node, cmd)
 		if err != nil {
 			return false, fmt.Errorf("failed to get node %s stable status: %w", node.GetName(), err)
 		}
 
 		if result != clusterKey {
-			return false, fmt.Errorf("%w: cluster %s is not stable, result is %s", errclass.ErrAerospike, clusterKey, result)
+			return false, fmt.Errorf("%w: node %s reported cluster key %s instead of %s",
+				ErrClusterUnstable, node.GetName(), result, clusterKey)
 		}
 	}
 

@@ -7,7 +7,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.23.3
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.8.2
 	github.com/aerospike/aerospike-client-go/v8 v8.9.0
-	github.com/aerospike/tools-common-go v0.4.4-0.20261013235541-22e773bce9b7
+	github.com/aerospike/tools-common-go v0.5.0
 	github.com/aws/aws-sdk-go-v2 v1.47.5
 	github.com/aws/aws-sdk-go-v2/config v1.33.13
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.6

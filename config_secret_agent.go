@@ -72,6 +72,20 @@ func (s *SecretAgentConfig) validate() error {
 		return fmt.Errorf("unsupported connection type: %s", *s.ConnectionType)
 	}
 
+	// An empty path would be treated as unset by the Secret Agent client,
+	// silently turning TLS off, so it is rejected here.
+	if err := validateFilePath("ca file", s.CaFile); err != nil {
+		return err
+	}
+
+	if err := validateFilePath("cert file", s.CertFile); err != nil {
+		return err
+	}
+
+	if err := validateFilePath("key file", s.KeyFile); err != nil {
+		return err
+	}
+
 	if s.CertFile != nil && s.KeyFile == nil {
 		return fmt.Errorf("key file is required when cert file is set")
 	}
@@ -82,6 +96,15 @@ func (s *SecretAgentConfig) validate() error {
 
 	if s.CertFile != nil && s.CaFile == nil {
 		return fmt.Errorf("ca file is required when cert file is set")
+	}
+
+	return nil
+}
+
+// validateFilePath rejects a set but empty file path.
+func validateFilePath(name string, path *string) error {
+	if path != nil && *path == "" {
+		return fmt.Errorf("%s must not be empty", name)
 	}
 
 	return nil

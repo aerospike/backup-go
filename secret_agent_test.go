@@ -287,12 +287,28 @@ func TestNewSecretAgentClient_Errors(t *testing.T) {
 	unix := secretagent.ConnectionTypeUDS
 	unknownType := "udp"
 	negativeTimeout := -1
+	emptyPath := ""
 
 	tests := []struct {
 		name    string
 		modify  func(*SecretAgentConfig)
 		wantErr error
 	}{
+		{
+			name:    "nil address",
+			modify:  func(c *SecretAgentConfig) { c.Address = nil },
+			wantErr: ErrInvalidConfig,
+		},
+		{
+			name:    "nil connection type",
+			modify:  func(c *SecretAgentConfig) { c.ConnectionType = nil },
+			wantErr: ErrInvalidConfig,
+		},
+		{
+			name:    "empty ca file",
+			modify:  func(c *SecretAgentConfig) { c.CaFile = &emptyPath },
+			wantErr: ErrInvalidConfig,
+		},
 		{
 			name:    "missing ca file",
 			modify:  func(c *SecretAgentConfig) { c.CaFile = &missingFile },

@@ -234,6 +234,11 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
   (TOOLS-4533)
 - `SecretAgentConfig` with a client certificate and no CA file is rejected as `ErrInvalidConfig`.
   The certificate used to be ignored and the connection made in plaintext. (TOOLS-4533)
+- `SecretAgentConfig` with an empty `CaFile`, `CertFile` or `KeyFile` is rejected as
+  `ErrInvalidConfig`. An empty `CaFile` would otherwise turn TLS off silently. (TOOLS-4533)
+- `NewSecretAgentClient` and `ParseSecret` validate `SecretAgentConfig` as backup and restore
+  configs do, and reject an invalid one as `ErrInvalidConfig`. A nil `Address` or
+  `ConnectionType` used to cause a panic. (TOOLS-4533)
 - `SecretAgentConfig.TimeoutMillisecond` bounds each request as a whole, from dial to response,
   instead of each read and write separately. (TOOLS-4533)
 - An empty or malformed Secret Agent response is reported as `ErrCorruptData`. An empty secret

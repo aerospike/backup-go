@@ -81,16 +81,29 @@ func TestConfigSecretAgent_validate(t *testing.T) {
 	cfgConTypeInvalid.ConnectionType = &cTypeInvalid
 
 	cfgCertNoKey := testSecretAgentConfig()
-	cert := "/path/to/cert.pem"
-	cfgCertNoKey.CertFile = &cert
+	cfgCertNoKey.CertFile = &certFile
 
 	cfgKeyNoCert := testSecretAgentConfig()
-	key := "/path/to/key.pem"
-	cfgKeyNoCert.KeyFile = &key
+	cfgKeyNoCert.KeyFile = &keyFile
 
 	cfgCertNoCA := testSecretAgentConfig()
-	cfgCertNoCA.CertFile = &cert
-	cfgCertNoCA.KeyFile = &key
+	cfgCertNoCA.CertFile = &certFile
+	cfgCertNoCA.KeyFile = &keyFile
+
+	emptyPath := ""
+
+	cfgEmptyCA := testSecretAgentConfig()
+	cfgEmptyCA.CaFile = &emptyPath
+
+	cfgEmptyCert := testSecretAgentConfig()
+	cfgEmptyCert.CaFile = &caFile
+	cfgEmptyCert.CertFile = &emptyPath
+	cfgEmptyCert.KeyFile = &keyFile
+
+	cfgEmptyKey := testSecretAgentConfig()
+	cfgEmptyKey.CaFile = &caFile
+	cfgEmptyKey.CertFile = &certFile
+	cfgEmptyKey.KeyFile = &emptyPath
 
 	testCases := []struct {
 		name       string
@@ -161,6 +174,21 @@ func TestConfigSecretAgent_validate(t *testing.T) {
 			name:       "cert file without ca file",
 			config:     cfgCertNoCA,
 			errContent: "ca file is required when cert file is set",
+		},
+		{
+			name:       "ca file is empty",
+			config:     cfgEmptyCA,
+			errContent: "ca file must not be empty",
+		},
+		{
+			name:       "cert file is empty",
+			config:     cfgEmptyCert,
+			errContent: "cert file must not be empty",
+		},
+		{
+			name:       "key file is empty",
+			config:     cfgEmptyKey,
+			errContent: "key file must not be empty",
 		},
 	}
 

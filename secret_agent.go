@@ -87,6 +87,10 @@ func NewSecretAgentClient(config *SecretAgentConfig) (*secretagent.Client, error
 		return nil, fmt.Errorf("%w: secret config not initialized", ErrInvalidConfig)
 	}
 
+	if err := config.validate(); err != nil {
+		return nil, fmt.Errorf("%w: secret agent invalid: %w", ErrInvalidConfig, err)
+	}
+
 	tlsConfig, err := secretagent.NewTLSConfig(secretagent.TLSOptions{
 		CAFile:     deref(config.CaFile),
 		CertFile:   deref(config.CertFile),

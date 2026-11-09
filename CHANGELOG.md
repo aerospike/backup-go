@@ -226,6 +226,23 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
 - `Lister.GetMetadata` takes a backup id and looks it up under the lister's prefix, as
   `FetchAllMetadata` does. Anything that is not a backup id fails with `ErrInvalidBackupID`.
   (BKRS-474)
+- **Breaking.** The Secret Agent client now comes from
+    `github.com/aerospike/tools-common-go/secretagent`, shared with the other Aerospike Go tools.
+    `NewSecretAgentClient` returns `*secretagent.Client` from that package. (TOOLS-4533)
+- Secret references are parsed like the Aerospike C tools do: `secrets:<key>` without a resource
+  is accepted, and a reference is split on its last colon, so the resource may contain colons.
+  (TOOLS-4533)
+- `SecretAgentConfig` with a client certificate and no CA file is rejected as `ErrInvalidConfig`.
+  The certificate used to be ignored and the connection made in plaintext. (TOOLS-4533)
+- `SecretAgentConfig` with an empty `CaFile`, `CertFile` or `KeyFile` is rejected as
+  `ErrInvalidConfig`. An empty `CaFile` would otherwise turn TLS off silently. (TOOLS-4533)
+- `NewSecretAgentClient` and `ParseSecret` validate `SecretAgentConfig` as backup and restore
+  configs do, and reject an invalid one as `ErrInvalidConfig`. A nil `Address` or
+  `ConnectionType` used to cause a panic. (TOOLS-4533)
+- `SecretAgentConfig.TimeoutMillisecond` bounds each request as a whole, from dial to response,
+  instead of each read and write separately. (TOOLS-4533)
+- An empty or malformed Secret Agent response is reported as `ErrCorruptData`. An empty secret
+  used to be returned as an empty value. (TOOLS-4533)
 
 ### Removed
 
@@ -237,6 +254,8 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
 - `RequestCommon.AccessKey` and `RequestCommon.SecretKey`. The server ignores these
   parameters since SERVER-700. (BKRS-464)
 - `RequestBackup.EnableChangeStream`, which the server no longer accepts. (BKRS-464)
+- **Breaking.** The `pkg/secretagent` package, including `connection` and `models`. Use
+  `github.com/aerospike/tools-common-go/secretagent` instead. (TOOLS-4533)
 
 ### Fixed
 

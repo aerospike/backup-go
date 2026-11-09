@@ -17,12 +17,12 @@ package backup
 import (
 	"testing"
 
-	saClient "github.com/aerospike/backup-go/pkg/secretagent"
+	"github.com/aerospike/tools-common-go/secretagent"
 	"github.com/stretchr/testify/require"
 )
 
 func testSecretAgentConfig() *SecretAgentConfig {
-	cType := saClient.ConnectionTypeTCP
+	cType := secretagent.ConnectionTypeTCP
 	address := "127.0.0.1"
 	port := testSAPort
 	timeout := 1000
@@ -43,7 +43,7 @@ func TestConfigSecretAgent_validate(t *testing.T) {
 	cfgValid := testSecretAgentConfig()
 
 	cfgValidUDS := testSecretAgentConfig()
-	cTypeUDS := saClient.ConnectionTypeUDS
+	cTypeUDS := secretagent.ConnectionTypeUDS
 	addrUDS := "/tmp/secret-agent.sock"
 	cfgValidUDS.ConnectionType = &cTypeUDS
 	cfgValidUDS.Address = &addrUDS
@@ -81,12 +81,29 @@ func TestConfigSecretAgent_validate(t *testing.T) {
 	cfgConTypeInvalid.ConnectionType = &cTypeInvalid
 
 	cfgCertNoKey := testSecretAgentConfig()
-	cert := "/path/to/cert.pem"
-	cfgCertNoKey.CertFile = &cert
+	cfgCertNoKey.CertFile = &certFile
 
 	cfgKeyNoCert := testSecretAgentConfig()
-	key := "/path/to/key.pem"
-	cfgKeyNoCert.KeyFile = &key
+	cfgKeyNoCert.KeyFile = &keyFile
+
+	cfgCertNoCA := testSecretAgentConfig()
+	cfgCertNoCA.CertFile = &certFile
+	cfgCertNoCA.KeyFile = &keyFile
+
+	emptyPath := ""
+
+	cfgEmptyCA := testSecretAgentConfig()
+	cfgEmptyCA.CaFile = &emptyPath
+
+	cfgEmptyCert := testSecretAgentConfig()
+	cfgEmptyCert.CaFile = &caFile
+	cfgEmptyCert.CertFile = &emptyPath
+	cfgEmptyCert.KeyFile = &keyFile
+
+	cfgEmptyKey := testSecretAgentConfig()
+	cfgEmptyKey.CaFile = &caFile
+	cfgEmptyKey.CertFile = &certFile
+	cfgEmptyKey.KeyFile = &emptyPath
 
 	testCases := []struct {
 		name       string
@@ -152,6 +169,26 @@ func TestConfigSecretAgent_validate(t *testing.T) {
 			name:       "key file without cert file",
 			config:     cfgKeyNoCert,
 			errContent: "cert file is required when key file is set",
+		},
+		{
+			name:       "cert file without ca file",
+			config:     cfgCertNoCA,
+			errContent: "ca file is required when cert file is set",
+		},
+		{
+			name:       "ca file is empty",
+			config:     cfgEmptyCA,
+			errContent: "ca file must not be empty",
+		},
+		{
+			name:       "cert file is empty",
+			config:     cfgEmptyCert,
+			errContent: "cert file must not be empty",
+		},
+		{
+			name:       "key file is empty",
+			config:     cfgEmptyKey,
+			errContent: "key file must not be empty",
 		},
 	}
 

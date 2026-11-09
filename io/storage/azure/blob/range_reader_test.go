@@ -40,8 +40,9 @@ var (
 	errBlobTest = errors.New("blob test error")
 )
 
+//go:fix inline
 func int64Ptr(i int64) *int64 {
-	return &i
+	return new(i)
 }
 
 func defaultReader() *rangeReader {
@@ -62,7 +63,7 @@ func TestNewRangeReader(t *testing.T) {
 		clientMock := mocks.NewMockazblobGetter(t)
 		clientMock.On("GetBlobProperties", ctx, testPath).
 			Return(blob.GetPropertiesResponse{
-				ContentLength: int64Ptr(testSize),
+				ContentLength: new(testSize),
 			}, nil)
 
 		reader, err := newRangeReader(ctx, clientMock, testContainer, testPath)

@@ -21,13 +21,22 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"slices"
 	"strconv"
 	"strings"
 
+	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/models"
 	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
+)
+
+// Operations of a [net.OpError] that fail before the server can run a request,
+// see [notSent].
+const (
+	netOpDial  = "dial"
+	netOpWrite = "write"
 )
 
 // Separators of the info response format. Most commands separate objects with
@@ -44,6 +53,45 @@ const (
 // commands. See [parseInfoResponse] for the format itself.
 func parseStdInfoResponse(resp string) ([]infomodels.InfoMap, error) {
 	return parseInfoResponse(resp, infoObjSep, infoPairSep, infoKVSep)
+}
+
+// parseStatusResponse parses the reply of a backup-status or restore-status
+// command: records are separated by ";", fields by ":", and each field is split
+// on its first "=". The server escapes ":" and ";" in string values, so no
+// value needs special handling, unlike in [parseStdInfoResponse].
+func parseStatusResponse(resp string) ([]infomodels.InfoMap, error) {
+	records := strings.Split(resp, infoObjSep)
+	info := make([]infomodels.InfoMap, 0, len(records))
+
+	for _, record := range records {
+		if record == "" {
+			continue
+		}
+
+		fields := strings.Split(record, infoPairSep)
+		data := make(infomodels.InfoMap, len(fields))
+
+		for _, field := range fields {
+			if field == "" {
+				continue
+			}
+
+			key, val, err := parseInfoKVPair(field, infoKVSep)
+			if err != nil {
+				return nil, err
+			}
+
+			data[key] = val
+		}
+
+		info = append(info, data)
+	}
+
+	if len(info) == 0 {
+		return nil, nil
+	}
+
+	return info, nil
 }
 
 // parseStatisticsResponse parses a statistics info response, which is a single
@@ -70,14 +118,89 @@ func parseUDFResponse(udfGetInfoResp string) (*models.UDF, error) {
 func parseResultResponse(cmd string, result map[string]string) (string, error) {
 	v, ok := result[cmd]
 	if !ok {
-		return "", fmt.Errorf("%w: no response for command %s", errclass.ErrAerospike, redactCmd(cmd))
+		return "", fmt.Errorf("%w: no response for command %s", errclass.ErrAerospike, cmd)
 	}
 
-	if strings.Contains(v, errCmdRespPrefix) {
-		return "", fmt.Errorf("%w: command %s failed: %s", errclass.ErrAerospike, redactCmd(cmd), redactCmd(v))
+	if strings.HasPrefix(strings.TrimSpace(v), errCmdRespPrefix) {
+		return "", &cmdRespError{
+			code: cmdRespErrorCode(v),
+			err: fmt.Errorf("%w: command %s failed: %s", errclass.ErrAerospike,
+				cmd, v),
+		}
 	}
 
 	return v, nil
+}
+
+// cmdRespError is an error answered by the server to an info command, in the
+// form "ERROR:<code>:<message>". It keeps the result code, so that callers can
+// tell the errors apart without matching the message.
+type cmdRespError struct {
+	err  error
+	code int
+}
+
+func (e *cmdRespError) Error() string {
+	return e.err.Error()
+}
+
+func (e *cmdRespError) Unwrap() error {
+	return e.err
+}
+
+// cmdRespErrorCode returns the result code of the error response resp, or
+// cmdRespNoCode if resp does not start with "ERROR:<code>:".
+func cmdRespErrorCode(resp string) int {
+	rest, ok := strings.CutPrefix(strings.TrimSpace(resp), errCmdRespPrefix+infoPairSep)
+	if !ok {
+		return cmdRespNoCode
+	}
+
+	codeStr, _, _ := strings.Cut(rest, infoPairSep)
+
+	code, err := strconv.Atoi(codeStr)
+	if err != nil {
+		return cmdRespNoCode
+	}
+
+	return code
+}
+
+// mayHaveTakenEffect reports whether the failure err of a command leaves its
+// outcome unknown: the command got no answer, such as on a network timeout, or
+// the server answered that it could not confirm the command
+// (AS_ERR_TIMEOUT, AS_ERR_UNKNOWN). Any other answered error is conclusive, and
+// so is a failure before the command could reach the server, see [notSent].
+func mayHaveTakenEffect(err error) bool {
+	if respErr, ok := errors.AsType[*cmdRespError](err); ok {
+		return respErr.code == cmdRespCodeTimeout || respErr.code == cmdRespCodeUnknown
+	}
+
+	return !notSent(err)
+}
+
+// notSent reports whether the failure err of an info command happened before
+// the server could run the command: the client got no connection to the node,
+// or could not write the request in full. The server runs only a request it
+// has read in full. Any other failure, such as a timeout while waiting for the
+// answer, may come after the server ran the command.
+func notSent(err error) bool {
+	if errors.Is(err, a.ErrConnectionPoolEmpty) || errors.Is(err, a.ErrServerNotAvailable) {
+		return true
+	}
+
+	var opErr *net.OpError
+
+	return errors.As(err, &opErr) && (opErr.Op == netOpDial || opErr.Op == netOpWrite)
+}
+
+// isNotFoundResp reports whether err is the server answering an info command
+// with the not found result code, such as a status command for a job the node
+// does not know.
+func isNotFoundResp(err error) bool {
+	var respErr *cmdRespError
+
+	return errors.As(err, &respErr) && respErr.code == cmdRespCodeNotFound
 }
 
 func (ic *Client) requestSIndexes(node infoGetter, namespace string, noWarn bool,

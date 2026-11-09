@@ -32,8 +32,6 @@ const (
 	// testPartition is the partition of every record buildRecord makes: the
 	// low 12 bits of its digest, which starts 01 02 03 04.
 	testPartition = 0x201
-
-	msgValidateUnexpectedErr = "Validate() unexpected error: %v"
 )
 
 var (
@@ -430,20 +428,13 @@ func TestValidate(t *testing.T) {
 			stats, err := Validate(tt.build(t))
 
 			if tt.wantErr != nil {
-				if !errors.Is(err, tt.wantErr) {
-					t.Fatalf("Validate() error = %v, want %v", err, tt.wantErr)
-				}
+				require.ErrorIs(t, err, tt.wantErr)
 
 				return
 			}
 
-			if err != nil {
-				t.Fatalf(msgValidateUnexpectedErr, err)
-			}
-
-			if stats != tt.wantStats {
-				t.Fatalf("Validate() stats = %+v, want %+v", stats, tt.wantStats)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantStats, stats)
 		})
 	}
 }
@@ -459,22 +450,12 @@ func TestValidate_RecordErrorPosition(t *testing.T) {
 	_, err := Validate(buildSegment(t, good, good, broken))
 
 	var recErr *RecordError
-	if !errors.As(err, &recErr) {
-		t.Fatalf("Validate() error = %v, want *RecordError", err)
-	}
+	require.ErrorAs(t, err, &recErr)
 
-	if recErr.Index != 2 {
-		t.Errorf("RecordError.Index = %d, want 2", recErr.Index)
-	}
-
+	assert.Equal(t, 2, recErr.Index)
 	// Offsets count from the start of the segment object, frame included.
-	if want := frameHeaderSize + 2*len(good); recErr.Offset != want {
-		t.Errorf("RecordError.Offset = %d, want %d", recErr.Offset, want)
-	}
-
-	if !errors.Is(recErr, ErrFrameContentMismatch) {
-		t.Errorf("RecordError does not wrap ErrFrameContentMismatch: %v", recErr.Err)
-	}
+	assert.Equal(t, frameHeaderSize+2*len(good), recErr.Offset)
+	require.ErrorIs(t, recErr, ErrFrameContentMismatch)
 }
 
 func TestValidate_ExtendedHeader(t *testing.T) {
@@ -617,6 +598,86 @@ func TestValidate_Partition(t *testing.T) {
 	}
 }
 
+func TestValidate_BlockType(t *testing.T) {
+	t.Parallel()
+
+	const reservedBlockType = BlockType(3)
+
+	query := buildSegment(t, buildRecord(t, defaultSpec()))
+
+	change := buildSegment(t, buildRecord(t, defaultSpec()))
+	binary.LittleEndian.PutUint16(change[frameBlockTypeOffset:], uint16(BlockChangeRecords))
+
+	oneRecord := Stats{RecordCount: 1, ByteCount: 64}
+
+	tests := []struct {
+		wantErr   error
+		name      string
+		give      []byte
+		giveOpts  []Option
+		wantStats Stats
+	}{
+		{
+			name:      "query segment in the query stream",
+			give:      query,
+			giveOpts:  []Option{WithBlockType(BlockQueryRecords)},
+			wantStats: oneRecord,
+		},
+		{
+			name:      "change segment in the change stream",
+			give:      change,
+			giveOpts:  []Option{WithBlockType(BlockChangeRecords)},
+			wantStats: oneRecord,
+		},
+		{
+			name:      "change segment accepted without the option",
+			give:      change,
+			wantStats: oneRecord,
+		},
+		{
+			name:     "query segment in the change stream",
+			give:     query,
+			giveOpts: []Option{WithBlockType(BlockChangeRecords)},
+			wantErr:  ErrBlockTypeMismatch,
+		},
+		{
+			name:     "change segment in the query stream",
+			give:     change,
+			giveOpts: []Option{WithBlockType(BlockQueryRecords)},
+			wantErr:  ErrBlockTypeMismatch,
+		},
+		{
+			name:     "reserved block type required",
+			give:     query,
+			giveOpts: []Option{WithBlockType(reservedBlockType)},
+			wantErr:  ErrInvalidBlockType,
+		},
+		{
+			name:     "zero block type required",
+			give:     query,
+			giveOpts: []Option{WithBlockType(0)},
+			wantErr:  ErrInvalidBlockType,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			stats, err := Validate(tt.give, tt.giveOpts...)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.NotErrorAs(t, err, new(*RecordError))
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantStats, stats)
+		})
+	}
+}
+
 func TestRecordPartition(t *testing.T) {
 	t.Parallel()
 
@@ -648,9 +709,7 @@ func TestValidate_FrameErrorIsNotARecordError(t *testing.T) {
 	_, err := Validate(buildRecord(t, defaultSpec()))
 
 	var recErr *RecordError
-	if errors.As(err, &recErr) {
-		t.Fatalf("Validate() error = %v, want a frame error not tied to a record", err)
-	}
+	require.NotErrorAs(t, err, &recErr, "want a frame error not tied to a record")
 }
 
 func TestValidate_StatsAreCumulative(t *testing.T) {
@@ -666,17 +725,9 @@ func TestValidate_StatsAreCumulative(t *testing.T) {
 	body := concat(parts...)
 
 	stats, err := Validate(buildSegment(t, parts...))
-	if err != nil {
-		t.Fatalf(msgValidateUnexpectedErr, err)
-	}
-
-	if stats.RecordCount != recordCount {
-		t.Errorf("RecordCount = %d, want %d", stats.RecordCount, recordCount)
-	}
-
-	if stats.ByteCount != len(body) {
-		t.Errorf("ByteCount = %d, want %d", stats.ByteCount, len(body))
-	}
+	require.NoError(t, err)
+	assert.Equal(t, recordCount, stats.RecordCount)
+	assert.Equal(t, len(body), stats.ByteCount)
 }
 
 // FuzzValidate feeds arbitrary objects to the validator. A segment comes from
@@ -707,8 +758,7 @@ func FuzzValidate(f *testing.F) {
 		stats, err := Validate(data, opts...)
 		require.NotErrorIs(t, err, ErrInvalidPartition)
 
-		var recErr *RecordError
-		if errors.As(err, &recErr) {
+		if recErr, ok := errors.AsType[*RecordError](err); ok {
 			require.GreaterOrEqual(t, recErr.Offset, frameHeaderSize)
 			require.Less(t, recErr.Offset, len(data))
 		}
@@ -754,20 +804,14 @@ func TestReadUintvar(t *testing.T) {
 			val, next, err := readUintvar(tt.data, 0, len(tt.data))
 
 			if tt.wantErr != nil {
-				if !errors.Is(err, tt.wantErr) {
-					t.Fatalf("readUintvar() error = %v, want %v", err, tt.wantErr)
-				}
+				require.ErrorIs(t, err, tt.wantErr)
 
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("readUintvar() unexpected error: %v", err)
-			}
-
-			if val != tt.wantVal || next != tt.wantNext {
-				t.Fatalf("readUintvar() = (%d, %d), want (%d, %d)", val, next, tt.wantVal, tt.wantNext)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantVal, val)
+			assert.Equal(t, tt.wantNext, next)
 		})
 	}
 }

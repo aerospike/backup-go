@@ -17,6 +17,9 @@ package segment
 import (
 	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRecordError(t *testing.T) {
@@ -25,24 +28,13 @@ func TestRecordError(t *testing.T) {
 	err := newRecordError(3, 192, ErrBadEndMark)
 
 	want := "record 3 at offset 192: " + ErrBadEndMark.Error()
-	if got := err.Error(); got != want {
-		t.Errorf("Error() = %q, want %q", got, want)
-	}
-
-	if !errors.Is(err, ErrBadEndMark) {
-		t.Errorf("errors.Is(err, ErrBadEndMark) = false, want true")
-	}
-
-	if got := errors.Unwrap(err); !errors.Is(got, ErrBadEndMark) {
-		t.Errorf("Unwrap() = %v, want %v", got, ErrBadEndMark)
-	}
+	require.EqualError(t, err, want)
+	require.ErrorIs(t, err, ErrBadEndMark)
+	require.ErrorIs(t, errors.Unwrap(err), ErrBadEndMark)
 
 	var recErr *RecordError
-	if !errors.As(error(err), &recErr) {
-		t.Fatalf("errors.As(err, *RecordError) = false, want true")
-	}
+	require.ErrorAs(t, err, &recErr)
 
-	if recErr.Index != 3 || recErr.Offset != 192 {
-		t.Errorf("record located at index %d offset %d, want 3 and 192", recErr.Index, recErr.Offset)
-	}
+	assert.Equal(t, 3, recErr.Index)
+	assert.Equal(t, 192, recErr.Offset)
 }

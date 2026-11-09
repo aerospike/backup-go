@@ -36,16 +36,17 @@ type ClusterInfo interface {
 	GetSIndexInfo(ctx context.Context, namespace string) (models.SIndexInfo, error)
 	GetPrimaryPartitions(ctx context.Context, node, namespace string) ([]int, error)
 	GetPendingMigrations(ctx context.Context, namespace string) (uint64, error)
-	GetClusterStable(ctx context.Context, namespace string) (bool, error)
+	GetClusterStable(ctx context.Context, namespace string, ignoreMigrations bool) (bool, error)
 }
 
 // ServerBackupInfo provides server-side backup and restore job control.
 type ServerBackupInfo interface {
 	StartBackup(ctx context.Context, request *infomodels.RequestBackup) (string, error)
-	StartRestore(ctx context.Context, request *infomodels.RequestRestore) error
-	PrepareRestore(ctx context.Context, request *infomodels.RequestPrepareRestore) error
+	StartRestore(ctx context.Context, request *infomodels.RequestRestore) (string, error)
 	GetBackupStatus(ctx context.Context, jobID string) (*infomodels.ResponseBackupState, error)
-	GetRestoreStatus(ctx context.Context, namespace string) (string, error)
+	GetRestoreStatus(ctx context.Context, namespace, jobID string) (*infomodels.ResponseRestoreState, error)
 	AbortBackup(ctx context.Context, backupID string) error
 	AbortRestore(ctx context.Context, namespace, backupID string) error
+	OpenRestore(ctx context.Context, namespace string) error
+	ClearRestoreStorage(ctx context.Context, namespace, jobID string) error
 }

@@ -49,8 +49,8 @@ func (_m *MockClusterInfo) EXPECT() *MockClusterInfo_Expecter {
 }
 
 // GetClusterStable provides a mock function for the type MockClusterInfo
-func (_mock *MockClusterInfo) GetClusterStable(ctx context.Context, namespace string) (bool, error) {
-	ret := _mock.Called(ctx, namespace)
+func (_mock *MockClusterInfo) GetClusterStable(ctx context.Context, namespace string, ignoreMigrations bool) (bool, error) {
+	ret := _mock.Called(ctx, namespace, ignoreMigrations)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetClusterStable")
@@ -58,16 +58,16 @@ func (_mock *MockClusterInfo) GetClusterStable(ctx context.Context, namespace st
 
 	var r0 bool
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
-		return returnFunc(ctx, namespace)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) (bool, error)); ok {
+		return returnFunc(ctx, namespace, ignoreMigrations)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) bool); ok {
-		r0 = returnFunc(ctx, namespace)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) bool); ok {
+		r0 = returnFunc(ctx, namespace, ignoreMigrations)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = returnFunc(ctx, namespace)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool) error); ok {
+		r1 = returnFunc(ctx, namespace, ignoreMigrations)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -82,11 +82,12 @@ type MockClusterInfo_GetClusterStable_Call struct {
 // GetClusterStable is a helper method to define mock.On call
 //   - ctx context.Context
 //   - namespace string
-func (_e *MockClusterInfo_Expecter) GetClusterStable(ctx any, namespace any) *MockClusterInfo_GetClusterStable_Call {
-	return &MockClusterInfo_GetClusterStable_Call{Call: _e.mock.On("GetClusterStable", ctx, namespace)}
+//   - ignoreMigrations bool
+func (_e *MockClusterInfo_Expecter) GetClusterStable(ctx any, namespace any, ignoreMigrations any) *MockClusterInfo_GetClusterStable_Call {
+	return &MockClusterInfo_GetClusterStable_Call{Call: _e.mock.On("GetClusterStable", ctx, namespace, ignoreMigrations)}
 }
 
-func (_c *MockClusterInfo_GetClusterStable_Call) Run(run func(ctx context.Context, namespace string)) *MockClusterInfo_GetClusterStable_Call {
+func (_c *MockClusterInfo_GetClusterStable_Call) Run(run func(ctx context.Context, namespace string, ignoreMigrations bool)) *MockClusterInfo_GetClusterStable_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -96,9 +97,14 @@ func (_c *MockClusterInfo_GetClusterStable_Call) Run(run func(ctx context.Contex
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
+		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -109,7 +115,7 @@ func (_c *MockClusterInfo_GetClusterStable_Call) Return(b bool, err error) *Mock
 	return _c
 }
 
-func (_c *MockClusterInfo_GetClusterStable_Call) RunAndReturn(run func(ctx context.Context, namespace string) (bool, error)) *MockClusterInfo_GetClusterStable_Call {
+func (_c *MockClusterInfo_GetClusterStable_Call) RunAndReturn(run func(ctx context.Context, namespace string, ignoreMigrations bool) (bool, error)) *MockClusterInfo_GetClusterStable_Call {
 	_c.Call.Return(run)
 	return _c
 }

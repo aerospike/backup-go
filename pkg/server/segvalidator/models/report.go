@@ -31,6 +31,15 @@ type ValidationReport struct {
 	Issues []ValidationIssue
 	// Manifests is what comparing manifests against the storage found.
 	Manifests ManifestReport
+	// Commit is what the commit record of the backup says, and whether a
+	// restore would start from it.
+	Commit CommitReport
+	// EmptyNamespaces are the namespaces a restore finds no query stream
+	// manifest for. A restore takes that for wrong coordinates and fails,
+	// unless the backup is an incremental one restored as part of a
+	// backup-ids list, so for any other backup each of them is also a
+	// manifest problem. Only a run over every segment determines them.
+	EmptyNamespaces []string
 	// TotalSegments is the number of segments the run was given to check. A
 	// sampled run never enumerates the backup, so this is the size of the
 	// sample and not the size of the backup.
@@ -49,7 +58,7 @@ type ValidationReport struct {
 
 // Failed reports whether the run found anything wrong with the backup.
 func (r *ValidationReport) Failed() bool {
-	return r.InvalidSegments > 0 || r.Manifests.Problems > 0
+	return r.InvalidSegments > 0 || r.Manifests.Problems > 0 || r.Commit.Refusal != nil
 }
 
 // Truncated reports whether more segments failed than Issues describes.
@@ -93,6 +102,10 @@ type ManifestReport struct {
 	// MissingSegments is the number of recorded segments the storage does not
 	// hold at all.
 	MissingSegments int64
+	// Superseded is the number of change stream manifests that were not read,
+	// because a newer manifest of the same node replaced them and a restore
+	// reads that one alone. What they recorded is reported as unrecorded.
+	Superseded int64
 	// Unrecorded is the number of checked segments that no manifest names.
 	// They were read like the others, but nothing recorded what they should
 	// be: they are either leftovers of an interrupted flush or the sign of a
@@ -122,4 +135,48 @@ type ManifestIssue struct {
 	// SegmentPath locates the recorded segment that is missing or the wrong
 	// size. It is empty when the manifest itself could not be read.
 	SegmentPath string
+}
+
+// CommitReport is what the commit record of a backup, its metadata.json, says.
+// A restore reads it before anything else and refuses to start unless it says
+// the backup completed, so a backup whose segments are all sound is still one
+// that cannot be restored when Refusal is set.
+//
+// Which restore a backup is validated for is decided by the record itself: a
+// backup that achieved fuzzy consistency is validated the way a fuzzy restore
+// reads it, from its query stream alone, and any other backup the way a strict
+// restore reads it, change stream included.
+type CommitReport struct {
+	// Refusal is why a restore of the backup would refuse to start, or nil
+	// when it would start.
+	Refusal error
+	// Path locates the commit record.
+	Path string
+	// State is what reading the record established: present, absent,
+	// unreadable or corrupt. It is empty when the record was not read.
+	State string
+	// Status is the status the record gives the backup: complete, aborted,
+	// empty for a record written before the field, or "?" when present but
+	// unreadable.
+	Status string
+	// BackupPolicy is the consistency the backup was asked for: strict,
+	// best-effort or fuzzy.
+	BackupPolicy string
+	// AchievedConsistency is the consistency the backup achieved: strict or
+	// fuzzy, empty for a record written before the field, or "?" when present
+	// but unreadable.
+	AchievedConsistency string
+	// FallbackReason is why a best-effort backup fell back to fuzzy.
+	FallbackReason string
+	// Namespace is the namespace the backup was taken of.
+	Namespace string
+	// BackupType is full or incremental, or empty when the record does not
+	// say or its modification time bounds contradict what it says.
+	BackupType string
+	// Strict tells that the backup was validated for a strict restore, which
+	// reads its change stream. Otherwise it was validated for a fuzzy one.
+	Strict bool
+	// ChangeStreamSkipped tells that the change stream of the backup was not
+	// validated, because a restore of a fuzzy backup never reads it.
+	ChangeStreamSkipped bool
 }

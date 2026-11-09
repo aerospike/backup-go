@@ -35,7 +35,7 @@ const (
 	testErrKey2 = "cmd: k2"
 
 	// testUnsafeValue would inject an extra parameter if it were sent as is.
-	testUnsafeValue = "v1;fuzzy-restore=true"
+	testUnsafeValue = "v1;restore-policy=fuzzy"
 	// testNewlineValue would inject an extra command if it were sent as is.
 	testNewlineValue = "v1\nbackup-abort:job-id=1"
 	// testPipeValue is valid unless the command forbids "|".
@@ -50,6 +50,9 @@ func TestInfoCmd_BuildParams(t *testing.T) {
 		testValue2 = "v2"
 		testValue3 = "v3"
 		wantEmpty  = "cmd:"
+		// wantNum is k1 sent with the value 42 of the number test cases.
+		wantNum     = "cmd:k1=42"
+		wantNumZero = "cmd:k1=0"
 	)
 
 	tests := []struct {
@@ -115,12 +118,12 @@ func TestInfoCmd_BuildParams(t *testing.T) {
 		{
 			name:  "num",
 			build: func(c *infoCmd) *infoCmd { return c.num(testCmdKey1, 42) },
-			want:  "cmd:k1=42",
+			want:  wantNum,
 		},
 		{
 			name:  "num zero is sent",
 			build: func(c *infoCmd) *infoCmd { return c.num(testCmdKey1, 0) },
-			want:  "cmd:k1=0",
+			want:  wantNumZero,
 		},
 		{
 			name:  "optional flag unset is omitted",
@@ -129,12 +132,12 @@ func TestInfoCmd_BuildParams(t *testing.T) {
 		},
 		{
 			name:  "optional flag false is sent",
-			build: func(c *infoCmd) *infoCmd { return c.optFlag(testCmdKey1, testPtr(false)) },
+			build: func(c *infoCmd) *infoCmd { return c.optFlag(testCmdKey1, new(false)) },
 			want:  "cmd:k1=false",
 		},
 		{
 			name:  "optional flag true is sent",
-			build: func(c *infoCmd) *infoCmd { return c.optFlag(testCmdKey1, testPtr(true)) },
+			build: func(c *infoCmd) *infoCmd { return c.optFlag(testCmdKey1, new(true)) },
 			want:  "cmd:k1=true",
 		},
 		{
@@ -145,7 +148,22 @@ func TestInfoCmd_BuildParams(t *testing.T) {
 		{
 			name:  "optional num is sent",
 			build: func(c *infoCmd) *infoCmd { return c.optNum(testCmdKey1, 42) },
-			want:  "cmd:k1=42",
+			want:  wantNum,
+		},
+		{
+			name:  "optional num pointer unset is omitted",
+			build: func(c *infoCmd) *infoCmd { return c.optNumPtr(testCmdKey1, nil) },
+			want:  wantEmpty,
+		},
+		{
+			name:  "optional num pointer zero is sent",
+			build: func(c *infoCmd) *infoCmd { return c.optNumPtr(testCmdKey1, new(0)) },
+			want:  wantNumZero,
+		},
+		{
+			name:  "optional num pointer is sent",
+			build: func(c *infoCmd) *infoCmd { return c.optNumPtr(testCmdKey1, new(42)) },
+			want:  wantNum,
 		},
 		{
 			name:  "optional float zero is omitted",
@@ -328,12 +346,66 @@ func TestInfoCmd_BuildMissingAndInvalid(t *testing.T) {
 	assert.Empty(t, got)
 }
 
+func TestInfoCmd_ParamKeys(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		build func(c *infoCmd) *infoCmd
+		want  []string
+	}{
+		{
+			name:  "nothing added",
+			build: func(c *infoCmd) *infoCmd { return c },
+		},
+		{
+			name: "keys in the order they were added",
+			build: func(c *infoCmd) *infoCmd {
+				return c.num(testCmdKey2, 1).str(testCmdKey1, testCmdValue1)
+			},
+			want: []string{testCmdKey2, testCmdKey1},
+		},
+		{
+			name: "omitted parameters are skipped",
+			build: func(c *infoCmd) *infoCmd {
+				return c.str(testCmdKey1, "").optNum(testCmdKey2, 0).optFlag(testCmdKey1, nil)
+			},
+		},
+		{
+			name: "missing parameter is skipped",
+			build: func(c *infoCmd) *infoCmd {
+				return c.required(testCmdKey1, "").optNumPtr(testCmdKey2, new(0))
+			},
+			want: []string{testCmdKey2},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, tt.build(newInfoCmd(testCmdName)).paramKeys())
+		})
+	}
+}
+
+func TestInfoCmd_ParamKeysCopy(t *testing.T) {
+	t.Parallel()
+
+	cmd := newInfoCmd(testCmdName).str(testCmdKey1, testCmdValue1)
+
+	keys := cmd.paramKeys()
+	keys[0] = testCmdKey2
+
+	assert.Equal(t, []string{testCmdKey1}, cmd.paramKeys())
+}
+
 func TestCommaSeparatedListValid(t *testing.T) {
 	t.Parallel()
 
 	const (
-		testListSingleID  = "260901T000000-abcd"
-		testListMultiple  = "260901T000000-abcd,260901T000001-efgh"
+		testListSingleID  = testCmdBackupID
+		testListMultiple  = testCmdBackupID + ",260901T000001-efgh"
 		testListCommaOnly = ","
 		testListEmptyPart = "a,,b"
 		testListLeading   = ",a"
@@ -362,13 +434,14 @@ func TestCommaSeparatedListValid(t *testing.T) {
 	}
 }
 
-func TestInfoCmd_RequiredCommaList(t *testing.T) {
+func TestInfoCmd_RequiredIDList(t *testing.T) {
 	t.Parallel()
 
 	const (
 		testListValue      = "id1,id2"
 		testListWant       = "cmd:k1=id1,id2"
 		testListInvalid    = "id1,"
+		testListBadID      = "id1,a:b"
 		testListInvalidKey = "cmd: k1"
 	)
 
@@ -396,13 +469,19 @@ func TestInfoCmd_RequiredCommaList(t *testing.T) {
 			wantErr:     errInvalidCmdParam,
 			wantErrText: testListInvalidKey,
 		},
+		{
+			name:        "invalid id in the list",
+			giveValue:   testListBadID,
+			wantErr:     errInvalidCmdParam,
+			wantErrText: testListInvalidKey,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := newInfoCmd(testCmdName).requiredCommaList(testCmdKey1, tt.giveValue).build()
+			got, err := newInfoCmd(testCmdName).requiredIDList(testCmdKey1, tt.giveValue).build()
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 				require.ErrorIs(t, err, errclass.ErrInvalidConfig)
@@ -414,6 +493,84 @@ func TestInfoCmd_RequiredCommaList(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestInfoCmd_JobID(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testJobValue   = testCmdBackupID
+		testJobWant    = "cmd:k1=" + testJobValue
+		testJobBad     = "a/b"
+		testJobBadText = "cmd: k1"
+	)
+
+	tests := []struct {
+		name        string
+		giveValue   string
+		want        string
+		wantErr     error
+		wantErrText string
+	}{
+		{name: "valid id", giveValue: testJobValue, want: testJobWant},
+		{name: "missing id", giveValue: "", wantErr: errMissingCmdParam, wantErrText: testErrKey1},
+		{name: "invalid id", giveValue: testJobBad, wantErr: errInvalidCmdParam, wantErrText: testJobBadText},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := newInfoCmd(testCmdName).jobID(testCmdKey1, tt.giveValue).build()
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				require.ErrorIs(t, err, errclass.ErrInvalidConfig)
+				require.ErrorContains(t, err, tt.wantErrText)
+				assert.Empty(t, got)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// TestValidID checks the job id and backup id rules of the server: 1 to 20
+// printable ASCII characters, none of "|:;=/" or a space, and no "..".
+func TestValidID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		give string
+		want bool
+	}{
+		{name: "generated id", give: testCmdBackupID, want: true},
+		{name: "single character", give: "a", want: true},
+		{name: "maximum length", give: "12345678901234567890", want: true},
+		{name: "single dot", give: "a.b", want: true},
+		{name: "empty", give: "", want: false},
+		{name: "too long", give: "123456789012345678901", want: false},
+		{name: "pipe", give: "a|b", want: false},
+		{name: "colon", give: "a:b", want: false},
+		{name: "semicolon", give: "a;b", want: false},
+		{name: "equals sign", give: "a=b", want: false},
+		{name: "slash", give: "a/b", want: false},
+		{name: "space", give: "a b", want: false},
+		{name: "double dot", give: "a..b", want: false},
+		{name: "control character", give: "a\tb", want: false},
+		{name: "non ASCII", give: "a\u00e9", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, validID(tt.give))
 		})
 	}
 }

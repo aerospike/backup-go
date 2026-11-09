@@ -256,8 +256,7 @@ func (r *Reader) openObject(
 	object, err := common.NewRetryableReader(ctx, rReader, r.RetryPolicy, r.Logger)
 	if err != nil {
 		// Skip 404 not found error.
-		var opErr *smithy.OperationError
-		if errors.As(err, &opErr) {
+		if opErr, ok := errors.AsType[*smithy.OperationError](err); ok {
 			var httpErr *awsHttp.ResponseError
 			if errors.As(opErr.Err, &httpErr) && httpErr.HTTPStatusCode() == http.StatusNotFound && skipNotFound {
 				return

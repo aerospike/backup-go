@@ -16,6 +16,8 @@ package segment
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // newTestHeader builds a header filled with a deterministic digest.
@@ -56,9 +58,7 @@ func TestWyhash64_GoldenValues(t *testing.T) {
 				key[i] = byte(i + 1)
 			}
 
-			if got := wyhash64(key); got != tt.want {
-				t.Fatalf("wyhash64() = %#016x, want %#016x", got, tt.want)
-			}
+			require.Equal(t, tt.want, wyhash64(key))
 		})
 	}
 }
@@ -80,13 +80,10 @@ func TestWyhash64_LengthClasses(t *testing.T) {
 
 		got := wyhash64(key)
 
-		if again := wyhash64(key); again != got {
-			t.Fatalf("wyhash64() is not stable for length %d", length)
-		}
+		require.Equal(t, got, wyhash64(key), "wyhash64() is not stable for length %d", length)
 
-		if prev, ok := seen[got]; ok {
-			t.Fatalf("wyhash64() collides for lengths %d and %d", prev, length)
-		}
+		prev, ok := seen[got]
+		require.False(t, ok, "wyhash64() collides for lengths %d and %d", prev, length)
 
 		seen[got] = length
 	}
@@ -103,26 +100,21 @@ func TestMakeEndMark(t *testing.T) {
 
 		const want = uint32(0x07ea27e1)
 
-		if mark != want {
-			t.Fatalf("makeEndMark() = %#08x, want %#08x", mark, want)
-		}
+		require.Equal(t, want, mark)
 	})
 
 	t.Run("stable", func(t *testing.T) {
 		t.Parallel()
 
-		if got := makeEndMark(newTestHeader(1)); got != mark {
-			t.Fatalf("makeEndMark() = %#x, want %#x", got, mark)
-		}
+		require.Equal(t, mark, makeEndMark(newTestHeader(1)))
 	})
 
 	t.Run("top bit is masked off", func(t *testing.T) {
 		t.Parallel()
 
 		for seed := range byte(64) {
-			if got := makeEndMark(newTestHeader(seed)); got&^endMarkMask != 0 {
-				t.Fatalf("makeEndMark() = %#x, top bit set", got)
-			}
+			got := makeEndMark(newTestHeader(seed))
+			require.Zero(t, got&^endMarkMask, "makeEndMark() = %#x, top bit set", got)
 		}
 	})
 
@@ -133,9 +125,7 @@ func TestMakeEndMark(t *testing.T) {
 			mutated := newTestHeader(1)
 			mutated[digestOffset+i] ^= 0xff
 
-			if got := makeEndMark(mutated); got == mark {
-				t.Fatalf("makeEndMark() unchanged after flipping byte %d", i)
-			}
+			require.NotEqual(t, mark, makeEndMark(mutated), "makeEndMark() unchanged after flipping byte %d", i)
 		}
 	})
 
@@ -147,8 +137,6 @@ func TestMakeEndMark(t *testing.T) {
 			mutated[i] ^= 0xff
 		}
 
-		if got := makeEndMark(mutated); got != mark {
-			t.Fatalf("makeEndMark() = %#x, want %#x", got, mark)
-		}
+		require.Equal(t, mark, makeEndMark(mutated))
 	})
 }

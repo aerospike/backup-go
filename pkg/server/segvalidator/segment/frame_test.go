@@ -42,7 +42,7 @@ func buildFrame(tb testing.TB, spec frameSpec) []byte {
 
 	copy(seg, frameMagic)
 	binary.LittleEndian.PutUint16(seg[frameVersionMajorOffset:], frameVersionMajor)
-	binary.LittleEndian.PutUint16(seg[frameBlockTypeOffset:], frameBlockRecords)
+	binary.LittleEndian.PutUint16(seg[frameBlockTypeOffset:], uint16(BlockQueryRecords))
 	binary.LittleEndian.PutUint32(seg[frameHeaderLenOffset:], uint32(spec.headerLen))
 	binary.LittleEndian.PutUint64(seg[frameBodyLenOffset:], uint64(len(spec.body)))
 	binary.LittleEndian.PutUint32(seg[frameFooterLenOffset:], uint32(spec.footerLen))
@@ -96,16 +96,93 @@ func TestParseFrame(t *testing.T) {
 
 	oneRecord := frame{recordCount: 1, bodyOff: frameHeaderSize, bodyLen: len(record)}
 
+	// changeSegment returns a fresh one record segment the change stream wrote.
+	changeSegment := func(t *testing.T) []byte {
+		t.Helper()
+		seg := oneRecordSegment(t)
+		binary.LittleEndian.PutUint16(seg[frameBlockTypeOffset:], uint16(BlockChangeRecords))
+
+		return seg
+	}
+
 	tests := []struct {
-		build   func(t *testing.T) []byte
-		wantErr error
-		name    string
-		want    frame
+		build    func(t *testing.T) []byte
+		wantErr  error
+		name     string
+		want     frame
+		giveWant BlockType
 	}{
 		{
 			name:  "current frame",
 			build: oneRecordSegment,
 			want:  oneRecord,
+		},
+		{
+			name:  "change stream frame",
+			build: changeSegment,
+			want:  oneRecord,
+		},
+		{
+			name:     "query stream frame where a query segment is expected",
+			build:    oneRecordSegment,
+			giveWant: BlockQueryRecords,
+			want:     oneRecord,
+		},
+		{
+			name:     "change stream frame where a change segment is expected",
+			build:    changeSegment,
+			giveWant: BlockChangeRecords,
+			want:     oneRecord,
+		},
+		{
+			name:     "query stream frame where a change segment is expected",
+			build:    oneRecordSegment,
+			giveWant: BlockChangeRecords,
+			wantErr:  ErrBlockTypeMismatch,
+		},
+		{
+			name:     "change stream frame where a query segment is expected",
+			build:    changeSegment,
+			giveWant: BlockQueryRecords,
+			wantErr:  ErrBlockTypeMismatch,
+		},
+		{
+			// The server refuses a reserved type before it compares types.
+			name: "reserved block type where a query segment is expected",
+			build: func(t *testing.T) []byte {
+				t.Helper()
+				seg := oneRecordSegment(t)
+				binary.LittleEndian.PutUint16(seg[frameBlockTypeOffset:], manifestBlockType)
+
+				return seg
+			},
+			giveWant: BlockQueryRecords,
+			wantErr:  ErrUnsupportedBlockType,
+		},
+		{
+			// The server reads the frame whole before it compares types.
+			name: "truncated frame reported before a block type mismatch",
+			build: func(t *testing.T) []byte {
+				t.Helper()
+				seg := changeSegment(t)
+
+				return seg[:len(seg)-1]
+			},
+			giveWant: BlockQueryRecords,
+			wantErr:  ErrFrameTruncated,
+		},
+		{
+			// The server compares types before it checks the body.
+			name: "block type mismatch reported before an empty body",
+			build: func(t *testing.T) []byte {
+				t.Helper()
+				seg := buildSegment(t)
+				binary.LittleEndian.PutUint16(seg[frameBlockTypeOffset:], uint16(BlockChangeRecords))
+
+				return seg
+			},
+			giveWant: BlockQueryRecords,
+			wantErr:  ErrBlockTypeMismatch,
 		},
 		{
 			name: "longer header and footer are honored",
@@ -340,7 +417,7 @@ func TestParseFrame(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := parseFrame(tt.build(t))
+			got, err := parseFrame(tt.build(t), tt.giveWant)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 				return

@@ -24,7 +24,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -32,12 +31,16 @@ import (
 	"github.com/aerospike/backup-go/pkg/server/segvalidator/models"
 	"github.com/aerospike/backup-go/pkg/server/segvalidator/segment"
 	"github.com/aerospike/backup-go/pkg/server/segvalidator/streamers"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// The ASBK v1 frame around a 64 byte body holding one record.
+// The ASBK v1 frame around a 64 byte body holding one record. The headers of
+// the two streams differ in the block type only.
 const (
-	fixtureFrameHeaderHex = "4153424b01000000010000002000000040000000000000001000000000000000"
-	fixtureFrameFooterHex = "01000000000000000000000000000000"
+	fixtureFrameHeaderHex       = "4153424b01000000010000002000000040000000000000001000000000000000"
+	fixtureChangeFrameHeaderHex = "4153424b01000000020000002000000040000000000000001000000000000000"
+	fixtureFrameFooterHex       = "01000000000000000000000000000000"
 )
 
 // The 64 byte flat record of the segment fixtures, holding set "demo" and a
@@ -53,6 +56,11 @@ const (
 
 // fixtureSegmentHex is a one record segment.
 const fixtureSegmentHex = fixtureFrameHeaderHex +
+	fixtureRecordMagicHex + fixtureRecordFlagsHex + fixtureRecordDigestTailHex +
+	fixtureFrameFooterHex
+
+// fixtureChangeSegmentHex is the same segment as the change stream writes it.
+const fixtureChangeSegmentHex = fixtureChangeFrameHeaderHex +
 	fixtureRecordMagicHex + fixtureRecordFlagsHex + fixtureRecordDigestTailHex +
 	fixtureFrameFooterHex
 
@@ -82,12 +90,8 @@ const (
 
 // Messages repeated across the tests.
 const (
-	msgValidateErr           = "Validate() error = %v"
-	msgValidateIssues        = "Validate() reported issues: %+v"
-	msgNewSegValidatorErr    = "NewSegValidator() error = %v"
-	msgWantErrNoSegments     = "Validate() error = %v, want ErrNoSegments"
-	msgWantContextCanceled   = "Validate() error = %v, want context.Canceled"
-	msgWantOneInvalidSegment = "valid = %d, invalid = %d, want 0 and 1"
+	msgValidateIssues = "Validate() reported issues: %+v"
+	msgReport         = "report = %+v"
 )
 
 var errOpenSegment = errors.New("open failed")
@@ -249,9 +253,7 @@ func decodeSegmentHex(t *testing.T, s string) []byte {
 	t.Helper()
 
 	b, err := hex.DecodeString(s)
-	if err != nil {
-		t.Fatalf("decode fixture: %v", err)
-	}
+	require.NoError(t, err, "decode fixture")
 
 	return b
 }
@@ -269,9 +271,7 @@ func newTestSegValidator(t *testing.T, streamer Streamer, opts ...Option) *SegVa
 	t.Helper()
 
 	v, err := NewSegValidator(streamer, opts...)
-	if err != nil {
-		t.Fatalf(msgNewSegValidatorErr, err)
-	}
+	require.NoError(t, err)
 
 	return v
 }
@@ -284,30 +284,17 @@ func TestSegValidator_ValidateReadableBackup(t *testing.T) {
 	streamer := newStubStreamer(decodeSegmentHex(t, fixtureSegmentHex), segments)
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
-	if err != nil {
-		t.Fatalf(msgValidateErr, err)
-	}
+	require.NoError(t, err)
+	require.False(t, report.Failed(), msgValidateIssues, report.Issues)
 
-	if report.Failed() {
-		t.Fatalf(msgValidateIssues, report.Issues)
-	}
+	assert.Equal(t, stubBackupID, report.BackupID)
 
-	if report.BackupID != stubBackupID {
-		t.Errorf("BackupID = %q, want %q", report.BackupID, stubBackupID)
-	}
+	require.EqualValues(t, segments, report.TotalSegments)
+	require.EqualValues(t, segments, report.CheckedSegments)
+	require.EqualValues(t, segments, report.ValidSegments)
 
-	if report.TotalSegments != segments || report.CheckedSegments != segments ||
-		report.ValidSegments != segments {
-		t.Fatalf("unexpected counts: %+v", report)
-	}
-
-	if report.TotalRecords != segments {
-		t.Errorf("TotalRecords = %d, want %d", report.TotalRecords, segments)
-	}
-
-	if report.TotalBytes != segments*fixtureRecordBytes {
-		t.Errorf("TotalBytes = %d, want %d", report.TotalBytes, segments*fixtureRecordBytes)
-	}
+	assert.EqualValues(t, segments, report.TotalRecords)
+	assert.EqualValues(t, segments*fixtureRecordBytes, report.TotalBytes)
 }
 
 func TestSegValidator_UnrestorableSegmentIsRefused(t *testing.T) {
@@ -363,17 +350,13 @@ func TestSegValidator_UnrestorableSegmentIsRefused(t *testing.T) {
 			streamer.manifestOf = tt.manifestOf
 
 			report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
-			if err != nil {
-				t.Fatalf(msgValidateErr, err)
-			}
+			require.NoError(t, err)
 
-			if len(report.Issues) != 1 || !errors.Is(report.Issues[0].Err, tt.wantErr) {
-				t.Fatalf("issues = %+v, want %v", report.Issues, tt.wantErr)
-			}
+			require.Len(t, report.Issues, 1)
+			require.ErrorIs(t, report.Issues[0].Err, tt.wantErr)
 
-			if report.ValidSegments != 0 || report.InvalidSegments != 1 {
-				t.Errorf(msgWantOneInvalidSegment, report.ValidSegments, report.InvalidSegments)
-			}
+			assert.Zero(t, report.ValidSegments)
+			assert.EqualValues(t, 1, report.InvalidSegments)
 		})
 	}
 }
@@ -383,7 +366,7 @@ func TestSegValidator_ChangeStreamIsNotPartitionChecked(t *testing.T) {
 
 	// A change stream segment mixes partitions, so the directory it sits in
 	// says nothing about its records.
-	streamer := newStubStreamer(decodeSegmentHex(t, fixtureSegmentHex), 1)
+	streamer := newStubStreamer(decodeSegmentHex(t, fixtureChangeSegmentHex), 1)
 	streamer.streamKind = streamers.ChangeStream
 	streamer.pathOf = func(n int) string {
 		return fmt.Sprintf("%s/ns/%s/change-stream/BB951D8A16DC7A2/data/p0/s%d.seg",
@@ -391,13 +374,8 @@ func TestSegValidator_ChangeStreamIsNotPartitionChecked(t *testing.T) {
 	}
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
-	if err != nil {
-		t.Fatalf(msgValidateErr, err)
-	}
-
-	if report.Failed() {
-		t.Fatalf(msgValidateIssues, report.Issues)
-	}
+	require.NoError(t, err)
+	require.False(t, report.Failed(), msgValidateIssues, report.Issues)
 }
 
 func TestSegValidator_ManifestPartitionOutranksDirectory(t *testing.T) {
@@ -413,13 +391,8 @@ func TestSegValidator_ManifestPartitionOutranksDirectory(t *testing.T) {
 	}
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
-	if err != nil {
-		t.Fatalf(msgValidateErr, err)
-	}
-
-	if report.Failed() {
-		t.Fatalf(msgValidateIssues, report.Issues)
-	}
+	require.NoError(t, err)
+	require.False(t, report.Failed(), msgValidateIssues, report.Issues)
 }
 
 func TestSegValidator_BrokenRecordIsLocated(t *testing.T) {
@@ -432,34 +405,23 @@ func TestSegValidator_BrokenRecordIsLocated(t *testing.T) {
 	}
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
-	if err != nil {
-		t.Fatalf(msgValidateErr, err)
-	}
-
-	if len(report.Issues) != 1 {
-		t.Fatalf("Validate() issues = %+v, want exactly one", report.Issues)
-	}
+	require.NoError(t, err)
+	require.Len(t, report.Issues, 1)
 
 	issue := report.Issues[0]
 
-	if issue.Namespace != stubNS || issue.SegmentPath != stubSegmentPath(0) {
-		t.Errorf("issue points at %s/%s, want %s/%s",
-			issue.Namespace, issue.SegmentPath, stubNS, stubSegmentPath(0))
-	}
+	assert.Equal(t, stubNS, issue.Namespace)
+	assert.Equal(t, stubSegmentPath(0), issue.SegmentPath)
 
-	if issue.RecordIndex != 0 || issue.Offset != fixtureFrameHeaderBytes {
-		t.Errorf("issue at record %d offset %d, want the first record",
-			issue.RecordIndex, issue.Offset)
-	}
+	// The issue points at the first record.
+	assert.Zero(t, issue.RecordIndex)
+	assert.Equal(t, fixtureFrameHeaderBytes, issue.Offset)
 
-	var recErr *segment.RecordError
-	if !errors.As(issue.Err, &recErr) {
-		t.Errorf("issue error = %v, want a *segment.RecordError", issue.Err)
-	}
+	var recordErr *segment.RecordError
+	require.ErrorAs(t, issue.Err, &recordErr)
 
-	if report.ValidSegments != 0 || report.InvalidSegments != 1 {
-		t.Errorf(msgWantOneInvalidSegment, report.ValidSegments, report.InvalidSegments)
-	}
+	assert.Zero(t, report.ValidSegments)
+	assert.EqualValues(t, 1, report.InvalidSegments)
 }
 
 func TestSegValidator_UnreadableSegmentIsReported(t *testing.T) {
@@ -471,18 +433,12 @@ func TestSegValidator_UnreadableSegmentIsReported(t *testing.T) {
 	}
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
-	if err != nil {
-		t.Fatalf(msgValidateErr, err)
-	}
+	require.NoError(t, err)
 
-	if len(report.Issues) != 1 || !errors.Is(report.Issues[0].Err, errOpenSegment) {
-		t.Fatalf("issues = %+v, want the open failure", report.Issues)
-	}
+	require.Len(t, report.Issues, 1)
+	require.ErrorIs(t, report.Issues[0].Err, errOpenSegment)
 
-	if report.Issues[0].RecordIndex != -1 {
-		t.Errorf("RecordIndex = %d, want -1 for a segment that was never read",
-			report.Issues[0].RecordIndex)
-	}
+	assert.Equal(t, -1, report.Issues[0].RecordIndex, "want -1 for a segment that was never read")
 }
 
 func TestSegValidator_IssuesAreCapped(t *testing.T) {
@@ -501,18 +457,11 @@ func TestSegValidator_IssuesAreCapped(t *testing.T) {
 
 	report, err := newTestSegValidator(t, streamer, WithMaxIssues(maxIssues)).
 		Validate(t.Context(), CheckAll)
-	if err != nil {
-		t.Fatalf(msgValidateErr, err)
-	}
+	require.NoError(t, err)
+	require.Len(t, report.Issues, maxIssues)
 
-	if len(report.Issues) != maxIssues {
-		t.Fatalf("issues = %d, want %d", len(report.Issues), maxIssues)
-	}
-
-	if report.InvalidSegments != segments || !report.Truncated() {
-		t.Errorf("invalid = %d, truncated = %v, want %d and true",
-			report.InvalidSegments, report.Truncated(), segments)
-	}
+	assert.EqualValues(t, segments, report.InvalidSegments)
+	assert.True(t, report.Truncated())
 }
 
 func TestSegValidator_OversizedSegment(t *testing.T) {
@@ -524,13 +473,11 @@ func TestSegValidator_OversizedSegment(t *testing.T) {
 	}
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
-	if err != nil {
-		t.Fatalf(msgValidateErr, err)
-	}
+	require.NoError(t, err)
 
-	if len(report.Issues) != 1 || !errors.Is(report.Issues[0].Err, ErrSegmentTooLarge) {
-		t.Fatalf("issues = %+v, want the segment to be refused as too large", report.Issues)
-	}
+	// The segment is refused as too large.
+	require.Len(t, report.Issues, 1)
+	require.ErrorIs(t, report.Issues[0].Err, ErrSegmentTooLarge)
 }
 
 func TestSegValidator_FullSegmentIsNotTooLarge(t *testing.T) {
@@ -541,13 +488,11 @@ func TestSegValidator_FullSegmentIsNotTooLarge(t *testing.T) {
 	streamer := newStubStreamer(make([]byte, segment.MaxSegmentSize), 1)
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
-	if err != nil {
-		t.Fatalf(msgValidateErr, err)
-	}
+	require.NoError(t, err)
 
-	if len(report.Issues) != 1 || !errors.Is(report.Issues[0].Err, segment.ErrBadFrameMagic) {
-		t.Fatalf("issues = %+v, want the segment to be parsed and its frame refused", report.Issues)
-	}
+	// The segment is parsed and its frame refused.
+	require.Len(t, report.Issues, 1)
+	require.ErrorIs(t, report.Issues[0].Err, segment.ErrBadFrameMagic)
 }
 
 func TestSegValidator_SamplingDownloadsOnlyTheSample(t *testing.T) {
@@ -561,14 +506,10 @@ func TestSegValidator_SamplingDownloadsOnlyTheSample(t *testing.T) {
 	streamer := newStubStreamer(decodeSegmentHex(t, fixtureSegmentHex), segments)
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), sampleSize)
-	if err != nil {
-		t.Fatalf(msgValidateErr, err)
-	}
+	require.NoError(t, err)
 
-	if report.CheckedSegments != sampleSize || streamer.opened.Load() != sampleSize {
-		t.Fatalf("checked %d segments and downloaded %d, want %d of each",
-			report.CheckedSegments, streamer.opened.Load(), sampleSize)
-	}
+	require.EqualValues(t, sampleSize, report.CheckedSegments, "checked segments")
+	require.EqualValues(t, sampleSize, streamer.opened.Load(), "downloaded segments")
 }
 
 func TestSegValidator_MissingSegmentOfAManifest(t *testing.T) {
@@ -580,24 +521,21 @@ func TestSegValidator_MissingSegmentOfAManifest(t *testing.T) {
 	streamer.missing = map[string]bool{stubSegmentPath(1): true}
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
-	if err != nil {
-		t.Fatalf(msgValidateErr, err)
-	}
+	require.NoError(t, err)
 
 	m := report.Manifests
 
-	if m.MissingSegments != 1 || m.Problems != 1 || m.CheckedSegments != 2 {
-		t.Fatalf("manifest report = %+v, want one missing segment out of two checked", m)
-	}
+	// One missing segment out of two checked.
+	require.EqualValues(t, 1, m.MissingSegments)
+	require.EqualValues(t, 1, m.Problems)
+	require.EqualValues(t, 2, m.CheckedSegments)
 
-	if len(m.Issues) != 1 || m.Issues[0].SegmentPath != stubSegmentPath(1) ||
-		m.Issues[0].ManifestPath != stubManifestPath(1) {
-		t.Fatalf("manifest issues = %+v, want the missing segment and the manifest naming it", m.Issues)
-	}
+	// The missing segment and the manifest naming it.
+	require.Len(t, m.Issues, 1)
+	require.Equal(t, stubSegmentPath(1), m.Issues[0].SegmentPath)
+	require.Equal(t, stubManifestPath(1), m.Issues[0].ManifestPath)
 
-	if !errors.Is(m.Issues[0].Err, streamers.ErrSegmentMissing) {
-		t.Errorf("issue error = %v, want ErrSegmentMissing", m.Issues[0].Err)
-	}
+	assert.ErrorIs(t, m.Issues[0].Err, streamers.ErrSegmentMissing)
 }
 
 func TestSegValidator_SizeMismatchAgainstAManifest(t *testing.T) {
@@ -608,17 +546,13 @@ func TestSegValidator_SizeMismatchAgainstAManifest(t *testing.T) {
 	streamer.recordedSize = fixtureSegmentBytes * 2
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
-	if err != nil {
-		t.Fatalf(msgValidateErr, err)
-	}
+	require.NoError(t, err)
 
-	if report.Manifests.Problems != 1 || report.Manifests.MissingSegments != 0 {
-		t.Fatalf("manifest report = %+v, want one problem and no missing segment", report.Manifests)
-	}
+	require.EqualValues(t, 1, report.Manifests.Problems)
+	require.Zero(t, report.Manifests.MissingSegments)
 
-	if len(report.Issues) != 1 || !errors.Is(report.Issues[0].Err, ErrSizeMismatch) {
-		t.Fatalf("issues = %+v, want the size mismatch", report.Issues)
-	}
+	require.Len(t, report.Issues, 1)
+	require.ErrorIs(t, report.Issues[0].Err, ErrSizeMismatch)
 }
 
 func TestSegValidator_SizeIsOnlyCheckedAgainstAManifest(t *testing.T) {
@@ -630,13 +564,8 @@ func TestSegValidator_SizeIsOnlyCheckedAgainstAManifest(t *testing.T) {
 	streamer.recordedSize = fixtureSegmentBytes * 2
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
-	if err != nil {
-		t.Fatalf(msgValidateErr, err)
-	}
-
-	if report.Failed() {
-		t.Fatalf(msgValidateIssues, report.Issues)
-	}
+	require.NoError(t, err)
+	require.False(t, report.Failed(), msgValidateIssues, report.Issues)
 }
 
 func TestSegValidator_SegmentAgainstItsManifest(t *testing.T) {
@@ -705,27 +634,21 @@ func TestSegValidator_SegmentAgainstItsManifest(t *testing.T) {
 			streamer.recordedCount = tt.giveCount
 
 			report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
-			if err != nil {
-				t.Fatalf(msgValidateErr, err)
-			}
+			require.NoError(t, err)
 
 			if tt.wantErr == nil {
-				if report.Failed() {
-					t.Fatalf("Validate() reported issues: %+v, %+v",
-						report.Issues, report.Manifests.Issues)
-				}
+				require.False(t, report.Failed(), "Validate() reported issues: %+v, %+v",
+					report.Issues, report.Manifests.Issues)
 
 				return
 			}
 
-			if len(report.Issues) != 1 || !errors.Is(report.Issues[0].Err, tt.wantErr) {
-				t.Fatalf("issues = %+v, want %v", report.Issues, tt.wantErr)
-			}
+			require.Len(t, report.Issues, 1)
+			require.ErrorIs(t, report.Issues[0].Err, tt.wantErr)
 
-			if report.Manifests.Problems != 1 || len(report.Manifests.Issues) != 1 {
-				t.Errorf("manifest report = %+v, want the mismatch reported against the manifest",
-					report.Manifests)
-			}
+			// The mismatch is reported against the manifest.
+			assert.EqualValues(t, 1, report.Manifests.Problems)
+			assert.Len(t, report.Manifests.Issues, 1)
 		})
 	}
 }
@@ -746,23 +669,19 @@ func TestSegValidator_ManifestIssuesOfTheStreamerAreReported(t *testing.T) {
 	}
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
-	if err != nil {
-		t.Fatalf(msgValidateErr, err)
-	}
+	require.NoError(t, err)
 
 	m := report.Manifests
 
-	if m.Total != 4 || m.Checked != 3 || m.Problems != 1 {
-		t.Fatalf("manifest report = %+v, want 4 found, 3 read and 1 problem", m)
-	}
+	require.EqualValues(t, 4, m.Total)
+	require.EqualValues(t, 3, m.Checked)
+	require.EqualValues(t, 1, m.Problems)
 
-	if len(m.Issues) != 1 || m.Issues[0].ManifestPath != stubManifestPath(0) {
-		t.Fatalf("manifest issues = %+v, want the unusable manifest", m.Issues)
-	}
+	// The unusable manifest.
+	require.Len(t, m.Issues, 1)
+	require.Equal(t, stubManifestPath(0), m.Issues[0].ManifestPath)
 
-	if !report.Failed() {
-		t.Error("Failed() = false, want a backup whose manifest could not be read to fail")
-	}
+	assert.True(t, report.Failed(), "want a backup whose manifest could not be read to fail")
 }
 
 func TestSegValidator_UnrecordedSegmentsAreReported(t *testing.T) {
@@ -774,31 +693,22 @@ func TestSegValidator_UnrecordedSegmentsAreReported(t *testing.T) {
 	streamer.unrecorded = true
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
-	if err != nil {
-		t.Fatalf(msgValidateErr, err)
-	}
+	require.NoError(t, err)
 
 	m := report.Manifests
 
-	if m.Unrecorded != segments || len(m.UnrecordedExamples) != segments {
-		t.Fatalf("manifest report = %+v, want the %d segments no manifest names", m, segments)
-	}
+	// The segments no manifest names.
+	require.EqualValues(t, segments, m.Unrecorded)
+	require.Len(t, m.UnrecordedExamples, segments)
 
-	if m.UnrecordedExamples[0] != stubSegmentPath(0) &&
-		!slices.Contains(m.UnrecordedExamples, stubSegmentPath(0)) {
-		t.Errorf("unrecorded = %v, want the streamed segments", m.UnrecordedExamples)
-	}
+	assert.Contains(t, m.UnrecordedExamples, stubSegmentPath(0))
 
 	// They were read like any other segment, and a backup can hold them and
 	// still restore, so they are reported rather than failed.
-	if report.CheckedSegments != segments || report.ValidSegments != segments {
-		t.Errorf("checked %d and validated %d segments, want %d of each",
-			report.CheckedSegments, report.ValidSegments, segments)
-	}
+	assert.EqualValues(t, segments, report.CheckedSegments)
+	assert.EqualValues(t, segments, report.ValidSegments)
 
-	if report.Failed() {
-		t.Errorf("Failed() = true, want segments nothing recorded to be reported and not failed")
-	}
+	assert.False(t, report.Failed(), "want segments nothing recorded to be reported and not failed")
 }
 
 func TestSegValidator_UnrecordedExamplesAreCapped(t *testing.T) {
@@ -811,13 +721,11 @@ func TestSegValidator_UnrecordedExamplesAreCapped(t *testing.T) {
 
 	report, err := newTestSegValidator(t, streamer, WithMaxIssues(maxIssues)).
 		Validate(t.Context(), CheckAll)
-	if err != nil {
-		t.Fatalf(msgValidateErr, err)
-	}
+	require.NoError(t, err)
 
-	if report.Manifests.Unrecorded != 20 || len(report.Manifests.UnrecordedExamples) != maxIssues {
-		t.Fatalf("manifest report = %+v, want 20 counted and %d named", report.Manifests, maxIssues)
-	}
+	// 20 counted and maxIssues named.
+	require.EqualValues(t, 20, report.Manifests.Unrecorded)
+	require.Len(t, report.Manifests.UnrecordedExamples, maxIssues)
 }
 
 func TestSegValidator_NoSegments(t *testing.T) {
@@ -826,9 +734,7 @@ func TestSegValidator_NoSegments(t *testing.T) {
 	streamer := newStubStreamer(nil, 0)
 
 	_, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
-	if !errors.Is(err, ErrNoSegments) {
-		t.Fatalf(msgWantErrNoSegments, err)
-	}
+	require.ErrorIs(t, err, ErrNoSegments)
 }
 
 func TestSegValidator_BackupOfANamespaceThatHeldNoRecords(t *testing.T) {
@@ -841,17 +747,13 @@ func TestSegValidator_BackupOfANamespaceThatHeldNoRecords(t *testing.T) {
 	streamer.stats = streamers.Stats{Namespaces: 1, ManifestsFound: 4096, ManifestsRead: 4096}
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), 10_000)
-	if err != nil {
-		t.Fatalf(msgValidateErr, err)
-	}
+	require.NoError(t, err)
 
-	if report.Failed() {
-		t.Errorf("Failed() = true, want a backup of an empty namespace to pass: %+v", report)
-	}
+	assert.False(t, report.Failed(), msgReport, report)
 
-	if report.CheckedSegments != 0 || report.Manifests.Checked != 4096 {
-		t.Errorf("report = %+v, want no segment checked and every manifest read", report)
-	}
+	// No segment checked and every manifest read.
+	assert.Zero(t, report.CheckedSegments)
+	assert.EqualValues(t, 4096, report.Manifests.Checked)
 }
 
 // TestSegValidator_EmptyNamespaceOnDisk runs a validator over a whole backup of
@@ -861,18 +763,15 @@ func TestSegValidator_EmptyNamespaceOnDisk(t *testing.T) {
 	t.Parallel()
 
 	const (
-		backupID       = "527139336"
-		namespace      = "test"
-		partitions     = 8
-		msgNewLocalErr = "NewLocal() error = %v"
+		backupID   = "527139336"
+		namespace  = "test"
+		partitions = 8
 	)
 
 	root := t.TempDir()
 	manifests := filepath.Join(root, backupID, "ns", namespace, "query-stream", "manifest")
 
-	if err := os.MkdirAll(manifests, 0o750); err != nil {
-		t.Fatalf("create manifest directory: %v", err)
-	}
+	require.NoError(t, os.MkdirAll(manifests, 0o750), "create manifest directory")
 
 	for p := range partitions {
 		body := fmt.Sprintf(`{"backup_id":%q,"namespace":%q,"partition_id":%d,"format_version":1,`+
@@ -880,40 +779,33 @@ func TestSegValidator_EmptyNamespaceOnDisk(t *testing.T) {
 			backupID, namespace, p)
 
 		name := filepath.Join(manifests, fmt.Sprintf("%d-7-0000181197010-%06x.json", p, p))
-		if err := os.WriteFile(name, []byte(body), 0o600); err != nil {
-			t.Fatalf("write manifest: %v", err)
-		}
+		require.NoError(t, os.WriteFile(name, []byte(body), 0o600), "write manifest")
 	}
+
+	metadata := `{"backup_id":"` + backupID + `","namespace":"` + namespace +
+		`","status":"complete","achieved_consistency":"strict"}`
+	require.NoError(t, os.WriteFile(filepath.Join(root, backupID, "metadata.json"), []byte(metadata), 0o600),
+		"write commit record")
 
 	streamer, err := streamers.NewLocal(root, backupID)
-	if err != nil {
-		t.Fatalf(msgNewLocalErr, err)
-	}
+	require.NoError(t, err)
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), 10_000)
-	if err != nil {
-		t.Fatalf(msgValidateErr, err)
-	}
+	require.NoError(t, err)
 
-	if report.Failed() || report.CheckedSegments != 0 {
-		t.Fatalf("report = %+v, want a backup holding no segment to pass", report)
-	}
+	// A backup holding no segment passes.
+	require.False(t, report.Failed(), msgReport, report)
+	require.Zero(t, report.CheckedSegments)
 
-	if report.Manifests.Checked != partitions {
-		t.Errorf("manifest report = %+v, want the %d manifests read", report.Manifests, partitions)
-	}
+	assert.EqualValues(t, partitions, report.Manifests.Checked)
 
 	// A backup id nothing was written under is still the one thing there is
 	// nothing to report about.
 	missing, err := streamers.NewLocal(root, "nosuchbackup")
-	if err != nil {
-		t.Fatalf(msgNewLocalErr, err)
-	}
+	require.NoError(t, err)
 
 	_, err = newTestSegValidator(t, missing).Validate(t.Context(), 10_000)
-	if !errors.Is(err, ErrNoSegments) {
-		t.Errorf(msgWantErrNoSegments, err)
-	}
+	require.ErrorIs(t, err, ErrNoSegments)
 }
 
 func TestSegValidator_NoSegmentsButUnreadableManifests(t *testing.T) {
@@ -934,17 +826,13 @@ func TestSegValidator_NoSegmentsButUnreadableManifests(t *testing.T) {
 	}
 
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
-	if err != nil {
-		t.Fatalf(msgValidateErr, err)
-	}
+	require.NoError(t, err)
 
-	if report.CheckedSegments != 0 || report.Manifests.Problems != 1 {
-		t.Fatalf("report = %+v, want no segment checked and the unreadable manifest reported", report)
-	}
+	// No segment checked and the unreadable manifest reported.
+	require.Zero(t, report.CheckedSegments)
+	require.EqualValues(t, 1, report.Manifests.Problems)
 
-	if !report.Failed() {
-		t.Error("Failed() = false, want a backup whose manifests cannot be read to fail")
-	}
+	assert.True(t, report.Failed(), "want a backup whose manifests cannot be read to fail")
 }
 
 func TestSegValidator_StreamFails(t *testing.T) {
@@ -954,9 +842,7 @@ func TestSegValidator_StreamFails(t *testing.T) {
 	streamer.streamErr = errOpenSegment
 
 	_, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
-	if !errors.Is(err, errOpenSegment) {
-		t.Fatalf("Validate() error = %v, want the streaming failure", err)
-	}
+	require.ErrorIs(t, err, errOpenSegment)
 }
 
 func TestSegValidator_ContextCancelled(t *testing.T) {
@@ -968,28 +854,24 @@ func TestSegValidator_ContextCancelled(t *testing.T) {
 	streamer := newStubStreamer(decodeSegmentHex(t, fixtureSegmentHex), 1_000_000)
 
 	_, err := newTestSegValidator(t, streamer).Validate(ctx, CheckAll)
-	if !errors.Is(err, context.Canceled) {
-		t.Fatalf(msgWantContextCanceled, err)
-	}
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 func TestNewSegValidatorValidation(t *testing.T) {
 	t.Parallel()
 
-	if _, err := NewSegValidator(nil); err == nil {
-		t.Error("NewSegValidator(nil) succeeded, want an error")
-	}
+	_, err := NewSegValidator(nil)
+	require.Error(t, err)
 
 	streamer := newStubStreamer(nil, 0)
 
 	v, err := NewSegValidator(streamer, WithLogger(nil), WithParallel(0), WithMaxIssues(0))
-	if err != nil {
-		t.Fatalf(msgNewSegValidatorErr, err)
-	}
+	require.NoError(t, err)
 
-	if v.logger == nil || v.parallel < 1 || v.maxIssues != defaultMaxIssues {
-		t.Errorf("options out of range changed the defaults: %+v", v)
-	}
+	// Options out of range do not change the defaults.
+	assert.NotNil(t, v.logger)
+	assert.GreaterOrEqual(t, v.parallel, 1)
+	assert.Equal(t, defaultMaxIssues, v.maxIssues)
 }
 
 // errReader fails partway through a segment, which is what a storage that
@@ -1013,23 +895,16 @@ func TestSegValidator_SegmentReadFails(t *testing.T) {
 	// A download that dies halfway is what is wrong with that segment, not a
 	// reason to abandon the run.
 	report, err := newTestSegValidator(t, streamer).Validate(t.Context(), CheckAll)
-	if err != nil {
-		t.Fatalf(msgValidateErr, err)
-	}
+	require.NoError(t, err)
 
-	if len(report.Issues) != 1 || !errors.Is(report.Issues[0].Err, errRead) {
-		t.Fatalf("Validate() issues = %+v, want the read failure", report.Issues)
-	}
+	require.Len(t, report.Issues, 1)
+	require.ErrorIs(t, report.Issues[0].Err, errRead)
 
 	// Nothing was parsed, so the failure points at no record in particular.
-	if report.Issues[0].RecordIndex != models.UnknownRecordIndex {
-		t.Errorf("issue record index = %d, want %d",
-			report.Issues[0].RecordIndex, models.UnknownRecordIndex)
-	}
+	assert.Equal(t, models.UnknownRecordIndex, report.Issues[0].RecordIndex)
 
-	if report.InvalidSegments != 1 || report.ValidSegments != 0 {
-		t.Errorf(msgWantOneInvalidSegment, report.ValidSegments, report.InvalidSegments)
-	}
+	assert.EqualValues(t, 1, report.InvalidSegments)
+	assert.Zero(t, report.ValidSegments)
 }
 
 func TestSegValidator_StreamerManifestIssuesAreCapped(t *testing.T) {
@@ -1049,20 +924,15 @@ func TestSegValidator_StreamerManifestIssuesAreCapped(t *testing.T) {
 
 	report, err := newTestSegValidator(t, streamer, WithMaxIssues(maxIssues)).
 		Validate(t.Context(), CheckAll)
-	if err != nil {
-		t.Fatalf(msgValidateErr, err)
-	}
+	require.NoError(t, err)
 
 	m := report.Manifests
 
-	if len(m.Issues) != maxIssues || m.Problems != 2 {
-		t.Fatalf("manifest report describes %d of %d problems, want %d described and 2 counted",
-			len(m.Issues), m.Problems, maxIssues)
-	}
+	// maxIssues problems described and 2 counted.
+	require.Len(t, m.Issues, maxIssues)
+	require.EqualValues(t, 2, m.Problems)
 
-	if !m.Truncated() {
-		t.Error("Truncated() = false, want a report describing fewer problems than it counted")
-	}
+	assert.True(t, m.Truncated(), "want a report describing fewer problems than it counted")
 }
 
 func TestNewSegValidator_Options(t *testing.T) {
@@ -1077,21 +947,11 @@ func TestNewSegValidator_Options(t *testing.T) {
 
 	v, err := NewSegValidator(newStubStreamer(nil, 0),
 		WithLogger(logger), WithParallel(parallel), WithMaxIssues(maxIssues))
-	if err != nil {
-		t.Fatalf(msgNewSegValidatorErr, err)
-	}
+	require.NoError(t, err)
 
-	if v.logger != logger {
-		t.Error("WithLogger() did not set the logger")
-	}
-
-	if v.parallel != parallel {
-		t.Errorf("parallel = %d, want %d", v.parallel, parallel)
-	}
-
-	if v.maxIssues != maxIssues {
-		t.Errorf("maxIssues = %d, want %d", v.maxIssues, maxIssues)
-	}
+	assert.Same(t, logger, v.logger, "WithLogger() did not set the logger")
+	assert.Equal(t, parallel, v.parallel)
+	assert.Equal(t, maxIssues, v.maxIssues)
 }
 
 func TestSegValidator_ContextCancelledMidRun(t *testing.T) {
@@ -1110,11 +970,8 @@ func TestSegValidator_ContextCancelledMidRun(t *testing.T) {
 	}
 
 	_, err := newTestSegValidator(t, streamer, WithParallel(1)).Validate(ctx, CheckAll)
-	if !errors.Is(err, context.Canceled) {
-		t.Fatalf(msgWantContextCanceled, err)
-	}
+	require.ErrorIs(t, err, context.Canceled)
 
-	if opened := streamer.opened.Load(); opened > 1_000 {
-		t.Errorf("downloaded %d segments after the run was canceled, want it to stop", opened)
-	}
+	assert.LessOrEqual(t, streamer.opened.Load(), int64(1_000),
+		"downloaded segments after the run was canceled, want it to stop")
 }

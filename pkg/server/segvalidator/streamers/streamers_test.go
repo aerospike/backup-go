@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -27,6 +26,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -47,7 +49,10 @@ const (
 	// query stream partition, {pid}-{regime}-{timestamp}-{uuid}.json.
 	testManifestName = "%d-7-0000181197010-%06x.json"
 
-	msgWantManifestUnusable = "issue error = %v, want ErrManifestUnusable"
+	// msgSegment names the segment a failed check is about.
+	msgSegment = "segment %q"
+	// msgNotInBackup is the failure of a segment the backup does not hold.
+	msgNotInBackup = "sampled a segment the backup does not hold"
 )
 
 // testBackup describes the files of a backup, which a test materializes into a
@@ -61,6 +66,7 @@ type testBackup struct {
 	recorded []string
 }
 
+//nolint:unparam // We should pass id as parameter.
 func newTestBackup(id string) *testBackup {
 	return &testBackup{id: id, files: make(map[string][]byte)}
 }
@@ -230,7 +236,9 @@ func newTestBackupTree(t *testing.T, partitions, segmentsPerPartition, nodes, se
 }
 
 // countingStore counts what a run asks of a storage, so a test can prove that
-// sampling downloads the manifests it samples from and nothing else.
+// sampling downloads the manifests it samples from and nothing else. The commit
+// record every run reads first is not part of the backup data and is not
+// counted as a download.
 type countingStore struct {
 	store
 	listedDirs  atomic.Int64
@@ -252,6 +260,10 @@ func (c *countingStore) listFiles(ctx context.Context, dir string, fn func(file)
 }
 
 func (c *countingStore) open(ctx context.Context, storagePath string) (io.ReadCloser, error) {
+	if path.Base(storagePath) == metadataFile {
+		return c.store.open(ctx, storagePath)
+	}
+
 	c.opened.Add(1)
 	c.openedPaths.Store(storagePath, true)
 
@@ -285,9 +297,7 @@ func newTestStreamer(t *testing.T, st store, opts ...Option) *Streamer {
 	opts = append([]Option{WithSeed(1)}, opts...)
 
 	s, err := newStreamer(st, testBackupID, opts...)
-	if err != nil {
-		t.Fatalf("newStreamer() error = %v", err)
-	}
+	require.NoError(t, err)
 
 	return s
 }
@@ -306,9 +316,8 @@ func collect(t *testing.T, run func(chan<- Segment) error) []Segment {
 		segments = append(segments, seg)
 	}
 
-	if err := <-done; err != nil {
-		t.Fatalf("streaming failed: %v", err)
-	}
+	err := <-done
+	require.NoError(t, err, "streaming failed")
 
 	return segments
 }
@@ -348,22 +357,16 @@ func TestStreamAll_FindsEverySegmentTheManifestsName(t *testing.T) {
 				return s.StreamAll(t.Context(), out)
 			})
 
-			if got := paths(segments); !slices.Equal(got, want) {
-				t.Fatalf("streamed %d segments, want %d\n got: %v\nwant: %v",
-					len(got), len(want), got, want)
-			}
+			require.Equal(t, want, paths(segments))
 
 			stats := s.Stats()
 
 			// The manifests are the only thing a full run downloads.
-			if stats.ManifestsRead != tc.store.opened.Load() || stats.ManifestsRead != stats.ManifestsFound {
-				t.Errorf("read %d of %d manifests and downloaded %d files, want every manifest and nothing else",
-					stats.ManifestsRead, stats.ManifestsFound, tc.store.opened.Load())
-			}
-
-			if stats.Segments != int64(len(want)) || stats.Namespaces != 1 {
-				t.Errorf("stats = %+v, want %d segments of one namespace", stats, len(want))
-			}
+			assert.Equal(t, stats.ManifestsRead, tc.store.opened.Load(),
+				"downloaded files, want every manifest read and nothing else")
+			assert.Equal(t, stats.ManifestsFound, stats.ManifestsRead, "manifests read, want every manifest")
+			assert.Equal(t, int64(len(want)), stats.Segments)
+			assert.Equal(t, int64(1), stats.Namespaces)
 		})
 	}
 }
@@ -391,10 +394,7 @@ func TestStreamAll_SegmentNoManifestNames(t *testing.T) {
 				return s.StreamAll(t.Context(), out)
 			})
 
-			if got := paths(segments); !slices.Equal(got, want) {
-				t.Fatalf("streamed %d segments, want the %d of the backup:\n got: %v\nwant: %v",
-					len(got), len(want), got, want)
-			}
+			require.Equal(t, want, paths(segments))
 
 			unrecorded := make([]string, 0, 2)
 
@@ -405,20 +405,14 @@ func TestStreamAll_SegmentNoManifestNames(t *testing.T) {
 
 				unrecorded = append(unrecorded, seg.Path)
 
-				if seg.Manifest != "" || seg.Checksum != "" {
-					t.Errorf("segment %q is unrecorded but carries manifest %q", seg.Path, seg.Manifest)
-				}
+				assert.Empty(t, seg.Manifest, "segment %q is unrecorded but carries a manifest", seg.Path)
+				assert.Empty(t, seg.Checksum, "segment %q is unrecorded but carries a checksum", seg.Path)
 			}
 
 			sort.Strings(unrecorded)
 
-			if !slices.Equal(unrecorded, []string{loose, inPartition}) {
-				t.Fatalf("unrecorded = %v, want %v", unrecorded, []string{loose, inPartition})
-			}
-
-			if s.Stats().Unrecorded != 2 {
-				t.Errorf("stats unrecorded = %d, want 2", s.Stats().Unrecorded)
-			}
+			require.Equal(t, []string{loose, inPartition}, unrecorded)
+			assert.Equal(t, int64(2), s.Stats().Unrecorded)
 		})
 	}
 }
@@ -440,13 +434,10 @@ func TestStreamAll_BackupInOrderCostsNoSecondLook(t *testing.T) {
 				return s.StreamAll(t.Context(), out)
 			})
 
-			if got := paths(segments); !slices.Equal(got, b.recordedSegments()) {
-				t.Fatalf("streamed %d segments, want the %d the manifests record", len(got), len(b.recorded))
-			}
+			require.Equal(t, b.recordedSegments(), paths(segments), "want the segments the manifests record")
 
-			if opened, read := tc.store.opened.Load(), s.Stats().ManifestsRead; opened != read {
-				t.Errorf("downloaded %d files for %d manifests, want each manifest read once", opened, read)
-			}
+			opened, read := tc.store.opened.Load(), s.Stats().ManifestsRead
+			assert.Equal(t, read, opened, "downloaded files, want each manifest read once")
 		})
 	}
 }
@@ -470,13 +461,10 @@ func TestStreamAll_MissingSegmentIsStillNamed(t *testing.T) {
 
 			// Reading the manifests is what makes a lost segment visible: a
 			// listing of the data would simply not mention it.
-			if !slices.Contains(paths(segments), gone) {
-				t.Fatalf("streamed %v, want the missing segment %q named", paths(segments), gone)
-			}
+			require.Contains(t, paths(segments), gone, "want the missing segment named")
 
-			if _, err := s.OpenSegment(t.Context(), &Segment{Path: gone}); !errors.Is(err, ErrSegmentMissing) {
-				t.Fatalf("OpenSegment() error = %v, want ErrSegmentMissing", err)
-			}
+			_, err := s.OpenSegment(t.Context(), &Segment{Path: gone})
+			require.ErrorIs(t, err, ErrSegmentMissing)
 		})
 	}
 }
@@ -507,17 +495,13 @@ func TestStreamAll_FallsBackToTheDataOfAStreamWithoutManifests(t *testing.T) {
 				return s.StreamAll(t.Context(), out)
 			})
 
-			if got := paths(segments); !slices.Equal(got, want) {
-				t.Fatalf("streamed %d segments, want the %d of the backup:\n got: %v\nwant: %v",
-					len(got), len(want), got, want)
-			}
+			require.Equal(t, want, paths(segments))
 
 			for _, seg := range segments {
 				recorded := seg.Stream == ChangeStream
 
-				if (seg.Manifest != "") != recorded {
-					t.Errorf("segment %q names manifest %q, want the listed stream to name none", seg.Path, seg.Manifest)
-				}
+				assert.Equal(t, recorded, seg.Manifest != "",
+					"segment %q names manifest %q, want the listed stream to name none", seg.Path, seg.Manifest)
 			}
 		})
 	}
@@ -543,10 +527,8 @@ func TestStreamAll_UnusableManifestIsReported(t *testing.T) {
 
 			// The partition of the broken manifest is still read: its segments
 			// are there, and nothing readable records them.
-			if len(segments) != 4 {
-				t.Fatalf("streamed %d segments past a broken manifest, want the 2 recorded and the 2 that are not",
-					len(segments))
-			}
+			require.Len(t, segments, 4,
+				"segments past a broken manifest, want the 2 recorded and the 2 that are not")
 
 			unrecorded := 0
 
@@ -556,19 +538,13 @@ func TestStreamAll_UnusableManifestIsReported(t *testing.T) {
 				}
 			}
 
-			if unrecorded != 2 {
-				t.Errorf("streamed %d unrecorded segments, want the 2 of the broken manifest", unrecorded)
-			}
+			assert.Equal(t, 2, unrecorded, "unrecorded segments, want the 2 of the broken manifest")
 
 			stats := s.Stats()
 
-			if stats.ManifestsFailed != 1 || len(stats.ManifestIssues) != 1 {
-				t.Fatalf("stats = %+v, want the one unusable manifest reported", stats)
-			}
-
-			if !errors.Is(stats.ManifestIssues[0].Err, ErrManifestUnusable) {
-				t.Errorf(msgWantManifestUnusable, stats.ManifestIssues[0].Err)
-			}
+			require.Equal(t, int64(1), stats.ManifestsFailed, "stats = %+v, want the one unusable manifest reported", stats)
+			require.Len(t, stats.ManifestIssues, 1)
+			assert.ErrorIs(t, stats.ManifestIssues[0].Err, ErrManifestUnusable)
 		})
 	}
 }
@@ -614,20 +590,14 @@ func TestStreaming_ManifestTheServerSkipsIsReported(t *testing.T) {
 					})
 
 					for _, seg := range segments {
-						if seg.Manifest == skipped {
-							t.Fatalf("segment %q taken from the skipped manifest", seg.Path)
-						}
+						require.NotEqual(t, skipped, seg.Manifest, "segment %q taken from the skipped manifest", seg.Path)
 					}
 
 					stats := s.Stats()
 
-					if len(stats.ManifestIssues) != 1 || stats.ManifestIssues[0].Path != skipped {
-						t.Fatalf("stats = %+v, want the skipped manifest reported", stats)
-					}
-
-					if !errors.Is(stats.ManifestIssues[0].Err, ErrManifestUnusable) {
-						t.Errorf(msgWantManifestUnusable, stats.ManifestIssues[0].Err)
-					}
+					require.Len(t, stats.ManifestIssues, 1, "stats = %+v, want the skipped manifest reported", stats)
+					require.Equal(t, skipped, stats.ManifestIssues[0].Path)
+					assert.ErrorIs(t, stats.ManifestIssues[0].Err, ErrManifestUnusable)
 				})
 			}
 		}
@@ -677,20 +647,14 @@ func TestStreaming_ManifestEntryTheServerRefusesIsReported(t *testing.T) {
 					})
 
 					for _, seg := range segments {
-						if seg.Manifest == manifest {
-							t.Fatalf("segment %q taken from the refused manifest", seg.Path)
-						}
+						require.NotEqual(t, manifest, seg.Manifest, "segment %q taken from the refused manifest", seg.Path)
 					}
 
 					stats := s.Stats()
 
-					if len(stats.ManifestIssues) != 1 || stats.ManifestIssues[0].Path != manifest {
-						t.Fatalf("stats = %+v, want the refused manifest reported", stats)
-					}
-
-					if !errors.Is(stats.ManifestIssues[0].Err, ErrManifestUnusable) {
-						t.Errorf(msgWantManifestUnusable, stats.ManifestIssues[0].Err)
-					}
+					require.Len(t, stats.ManifestIssues, 1, "stats = %+v, want the refused manifest reported", stats)
+					require.Equal(t, manifest, stats.ManifestIssues[0].Path)
+					assert.ErrorIs(t, stats.ManifestIssues[0].Err, ErrManifestUnusable)
 				})
 			}
 		}
@@ -715,9 +679,7 @@ func TestStreamSample_MalformedEntryOutsideTheSampleIsReported(t *testing.T) {
 			picked := collect(t, func(out chan<- Segment) error {
 				return newTestStreamer(t, tc.store).StreamSample(t.Context(), 1, out)
 			})
-			if len(picked) != 1 {
-				t.Fatalf("sample = %+v, want one segment", picked)
-			}
+			require.Len(t, picked, 1)
 
 			// The manifest records the segments in the order they were written.
 			left := slices.IndexFunc(sound.recorded, func(p string) bool {
@@ -735,13 +697,10 @@ func TestStreamSample_MalformedEntryOutsideTheSampleIsReported(t *testing.T) {
 
 			stats := s.Stats()
 
-			if len(stats.ManifestIssues) != 1 || stats.ManifestIssues[0].Path != manifest {
-				t.Fatalf("stats = %+v, want the manifest with a broken entry reported", stats)
-			}
-
-			if !errors.Is(stats.ManifestIssues[0].Err, ErrManifestUnusable) {
-				t.Errorf(msgWantManifestUnusable, stats.ManifestIssues[0].Err)
-			}
+			require.Len(t, stats.ManifestIssues, 1,
+				"stats = %+v, want the manifest with a broken entry reported", stats)
+			require.Equal(t, manifest, stats.ManifestIssues[0].Path)
+			assert.ErrorIs(t, stats.ManifestIssues[0].Err, ErrManifestUnusable)
 		})
 	}
 }
@@ -754,26 +713,20 @@ func editSegment(
 	t.Helper()
 
 	var m map[string]any
-	if err := json.Unmarshal(manifest, &m); err != nil {
-		t.Fatalf("json.Unmarshal() error = %v", err)
-	}
+	require.NoError(t, json.Unmarshal(manifest, &m))
 
 	segments, ok := m[manifestSegmentsKey].([]any)
-	if !ok || index < 0 || index >= len(segments) {
-		t.Fatalf("manifest records no segment %d: %s", index, manifest)
-	}
+	require.True(t, ok, "manifest records no segments: %s", manifest)
+	require.GreaterOrEqual(t, index, 0)
+	require.Less(t, index, len(segments), "manifest records no segment %d: %s", index, manifest)
 
 	entry, ok := segments[index].(map[string]any)
-	if !ok {
-		t.Fatalf("segment entry = %T, want an object", segments[index])
-	}
+	require.True(t, ok, "segment entry = %T, want an object", segments[index])
 
 	edit(entry)
 
 	body, err := json.Marshal(m)
-	if err != nil {
-		t.Fatalf("json.Marshal() error = %v", err)
-	}
+	require.NoError(t, err)
 
 	return body
 }
@@ -803,9 +756,7 @@ func TestStreamAll_DataDirectoryOfItsOwn(t *testing.T) {
 		return s.StreamAll(t.Context(), out)
 	})
 
-	if got := paths(segments); !slices.Equal(got, b.segments()) {
-		t.Fatalf("streamed %d segments, want the %d of the backup", len(got), len(b.segments()))
-	}
+	require.Equal(t, b.segments(), paths(segments))
 }
 
 func TestStreamAll_DescribesEverySegment(t *testing.T) {
@@ -829,26 +780,13 @@ func TestStreamAll_DescribesEverySegment(t *testing.T) {
 				byStream[seg.Stream] = seg
 			}
 
-			if len(byStream) != 2 {
-				t.Fatalf("streams = %v, want both streams of the namespace", byStream)
-			}
+			require.Len(t, byStream, 2, "want both streams of the namespace")
 
 			for stream, seg := range byStream {
-				if seg.Namespace != testNS {
-					t.Errorf("%s namespace = %q, want %q", stream, seg.Namespace, testNS)
-				}
-
-				if seg.Size != int64(len(b.files[seg.Path])) {
-					t.Errorf("%s size = %d, want %d", stream, seg.Size, len(b.files[seg.Path]))
-				}
-
-				if _, ok := b.files[seg.Manifest]; !ok {
-					t.Errorf("%s manifest = %q, which the backup does not hold", stream, seg.Manifest)
-				}
-
-				if seg.Checksum != testChecksum {
-					t.Errorf("%s checksum = %q, want %q", stream, seg.Checksum, testChecksum)
-				}
+				assert.Equal(t, testNS, seg.Namespace, "%s namespace", stream)
+				assert.Equal(t, int64(len(b.files[seg.Path])), seg.Size, "%s size", stream)
+				assert.Contains(t, b.files, seg.Manifest, "%s manifest, which the backup does not hold", stream)
+				assert.Equal(t, testChecksum, seg.Checksum, "%s checksum", stream)
 
 				// Only a query stream manifest records how many records a
 				// segment holds.
@@ -857,9 +795,7 @@ func TestStreamAll_DescribesEverySegment(t *testing.T) {
 					wantCount = testRecordCount
 				}
 
-				if seg.RecordCount != wantCount {
-					t.Errorf("%s record count = %d, want %d", stream, seg.RecordCount, wantCount)
-				}
+				assert.Equal(t, wantCount, seg.RecordCount, "%s record count", stream)
 			}
 		})
 	}
@@ -873,17 +809,13 @@ func TestStreamAll_UnknownBackupYieldsNothing(t *testing.T) {
 			t.Parallel()
 
 			s, err := newStreamer(tc.store, "no-such-backup")
-			if err != nil {
-				t.Fatalf("newStreamer() error = %v", err)
-			}
+			require.NoError(t, err)
 
 			segments := collect(t, func(out chan<- Segment) error {
 				return s.StreamAll(t.Context(), out)
 			})
 
-			if len(segments) != 0 {
-				t.Fatalf("streamed %d segments of a backup that does not exist", len(segments))
-			}
+			require.Empty(t, segments, "streamed segments of a backup that does not exist")
 		})
 	}
 }
@@ -904,18 +836,12 @@ func TestStreamSample_SizeIsHonoured(t *testing.T) {
 					return s.StreamSample(t.Context(), n, out)
 				})
 
-				if len(segments) != n {
-					t.Errorf("sample of %d holds %d segments", n, len(segments))
-				}
-
-				if len(unique(paths(segments))) != len(segments) {
-					t.Errorf("sample of %d holds the same segment twice: %v", n, paths(segments))
-				}
+				assert.Len(t, segments, n, "sample of %d", n)
+				assert.Len(t, unique(paths(segments)), len(segments),
+					"sample of %d holds the same segment twice: %v", n, paths(segments))
 
 				for _, seg := range segments {
-					if _, ok := b.files[seg.Path]; !ok {
-						t.Errorf("sampled %q, which the backup does not hold", seg.Path)
-					}
+					assert.Contains(t, b.files, seg.Path, msgNotInBackup)
 				}
 			}
 		})
@@ -940,37 +866,25 @@ func TestStreamSample_ComesFromTheManifests(t *testing.T) {
 			})
 
 			for _, seg := range segments {
-				if seg.Manifest == "" {
-					t.Fatalf("segment %q names no manifest, want the sample drawn from the manifests", seg.Path)
-				}
-
-				if _, ok := b.files[seg.Manifest]; !ok {
-					t.Errorf("segment %q names manifest %q, which the backup does not hold", seg.Path, seg.Manifest)
-				}
+				require.NotEmpty(t, seg.Manifest,
+					"segment %q names no manifest, want the sample drawn from the manifests", seg.Path)
+				assert.Contains(t, b.files, seg.Manifest,
+					"segment %q names a manifest the backup does not hold", seg.Path)
 
 				// The size and the checksum come from the manifest, which is
 				// what makes them worth comparing against the storage.
-				if seg.Size != int64(len(b.files[seg.Path])) {
-					t.Errorf("segment %q recorded size = %d, want %d", seg.Path, seg.Size, len(b.files[seg.Path]))
-				}
-
-				if seg.Checksum != testChecksum {
-					t.Errorf("segment %q checksum = %q, want %q", seg.Path, seg.Checksum, testChecksum)
-				}
+				assert.Equal(t, int64(len(b.files[seg.Path])), seg.Size, msgSegment, seg.Path)
+				assert.Equal(t, testChecksum, seg.Checksum, msgSegment, seg.Path)
 			}
 
 			// Only the manifests are downloaded to pick a sample; the segments
 			// are downloaded by whoever validates them.
 			stats := s.Stats()
 
-			if stats.ManifestsRead != tc.store.opened.Load() {
-				t.Errorf("read %d manifests but downloaded %d files, want only the manifests",
-					stats.ManifestsRead, tc.store.opened.Load())
-			}
-
-			if stats.ManifestsFound != 21 || stats.ManifestsFailed != 0 {
-				t.Errorf("stats = %+v, want the 21 manifests of the backup, none of them failing", stats)
-			}
+			assert.Equal(t, stats.ManifestsRead, tc.store.opened.Load(),
+				"downloaded files, want only the manifests")
+			assert.Equal(t, int64(21), stats.ManifestsFound, "want the 21 manifests of the backup")
+			assert.Zero(t, stats.ManifestsFailed, "want no manifest failing")
 		})
 	}
 }
@@ -992,9 +906,8 @@ func TestStreamSample_TinySampleGoesWhereTheDataIs(t *testing.T) {
 				return s.StreamSample(t.Context(), 1, out)
 			})
 
-			if len(segments) != 1 || segments[0].Stream != QueryStream {
-				t.Fatalf("sample = %+v, want one segment of the query stream", segments)
-			}
+			require.Len(t, segments, 1, "want one segment of the query stream")
+			require.Equal(t, QueryStream, segments[0].Stream)
 		})
 	}
 }
@@ -1021,10 +934,8 @@ func TestStreamSample_ChecksumIsCarriedWhateverTheDeclaredAlgorithm(t *testing.T
 			})
 
 			for _, seg := range segments {
-				if seg.Manifest == "" || seg.Checksum != testChecksum {
-					t.Errorf("segment %q carries checksum %q, want %q",
-						seg.Path, seg.Checksum, testChecksum)
-				}
+				assert.NotEmpty(t, seg.Manifest, msgSegment, seg.Path)
+				assert.Equal(t, testChecksum, seg.Checksum, msgSegment, seg.Path)
 			}
 		})
 	}
@@ -1051,15 +962,15 @@ func TestStreamSample_CoversBothStreams(t *testing.T) {
 				byStream[seg.Stream]++
 			}
 
-			if byStream[ChangeStream] < 2 || byStream[QueryStream] < 2 {
-				t.Fatalf("sample by stream = %v, want both streams of the backup covered", byStream)
-			}
+			require.GreaterOrEqual(t, byStream[ChangeStream], 2,
+				"sample by stream = %v, want the change stream covered", byStream)
+			require.GreaterOrEqual(t, byStream[QueryStream], 2,
+				"sample by stream = %v, want the query stream covered", byStream)
 
 			// Most of the data is in the query stream, and so is most of the
 			// sample.
-			if byStream[QueryStream] <= byStream[ChangeStream] {
-				t.Errorf("sample by stream = %v, want the wider stream to carry the sample", byStream)
-			}
+			assert.Greater(t, byStream[QueryStream], byStream[ChangeStream],
+				"sample by stream = %v, want the wider stream to carry the sample", byStream)
 		})
 	}
 }
@@ -1082,13 +993,8 @@ func TestStreamSample_IsRepeatable(t *testing.T) {
 			}
 
 			first, again := sample(7), sample(7)
-			if !slices.Equal(first, again) {
-				t.Fatalf("the same seed sampled differently:\n%v\n%v", first, again)
-			}
-
-			if other := sample(99); slices.Equal(first, other) {
-				t.Errorf("another seed sampled the same segments: %v", other)
-			}
+			require.Equal(t, first, again, "the same seed sampled differently")
+			assert.NotEqual(t, first, sample(99), "another seed sampled the same segments")
 		})
 	}
 }
@@ -1109,9 +1015,7 @@ func TestStreamSample_SmallBackupIsSampledWhole(t *testing.T) {
 				return s.StreamSample(t.Context(), len(want)*4, out)
 			})
 
-			if got := unique(paths(segments)); !slices.Equal(got, want) {
-				t.Fatalf("sampled %v, want every segment of the backup %v", got, want)
-			}
+			require.Equal(t, want, unique(paths(segments)), "want every segment of the backup")
 		})
 	}
 }
@@ -1129,10 +1033,8 @@ func TestStreamSample_NothingIsAskedFor(t *testing.T) {
 				return s.StreamSample(t.Context(), 0, out)
 			})
 
-			if len(segments) != 0 || tc.store.opened.Load() != 0 {
-				t.Fatalf("a sample of nothing streamed %d segments and downloaded %d files",
-					len(segments), tc.store.opened.Load())
-			}
+			require.Empty(t, segments, "a sample of nothing streamed segments")
+			require.Zero(t, tc.store.opened.Load(), "a sample of nothing downloaded files")
 		})
 	}
 }
@@ -1169,7 +1071,7 @@ func TestStreaming_StreamWithoutADataDirectory(t *testing.T) {
 		want      []string
 		manifests int64
 	}{
-		{name: "recorded nothing", backup: empty, want: nil, manifests: 3},
+		{name: "recorded nothing", backup: empty, want: []string{}, manifests: 3},
 		{name: "data is gone", backup: lost, want: lost.recordedSegments(), manifests: 3},
 		{name: "data of a node is gone", backup: lostNode, want: lostNode.recordedSegments(), manifests: 1},
 	}
@@ -1185,17 +1087,14 @@ func TestStreaming_StreamWithoutADataDirectory(t *testing.T) {
 					return s.StreamAll(t.Context(), out)
 				})
 
-				if got := paths(segments); !slices.Equal(got, tt.want) {
-					t.Fatalf("streamed %v, want the segments the manifests name %v", got, tt.want)
-				}
+				require.Equal(t, tt.want, paths(segments), "want the segments the manifests name")
 
 				// The manifests were read, whether or not they led anywhere,
 				// which is what tells a backup holding nothing from a backup
 				// id nothing was written under.
-				if stats := s.Stats(); stats.ManifestsRead != tt.manifests || stats.Namespaces != 1 {
-					t.Errorf("stats = %+v, want the %d manifests of the one namespace read",
-						stats, tt.manifests)
-				}
+				stats := s.Stats()
+				assert.Equal(t, tt.manifests, stats.ManifestsRead, "want the manifests of the namespace read")
+				assert.Equal(t, int64(1), stats.Namespaces)
 			})
 		}
 	}
@@ -1214,9 +1113,7 @@ func TestStreamSample_BackupHoldingNothing(t *testing.T) {
 				return s.StreamSample(t.Context(), 10_000, out)
 			})
 
-			if len(segments) != 0 {
-				t.Fatalf("a backup holding nothing sampled %d segments", len(segments))
-			}
+			require.Empty(t, segments, "a backup holding nothing sampled segments")
 		})
 	}
 }
@@ -1240,23 +1137,14 @@ func TestStreamSample_FallsBackToTheDataOfAStreamWithoutManifests(t *testing.T) 
 				return s.StreamSample(t.Context(), 9, out)
 			})
 
-			if len(segments) != 9 {
-				t.Fatalf("sampled %d segments of a stream without manifests, want 9", len(segments))
-			}
+			require.Len(t, segments, 9, "sampled segments of a stream without manifests")
 
 			for _, seg := range segments {
-				if seg.Manifest != "" {
-					t.Errorf("segment %q names manifest %q, want none", seg.Path, seg.Manifest)
-				}
-
-				if _, ok := b.files[seg.Path]; !ok {
-					t.Errorf("sampled %q, which the backup does not hold", seg.Path)
-				}
+				assert.Empty(t, seg.Manifest, msgSegment, seg.Path)
+				assert.Contains(t, b.files, seg.Path, msgNotInBackup)
 			}
 
-			if tc.store.opened.Load() != 0 {
-				t.Errorf("downloaded %d files, want a listing to download nothing", tc.store.opened.Load())
-			}
+			assert.Zero(t, tc.store.opened.Load(), "downloaded files, want a listing to download nothing")
 		})
 	}
 }
@@ -1279,25 +1167,19 @@ func TestStreamSample_UnusableManifestIsReported(t *testing.T) {
 				return s.StreamSample(t.Context(), 2, out)
 			})
 
-			if len(segments) != 2 {
-				t.Fatalf("sampled %d segments past an unusable manifest, want 2", len(segments))
-			}
+			require.Len(t, segments, 2, "sampled segments past an unusable manifest")
 
 			stats := s.Stats()
 
-			if stats.ManifestsFailed != 1 || len(stats.ManifestIssues) != 1 {
-				t.Fatalf("stats = %+v, want the one unusable manifest to be reported", stats)
-			}
+			require.Equal(t, int64(1), stats.ManifestsFailed,
+				"stats = %+v, want the one unusable manifest to be reported", stats)
+			require.Len(t, stats.ManifestIssues, 1)
 
 			issue := stats.ManifestIssues[0]
 
-			if issue.Path != b.manifestPath(0) || issue.Namespace != testNS {
-				t.Errorf("issue = %+v, want the manifest of partition 0", issue)
-			}
-
-			if !errors.Is(issue.Err, ErrManifestUnusable) {
-				t.Errorf(msgWantManifestUnusable, issue.Err)
-			}
+			assert.Equal(t, b.manifestPath(0), issue.Path, "want the manifest of partition 0")
+			assert.Equal(t, testNS, issue.Namespace)
+			assert.ErrorIs(t, issue.Err, ErrManifestUnusable)
 		})
 	}
 }
@@ -1324,19 +1206,14 @@ func TestStreaming_EmptyManifestIsReported(t *testing.T) {
 					return run(s, out)
 				})
 
-				if len(segments) == 0 {
-					t.Fatal("an empty manifest left the run with nothing, want the rest of the backup")
-				}
+				require.NotEmpty(t, segments, "an empty manifest left the run with nothing, want the rest of the backup")
 
 				stats := s.Stats()
 
-				if stats.ManifestsFailed != 1 || len(stats.ManifestIssues) != 1 {
-					t.Fatalf("stats = %+v, want the empty manifest to be reported", stats)
-				}
-
-				if !errors.Is(stats.ManifestIssues[0].Err, ErrManifestUnusable) {
-					t.Errorf(msgWantManifestUnusable, stats.ManifestIssues[0].Err)
-				}
+				require.Equal(t, int64(1), stats.ManifestsFailed,
+					"stats = %+v, want the empty manifest to be reported", stats)
+				require.Len(t, stats.ManifestIssues, 1)
+				assert.ErrorIs(t, stats.ManifestIssues[0].Err, ErrManifestUnusable)
 			})
 		}
 	}
@@ -1361,14 +1238,10 @@ func TestStreamSample_ManifestNamingAMissingSegment(t *testing.T) {
 				return s.StreamSample(t.Context(), 2, out)
 			})
 
-			if !slices.Contains(paths(segments), gone) {
-				t.Fatalf("sample = %v, want it to name the missing segment %q", paths(segments), gone)
-			}
+			require.Contains(t, paths(segments), gone, "want the sample to name the missing segment")
 
 			_, err := s.OpenSegment(t.Context(), &Segment{Path: gone})
-			if !errors.Is(err, ErrSegmentMissing) {
-				t.Fatalf("OpenSegment() error = %v, want ErrSegmentMissing", err)
-			}
+			require.ErrorIs(t, err, ErrSegmentMissing)
 		})
 	}
 }
@@ -1386,19 +1259,12 @@ func TestOpenSegment(t *testing.T) {
 			s := newTestStreamer(t, tc.store)
 
 			body, err := s.OpenSegment(t.Context(), &Segment{Path: want})
-			if err != nil {
-				t.Fatalf("OpenSegment() error = %v", err)
-			}
+			require.NoError(t, err)
 			defer body.Close()
 
 			got, err := io.ReadAll(body)
-			if err != nil {
-				t.Fatalf("read segment: %v", err)
-			}
-
-			if !bytes.Equal(got, b.files[want]) {
-				t.Errorf("read %d bytes, want the %d bytes of the segment", len(got), len(b.files[want]))
-			}
+			require.NoError(t, err, "read segment")
+			assert.Equal(t, b.files[want], got)
 		})
 	}
 }
@@ -1418,14 +1284,10 @@ func TestStreaming_StopsOnACanceledContext(t *testing.T) {
 			s := newTestStreamer(t, tc.store)
 
 			out := make(chan Segment, 1)
-			if err := s.StreamAll(ctx, out); !errors.Is(err, context.Canceled) {
-				t.Errorf("StreamAll() error = %v, want context.Canceled", err)
-			}
+			require.ErrorIs(t, s.StreamAll(ctx, out), context.Canceled, "StreamAll()")
 
 			out = make(chan Segment, 1)
-			if err := s.StreamSample(ctx, 10, out); !errors.Is(err, context.Canceled) {
-				t.Errorf("StreamSample() error = %v, want context.Canceled", err)
-			}
+			require.ErrorIs(t, s.StreamSample(ctx, 10, out), context.Canceled, "StreamSample()")
 		})
 	}
 }
@@ -1453,13 +1315,9 @@ func TestStreaming_ThrottlesOnASlowConsumer(t *testing.T) {
 				count++
 			}
 
-			if err := <-done; err != nil {
-				t.Fatalf("StreamAll() error = %v", err)
-			}
-
-			if count != len(b.segments()) {
-				t.Errorf("streamed %d segments, want %d", count, len(b.segments()))
-			}
+			err := <-done
+			require.NoError(t, err)
+			assert.Equal(t, len(b.segments()), count)
 		})
 	}
 }
@@ -1475,4 +1333,61 @@ func unique[T comparable](values []T) []T {
 	}
 
 	return found
+}
+
+// A server writing under a path names the segments in its manifests from that
+// path down, so a backup identified by the path and its id is found whole and
+// every segment it records opens.
+func TestStreaming_BackupWrittenUnderAPath(t *testing.T) {
+	t.Parallel()
+
+	const prefix = "backups/daily"
+
+	tree := newTestBackupTree(t, 3, 2, 1, 2)
+	b := newTestBackup(testBackupID)
+
+	for p, body := range tree.files {
+		b.put(path.Join(prefix, p), body)
+	}
+
+	want := make([]string, 0, len(tree.recorded))
+	for _, p := range tree.recordedSegments() {
+		want = append(want, path.Join(prefix, p))
+	}
+
+	for name, run := range streamRuns(t.Context(), len(want)*4) {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			for _, tc := range storesOf(t, b) {
+				t.Run(tc.name, func(t *testing.T) {
+					t.Parallel()
+
+					s := newTestStreamer(t, tc.store, WithPath(prefix))
+
+					segments := collect(t, func(out chan<- Segment) error {
+						return run(s, out)
+					})
+
+					require.Equal(t, want, unique(paths(segments)))
+
+					for i := range segments {
+						seg := &segments[i]
+
+						assert.False(t, seg.Unrecorded,
+							"segment %q is unrecorded, want every segment matched to its manifest", seg.Path)
+
+						body, err := s.OpenSegment(t.Context(), seg)
+						require.NoError(t, err, "OpenSegment(%q)", seg.Path)
+
+						_ = body.Close()
+					}
+
+					stats := s.Stats()
+					assert.Zero(t, stats.ManifestsFailed, "want no failed manifest")
+					assert.Zero(t, stats.Unrecorded, "want no unrecorded segment")
+				})
+			}
+		})
+	}
 }

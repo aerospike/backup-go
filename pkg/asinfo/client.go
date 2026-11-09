@@ -29,6 +29,31 @@ import (
 const errCmdRespPrefix = "ERROR"
 
 const (
+	// statPaxosPrincipal is the statistics key of the cluster principal node id.
+	statPaxosPrincipal = "paxos_principal"
+	// statClusterPrincipal is the statistics key of the same node id as
+	// statPaxosPrincipal.
+	statClusterPrincipal = "cluster_principal"
+)
+
+const (
+	// cmdRespCodeUnknown is the result code of an error response that reports
+	// an internal error, or a start the server could not confirm
+	// (AS_ERR_UNKNOWN).
+	cmdRespCodeUnknown = 1
+	// cmdRespCodeNotFound is the result code of an error response that reports
+	// the requested object as not found (AS_ERR_NOT_FOUND).
+	cmdRespCodeNotFound = 2
+	// cmdRespCodeTimeout is the result code of an error response that reports
+	// a command not acknowledged by every node in time (AS_ERR_TIMEOUT). The
+	// command may have taken effect.
+	cmdRespCodeTimeout = 9
+	// cmdRespNoCode stands for the result code of an error response that
+	// carries none.
+	cmdRespNoCode = -1
+)
+
+const (
 	indexTypeDefault   = "default"
 	indexTypeNone      = "none"
 	indexTypeList      = "list"
@@ -63,6 +88,23 @@ var (
 	// class, not the class itself, so matching it stays specific to this package.
 	ErrNotFound = fmt.Errorf("%w: info not found", errclass.ErrNotFound)
 
+	// ErrOutcomeUnknown is wrapped by the error of a failed command whose
+	// effect the server may have applied anyway, such as after a timeout: a job
+	// start ([Client.StartBackup], [Client.StartRestore]) or a restore open
+	// ([Client.OpenRestore]). The outcome should then be checked with a status
+	// command. Without it, the failure is the server's own answer: a start was
+	// not accepted, while an open may still have taken partial effect.
+	ErrOutcomeUnknown = fmt.Errorf("%w: command outcome unknown", errclass.ErrAerospike)
+
+	// ErrClusterUnstable is wrapped by the error of [Client.GetClusterStable]
+	// when a node answers with a cluster key other than the one of the cluster:
+	// the cluster is changing and the check may succeed later. Any other
+	// failure of the check, including an error answered by a node, does not
+	// wrap it. If the context is canceled between attempts, the error wraps both
+	// the context error and the error of the last attempt, so check the context
+	// error first.
+	ErrClusterUnstable = fmt.Errorf("%w: cluster is not stable", errclass.ErrAerospike)
+
 	// Static internal errors. Kept as package-level sentinels so they can be
 	// matched with errors.Is and satisfy err113/perfsprint linters.
 	errNoInfoCommands = fmt.Errorf("%w: no info commands provided or command not supported",
@@ -79,6 +121,12 @@ var (
 	errInvalidCmdParam = fmt.Errorf("%w: info command parameter value contains separator",
 		errclass.ErrInvalidConfig)
 	errNilRequest = fmt.Errorf("%w: nil request", errclass.ErrInvalidConfig)
+	// errParamNotApplicable reports a parameter that the rest of the request,
+	// such as the restore policy, does not accept: the server rejects it
+	// instead of ignoring it.
+	errParamNotApplicable = fmt.Errorf("%w: info command parameter does not apply to the request",
+		errclass.ErrInvalidConfig)
+	errUnknownPolicy = fmt.Errorf("%w: info command policy is unknown", errclass.ErrInvalidConfig)
 
 	secretAgentValRegex = regexp.MustCompile(`(.+?)=secrets:(.+?):(.+?)`)
 )
@@ -222,7 +270,7 @@ func (ic *Client) requestRandomNodeOnce(cmd string) (string, error) {
 func parseCmdResponse(cmd string, resp map[string]string) (string, error) {
 	result, err := parseResultResponse(cmd, resp)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse %s info response: %w", redactCmd(cmd), err)
+		return "", fmt.Errorf("failed to parse %s info response: %w", cmd, err)
 	}
 
 	return result, nil
@@ -234,7 +282,7 @@ func (ic *Client) requestByNodeName(nodeName, cmd string) (string, error) {
 	node, aErr := ic.cluster.GetNodeByName(nodeName)
 	if aErr != nil {
 		return "", fmt.Errorf("%w: failed to get node %s for command %s: %w",
-			errclass.ErrAerospike, nodeName, redactCmd(cmd), aErr)
+			errclass.ErrAerospike, nodeName, cmd, aErr)
 	}
 
 	return ic.requestByNode(node, cmd)
@@ -277,9 +325,20 @@ func (ic *Client) getPrincipalName() (string, error) {
 		return "", fmt.Errorf("failed to get cluster statistics: %w", err)
 	}
 
-	principal, ok := searchInInfoResponse(stats, "cluster_principal")
+	return principalFromStatistics(stats)
+}
+
+// principalFromStatistics returns the node id of the cluster principal from a
+// statistics info response. The server names it paxos_principal;
+// cluster_principal, which holds the same node id, is read if it is missing.
+func principalFromStatistics(stats []infomodels.InfoMap) (string, error) {
+	principal, ok := searchInInfoResponse(stats, statPaxosPrincipal)
 	if !ok {
-		return "", fmt.Errorf("%w: cluster key not found in statistics", errclass.ErrAerospike)
+		principal, ok = searchInInfoResponse(stats, statClusterPrincipal)
+	}
+
+	if !ok {
+		return "", fmt.Errorf("%w: cluster principal not found in statistics", errclass.ErrAerospike)
 	}
 
 	if principal == "" {

@@ -24,6 +24,10 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/aerospike/backup-go/errclass"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // errStorage is what a storage that stopped answering reports.
@@ -102,7 +106,7 @@ func drain(run func(chan<- Segment) error) error {
 
 	go func() { done <- run(out) }()
 
-	for range out { //nolint:revive // The segments are drained, not inspected.
+	for range out {
 	}
 
 	return <-done
@@ -121,24 +125,80 @@ func TestStreamerOptions(t *testing.T) {
 
 	s, err := newStreamer(&localStore{root: t.TempDir()}, testBackupID,
 		WithLogger(logger), WithConcurrency(concurrency), WithScanLimit(scanLimit), WithSeed(seed))
-	if err != nil {
-		t.Fatalf("newStreamer() error = %v", err)
+	require.NoError(t, err)
+
+	assert.Same(t, logger, s.logger, "WithLogger() did not set the logger")
+	assert.Equal(t, concurrency, s.options.concurrency)
+	assert.Equal(t, scanLimit, s.options.scanLimit)
+	assert.Equal(t, seed, s.options.seed)
+}
+
+func TestWithPath(t *testing.T) {
+	t.Parallel()
+
+	const (
+		prefix       = "backups/daily"
+		prefixedDir  = prefix + "/" + testBackupID
+		nestedPrefix = "a/b/c"
+	)
+
+	tests := []struct {
+		name       string
+		givePrefix string
+		giveID     string
+		wantPrefix string
+		wantDir    string
+		wantErr    bool
+	}{
+		{name: "no path", giveID: testBackupID, wantDir: testBackupID},
+		{name: "path", givePrefix: prefix, giveID: testBackupID, wantPrefix: prefix, wantDir: prefixedDir},
+		{
+			name:       "nested path",
+			givePrefix: nestedPrefix,
+			giveID:     testBackupID,
+			wantPrefix: nestedPrefix,
+			wantDir:    nestedPrefix + "/" + testBackupID,
+		},
+		{
+			name:       "surrounding slashes",
+			givePrefix: "/" + prefix + "/",
+			giveID:     testBackupID,
+			wantPrefix: prefix,
+			wantDir:    prefixedDir,
+		},
+		{
+			name:       "unclean path",
+			givePrefix: "backups//./daily/",
+			giveID:     testBackupID,
+			wantPrefix: prefix,
+			wantDir:    prefixedDir,
+		},
+		{name: "root only", givePrefix: "/", giveID: testBackupID, wantDir: testBackupID},
+		{name: "current directory", givePrefix: "./", giveID: testBackupID, wantDir: testBackupID},
+		{name: "path leaving the storage", givePrefix: "../backups", giveID: testBackupID, wantErr: true},
+		{name: "path leaving through a subdirectory", givePrefix: "a/../..", giveID: testBackupID, wantErr: true},
+		{name: "empty backup id", giveID: "", wantErr: true},
+		{name: "backup id holding a path", giveID: prefixedDir, wantErr: true},
+		{name: "backup id of the current directory", giveID: ".", wantErr: true},
+		{name: "backup id of the parent directory", giveID: "..", wantErr: true},
 	}
 
-	if s.logger != logger {
-		t.Error("WithLogger() did not set the logger")
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	if s.options.concurrency != concurrency {
-		t.Errorf("concurrency = %d, want %d", s.options.concurrency, concurrency)
-	}
+			s, err := newStreamer(&localStore{root: t.TempDir()}, tt.giveID, WithPath(tt.givePrefix))
+			if tt.wantErr {
+				require.ErrorIs(t, err, errclass.ErrInvalidConfig)
 
-	if s.options.scanLimit != scanLimit {
-		t.Errorf("scanLimit = %d, want %d", s.options.scanLimit, scanLimit)
-	}
+				return
+			}
 
-	if s.options.seed != seed {
-		t.Errorf("seed = %d, want %d", s.options.seed, seed)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantPrefix, s.prefix)
+			assert.Equal(t, tt.wantDir, s.dir)
+			assert.Equal(t, tt.giveID, s.BackupID())
+		})
 	}
 }
 
@@ -147,17 +207,11 @@ func TestStreamerOptions_OutOfRangeAreIgnored(t *testing.T) {
 
 	s, err := newStreamer(&localStore{root: t.TempDir()}, testBackupID,
 		WithLogger(nil), WithConcurrency(0), WithScanLimit(-1))
-	if err != nil {
-		t.Fatalf("newStreamer() error = %v", err)
-	}
+	require.NoError(t, err)
 
-	if s.logger == nil {
-		t.Error("WithLogger(nil) cleared the logger, want the default kept")
-	}
-
-	if s.options.concurrency != defaultConcurrency || s.options.scanLimit != defaultScanLimit {
-		t.Errorf("options = %+v, want the defaults kept", s.options)
-	}
+	assert.NotNil(t, s.logger, "WithLogger(nil) cleared the logger, want the default kept")
+	assert.Equal(t, defaultConcurrency, s.options.concurrency, "want the default concurrency kept")
+	assert.Equal(t, defaultScanLimit, s.options.scanLimit, "want the default scan limit kept")
 }
 
 func TestStopped(t *testing.T) {
@@ -185,16 +239,12 @@ func TestStopped(t *testing.T) {
 			got := stopped(tt.err)
 
 			if tt.wantErr == nil {
-				if got != nil {
-					t.Fatalf("stopped() = %v, want nil", got)
-				}
+				require.NoError(t, got)
 
 				return
 			}
 
-			if !errors.Is(got, tt.wantErr) {
-				t.Fatalf("stopped() = %v, want %v", got, tt.wantErr)
-			}
+			require.ErrorIs(t, got, tt.wantErr)
 		})
 	}
 }
@@ -258,9 +308,7 @@ func TestStreaming_ShapeOfTheBackupCannotBeListed(t *testing.T) {
 						return s.StreamSample(t.Context(), 4, out)
 					})
 
-					if !errors.Is(err, errStorage) {
-						t.Fatalf("streaming error = %v, want the storage failure", err)
-					}
+					require.ErrorIs(t, err, errStorage, "want the storage failure")
 				})
 			}
 		})
@@ -277,9 +325,7 @@ func TestStreamAll_ListingTheManifestsFails(t *testing.T) {
 	})
 
 	err := drain(func(out chan<- Segment) error { return s.StreamAll(t.Context(), out) })
-	if !errors.Is(err, errStorage) {
-		t.Fatalf("StreamAll() error = %v, want the storage failure", err)
-	}
+	require.ErrorIs(t, err, errStorage, "want the storage failure")
 }
 
 func TestStreamSample_ListingTheManifestsFails(t *testing.T) {
@@ -292,9 +338,7 @@ func TestStreamSample_ListingTheManifestsFails(t *testing.T) {
 	})
 
 	err := drain(func(out chan<- Segment) error { return s.StreamSample(t.Context(), 4, out) })
-	if !errors.Is(err, errStorage) {
-		t.Fatalf("StreamSample() error = %v, want the storage failure", err)
-	}
+	require.ErrorIs(t, err, errStorage, "want the storage failure")
 }
 
 // A manifest that cannot be parsed is reported and stepped over; a storage
@@ -320,9 +364,7 @@ func TestStreaming_DownloadingAManifestFails(t *testing.T) {
 				return s.StreamSample(t.Context(), 4, out)
 			})
 
-			if !errors.Is(err, errStorage) {
-				t.Fatalf("streaming error = %v, want the storage failure", err)
-			}
+			require.ErrorIs(t, err, errStorage, "want the storage failure")
 		})
 	}
 }
@@ -353,9 +395,7 @@ func TestStreaming_ListingAPartitionOfAStreamWithoutManifestsFails(t *testing.T)
 				return s.StreamSample(t.Context(), 4, out)
 			})
 
-			if !errors.Is(err, errStorage) {
-				t.Fatalf("streaming error = %v, want the storage failure", err)
-			}
+			require.ErrorIs(t, err, errStorage, "want the storage failure")
 		})
 	}
 }
@@ -372,9 +412,7 @@ func TestStreamAll_CountingASegmentDirectoryFails(t *testing.T) {
 	})
 
 	err := drain(func(out chan<- Segment) error { return s.StreamAll(t.Context(), out) })
-	if !errors.Is(err, errStorage) {
-		t.Fatalf("StreamAll() error = %v, want the storage failure", err)
-	}
+	require.ErrorIs(t, err, errStorage, "want the storage failure")
 }
 
 // A directory holding more segments than its manifests recorded is reconciled
@@ -394,7 +432,7 @@ func TestStreamAll_ManifestThatCannotBeReadAgain(t *testing.T) {
 		st.failOpen = func(storagePath string) error {
 			// The first read is the one that streams the manifest; the second
 			// is the one that reconciles the directory it recorded.
-			if isManifest(storagePath) && opened.Add(1) > 1 {
+			if isManifest(storagePath) && path.Base(storagePath) != metadataFile && opened.Add(1) > 1 {
 				return errStorage
 			}
 
@@ -405,15 +443,11 @@ func TestStreamAll_ManifestThatCannotBeReadAgain(t *testing.T) {
 	segments := collect(t, func(out chan<- Segment) error { return s.StreamAll(t.Context(), out) })
 
 	for _, seg := range segments {
-		if seg.Unrecorded {
-			t.Errorf("segment %q was called unrecorded, want a directory whose manifests "+
-				"cannot be read again to be left alone", seg.Path)
-		}
+		assert.False(t, seg.Unrecorded, "segment %q was called unrecorded, want a directory whose manifests "+
+			"cannot be read again to be left alone", seg.Path)
 	}
 
-	if s.Stats().Unrecorded != 0 {
-		t.Errorf("stats unrecorded = %d, want none", s.Stats().Unrecorded)
-	}
+	assert.Zero(t, s.Stats().Unrecorded, "stats unrecorded")
 }
 
 // Only the files a backup is made of are streamed. A directory of a backup can
@@ -449,14 +483,10 @@ func TestStreaming_StrayFilesAreNotStreamed(t *testing.T) {
 					})
 
 					for _, seg := range segments {
-						if !isSegment(seg.Path) {
-							t.Errorf("streamed %q, want segments only", seg.Path)
-						}
+						assert.True(t, isSegment(seg.Path), "streamed %q, want segments only", seg.Path)
 					}
 
-					if s.Stats().ManifestsFound != 2 {
-						t.Errorf("found %d manifests, want the 2 of the backup", s.Stats().ManifestsFound)
-					}
+					assert.Equal(t, int64(2), s.Stats().ManifestsFound, "want the 2 manifests of the backup")
 				})
 			}
 		})
@@ -494,14 +524,10 @@ func TestStreamSample_StrayFilesOfAStreamWithoutManifests(t *testing.T) {
 						return s.StreamSample(t.Context(), 8, out)
 					})
 
-					if len(segments) == 0 {
-						t.Fatal("streamed nothing, want the segments of the data directories")
-					}
+					require.NotEmpty(t, segments, "want the segments of the data directories")
 
 					for _, seg := range segments {
-						if !isSegment(seg.Path) {
-							t.Errorf("streamed %q, want segments only", seg.Path)
-						}
+						assert.True(t, isSegment(seg.Path), "streamed %q, want segments only", seg.Path)
 					}
 				})
 			}
@@ -527,15 +553,12 @@ func TestStreamSample_ScanLimitBoundsTheListing(t *testing.T) {
 				return s.StreamSample(t.Context(), 4, out)
 			})
 
-			if len(segments) == 0 {
-				t.Fatal("StreamSample() streamed nothing, want a sample of what it scanned")
-			}
+			require.NotEmpty(t, segments, "StreamSample() want a sample of what it scanned")
 
 			// One manifest per listing was scanned, so no more than one
 			// manifest per unit was read.
-			if read := s.Stats().ManifestsRead; read > 1 {
-				t.Errorf("read %d manifests, want at most the one the scan limit allowed", read)
-			}
+			assert.LessOrEqual(t, s.Stats().ManifestsRead, int64(1),
+				"manifests read, want at most the one the scan limit allowed")
 		})
 	}
 }
@@ -558,14 +581,10 @@ func TestStreamSample_ScanLimitBoundsAStreamWithoutManifests(t *testing.T) {
 				return s.StreamSample(t.Context(), 4, out)
 			})
 
-			if len(segments) == 0 {
-				t.Fatal("StreamSample() streamed nothing, want a sample of what it scanned")
-			}
+			require.NotEmpty(t, segments, "StreamSample() want a sample of what it scanned")
 
 			for _, seg := range segments {
-				if !isSegment(seg.Path) {
-					t.Errorf("streamed %q, want segments only", seg.Path)
-				}
+				assert.True(t, isSegment(seg.Path), "streamed %q, want segments only", seg.Path)
 			}
 		})
 	}
@@ -595,10 +614,7 @@ func TestStreamAll_StreamDirectoryHoldingMoreThanItsNodes(t *testing.T) {
 				return s.StreamAll(t.Context(), out)
 			})
 
-			if got := paths(segments); len(got) != len(want) {
-				t.Fatalf("streamed %d segments, want the %d of the backup:\n got: %v\nwant: %v",
-					len(got), len(want), got, want)
-			}
+			require.Len(t, paths(segments), len(want), "want the segments of the backup: %v", want)
 		})
 	}
 }
@@ -630,20 +646,15 @@ func TestStreaming_ManifestNamingASegmentOutsideTheStorage(t *testing.T) {
 			})
 
 			for _, seg := range segments {
-				if strings.Contains(seg.Path, "elsewhere") {
-					t.Errorf("streamed %q, want a segment outside the storage to be refused", seg.Path)
-				}
+				assert.NotContains(t, seg.Path, "elsewhere", "want a segment outside the storage to be refused")
 			}
 
 			stats := s.Stats()
 
-			if stats.ManifestsFailed != 1 || len(stats.ManifestIssues) != 1 {
-				t.Fatalf("stats = %+v, want the manifest reported as unusable", stats)
-			}
+			require.Equal(t, int64(1), stats.ManifestsFailed, "stats = %+v, want the manifest reported as unusable", stats)
+			require.Len(t, stats.ManifestIssues, 1, "stats = %+v, want the manifest reported as unusable", stats)
 
-			if !errors.Is(stats.ManifestIssues[0].Err, ErrManifestUnusable) {
-				t.Errorf("manifest issue = %v, want ErrManifestUnusable", stats.ManifestIssues[0].Err)
-			}
+			assert.ErrorIs(t, stats.ManifestIssues[0].Err, ErrManifestUnusable)
 		})
 	}
 }
@@ -673,9 +684,7 @@ func TestStreamAll_SecondListingOfADirectoryFails(t *testing.T) {
 	})
 
 	err := drain(func(out chan<- Segment) error { return s.StreamAll(t.Context(), out) })
-	if !errors.Is(err, errStorage) {
-		t.Fatalf("StreamAll() error = %v, want the storage failure", err)
-	}
+	require.ErrorIs(t, err, errStorage, "want the storage failure")
 }
 
 // A canceled run stops where it is instead of blocking on a consumer that
@@ -701,9 +710,7 @@ func TestStreaming_SendingIntoACanceledRun(t *testing.T) {
 	// block here forever.
 	out := make(chan Segment)
 
-	if err := s.streamLoose(ctx, &u, out); !errors.Is(err, context.Canceled) {
-		t.Errorf("streamLoose() error = %v, want context.Canceled", err)
-	}
+	require.ErrorIs(t, s.streamLoose(ctx, &u, out), context.Canceled, "streamLoose()")
 
 	data := u.data()
 	known := []file{
@@ -716,9 +723,7 @@ func TestStreaming_SendingIntoACanceledRun(t *testing.T) {
 	}
 
 	err := s.sendUnrecorded(ctx, &u, data, newRecorded(), known, out)
-	if !errors.Is(err, context.Canceled) {
-		t.Errorf("sendUnrecorded() error = %v, want context.Canceled", err)
-	}
+	assert.ErrorIs(t, err, context.Canceled, "sendUnrecorded()")
 }
 
 // A manifest that recorded a segment and then something unusable is reported,
@@ -746,13 +751,10 @@ func TestStreamAll_ManifestThatBreaksHalfway(t *testing.T) {
 	segments := collect(t, func(out chan<- Segment) error { return s.StreamAll(t.Context(), out) })
 
 	for _, seg := range segments {
-		if seg.Unrecorded {
-			t.Errorf("segment %q was called unrecorded, want a directory whose manifest "+
-				"cannot be read whole to be left alone", seg.Path)
-		}
+		assert.False(t, seg.Unrecorded, "segment %q was called unrecorded, want a directory whose manifest "+
+			"cannot be read whole to be left alone", seg.Path)
 	}
 
-	if s.Stats().ManifestsFailed != 1 {
-		t.Errorf("stats = %+v, want the manifest reported as unusable", s.Stats())
-	}
+	assert.Equal(t, int64(1), s.Stats().ManifestsFailed, "stats = %+v, want the manifest reported as unusable",
+		s.Stats())
 }

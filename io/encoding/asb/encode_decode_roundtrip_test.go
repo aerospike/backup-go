@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
+	"math"
 	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
@@ -38,6 +40,13 @@ type roundTripCase struct {
 
 func roundTripCases() []roundTripCase {
 	stringKey, _ := a.NewKey("test", "roundtrip", "user-key")
+
+	vectorBins := a.BinMap{
+		"vector_float16": mustRoundTripVector(a.NewVectorFloat16Bits([]uint16{0x3C00, 0xC000, 0x0001})),
+		"vector_int32":   mustRoundTripVector(a.NewVectorInt32([]int32{math.MinInt32, -1, 0, math.MaxInt32})),
+		"vector_float32": mustRoundTripVector(a.NewVectorFloat32([]float32{-0.5, 0, math.MaxFloat32})),
+		"vector_float64": mustRoundTripVector(a.NewVectorFloat64([]float64{math.SmallestNonzeroFloat64, -1e300})),
+	}
 
 	allTypesBins := a.BinMap{
 		"bool_true":   true,
@@ -62,6 +71,7 @@ func roundTripCases() []roundTripCase {
 			Data:         []byte("raw-list-bytes"),
 		},
 	}
+	maps.Copy(allTypesBins, vectorBins)
 
 	manyInts := a.BinMap{}
 	for i := range 50 {
@@ -108,6 +118,31 @@ func roundTripCases() []roundTripCase {
 			),
 		},
 		{
+			name:    "vector_compact",
+			compact: true,
+			record:  roundTripRecord(stringKey, vectorBins, 5, 600),
+		},
+		{
+			name:    "large_vector_payload",
+			compact: false,
+			record: roundTripRecord(
+				stringKey,
+				a.BinMap{"vector": mustRoundTripVector(a.NewVectorFloat32(make([]float32, 65536)))},
+				3,
+				500,
+			),
+		},
+		{
+			name:    "large_compact_vector_payload",
+			compact: true,
+			record: roundTripRecord(
+				stringKey,
+				a.BinMap{"vector": mustRoundTripVector(a.NewVectorFloat32(make([]float32, 65536)))},
+				3,
+				500,
+			),
+		},
+		{
 			name:    "float_edge_cases",
 			compact: false,
 			record:  roundTripRecord(stringKey, floatEdgeBins, 7, 700),
@@ -120,6 +155,15 @@ func roundTripCases() []roundTripCase {
 			}, 2, 30),
 		},
 	}
+}
+
+// mustRoundTripVector unwraps a vector constructor result for static test fixtures.
+func mustRoundTripVector(vector *a.Vector, err a.Error) *a.Vector {
+	if err != nil {
+		panic(fmt.Sprintf("failed to create test vector: %v", err))
+	}
+
+	return vector
 }
 
 func roundTripRecord(key *a.Key, bins a.BinMap, generation uint32, voidTime int64) *models.Record {

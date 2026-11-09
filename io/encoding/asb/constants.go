@@ -87,6 +87,7 @@ const (
 	binTypeLDT          byte = 'U'
 	binTypeStringBase64 byte = 'X'
 	binTypeGeoJSON      byte = 'G'
+	binTypeVector       byte = 'V'
 )
 
 // sindex types
@@ -137,31 +138,34 @@ var (
 	space                = []byte(" ")
 	delimsSpaceOrNewline = []byte{' ', asbNewLine}
 
-	binBoolTypePrefix         = []byte("- Z ")
-	binIntTypePrefix          = []byte("- I ")
-	binFloatTypePrefix        = []byte("- D ")
-	binStringTypePrefix       = []byte("- S ")
-	binBytesTypePrefix        = []byte("- B ")
-	binBytesTypeCompactPrefix = []byte("- B! ")
-	binHLLTypePrefix          = []byte("- Y ")
-	binHLLTypeCompactPrefix   = []byte("- Y! ")
-	binGeoJSONTypePrefix      = []byte("- G ")
-	binNilTypePrefix          = []byte("- N ")
-	binMapTypePrefix          = []byte("- M ")
-	binMapTypeCompactPrefix   = []byte("- M! ")
-	binListTypePrefix         = []byte("- L ")
-	binListTypeCompactPrefix  = []byte("- L! ")
-	namespacePrefix           = []byte("+ n ")
-	setPrefix                 = []byte("+ s ")
-	digestPrefix              = []byte("+ d ")
-	headerGeneration          = []byte("+ g ")
-	headerExpiration          = []byte("+ t ")
-	headerBinCount            = []byte("+ b ")
-	userKeyIntPrefix          = []byte("+ k I ")
-	userKeyFloatPrefix        = []byte("+ k D ")
-	userKeyStringPrefix       = []byte("+ k S ")
-	userKeyBytesPrefix        = []byte("+ k B ")
-	sindexSizeOne             = []byte("1")
+	binBoolTypePrefix          = []byte("- Z ")
+	binIntTypePrefix           = []byte("- I ")
+	binFloatTypePrefix         = []byte("- D ")
+	binStringTypePrefix        = []byte("- S ")
+	binBytesTypePrefix         = []byte("- B ")
+	binBytesTypeCompactPrefix  = []byte("- B! ")
+	binHLLTypePrefix           = []byte("- Y ")
+	binHLLTypeCompactPrefix    = []byte("- Y! ")
+	binGeoJSONTypePrefix       = []byte("- G ")
+	binNilTypePrefix           = []byte("- N ")
+	binMapTypePrefix           = []byte("- M ")
+	binMapTypeCompactPrefix    = []byte("- M! ")
+	binListTypePrefix          = []byte("- L ")
+	binListTypeCompactPrefix   = []byte("- L! ")
+	binVectorTypePrefix        = []byte("- V ")
+	binVectorTypeCompactPrefix = []byte("- V! ")
+
+	namespacePrefix     = []byte("+ n ")
+	setPrefix           = []byte("+ s ")
+	digestPrefix        = []byte("+ d ")
+	headerGeneration    = []byte("+ g ")
+	headerExpiration    = []byte("+ t ")
+	headerBinCount      = []byte("+ b ")
+	userKeyIntPrefix    = []byte("+ k I ")
+	userKeyFloatPrefix  = []byte("+ k D ")
+	userKeyStringPrefix = []byte("+ k S ")
+	userKeyBytesPrefix  = []byte("+ k B ")
+	sindexSizeOne       = []byte("1")
 
 	globalSection          = []byte{markerGlobalSection}
 	globalSIndex           = []byte{globalTypeSIndex}

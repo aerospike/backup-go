@@ -22,6 +22,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	errClassTestBinName  = "bin"
+	errClassTestFileName = "test"
+)
+
 func TestErrorClasses_Corrupt(t *testing.T) {
 	t.Parallel()
 
@@ -43,7 +48,7 @@ func TestErrorClasses_Corrupt(t *testing.T) {
 		{
 			name: "malformed number",
 			call: func() error {
-				_, err := readUnsignedInt(newCountingReader(strings.NewReader("12x\n"), "test"), '\n')
+				_, err := readUnsignedInt(newCountingReader(strings.NewReader("12x\n"), errClassTestFileName), '\n')
 				return err
 			},
 		},
@@ -51,8 +56,23 @@ func TestErrorClasses_Corrupt(t *testing.T) {
 			name: "nil raw blob bin",
 			call: func() error {
 				encoder := NewEncoder(testEncoderConfig)
-				_, err := encoder.appendRawBlobBin(nil, "bin", nil, new([32]byte))
+				_, err := encoder.appendRawBlobBin(nil, errClassTestBinName, nil, new([32]byte))
 				return err
+			},
+		},
+		{
+			name: "nil vector bin",
+			call: func() error {
+				encoder := NewEncoder(testEncoderConfig)
+				_, err := encoder.appendVectorBin(nil, errClassTestBinName, nil, new([32]byte))
+				return err
+			},
+		},
+		{
+			name: "invalid vector bin payload",
+			call: func() error {
+				decoder := &Decoder{reader: newCountingReader(strings.NewReader("V! bin 3 123\n"), errClassTestFileName)}
+				return decoder.readBin(make(map[string]any))
 			},
 		},
 	}

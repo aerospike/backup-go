@@ -112,6 +112,7 @@ const (
 	dtTypeMap     = "Map"
 	dtTypeGeoJSON = "GeoJSON"
 	dtTypeHLL     = "HLL"
+	dtTypeVector  = "Vector"
 )
 
 // Bin names.
@@ -125,6 +126,7 @@ const (
 	dtBinMap     = "MapBin"
 	dtBinGeoJSON = "GeoJSONBin"
 	dtBinHLL     = "HLLBin"
+	dtBinVector  = "VectorBin"
 )
 
 // Map keys used by the nested structures.
@@ -187,6 +189,20 @@ const (
 	dtHLLNoMinHash = -1
 )
 
+// Vector generation. The element type rotates per record, so every size class
+// covers all of them.
+const (
+	// dtVectorHeaderSize is the serialized vector header: version, element type
+	// and dimension count.
+	dtVectorHeaderSize = 6
+	// dtVectorElementTypes is the number of vector element types.
+	dtVectorElementTypes = 4
+	// dtFloat16FiniteLimit bounds the magnitude bits of a float16 element below
+	// the all-ones exponent, which encodes NaN and infinity.
+	dtFloat16FiniteLimit = 0x7C00
+	dtFloat16SignBit     = 0x8000
+)
+
 // dtIntValues cycles through the edges of the integer particle.
 var dtIntValues = []int{0, 1, -1, math.MaxInt32, math.MinInt32, math.MaxInt64, math.MinInt64}
 
@@ -232,6 +248,8 @@ type dtSpec struct {
 	writer  dtWriter
 	name    string
 	classes []dtSizeClass
+	// needsVector skips the case on clusters without native vector support.
+	needsVector bool
 }
 
 // testBins is a collection of all supported bin types
@@ -438,6 +456,13 @@ func dtSpecs() []dtSpec {
 			writer:  dtHLLWriter{indexBits: dtHLLMediumIndexBits, minHashBits: dtHLLMediumMinHashBits},
 			classes: []dtSizeClass{dtClassMedium},
 		},
+		{
+			// A vector payload is capped at 256 KiB, so it has no large buckets.
+			name:        dtTypeVector,
+			writer:      dtVectorWriter{},
+			classes:     []dtSizeClass{dtClassSmall, dtClassMedium},
+			needsVector: true,
+		},
 	}
 }
 
@@ -445,6 +470,10 @@ func dtSpecs() []dtSpec {
 // for a single (type, size) pair.
 func dtRunCase(ctx context.Context, t *testing.T, client *a.Client, spec dtSpec, class dtSizeClass) {
 	t.Helper()
+
+	if spec.needsVector && !dtClusterSupportsVector(client) {
+		t.Skip("cluster does not support native vector bins")
+	}
 
 	setName := dtSetName(spec.name, class.name)
 	t.Cleanup(func() {
@@ -667,6 +696,100 @@ func (w dtHLLWriter) Write(client *a.Client, keys []*a.Key, _ int) (map[digestT]
 	return written, nil
 }
 
+// dtVectorWriter writes vector bins. Vector constructors validate their input,
+// so unlike dtGenWriter the generator can fail.
+type dtVectorWriter struct{}
+
+func (dtVectorWriter) Write(client *a.Client, keys []*a.Key, size int) (map[digestT]a.BinMap, error) {
+	policy := dtWritePolicy()
+	written := make(map[digestT]a.BinMap, len(keys))
+
+	for i, key := range keys {
+		vector, err := dtGenVector(size, i)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build vector for %s: %w", key, err)
+		}
+
+		bins := a.BinMap{dtBinVector: vector}
+		if err := client.Put(policy, key, bins); err != nil {
+			return nil, fmt.Errorf("failed to write record %s: %w", key, err)
+		}
+
+		written[string(key.Digest())] = bins
+	}
+
+	return written, nil
+}
+
+// dtGenVector builds a deterministic vector of roughly size bytes. The element
+// type rotates with idx.
+func dtGenVector(size, idx int) (*a.Vector, error) {
+	rnd := rand.New(rand.NewPCG(dtSeed, uint64(idx)))
+	payload := max(1, size-dtVectorHeaderSize)
+
+	var (
+		vector *a.Vector
+		err    a.Error
+	)
+
+	switch idx % dtVectorElementTypes {
+	case 0:
+		elements := make([]uint16, max(1, payload/2))
+		for i := range elements {
+			elements[i] = uint16(rnd.IntN(dtFloat16FiniteLimit))
+			if rnd.IntN(2) == 0 {
+				elements[i] |= dtFloat16SignBit
+			}
+		}
+
+		vector, err = a.NewVectorFloat16Bits(elements)
+	case 1:
+		elements := make([]int32, max(1, payload/4))
+		for i := range elements {
+			elements[i] = int32(rnd.Uint32()) // Wraps to negative values on purpose.
+		}
+
+		vector, err = a.NewVectorInt32(elements)
+	case 2:
+		elements := make([]float32, max(1, payload/4))
+		for i := range elements {
+			elements[i] = float32(rnd.NormFloat64())
+		}
+
+		vector, err = a.NewVectorFloat32(elements)
+	default:
+		elements := make([]float64, max(1, payload/8))
+		for i := range elements {
+			elements[i] = rnd.NormFloat64()
+		}
+
+		vector, err = a.NewVectorFloat64(elements)
+	}
+
+	// Checked separately: a nil a.Error must not become a non-nil error.
+	if err != nil {
+		return nil, err
+	}
+
+	return vector, nil
+}
+
+// dtClusterSupportsVector reports whether every node supports native vectors.
+func dtClusterSupportsVector(client *a.Client) bool {
+	nodes := client.GetNodes()
+	if len(nodes) == 0 {
+		return false
+	}
+
+	for _, node := range nodes {
+		if !node.SupportsVector() {
+			return false
+		}
+	}
+
+	return true
+}
+
 func dtGenInt(_, idx int) a.BinMap {
 	return a.BinMap{dtBinInt: dtIntValues[idx%len(dtIntValues)]}
 }
@@ -843,6 +966,12 @@ func dtDescribe(value any) string {
 		return fmt.Sprintf("a.HLLValue(len=%d)", len(v))
 	case a.GeoJSONValue:
 		return fmt.Sprintf("a.GeoJSONValue(len=%d)", len(v))
+	case *a.Vector:
+		if v == nil {
+			return "*a.Vector(nil)"
+		}
+
+		return fmt.Sprintf("*a.Vector(type=%s, dimensions=%d)", v.ElementType(), v.Dimensions())
 	case []any:
 		return fmt.Sprintf("[]any(len=%d)", len(v))
 	case map[any]any:

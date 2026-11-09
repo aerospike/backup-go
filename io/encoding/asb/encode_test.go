@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -425,6 +426,16 @@ func encoderTestKey(t *testing.T) *a.Key {
 	return key
 }
 
+// newTestVector returns a small float32 vector used by encoder and decoder tests.
+func newTestVector(t *testing.T) *a.Vector {
+	t.Helper()
+
+	vector, err := a.NewVectorFloat32([]float32{1.5, -2, 3.25})
+	require.NoError(t, err)
+
+	return vector
+}
+
 func encoderTestRecordPrefix(key *a.Key, generation uint32, voidTime int64, binCount int) string {
 	return fmt.Sprintf("+ k S 3 key\n+ n test\n+ d %s\n+ s demo\n+ g %d\n+ t %d\n+ b %d\n",
 		base64Encode(key.Digest()), generation, voidTime, binCount)
@@ -638,6 +649,8 @@ func TestAppendRecordBins(t *testing.T) {
 	geoJSONStr := `{"type": "Polygon", "coordinates": [[[0,0], [0, 10], [10, 10], [0,0]]]}`
 	key := encoderTestKey(t)
 	prefix := encoderTestRecordPrefix(key, 1, 2, 1)
+	vector := newTestVector(t)
+	vectorBase64 := base64.StdEncoding.EncodeToString(vector.Bytes())
 
 	tests := []struct {
 		name    string
@@ -705,6 +718,11 @@ func TestAppendRecordBins(t *testing.T) {
 				base64.StdEncoding.EncodeToString([]byte("123"))),
 		},
 		{
+			name: "vector bin", binName: "binName", binVal: vector,
+			want: fmt.Appendf(nil, "- V binName %d %s\n", len(vectorBase64), vectorBase64),
+		},
+		{name: "nil vector bin", binName: "binName", binVal: (*a.Vector)(nil), wantErr: true},
+		{
 			name: "invalid raw blob particle type", binName: "binName",
 			binVal: &a.RawBlobValue{ParticleType: particleType.NULL}, wantErr: true,
 		},
@@ -744,6 +762,8 @@ func TestAppendRecordCompactBins(t *testing.T) {
 
 	key := encoderTestKey(t)
 	prefix := encoderTestRecordPrefix(key, 1, 2, 1)
+	vector := newTestVector(t)
+	vectorBytes := vector.Bytes()
 
 	tests := []struct {
 		name    string
@@ -762,6 +782,10 @@ func TestAppendRecordCompactBins(t *testing.T) {
 			name: "compact list", binName: "binName",
 			binVal: &a.RawBlobValue{ParticleType: particleType.LIST, Data: []byte("hello")},
 			want:   []byte("- L! binName 5 hello\n"),
+		},
+		{
+			name: "compact vector", binName: "binName", binVal: vector,
+			want: slices.Concat(fmt.Appendf(nil, "- V! binName %d ", len(vectorBytes)), vectorBytes, []byte("\n")),
 		},
 	}
 

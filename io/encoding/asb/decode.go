@@ -808,6 +808,7 @@ var bytesBinTypes = map[byte]struct{}{
 	binTypeBytesHLL:    {},
 	binTypeBytesMap:    {},
 	binTypeBytesList:   {},
+	binTypeVector:      {},
 }
 
 // these are types that are stored as msgPack encoded bytes
@@ -836,6 +837,7 @@ var binTypes = map[byte]struct{}{
 	binTypeBytesHLL:  {},
 	binTypeBytesMap:  {},
 	binTypeBytesList: {},
+	binTypeVector:    {},
 	// end bytes types
 	binTypeLDT:          {},
 	binTypeStringBase64: {},
@@ -955,6 +957,11 @@ func fetchBinValue(r *Decoder, binType byte, base64Encoded bool) (any, error) {
 
 	if err != nil {
 		return nil, err
+	}
+
+	// Vector is not msgpack, it has its own binary format.
+	if binType == binTypeVector {
+		return decodeVector(val)
 	}
 
 	if _, ok := isMsgPackBytes[binType]; !ok {
@@ -1215,6 +1222,20 @@ func decodeBase64(src []byte) ([]byte, error) {
 	return buf[:bw], nil
 }
 
+// decodeVector builds a vector from its serialized bytes.
+//
+// TODO: val is already a fresh allocation, but a.NewVectorFromBytes copies it
+// once more. Drop the extra copy once the client team adds a constructor that
+// takes ownership of the slice.
+func decodeVector(val []byte) (*a.Vector, error) {
+	v, err := a.NewVectorFromBytes(val)
+	if err != nil {
+		return nil, fmt.Errorf("%w: failed to decode vector bin: %w", errclass.ErrCorruptData, err)
+	}
+
+	return v, nil
+}
+
 func readStringSized(src *countingReader, sizeDelim byte) (string, error) {
 	val, err := readBytesSized(src, sizeDelim)
 	if err != nil {
@@ -1269,15 +1290,6 @@ func readGeoJSON(src *countingReader, sizeDelim byte) (a.GeoJSONValue, error) {
 	}
 
 	return a.NewGeoJSONValue(val), nil
-}
-
-func readHLL(src *countingReader, sizeDelim byte) (a.HLLValue, error) {
-	data, err := readBytesSized(src, sizeDelim)
-	if err != nil {
-		return nil, err
-	}
-
-	return a.NewHLLValue(data), nil
 }
 
 func readUntilEscaped(src *countingReader, delim byte) (string, error) {

@@ -296,6 +296,8 @@ func (e *Encoder) appendRecordBin(dst []byte, name string, value any, number *[3
 		return appendStringBin(dst, binGeoJSONTypePrefix, name, string(value), number), nil
 	case *a.RawBlobValue:
 		return e.appendRawBlobBin(dst, name, value, number)
+	case *a.Vector:
+		return e.appendVectorBin(dst, name, value, number)
 	case nil:
 		return appendBinName(dst, binNilTypePrefix, name, '\n'), nil
 	default:
@@ -335,6 +337,23 @@ func appendBase64Bin(dst, prefix []byte, name string, value []byte, number *[32]
 	dst = appendBase64(dst, value)
 
 	return append(dst, '\n')
+}
+
+// appendVectorBin appends a vector bin.
+//
+// TODO: Vector.Bytes allocates a copy of the serialized vector for every bin.
+// Switch to the zero-copy accessor (WireBytes or AppendBytes) once the client
+// team adds it.
+func (e *Encoder) appendVectorBin(dst []byte, name string, value *a.Vector, number *[32]byte) ([]byte, error) {
+	if value == nil {
+		return dst, fmt.Errorf("%w: vector bin %q is nil", errclass.ErrCorruptData, name)
+	}
+
+	if e.config.Compact {
+		return appendRawBin(dst, binVectorTypeCompactPrefix, name, value.Bytes(), number), nil
+	}
+
+	return appendBase64Bin(dst, binVectorTypePrefix, name, value.Bytes(), number), nil
 }
 
 func (e *Encoder) appendRawBlobBin(

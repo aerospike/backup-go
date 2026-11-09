@@ -117,7 +117,7 @@ func drawBins(t *rapid.T) a.BinMap {
 func drawBinValue(t *rapid.T) any {
 	t.Helper()
 
-	switch rapid.IntRange(0, 13).Draw(t, "binKind") {
+	switch rapid.IntRange(0, 15).Draw(t, "binKind") {
 	case 0:
 		return nil
 	case 1:
@@ -147,12 +147,47 @@ func drawBinValue(t *rapid.T) any {
 			ParticleType: particleType.MAP,
 			Data:         drawBytes(t, "mapBin", 256),
 		}
-	default:
+	case 13:
 		return &a.RawBlobValue{
 			ParticleType: particleType.LIST,
 			Data:         drawBytes(t, "listBin", 256),
 		}
+	case 14:
+		return drawVectorInt32(t)
+	default:
+		return drawVectorFloat64(t)
 	}
+}
+
+func drawVectorInt32(t *rapid.T) *a.Vector {
+	t.Helper()
+
+	elements := rapid.SliceOfN(rapid.Int32(), 1, 256).Draw(t, "vectorInt32Bin")
+
+	vector, err := a.NewVectorInt32(elements)
+	if err != nil {
+		t.Fatalf("failed to create int32 vector: %v", err)
+	}
+
+	return vector
+}
+
+func drawVectorFloat64(t *rapid.T) *a.Vector {
+	t.Helper()
+
+	count := rapid.IntRange(1, 256).Draw(t, "vectorFloat64Count")
+	elements := make([]float64, count)
+
+	for i := range elements {
+		elements[i] = drawFiniteFloat(t, "vectorFloat64Element")
+	}
+
+	vector, err := a.NewVectorFloat64(elements)
+	if err != nil {
+		t.Fatalf("failed to create float64 vector: %v", err)
+	}
+
+	return vector
 }
 
 func drawASBString(t *rapid.T, label string) string {

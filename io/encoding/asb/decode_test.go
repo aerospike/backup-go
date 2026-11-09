@@ -632,6 +632,10 @@ func TestASBReader_readUDF(t *testing.T) {
 func TestASBReader_readBin(t *testing.T) {
 	t.Parallel()
 
+	testVector := newTestVector(t)
+	testVectorBytes := testVector.Bytes()
+	testVectorBase64 := base64.StdEncoding.EncodeToString(testVectorBytes)
+
 	type fields struct {
 		header   *header
 		metaData *metaData
@@ -1029,6 +1033,56 @@ func TestASBReader_readBin(t *testing.T) {
 			fields: fields{
 				reader: newTestCountingReader(fmt.Sprintf("M map-bin %d %s\n",
 					500, "abcd")),
+			},
+			want:    map[string]any{},
+			wantErr: true,
+		},
+		{
+			name: "positive vector bin",
+			fields: fields{
+				reader: newTestCountingReader(fmt.Sprintf("V vector-bin %d %s\n",
+					len(testVectorBase64), testVectorBase64)),
+			},
+			want: map[string]any{
+				"vector-bin": testVector,
+			},
+			wantErr: false,
+		},
+		{
+			name: "positive plain text vector bin",
+			fields: fields{
+				reader: newTestCountingReader(fmt.Sprintf("V! vector-bin %d %s\n",
+					len(testVectorBytes), testVectorBytes)),
+			},
+			want: map[string]any{
+				"vector-bin": testVector,
+			},
+			wantErr: false,
+		},
+		{
+			name: "negative vector bin bad size",
+			fields: fields{
+				reader: newTestCountingReader(fmt.Sprintf("V vector-bin %d %s\n",
+					500, testVectorBase64)),
+			},
+			want:    map[string]any{},
+			wantErr: true,
+		},
+		{
+			name: "negative vector bin invalid payload",
+			fields: fields{
+				reader: newTestCountingReader(fmt.Sprintf("V vector-bin %d %s\n",
+					len(base64.StdEncoding.EncodeToString([]byte("123"))),
+					base64.StdEncoding.EncodeToString([]byte("123")))),
+			},
+			want:    map[string]any{},
+			wantErr: true,
+		},
+		{
+			name: "negative plain text vector bin truncated header",
+			fields: fields{
+				reader: newTestCountingReader(fmt.Sprintf("V! vector-bin %d %s\n",
+					3, testVectorBytes[:3])),
 			},
 			want:    map[string]any{},
 			wantErr: true,
@@ -3174,54 +3228,6 @@ func TestReadGeoJSON(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("readGeoJSON() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestReadHLL(t *testing.T) {
-	t.Parallel()
-	type args struct {
-		src       *countingReader
-		sizeDelim byte
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    a.HLLValue
-		wantErr bool
-	}{
-		{
-			name: "positive hll",
-			args: args{
-				src: newTestCountingReader("6 string"),
-
-				sizeDelim: ' ',
-			},
-			want:    a.NewHLLValue([]byte("string")),
-			wantErr: false,
-		},
-		{
-			name: "negative bad size",
-			args: args{
-				src: newTestCountingReader("notanint string"),
-
-				sizeDelim: ' ',
-			},
-			want:    nil,
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got, err := readHLL(tt.args.src, tt.args.sizeDelim)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readHLL() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("readHLL() = %v, want %v", got, tt.want)
 			}
 		})
 	}

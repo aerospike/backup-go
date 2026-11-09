@@ -164,6 +164,12 @@ type Decoder struct {
 	// If set to true, unknown global/record types will be ignored and the decoder will continue to read the next line.
 	ignoreUnknownFields bool
 	logger              *slog.Logger
+
+	// Reusable buffers for vector bins. a.NewVectorFromBytes copies its input,
+	// so a decoded vector never references them and they are reused for the
+	// next vector bin instead of allocating new garbage per bin.
+	vectorRaw     []byte
+	vectorDecoded []byte
 }
 
 // NewDecoder creates a new Decoder.
@@ -938,6 +944,8 @@ func fetchBinValue(r *Decoder, binType byte, base64Encoded bool) (any, error) {
 		return string(val), nil
 	case binTypeGeoJSON:
 		return readGeoJSON(r.reader, ' ')
+	case binTypeVector:
+		return r.readVector(base64Encoded)
 	}
 
 	if _, ok := bytesBinTypes[binType]; !ok {
@@ -957,11 +965,6 @@ func fetchBinValue(r *Decoder, binType byte, base64Encoded bool) (any, error) {
 
 	if err != nil {
 		return nil, err
-	}
-
-	// Vector is not msgpack, it has its own binary format.
-	if binType == binTypeVector {
-		return decodeVector(val)
 	}
 
 	if _, ok := isMsgPackBytes[binType]; !ok {
@@ -1222,11 +1225,61 @@ func decodeBase64(src []byte) ([]byte, error) {
 	return buf[:bw], nil
 }
 
-// decodeVector builds a vector from its serialized bytes.
-//
-// TODO: val is already a fresh allocation, but a.NewVectorFromBytes copies it
-// once more. Drop the extra copy once the client team adds a constructor that
-// takes ownership of the slice.
+const (
+	// vectorMaxWireSize is the largest serialized vector the server accepts:
+	// a 6-byte header plus at most 256 KiB of elements. It mirrors the
+	// unexported limits of the Aerospike client.
+	vectorMaxWireSize = 6 + 256*1024
+	// vectorMaxBase64Size is the base64 (padded) length of vectorMaxWireSize bytes.
+	vectorMaxBase64Size = (vectorMaxWireSize + 2) / 3 * 4
+)
+
+// readVector reads a vector bin value. The raw (and base64-decoded) bytes go
+// into the decoder's reusable buffers, and a.NewVectorFromBytes makes the only
+// copy, which the returned vector owns.
+func (r *Decoder) readVector(base64Encoded bool) (*a.Vector, error) {
+	maxLen := vectorMaxWireSize
+	if base64Encoded {
+		maxLen = vectorMaxBase64Size
+	}
+
+	raw, err := readBytesSizedInto(r.reader, ' ', r.vectorRaw, maxLen)
+	if err != nil {
+		return nil, err
+	}
+
+	r.vectorRaw = raw
+
+	if !base64Encoded {
+		return decodeVector(raw)
+	}
+
+	r.vectorDecoded, err = decodeBase64Into(r.vectorDecoded, raw)
+	if err != nil {
+		return nil, fmt.Errorf("%w: failed to decode vector bin base64: %w", errclass.ErrCorruptData, err)
+	}
+
+	return decodeVector(r.vectorDecoded)
+}
+
+// decodeBase64Into decodes src into dst, growing dst only if its capacity is
+// too small, and returns the decoded bytes.
+func decodeBase64Into(dst, src []byte) ([]byte, error) {
+	decodedLen := base64.StdEncoding.DecodedLen(len(src))
+	if cap(dst) < decodedLen {
+		dst = make([]byte, decodedLen)
+	}
+
+	bw, err := base64.StdEncoding.Decode(dst[:decodedLen], src)
+	if err != nil {
+		return nil, err
+	}
+
+	return dst[:bw], nil
+}
+
+// decodeVector builds a vector from its serialized bytes. The bytes are
+// copied, so val may be reused after the call.
 func decodeVector(val []byte) (*a.Vector, error) {
 	v, err := a.NewVectorFromBytes(val)
 	if err != nil {
@@ -1256,6 +1309,38 @@ func readBytesSized(src *countingReader, sizeDelim byte) ([]byte, error) {
 	}
 
 	return readNBytes(src, int64(length))
+}
+
+// readBytesSizedInto works like readBytesSized, but reads into buf, growing it
+// only if its capacity is too small. The result is valid until buf is reused.
+// A size above maxLen is rejected before any allocation, so corrupt data can't
+// make the caller keep a huge buffer.
+func readBytesSizedInto(src *countingReader, sizeDelim byte, buf []byte, maxLen int) ([]byte, error) {
+	length, err := readUnsignedInt(src, sizeDelim)
+	if err != nil {
+		return nil, err
+	}
+
+	n := int(length)
+	if n > maxLen {
+		return nil, fmt.Errorf("%w: value size %d exceeds max %d", errclass.ErrCorruptData, n, maxLen)
+	}
+
+	if err := expectChar(src, sizeDelim); err != nil {
+		return nil, err
+	}
+
+	if cap(buf) < n {
+		buf = make([]byte, n)
+	}
+
+	buf = buf[:n]
+
+	if err := readFull(src, buf); err != nil {
+		return nil, err
+	}
+
+	return buf, nil
 }
 
 func readBool(src *countingReader) (bool, error) {
@@ -1425,10 +1510,20 @@ func readUntilAnyEscaped(src *countingReader, delims []byte) ([]byte, error) {
 func readNBytes(src *countingReader, n int64) ([]byte, error) {
 	buf := make([]byte, n)
 
-	_, err := io.ReadFull(src, buf)
-	if err != nil {
+	if err := readFull(src, buf); err != nil {
 		return nil, err
 	}
+
+	return buf, nil
+}
+
+// readFull fills buf from src and updates the position tracker.
+func readFull(src *countingReader, buf []byte) error {
+	if _, err := io.ReadFull(src, buf); err != nil {
+		return err
+	}
+
+	n := int64(len(buf))
 
 	// Increase global offset.
 	src.tracker.offset += uint64(n)
@@ -1452,7 +1547,7 @@ func readNBytes(src *countingReader, n int64) ([]byte, error) {
 		src.tracker.prevByte = buf[n-1]
 	}
 
-	return buf, nil
+	return nil
 }
 
 func expectChar(src *countingReader, c byte) error {

@@ -50,6 +50,7 @@ func TestClient_GetSIndexes(t *testing.T) {
 
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
+	t.Cleanup(client.Close)
 
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
@@ -65,6 +66,7 @@ func TestClient_GetUDFs(t *testing.T) {
 
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
+	t.Cleanup(client.Close)
 
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
@@ -80,6 +82,7 @@ func TestClient_GetRecordCount(t *testing.T) {
 
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
+	t.Cleanup(client.Close)
 
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
@@ -95,6 +98,7 @@ func TestClient_GetSets(t *testing.T) {
 
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
+	t.Cleanup(client.Close)
 
 	wp := a.NewWritePolicy(0, 0)
 	k, aerr := a.NewKey(testASNamespace, testSetInfo, "get-sets")
@@ -119,6 +123,7 @@ func TestClient_getRackNodes(t *testing.T) {
 
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
+	t.Cleanup(client.Close)
 
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
@@ -136,6 +141,7 @@ func TestClient_getService(t *testing.T) {
 
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
+	t.Cleanup(client.Close)
 
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
@@ -151,6 +157,7 @@ func TestClient_GetNamespacesList(t *testing.T) {
 
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
+	t.Cleanup(client.Close)
 
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
@@ -168,6 +175,7 @@ func TestClient_GetStatus(t *testing.T) {
 
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
+	t.Cleanup(client.Close)
 
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
@@ -183,6 +191,7 @@ func TestClient_GetStatus(t *testing.T) {
 func TestClient_GetReplicas(t *testing.T) {
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
+	t.Cleanup(client.Close)
 
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
@@ -200,6 +209,7 @@ func TestClient_GetReplicas(t *testing.T) {
 func TestClient_GetPendingMigrations(t *testing.T) {
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
+	t.Cleanup(client.Close)
 
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
@@ -245,6 +255,7 @@ func TestClient_getStatistics(t *testing.T) {
 
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
+	t.Cleanup(client.Close)
 
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
@@ -258,6 +269,7 @@ func TestClient_getPrincipal(t *testing.T) {
 
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
+	t.Cleanup(client.Close)
 
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)
@@ -271,6 +283,9 @@ func TestClient_SupportsFeature(t *testing.T) {
 
 	client, aerr := newAerospikeClient()
 	require.NoError(t, aerr)
+	// Parallel subtests run after this function returns. Without this cleanup the
+	// client becomes unreachable, and its GC finalizer closes the shared cluster.
+	t.Cleanup(client.Close)
 
 	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
 	require.NoError(t, err)

@@ -339,21 +339,57 @@ func appendBase64Bin(dst, prefix []byte, name string, value []byte, number *[32]
 	return append(dst, '\n')
 }
 
-// appendVectorBin appends a vector bin.
-//
-// TODO: Vector.Bytes allocates a copy of the serialized vector for every bin.
-// Switch to the zero-copy accessor (WireBytes or AppendBytes) once the client
-// team adds it.
+// vectorBufPool holds buffers for serialized vectors in base64 mode. Base64
+// encoding needs a separate source, so the vector can't be appended straight
+// to dst. A pool is used because the Encoder is shared by parallel writers.
+var vectorBufPool = sync.Pool{
+	New: func() any { return new([]byte) },
+}
+
+// appendVectorBin appends a vector bin using Vector.AppendBytes, so no
+// per-bin garbage is produced.
 func (e *Encoder) appendVectorBin(dst []byte, name string, value *a.Vector, number *[32]byte) ([]byte, error) {
 	if value == nil {
 		return dst, fmt.Errorf("%w: vector bin %q is nil", errclass.ErrCorruptData, name)
 	}
 
 	if e.config.Compact {
-		return appendRawBin(dst, binVectorTypeCompactPrefix, name, value.Bytes(), number), nil
+		return appendVectorCompactBin(dst, name, value, number), nil
 	}
 
-	return appendBase64Bin(dst, binVectorTypePrefix, name, value.Bytes(), number), nil
+	bufPtr, ok := vectorBufPool.Get().(*[]byte)
+	if !ok {
+		bufPtr = new([]byte)
+	}
+
+	wire := value.AppendBytes((*bufPtr)[:0])
+	dst = appendBase64Bin(dst, binVectorTypePrefix, name, wire, number)
+
+	*bufPtr = wire
+	vectorBufPool.Put(bufPtr)
+
+	return dst, nil
+}
+
+// appendVectorCompactBin appends a compact vector bin without a temporary
+// buffer. The vector length is unknown until it is serialized, so the vector
+// is appended first and then moved right to make room for "<length> ".
+func appendVectorCompactBin(dst []byte, name string, value *a.Vector, number *[32]byte) []byte {
+	dst = appendBinName(dst, binVectorTypeCompactPrefix, name, ' ')
+
+	start := len(dst)
+	dst = value.AppendBytes(dst)
+	n := len(dst) - start
+
+	size := strconv.AppendInt(number[:0], int64(n), 10)
+	size = append(size, ' ')
+
+	// Grow dst by len(size), then shift the vector and put the size before it.
+	dst = append(dst, size...)
+	copy(dst[start+len(size):], dst[start:start+n])
+	copy(dst[start:], size)
+
+	return append(dst, '\n')
 }
 
 func (e *Encoder) appendRawBlobBin(

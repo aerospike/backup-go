@@ -44,8 +44,8 @@ github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapp
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.60.0/go.mod h1:SRAbhyZ4R4FagHMM9VtRgSY/lheRoht2fKelZXQUenk=
 github.com/Masterminds/semver/v3 v3.5.0 h1:kQceYJfbupGfZOKZQg0kou0DgAKhzDg2NZPAwZ/2OOE=
 github.com/Masterminds/semver/v3 v3.5.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
-github.com/aerospike/aerospike-client-go/v8 v8.7.1-0.20261107064708-7964d227a53c h1:UK7uFUksZ0tRyWgSsc3T1azdETj9/U+iAozb9mwn7J4=
-github.com/aerospike/aerospike-client-go/v8 v8.7.1-0.20261107064708-7964d227a53c/go.mod h1:IKvSwuSLrLdcRRya70ZevcyF3ZDow5I6jAwhBLrEN8o=
+github.com/aerospike/aerospike-client-go/v8 v8.7.1-0.20261110064555-84a669469ea5 h1:vrc+A9ej1daNDpgDFWv/pIpJ3ZOmGE7WsxRqKwuT0Fk=
+github.com/aerospike/aerospike-client-go/v8 v8.7.1-0.20261110064555-84a669469ea5/go.mod h1:IKvSwuSLrLdcRRya70ZevcyF3ZDow5I6jAwhBLrEN8o=
 github.com/andybalholm/brotli v1.2.2 h1:HzTuoo2ErYQqf5qvcJInB8uvqSVxRttzkFexPWtnceM=
 github.com/andybalholm/brotli v1.2.2/go.mod h1:rzTDkvFWvIrjDXZHkuS16NPggd91W3kUSvPlQ1pLaKY=
 github.com/apache/arrow-go/v18 v18.7.0 h1:Vw/i+cJyebUofT7JlqFpe65LrmwxULn166jjwStM4HY=

@@ -158,7 +158,13 @@ func newBackupHandler(
 		}
 	}
 
-	encoder := NewEncoder(config.Namespace, config.Compact, sIndexInfo)
+	hasVectorDataType, err := infoClient.SupportsVectorDataType(base.ctx)
+	if err != nil {
+		base.cancel()
+		return nil, fmt.Errorf("failed to check vector data type support: %w", err)
+	}
+
+	encoder := NewEncoder(config.Namespace, config.Compact, hasVectorDataType, sIndexInfo)
 
 	stats := models.NewBackupStats()
 

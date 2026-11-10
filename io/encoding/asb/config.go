@@ -27,29 +27,44 @@ type EncoderConfig struct {
 	HasExpressionSIndex bool
 	// HasSetSIndex indicates whether the backup contains a set SIndex.
 	HasSetSIndex bool
+	// HasVectorDataType indicates whether the database supports the vector data type.
+	// In that case the records file version is bumped.
+	HasVectorDataType bool
 }
 
 // NewEncoderConfig returns a new encoder EncoderConfig.
-func NewEncoderConfig(namespace string, compact bool, sIndexInfo models.SIndexInfo) *EncoderConfig {
+func NewEncoderConfig(
+	namespace string, compact, hasVectorDataType bool, sIndexInfo models.SIndexInfo,
+) *EncoderConfig {
 	c := &EncoderConfig{
 		Namespace:           namespace,
 		Compact:             compact,
 		HasExpressionSIndex: sIndexInfo.HasExpression,
 		HasSetSIndex:        sIndexInfo.HasSet,
+		HasVectorDataType:   hasVectorDataType,
 	}
 
 	return c
 }
 
-// getVersion resolves version depending on the config.
-func (c *EncoderConfig) getVersion() *version {
-	if c.HasSetSIndex {
+// getMetadataVersion resolves the ASB version of a metadata file depending on the config.
+func (c *EncoderConfig) getMetadataVersion() *version {
+	switch {
+	case c.HasSetSIndex:
 		return version33
-	}
-
-	if c.HasExpressionSIndex {
+	case c.HasExpressionSIndex:
 		return version32
+	default:
+		return version31
 	}
+}
 
-	return version31
+// getRecordsVersion resolves the ASB version of a records file depending on the config.
+func (c *EncoderConfig) getRecordsVersion() *version {
+	switch {
+	case c.HasVectorDataType:
+		return version34
+	default:
+		return version31
+	}
 }

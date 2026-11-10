@@ -17,12 +17,14 @@
 package asinfo
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"testing"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/models"
+	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
 	"github.com/stretchr/testify/require"
 )
 
@@ -262,4 +264,46 @@ func TestClient_getPrincipal(t *testing.T) {
 
 	_, err = ic.getPrincipalName()
 	require.NoError(t, err)
+}
+
+func TestClient_SupportsFeature(t *testing.T) {
+	t.Parallel()
+
+	client, aerr := newAerospikeClient()
+	require.NoError(t, aerr)
+
+	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
+	require.NoError(t, err)
+
+	ctx := t.Context()
+
+	version, err := ic.GetVersion(ctx)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name       string
+		check      func(context.Context) (bool, error)
+		minVersion infomodels.AerospikeVersion
+	}{
+		{
+			name:       "batch write",
+			check:      ic.SupportsBatchWrite,
+			minVersion: infomodels.AerospikeVersionSupportsBatchWrites,
+		},
+		{
+			name:       "vector data type",
+			check:      ic.SupportsVectorDataType,
+			minVersion: infomodels.AerospikeVersionSupportsVectorDataType,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := tt.check(t.Context())
+			require.NoError(t, err)
+			require.Equal(t, version.IsGreaterOrEqual(tt.minVersion), got)
+		})
+	}
 }

@@ -44,7 +44,7 @@ const (
 func testASBPayload(t *testing.T, n int) []byte {
 	t.Helper()
 
-	encoder := NewEncoder(testPayloadNamespace, false, models.SIndexInfo{})
+	encoder := NewEncoder(testPayloadNamespace, false, false, models.SIndexInfo{})
 
 	var payload bytes.Buffer
 

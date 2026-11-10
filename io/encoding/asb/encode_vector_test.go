@@ -63,7 +63,7 @@ func TestAppendVectorBinReusesBuffers(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			encoder := NewEncoder(NewEncoderConfig("test", tt.compact, models.SIndexInfo{}))
+			encoder := NewEncoder(NewEncoderConfig("test", tt.compact, true, models.SIndexInfo{}))
 
 			var number [32]byte
 

@@ -30,9 +30,12 @@ var (
 	version32 = newVersion(3, 2)
 	// version33 is the version of the ASB format with set Sindex support.
 	version33 = newVersion(3, 3)
+	// version34 is the version of the ASB format with vector data type support.
+	// Should be used only for records files.
+	version34 = newVersion(3, 4)
 
 	// Current supported version for decoding.
-	versionCurrent = version33
+	versionCurrent = version34
 )
 
 // version represents protocol version in format major.minor

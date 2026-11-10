@@ -33,8 +33,8 @@ type Encoder interface {
 }
 
 // NewEncoder returns a new ASB encoder.
-func NewEncoder(namespace string, compact bool, sIndexInfo models.SIndexInfo) Encoder {
-	cfg := asb.NewEncoderConfig(namespace, compact, sIndexInfo)
+func NewEncoder(namespace string, compact, hasVectorDataType bool, sIndexInfo models.SIndexInfo) Encoder {
+	cfg := asb.NewEncoderConfig(namespace, compact, hasVectorDataType, sIndexInfo)
 	return asb.NewEncoder(cfg)
 }
 

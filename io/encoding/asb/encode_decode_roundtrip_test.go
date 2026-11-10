@@ -210,7 +210,7 @@ func encodeDecodeRecords(t *testing.T, compact bool, tokens ...*models.Token) []
 }
 
 func roundTripEncodeDecode(compact bool, tokens ...*models.Token) ([]*models.Record, error) {
-	encoder := NewEncoder(NewEncoderConfig("test", compact, models.SIndexInfo{}))
+	encoder := NewEncoder(NewEncoderConfig("test", compact, true, models.SIndexInfo{}))
 
 	var payload bytes.Buffer
 	if _, err := payload.Write(encoder.GetHeader(true)); err != nil {

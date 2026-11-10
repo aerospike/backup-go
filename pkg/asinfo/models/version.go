@@ -38,6 +38,8 @@ var (
 
 	// AerospikeVersionSupportsIntegratedBackup TODO: change this, after server release.
 	AerospikeVersionSupportsIntegratedBackup = AerospikeVersion{8, 1, 0}
+	// AerospikeVersionSupportsVectorDataType version with vector support.
+	AerospikeVersionSupportsVectorDataType = AerospikeVersion{8, 1, 0}
 )
 
 // String returns the string representation of the version.

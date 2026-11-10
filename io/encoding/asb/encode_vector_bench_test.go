@@ -60,8 +60,8 @@ var vectorEncodeApproaches = []vectorEncodeApproach{
 // vectorBenchEncoders returns encoders for the base64 and compact modes.
 func vectorBenchEncoders() map[string]*Encoder {
 	return map[string]*Encoder{
-		benchVectorBase64:  NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{})),
-		benchVectorCompact: NewEncoder(NewEncoderConfig("test", true, models.SIndexInfo{})),
+		benchVectorBase64:  NewEncoder(NewEncoderConfig("test", false, false, models.SIndexInfo{})),
+		benchVectorCompact: NewEncoder(NewEncoderConfig("test", true, false, models.SIndexInfo{})),
 	}
 }
 

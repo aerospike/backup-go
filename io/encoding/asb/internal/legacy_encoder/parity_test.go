@@ -147,7 +147,7 @@ func TestRecordEncoderPreservesPartialOutputOnError(t *testing.T) {
 	legacyBuf := bytes.NewBufferString("existing:")
 	legacyN, legacyErr := legacy_encoder.RecordToASB(false, record, legacyBuf)
 
-	encoder := asb.NewEncoder(asb.NewEncoderConfig("test", false, models.SIndexInfo{}))
+	encoder := asb.NewEncoder(asb.NewEncoderConfig("test", false, false, models.SIndexInfo{}))
 	token := &models.Token{Type: models.TokenTypeRecord, Record: record}
 	currentOut, currentErr := encoder.EncodeToken(token, []byte("existing:"))
 
@@ -182,7 +182,7 @@ func TestRecordEncoderMetadataCacheHandlesNamespaceAndSetChanges(t *testing.T) {
 		recordEncoderFixture(keyA, a.BinMap{"value": 3}, 3, 30),
 	}
 
-	encoder := asb.NewEncoder(asb.NewEncoderConfig("test", false, models.SIndexInfo{}))
+	encoder := asb.NewEncoder(asb.NewEncoderConfig("test", false, false, models.SIndexInfo{}))
 	for _, record := range records {
 		legacy := &bytes.Buffer{}
 		if _, err := legacy_encoder.RecordToASB(false, record, legacy); err != nil {
@@ -212,7 +212,7 @@ func TestEncodeTokenRecordMatchesLegacy(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			cfg := asb.NewEncoderConfig("test", workload.compact, models.SIndexInfo{})
+			cfg := asb.NewEncoderConfig("test", workload.compact, false, models.SIndexInfo{})
 			encoder := asb.NewEncoder(cfg)
 			token := &models.Token{Type: models.TokenTypeRecord, Record: workload.record}
 
@@ -229,7 +229,7 @@ func TestEncodeTokenRecordMatchesLegacy(t *testing.T) {
 func TestEncodeTokenRecordParity(t *testing.T) {
 	t.Parallel()
 
-	encoder := asb.NewEncoder(asb.NewEncoderConfig("test", false, models.SIndexInfo{}))
+	encoder := asb.NewEncoder(asb.NewEncoderConfig("test", false, false, models.SIndexInfo{}))
 
 	key, keyErr := a.NewKey("test", "demo", "1234")
 	if keyErr != nil {
@@ -283,7 +283,7 @@ func assertRecordEncoderMatchesLegacy(t *testing.T, workload recordEncoderWorklo
 	legacy := &bytes.Buffer{}
 	legacyN, legacyErr := legacy_encoder.RecordToASB(workload.compact, workload.record, legacy)
 
-	encoder := asb.NewEncoder(asb.NewEncoderConfig("test", workload.compact, models.SIndexInfo{}))
+	encoder := asb.NewEncoder(asb.NewEncoderConfig("test", workload.compact, false, models.SIndexInfo{}))
 	token := &models.Token{Type: models.TokenTypeRecord, Record: workload.record}
 	currentOut, currentErr := encoder.EncodeToken(token, nil)
 
@@ -327,7 +327,7 @@ func benchmarkLegacyRecordEncoder(b *testing.B, workload recordEncoderWorkload) 
 func benchmarkEncodeTokenRecord(b *testing.B, workload recordEncoderWorkload) {
 	b.Helper()
 	b.ReportAllocs()
-	cfg := asb.NewEncoderConfig("test", workload.compact, models.SIndexInfo{})
+	cfg := asb.NewEncoderConfig("test", workload.compact, false, models.SIndexInfo{})
 	encoder := asb.NewEncoder(cfg)
 	token := &models.Token{Type: models.TokenTypeRecord, Record: workload.record}
 	out := make([]byte, 0, 4096)

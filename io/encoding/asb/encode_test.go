@@ -29,10 +29,11 @@ import (
 	particleType "github.com/aerospike/aerospike-client-go/v8/types/particle_type"
 	"github.com/aerospike/backup-go/models"
 	"github.com/segmentio/asm/base64"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var testEncoderConfig = NewEncoderConfig("test", false, models.SIndexInfo{})
+var testEncoderConfig = NewEncoderConfig("test", false, false, models.SIndexInfo{})
 
 func TestEncodeTokenUDF(t *testing.T) {
 	t.Parallel()
@@ -444,7 +445,7 @@ func encoderTestRecordPrefix(key *a.Key, generation uint32, voidTime int64, binC
 func encodeTestRecord(t *testing.T, compact bool, record *models.Record) ([]byte, error) {
 	t.Helper()
 
-	encoder := NewEncoder(NewEncoderConfig("test", compact, models.SIndexInfo{}))
+	encoder := NewEncoder(NewEncoderConfig("test", compact, false, models.SIndexInfo{}))
 
 	return encoder.appendRecord(nil, record)
 }
@@ -558,7 +559,7 @@ func TestAppendRecordKey(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
+			encoder := NewEncoder(NewEncoderConfig("test", false, false, models.SIndexInfo{}))
 			got, err := encoder.appendRecordKey(nil, tt.key)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
@@ -862,7 +863,7 @@ func TestRecordWithUserKeyTypes(t *testing.T) {
 func TestGenerateFilename(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder(NewEncoderConfig("backup-ns", false, models.SIndexInfo{}))
+	encoder := NewEncoder(NewEncoderConfig("backup-ns", false, false, models.SIndexInfo{}))
 
 	first := encoder.GenerateFilename("pre_", ".part")
 	second := encoder.GenerateFilename("pre_", ".part")
@@ -877,7 +878,7 @@ func TestGetHeaderNonRecordFiles(t *testing.T) {
 	t.Run("default version", func(t *testing.T) {
 		t.Parallel()
 
-		encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
+		encoder := NewEncoder(NewEncoderConfig("test", false, false, models.SIndexInfo{}))
 		require.Equal(t, "Version 3.1\n# namespace test\n# first-file\n", string(encoder.GetHeader(false)))
 		require.Equal(t, "Version 3.1\n# namespace test\n", string(encoder.GetHeader(false)))
 	})
@@ -885,15 +886,109 @@ func TestGetHeaderNonRecordFiles(t *testing.T) {
 	t.Run("expression sindex version", func(t *testing.T) {
 		t.Parallel()
 
-		encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{HasExpression: true}))
+		encoder := NewEncoder(NewEncoderConfig("test", false, false, models.SIndexInfo{HasExpression: true}))
 		require.Equal(t, "Version 3.2\n# namespace test\n# first-file\n", string(encoder.GetHeader(false)))
 	})
+}
+
+func TestEncoderConfigVersions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                string
+		giveVectorDataType  bool
+		giveSIndexInfo      models.SIndexInfo
+		wantRecordsVersion  *version
+		wantMetadataVersion *version
+	}{
+		{
+			name:                "default",
+			wantRecordsVersion:  version31,
+			wantMetadataVersion: version31,
+		},
+		{
+			name:                "vector data type",
+			giveVectorDataType:  true,
+			wantRecordsVersion:  version34,
+			wantMetadataVersion: version31,
+		},
+		{
+			name:                "expression sindex",
+			giveSIndexInfo:      models.SIndexInfo{HasExpression: true},
+			wantRecordsVersion:  version31,
+			wantMetadataVersion: version32,
+		},
+		{
+			name:                "set sindex",
+			giveSIndexInfo:      models.SIndexInfo{HasSet: true},
+			wantRecordsVersion:  version31,
+			wantMetadataVersion: version33,
+		},
+		{
+			name:                "set and expression sindex",
+			giveSIndexInfo:      models.SIndexInfo{HasExpression: true, HasSet: true},
+			wantRecordsVersion:  version31,
+			wantMetadataVersion: version33,
+		},
+		{
+			name:                "vector data type and set sindex",
+			giveVectorDataType:  true,
+			giveSIndexInfo:      models.SIndexInfo{HasSet: true},
+			wantRecordsVersion:  version34,
+			wantMetadataVersion: version33,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			cfg := NewEncoderConfig("test", false, tt.giveVectorDataType, tt.giveSIndexInfo)
+
+			assert.Equal(t, tt.wantRecordsVersion, cfg.getRecordsVersion())
+			assert.Equal(t, tt.wantMetadataVersion, cfg.getMetadataVersion())
+		})
+	}
+}
+
+func TestGetHeaderRecordFiles(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name               string
+		giveVectorDataType bool
+		wantFirst          string
+		wantNext           string
+	}{
+		{
+			name:      "default version",
+			wantFirst: "Version 3.1\n# namespace test\n# first-file\n",
+			wantNext:  "Version 3.1\n# namespace test\n",
+		},
+		{
+			name:               "vector data type version",
+			giveVectorDataType: true,
+			wantFirst:          "Version 3.4\n# namespace test\n# first-file\n",
+			wantNext:           "Version 3.4\n# namespace test\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			encoder := NewEncoder(NewEncoderConfig("test", false, tt.giveVectorDataType, models.SIndexInfo{}))
+
+			assert.Equal(t, tt.wantFirst, string(encoder.GetHeader(true)))
+			assert.Equal(t, tt.wantNext, string(encoder.GetHeader(true)))
+		})
+	}
 }
 
 func TestEncodeTokenUnknownType(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
+	encoder := NewEncoder(NewEncoderConfig("test", false, false, models.SIndexInfo{}))
 	token := &models.Token{Type: models.TokenType(99)}
 
 	_, err := encoder.EncodeToken(token, []byte("prefix"))
@@ -918,7 +1013,7 @@ func TestEncodeTokenRecordWithPrefix(t *testing.T) {
 	expected := fmt.Sprintf("+ k S 4 1234\n+ n test\n+ d %s\n+ s demo\n+ g 1234\n+ t 10\n+ b 1\n- I bin1 0\n",
 		base64Encode(key.Digest()))
 
-	encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
+	encoder := NewEncoder(NewEncoderConfig("test", false, false, models.SIndexInfo{}))
 	token := &models.Token{Type: models.TokenTypeRecord, Record: record}
 
 	dst := []byte("existing:")
@@ -944,7 +1039,7 @@ func TestMetadataCacheHit(t *testing.T) {
 		}
 	}
 
-	encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
+	encoder := NewEncoder(NewEncoderConfig("test", false, false, models.SIndexInfo{}))
 
 	first, firstErr := encoder.appendRecord(nil, record(1))
 	require.NoError(t, firstErr)
@@ -960,8 +1055,8 @@ func TestMetadataCacheHit(t *testing.T) {
 func TestEncodeTokenManySets(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
-	fresh := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
+	encoder := NewEncoder(NewEncoderConfig("test", false, false, models.SIndexInfo{}))
+	fresh := NewEncoder(NewEncoderConfig("test", false, false, models.SIndexInfo{}))
 	out := make([]byte, 0, 512)
 
 	for i := range 128 {
@@ -996,7 +1091,7 @@ func TestEncodeTokenManySets(t *testing.T) {
 func TestEncodeTokenReusedBufferDoesNotGrowUnbounded(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
+	encoder := NewEncoder(NewEncoderConfig("test", false, false, models.SIndexInfo{}))
 	out := make([]byte, 0, 64)
 	maxCap := cap(out)
 
@@ -1033,7 +1128,7 @@ func TestEncodeTokenReusedBufferDoesNotGrowUnbounded(t *testing.T) {
 func TestEncodeTokenConcurrent(t *testing.T) {
 	t.Parallel()
 
-	encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
+	encoder := NewEncoder(NewEncoderConfig("test", false, false, models.SIndexInfo{}))
 	tokens := make([]*models.Token, 32)
 
 	for i := range tokens {

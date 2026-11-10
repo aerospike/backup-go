@@ -27,6 +27,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	particleType "github.com/aerospike/aerospike-client-go/v8/types/particle_type"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/models"
 	"github.com/segmentio/asm/base64"
 	"github.com/stretchr/testify/assert"
@@ -3527,6 +3528,43 @@ func TestASBReader_NextToken(t *testing.T) {
 	}
 }
 
+func TestNewDecoderVersionCheck(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		give    string
+		wantErr error
+	}{
+		{name: "version 3.1", give: "3.1"},
+		{name: "version 3.3", give: "3.3"},
+		{name: "version 3.4 vector data type", give: "3.4"},
+		{name: "version 3.5 unsupported", give: "3.5", wantErr: errclass.ErrUnsupported},
+		{name: "version 4.0 unsupported", give: "4.0", wantErr: errclass.ErrUnsupported},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// "a" is appended to avoid an EOF error.
+			src := newTestCountingReader("Version " + tt.give + "\n# namespace ns1\n# first-file\na")
+
+			got, err := NewDecoder(src, testFileName, false, slog.Default())
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, got)
+
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			assert.Equal(t, tt.give, got.header.Version)
+		})
+	}
+}
+
 func TestNewASBReader(t *testing.T) {
 	t.Parallel()
 	type args struct {
@@ -3636,7 +3674,7 @@ func BenchmarkDecodeRecordRoundTrip(b *testing.B) {
 		VoidTime: 100,
 	}, 0, nil)
 
-	encoder := NewEncoder(NewEncoderConfig("test", false, models.SIndexInfo{}))
+	encoder := NewEncoder(NewEncoderConfig("test", false, false, models.SIndexInfo{}))
 	var payload bytes.Buffer
 	payload.Write(encoder.GetHeader(true))
 	encoded, err := encoder.EncodeToken(token, nil)

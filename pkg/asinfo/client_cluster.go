@@ -122,6 +122,16 @@ func (ic *Client) SupportsBatchWrite(ctx context.Context) (bool, error) {
 	return v.IsGreaterOrEqual(infomodels.AerospikeVersionSupportsBatchWrites), nil
 }
 
+// SupportsVectorDataType reports whether the cluster version supports the vector data type.
+func (ic *Client) SupportsVectorDataType(ctx context.Context) (bool, error) {
+	v, err := ic.GetVersion(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to get aerospike version: %w", err)
+	}
+
+	return v.IsGreaterOrEqual(infomodels.AerospikeVersionSupportsVectorDataType), nil
+}
+
 // GetRecordCount counts number of records in given namespace and sets.
 func (ic *Client) GetRecordCount(ctx context.Context, namespace string, sets []string) (uint64, error) {
 	namespaceCmd, err := ic.cmds.namespaceInfo(namespace)

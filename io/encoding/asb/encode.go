@@ -119,10 +119,10 @@ func (e *Encoder) GetHeader(isRecords bool) []byte {
 
 func (e *Encoder) headerVersion(isRecords bool) string {
 	if isRecords {
-		return version31.toString()
+		return e.config.getRecordsVersion().toString()
 	}
 
-	return e.config.getVersion().toString()
+	return e.config.getMetadataVersion().toString()
 }
 
 func (e *Encoder) appendRecord(dst []byte, r *models.Record) ([]byte, error) {

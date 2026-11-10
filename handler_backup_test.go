@@ -51,6 +51,7 @@ func TestBackupHandler_GoroutineLeak_OnSuccess(t *testing.T) {
 	}).Maybe()
 	mockWriter.EXPECT().Remove(mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockInfoGetter.EXPECT().GetSIndexInfo(mock.Anything, mock.Anything).Return(models.SIndexInfo{}, nil).Maybe()
+	mockInfoGetter.EXPECT().SupportsVectorDataType(mock.Anything).Return(false, nil).Maybe()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
@@ -148,6 +149,7 @@ func TestBackupHandler_Wait_StateCleanupFailureKeepsSuccess(t *testing.T) {
 	mockWriter.EXPECT().Remove(mock.Anything, mock.Anything).
 		Return(errors.New("permission denied")).Once()
 	mockInfoGetter.EXPECT().GetSIndexInfo(mock.Anything, mock.Anything).Return(models.SIndexInfo{}, nil).Maybe()
+	mockInfoGetter.EXPECT().SupportsVectorDataType(mock.Anything).Return(false, nil).Maybe()
 
 	logs := &syncBuffer{}
 	logger := slog.New(slog.NewTextHandler(logs, nil))
@@ -182,4 +184,32 @@ func TestBackupHandler_Wait_StateCleanupFailureKeepsSuccess(t *testing.T) {
 	// The job succeeded, so a failing state file cleanup is only logged.
 	require.NoError(t, handler.Wait(t.Context()))
 	require.Contains(t, logs.String(), "failed to cleanup state")
+}
+
+// TestNewBackupHandler_VectorDataTypeCheckFails checks that a failed vector data
+// type check stops the backup instead of writing files with a wrong ASB version.
+func TestNewBackupHandler_VectorDataTypeCheckFails(t *testing.T) {
+	t.Parallel()
+
+	errVersion := errors.New("version request failed")
+
+	mockAerospikeClient := mocks.NewMockAerospikeClient(t)
+	mockInfoGetter := mocks.NewMockClusterInfo(t)
+	mockInfoGetter.EXPECT().SupportsVectorDataType(mock.Anything).Return(false, errVersion).Once()
+
+	cfg := NewDefaultBackupConfig()
+	cfg.NoIndexes = true
+
+	handler, err := newBackupHandler(
+		t.Context(),
+		cfg,
+		mockAerospikeClient,
+		slog.New(slog.DiscardHandler),
+		nil, // writer
+		nil, // reader
+		nil, // scanLimiter
+		mockInfoGetter,
+	)
+	require.ErrorIs(t, err, errVersion)
+	require.Nil(t, handler)
 }

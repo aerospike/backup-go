@@ -30,6 +30,7 @@ type ClusterInfo interface {
 	GetSIndexes(ctx context.Context, namespace string) ([]*models.SIndex, error)
 	GetUDFs(ctx context.Context) ([]*models.UDF, error)
 	SupportsBatchWrite(ctx context.Context) (bool, error)
+	SupportsVectorDataType(ctx context.Context) (bool, error)
 	GetSetsList(ctx context.Context, namespace string) ([]string, error)
 	GetNamespacesList(ctx context.Context) ([]string, error)
 	GetStatus(ctx context.Context) (string, error)

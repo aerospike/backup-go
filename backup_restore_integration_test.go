@@ -2116,7 +2116,7 @@ func TestRestoreExpiredRecords(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, w)
 
-	encoder := NewEncoder(testASNamespace, false, models.SIndexInfo{})
+	encoder := NewEncoder(testASNamespace, false, false, models.SIndexInfo{})
 
 	header := encoder.GetHeader(true)
 

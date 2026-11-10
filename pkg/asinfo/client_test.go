@@ -4117,3 +4117,43 @@ func TestClient_GetClusterStableNoNodes(t *testing.T) {
 	require.ErrorIs(t, err, errNoNodesAvailable)
 	assert.False(t, got)
 }
+
+// TestClient_SupportsFeatureNoNodes checks that the feature checks fail when the
+// cluster version cannot be read, instead of reporting the feature as unsupported.
+func TestClient_SupportsFeatureNoNodes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		check func(context.Context, *Client) (bool, error)
+	}{
+		{
+			name: "batch write",
+			check: func(ctx context.Context, ic *Client) (bool, error) {
+				return ic.SupportsBatchWrite(ctx)
+			},
+		},
+		{
+			name: "vector data type",
+			check: func(ctx context.Context, ic *Client) (bool, error) {
+				return ic.SupportsVectorDataType(ctx)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockNodeGetter := mocks.NewMockNodeGetter(t)
+			mockNodeGetter.EXPECT().GetNodes().Return(nil).Once()
+
+			ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, 0))
+
+			got, err := tt.check(t.Context(), ic)
+
+			require.ErrorIs(t, err, errNoNodesAvailable)
+			assert.False(t, got)
+		})
+	}
+}

@@ -17,6 +17,12 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
 
 ### Added
 
+- Backup and restore of the vector data type. A records file backed up from a cluster that
+  supports vectors (Aerospike 8.1 and later) has the ASB version 3.4, whether or not it holds
+  vector bins. Earlier releases of the library cannot restore such files, they fail with
+  `ErrUnsupported`. (BKRS-505)
+- `ClusterInfo.SupportsVectorDataType` and `asinfo.Client.SupportsVectorDataType` report whether
+  the cluster version supports the vector data type. (BKRS-505)
 - `RequestBackup.NoConfig` sends `no-config`, which stops the nodes from uploading their config
   file with the backup. (BKRS-494)
 - `RequestRestore.HydrateReplica` sends `hydrate-replica` with the restore command. Only the
@@ -51,6 +57,8 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
 
 ### Changed
 
+- `NewEncoder` and `asb.NewEncoderConfig` take a `hasVectorDataType` argument after `compact`.
+  With `true`, records files are written with the ASB version 3.4. (BKRS-505)
 - A cold restore is started by `StartRestore` alone: the server gates and prepares the namespace
   on every node and starts the restore once every node is READY. (BKRS-494)
 - `RequestCommon.Storage` is a `StorageType` instead of a `string`. (BKRS-494)

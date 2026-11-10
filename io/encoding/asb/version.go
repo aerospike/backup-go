@@ -45,6 +45,8 @@ type version struct {
 }
 
 // newVersion creates new version.
+//
+//nolint:unparam // Major version is always 3, but in can be changed any time.
 func newVersion(major, minor int) *version {
 	return &version{Major: major, Minor: minor}
 }

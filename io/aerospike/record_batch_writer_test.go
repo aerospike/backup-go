@@ -22,7 +22,12 @@ import (
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
 	"github.com/aerospike/backup-go/models"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+// testAttempts is the total number of attempts for tests that exercise retries.
+const testAttempts = 3
 
 func asErr(rc atypes.ResultCode, inDoubt bool) a.Error {
 	return &a.AerospikeError{
@@ -112,8 +117,6 @@ func TestFlushBuffer_AllSuccess_WithNilBatchError(t *testing.T) {
 		mkOp(t, atypes.KEY_EXISTS_ERROR, nil),
 		// fresher
 		mkOp(t, atypes.GENERATION_ERROR, nil),
-		// ignored
-		mkOp(t, atypes.BIN_NOT_FOUND, nil),
 	}
 
 	if err := rw.flushBuffer(); err != nil {
@@ -247,4 +250,111 @@ func TestFlushBuffer_IgnoreRecordError_Path(t *testing.T) {
 	if got := len(rw.operationBuffer); got != 1 {
 		t.Fatalf("expected 1 remaining op, got %d", got)
 	}
+}
+
+func TestFlushBuffer_RejectedRecord(t *testing.T) {
+	t.Parallel()
+
+	rejectCodes := []atypes.ResultCode{
+		atypes.RECORD_TOO_BIG,
+		atypes.KEY_MISMATCH,
+		atypes.BIN_NAME_TOO_LONG,
+		atypes.ALWAYS_FORBIDDEN,
+		atypes.FAIL_FORBIDDEN,
+		atypes.BIN_TYPE_ERROR,
+		atypes.BIN_NOT_FOUND,
+	}
+
+	tests := []struct {
+		name              string
+		ignoreRecordError bool
+		wantErr           bool
+		wantRemaining     int
+		wantIgnored       uint64
+		wantCalls         int
+	}{
+		{
+			name:          "retried and fails without ignore record error",
+			wantErr:       true,
+			wantRemaining: 1,
+			wantCalls:     testAttempts,
+		},
+		{
+			name:              "ignored with ignore record error",
+			ignoreRecordError: true,
+			wantIgnored:       1,
+			wantCalls:         1,
+		},
+	}
+
+	for _, code := range rejectCodes {
+		for _, tt := range tests {
+			t.Run(code.String()+"/"+tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				var calls int
+
+				asc := &mockDBWriter{batchFn: func(_ *a.BatchPolicy, _ []a.BatchRecordIfc) a.Error {
+					calls++
+					return nil
+				}}
+				rw := newTestWriter(t, asc)
+				rw.ignoreRecordError = tt.ignoreRecordError
+				// Several attempts, no sleep.
+				rw.retryPolicy = models.NewRetryPolicy(0, 1, testAttempts)
+
+				rw.operationBuffer = []a.BatchRecordIfc{
+					mkOp(t, atypes.OK, nil),
+					mkOp(t, code, asErr(code, false)),
+				}
+
+				err := rw.flushBuffer()
+				if tt.wantErr {
+					var ae a.Error
+					require.ErrorAs(t, err, &ae)
+					assert.True(t, ae.Matches(code))
+				} else {
+					require.NoError(t, err)
+				}
+
+				assert.Equal(t, tt.wantCalls, calls)
+				assert.Len(t, rw.operationBuffer, tt.wantRemaining)
+				assert.Equal(t, tt.wantIgnored, rw.stats.GetRecordsIgnored())
+				assert.Equal(t, uint64(1), rw.stats.GetRecordsInserted())
+			})
+		}
+	}
+}
+
+func TestFlushBuffer_RetryResendsOnlyFailedOps(t *testing.T) {
+	t.Parallel()
+
+	var sentPerCall []int
+
+	asc := &mockDBWriter{batchFn: func(_ *a.BatchPolicy, recs []a.BatchRecordIfc) a.Error {
+		sentPerCall = append(sentPerCall, len(recs))
+
+		// The retried operation succeeds on the second attempt.
+		if len(sentPerCall) > 1 {
+			for _, r := range recs {
+				r.BatchRec().ResultCode = atypes.OK
+				r.BatchRec().Err = nil
+			}
+		}
+
+		return nil
+	}}
+	rw := newTestWriter(t, asc)
+	rw.retryPolicy = models.NewRetryPolicy(0, 1, testAttempts)
+
+	rw.operationBuffer = []a.BatchRecordIfc{
+		mkOp(t, atypes.OK, nil),
+		mkOp(t, atypes.TIMEOUT, asErr(atypes.TIMEOUT, false)),
+	}
+
+	require.NoError(t, rw.flushBuffer())
+
+	assert.Equal(t, []int{2, 1}, sentPerCall)
+	assert.Empty(t, rw.operationBuffer)
+	assert.Equal(t, uint64(2), rw.stats.GetRecordsInserted())
 }

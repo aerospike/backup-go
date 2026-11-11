@@ -202,7 +202,15 @@ func (rw *batchRecordWriter) processOperationResult(op a.BatchRecordIfc) bool {
 		atypes.FAIL_FORBIDDEN,
 		atypes.BIN_TYPE_ERROR,
 		atypes.BIN_NOT_FOUND:
+		// Without ignoreRecordError, a rejected record must fail the restore,
+		// the same way as in singleRecordWriter: keep it in the buffer so its
+		// error is returned once the retry policy is exhausted.
+		if !rw.ignoreRecordError {
+			return true
+		}
+
 		rw.stats.IncrRecordsIgnored()
+
 		return false
 	case atypes.OK:
 		rw.stats.IncrRecordsInserted()

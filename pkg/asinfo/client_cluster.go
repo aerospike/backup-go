@@ -39,6 +39,10 @@ func (ic *Client) GetVersion(ctx context.Context) (infomodels.AerospikeVersion, 
 		var lowestVersion infomodels.AerospikeVersion
 
 		for i, node := range nodes {
+			if !node.IsActive() {
+				continue
+			}
+
 			currentVersion, err := ic.getAerospikeVersion(node)
 			if err != nil {
 				return zero, fmt.Errorf("failed to get version from node %s: %w", node.String(), err)

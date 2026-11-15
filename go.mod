@@ -18,7 +18,7 @@ require (
 	github.com/segmentio/asm v1.2.1
 	github.com/stretchr/testify v1.12.1
 	github.com/vektra/mockery/v3 v3.9.0
-	golang.org/x/sync v0.24.0
+	golang.org/x/sync v0.25.0
 	golang.org/x/text v0.43.0
 	golang.org/x/time v0.16.0
 	google.golang.org/api v0.310.0

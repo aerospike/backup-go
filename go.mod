@@ -14,7 +14,7 @@ require (
 	github.com/aws/smithy-go v1.28.7
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.27.0
-	github.com/klauspost/compress v1.20.3
+	github.com/klauspost/compress v1.20.4
 	github.com/segmentio/asm v1.2.1
 	github.com/stretchr/testify v1.12.1
 	github.com/vektra/mockery/v3 v3.9.0

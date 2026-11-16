@@ -23,6 +23,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/pkg/server/lister/mocks"
 	"github.com/aerospike/backup-go/pkg/server/lister/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -380,6 +381,21 @@ func TestLister_GetStatistics_S3Errors(t *testing.T) {
 
 		_, err := NewLister(m, "bucket", "").GetStatistics(t.Context(), statsKey)
 		require.ErrorIs(t, err, errS3)
+	})
+
+	t.Run("listed manifest is gone", func(t *testing.T) {
+		t.Parallel()
+
+		m := mocks.NewMockS3API(t)
+		m.EXPECT().ListObjectsV2(mock.Anything, mock.Anything, mock.Anything).RunAndReturn(
+			func(_ context.Context, in *s3.ListObjectsV2Input, _ ...func(*s3.Options)) (*s3.ListObjectsV2Output, error) {
+				return listPage([]string{manifestKey}, aws.ToString(in.Prefix), aws.ToString(in.Delimiter), ""), nil
+			})
+		m.EXPECT().GetObject(mock.Anything, mock.Anything).Return(nil, &types.NoSuchKey{})
+
+		_, err := NewLister(m, "bucket", "").GetStatistics(t.Context(), statsKey)
+		require.ErrorIs(t, err, errclass.ErrNotFound)
+		require.ErrorContains(t, err, manifestKey)
 	})
 
 	t.Run("get udf.json", func(t *testing.T) {

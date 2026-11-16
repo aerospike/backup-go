@@ -16,10 +16,11 @@ package lister
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"fmt"
 	"strings"
 
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/internal/util/collections"
 	"github.com/aerospike/backup-go/pkg/server/internal/manifestname"
 	"github.com/aerospike/backup-go/pkg/server/lister/models"
@@ -320,12 +321,21 @@ func newestChangeManifest(keys []string) (ref manifestRef, ok bool) {
 	return ref, ok
 }
 
-// manifestStatistics reads the counts of the manifest m.
+// manifestStatistics reads the counts of the manifest m. The manifest was
+// listed, so a missing one is an error.
 func (l *Lister) manifestStatistics(ctx context.Context, m manifestRef) (models.Statistics, error) {
+	data, found, err := l.fetch(ctx, m.key, maxObjectSize)
+	switch {
+	case err != nil:
+		return models.Statistics{}, err
+	case !found:
+		return models.Statistics{}, fmt.Errorf("%w: manifest %s", errclass.ErrNotFound, m.key)
+	}
+
 	if m.change {
 		var manifest changeManifest
-		if err := l.readJSON(ctx, m.key, maxObjectSize, &manifest); err != nil {
-			return models.Statistics{}, err
+		if err := json.Unmarshal(data, &manifest); err != nil {
+			return models.Statistics{}, fmt.Errorf("failed to parse %s: %w", m.key, err)
 		}
 
 		stats := segmentStatistics(manifest.Segments)
@@ -335,8 +345,8 @@ func (l *Lister) manifestStatistics(ctx context.Context, m manifestRef) (models.
 	}
 
 	var manifest queryManifest
-	if err := l.readJSON(ctx, m.key, maxObjectSize, &manifest); err != nil {
-		return models.Statistics{}, err
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return models.Statistics{}, fmt.Errorf("failed to parse %s: %w", m.key, err)
 	}
 
 	stats := segmentStatistics(manifest.Segments)
@@ -362,9 +372,14 @@ func segmentStatistics(segments []segmentEntry) models.Statistics {
 // sindexStatistics counts the secondary indexes of the sindex.json at key. A
 // missing file counts as none.
 func (l *Lister) sindexStatistics(ctx context.Context, key string) (models.Statistics, error) {
-	var file sindexFile
-	if err := l.readOptionalJSON(ctx, key, &file); err != nil {
+	data, found, err := l.fetch(ctx, key, maxObjectSize)
+	if err != nil || !found {
 		return models.Statistics{}, err
+	}
+
+	var file sindexFile
+	if err := json.Unmarshal(data, &file); err != nil {
+		return models.Statistics{}, fmt.Errorf("failed to parse %s: %w", key, err)
 	}
 
 	return models.Statistics{IndexCount: uint64(len(file.SIndexes))}, nil
@@ -373,23 +388,17 @@ func (l *Lister) sindexStatistics(ctx context.Context, key string) (models.Stati
 // udfStatistics counts the UDF modules of the udf.json at key. A missing file
 // counts as none.
 func (l *Lister) udfStatistics(ctx context.Context, key string) (models.Statistics, error) {
-	var file udfFile
-	if err := l.readOptionalJSON(ctx, key, &file); err != nil {
+	data, found, err := l.fetch(ctx, key, maxObjectSize)
+	if err != nil || !found {
 		return models.Statistics{}, err
 	}
 
-	return models.Statistics{UDFCount: uint64(len(file.UDFs))}, nil
-}
-
-// readOptionalJSON is readJSON for an object that may be missing, which leaves
-// v as it is.
-func (l *Lister) readOptionalJSON(ctx context.Context, key string, v any) error {
-	err := l.readJSON(ctx, key, maxObjectSize, v)
-	if errors.Is(err, errObjectNotFound) {
-		return nil
+	var file udfFile
+	if err := json.Unmarshal(data, &file); err != nil {
+		return models.Statistics{}, fmt.Errorf("failed to parse %s: %w", key, err)
 	}
 
-	return err
+	return models.Statistics{UDFCount: uint64(len(file.UDFs))}, nil
 }
 
 // listSubdirs returns the keys of the directories directly under dir, without

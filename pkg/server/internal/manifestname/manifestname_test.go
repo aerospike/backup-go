@@ -59,6 +59,20 @@ func TestParseQuery(t *testing.T) {
 			want:   Name{Partition: 935, Regime: 7, Timestamp: math.MaxUint64},
 			wantOK: true,
 		},
+		{
+			name:   "hexadecimal prefix of the uuid",
+			give:   dir + "935-7-0000181178352-0xdb526a.json",
+			want:   Name{Partition: 935, Regime: 7, Timestamp: 181178352},
+			wantOK: true,
+		},
+		{name: "uuid not hexadecimal", give: dir + "935-7-0000181178352-xyz.json"},
+		{
+			// %x reads the 0 and leaves the x, as no hexadecimal digit follows.
+			name:   "hexadecimal prefix without digits",
+			give:   dir + "935-7-0000181178352-0x.json",
+			want:   Name{Partition: 935, Regime: 7, Timestamp: 181178352},
+			wantOK: true,
+		},
 		{name: "change stream name", give: dir + "7-0000181178352-db526a.json"},
 		{name: "partition out of range", give: dir + "4096-7-0000181178352-db526a.json"},
 		{name: "no uuid", give: dir + "935-7-0000181178352.json"},

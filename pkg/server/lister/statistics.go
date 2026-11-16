@@ -24,7 +24,6 @@ import (
 
 	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/internal/util/collections"
-	"github.com/aerospike/backup-go/pkg/asinfo"
 	"github.com/aerospike/backup-go/pkg/server/internal/manifestname"
 	"github.com/aerospike/backup-go/pkg/server/lister/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -94,9 +93,9 @@ type manifestDirRef struct {
 // manifests the server wrote for it, and counts the secondary indexes and UDFs
 // it holds. Like GetMetadata, it takes the job id the backup was started with,
 // not a storage path, and looks it up under the lister's prefix; anything else
-// fails with [ErrInvalidBackupID]. It reads no record data, so its cost grows with the number of
-// manifests, about one per partition plus one per node, and not with the size
-// of the backup.
+// fails with [ErrInvalidBackupID]. It reads no record data, so its cost grows
+// with the number of manifests, about one per partition plus one per node, and
+// not with the size of the backup.
 //
 // A server side backup lays out its files as follows:
 //
@@ -156,8 +155,7 @@ type manifestDirRef struct {
 // IndexCount and UDFCount are exact. The principal node writes sindex.json, the
 // definitions of the secondary indexes of the namespace, and udf.json, every UDF
 // module of the cluster, when the backup finishes. A backup taken with
-// no-indexes or no-udfs, or one that did not finish, lacks the file, and its
-// count is zero.
+// no-indexes or no-udfs lacks the file, and its count is zero.
 //
 // IncrRecordCount and ChangeRecordCount report the other two sources as they
 // are, summed over the manifests restore applies. RecordCount + IncrRecordCount
@@ -167,11 +165,14 @@ type manifestDirRef struct {
 // Counting distinct records exactly needs reading every segment, which does not
 // scale to large backups.
 //
-// A backup that does not exist has no manifests, and its statistics are zero.
+// Like GetMetadata, it fails with [ErrMetadataNotFound] for a backup without
+// metadata.json, one that does not exist or has not finished, rather than
+// count what an unfinished backup holds so far.
 func (l *Lister) GetStatistics(ctx context.Context, backupID string) (models.Statistics, error) {
-	// A job id holds no slash, so the keys cannot leave the prefix.
-	if !asinfo.IsJobID(backupID) {
-		return models.Statistics{}, fmt.Errorf("%w: %q", ErrInvalidBackupID, backupID)
+	// GetMetadata checks the id too: a job id holds no slash, so the keys
+	// cannot leave the prefix.
+	if _, err := l.GetMetadata(ctx, backupID); err != nil {
+		return models.Statistics{}, err
 	}
 
 	backupKey := objectKey(l.prefix, backupID)

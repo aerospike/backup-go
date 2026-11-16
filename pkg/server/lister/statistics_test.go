@@ -18,6 +18,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -102,6 +104,40 @@ func udfJSON(modules ...string) string {
 	}
 
 	return `{"backup_id":"` + jobID1 + `","format_version":2,"udf":[` + strings.Join(entries, ",") + `]}`
+}
+
+// finished adds the metadata.json of a finished backup jobID1 to objects.
+func finished(objects map[string]string) map[string]string {
+	out := map[string]string{statsKey + "/metadata.json": metadataJSON(jobID1)}
+	maps.Copy(out, objects)
+
+	return out
+}
+
+// metadataOr serves the metadata.json of jobID1 and fails every other read
+// with err.
+func metadataOr(err error) func(context.Context, *s3.GetObjectInput, ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+	return func(_ context.Context, in *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+		if aws.ToString(in.Key) == statsKey+"/metadata.json" {
+			return objectBody(metadataJSON(jobID1)), nil
+		}
+
+		return nil, err
+	}
+}
+
+// listOrFail lists key as S3 would, and fails with err the listing of every
+// prefix that holds marker.
+func listOrFail(
+	key, marker string, err error,
+) func(context.Context, *s3.ListObjectsV2Input, ...func(*s3.Options)) (*s3.ListObjectsV2Output, error) {
+	return func(_ context.Context, in *s3.ListObjectsV2Input, _ ...func(*s3.Options)) (*s3.ListObjectsV2Output, error) {
+		if strings.Contains(aws.ToString(in.Prefix), marker) {
+			return nil, err
+		}
+
+		return listPage([]string{key}, aws.ToString(in.Prefix), aws.ToString(in.Delimiter), ""), nil
+	}
 }
 
 // mockBucket serves objects to m as S3 would: listings with a delimiter, split
@@ -299,20 +335,13 @@ func TestLister_GetStatistics(t *testing.T) {
 			},
 			want: models.Statistics{},
 		},
-		{
-			name: "a backup that does not exist has zero statistics",
-			objects: map[string]string{
-				jobID2 + "/ns/bar/query-stream/manifest/" + queryManifestName(1, 0, 1): queryManifestJSON(1, 1, 1),
-			},
-			want: models.Statistics{},
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			l := NewLister(mockBucket(t, tt.objects), "bucket", statsPrefix)
+			l := NewLister(mockBucket(t, finished(tt.objects)), "bucket", statsPrefix)
 
 			got, err := l.GetStatistics(t.Context(), jobID1)
 			require.NoError(t, err)
@@ -348,7 +377,7 @@ func TestLister_GetStatistics_ParseErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			l := NewLister(mockBucket(t, map[string]string{tt.key: tt.body}), "bucket", statsPrefix)
+			l := NewLister(mockBucket(t, finished(map[string]string{tt.key: tt.body})), "bucket", statsPrefix)
 
 			_, err := l.GetStatistics(t.Context(), jobID1)
 			require.ErrorContains(t, err, "failed to parse "+tt.key)
@@ -366,13 +395,25 @@ func TestLister_GetStatistics_S3Errors(t *testing.T) {
 		t.Parallel()
 
 		m := mocks.NewMockS3API(t)
+		m.EXPECT().GetObject(mock.Anything, mock.Anything).RunAndReturn(metadataOr(nil))
 		m.EXPECT().ListObjectsV2(mock.Anything, mock.Anything, mock.Anything).Return(nil, errS3)
 
 		_, err := NewLister(m, "bucket", statsPrefix).GetStatistics(t.Context(), jobID1)
 		require.ErrorIs(t, err, errS3)
 	})
 
-	t.Run("get", func(t *testing.T) {
+	t.Run("get metadata.json", func(t *testing.T) {
+		t.Parallel()
+
+		m := mocks.NewMockS3API(t)
+		m.EXPECT().GetObject(mock.Anything, mock.Anything).Return(nil, errS3)
+
+		_, err := NewLister(m, "bucket", statsPrefix).GetStatistics(t.Context(), jobID1)
+		require.ErrorIs(t, err, errS3)
+		require.ErrorContains(t, err, "metadata")
+	})
+
+	t.Run("get manifest", func(t *testing.T) {
 		t.Parallel()
 
 		m := mocks.NewMockS3API(t)
@@ -380,7 +421,7 @@ func TestLister_GetStatistics_S3Errors(t *testing.T) {
 			func(_ context.Context, in *s3.ListObjectsV2Input, _ ...func(*s3.Options)) (*s3.ListObjectsV2Output, error) {
 				return listPage([]string{manifestKey}, aws.ToString(in.Prefix), aws.ToString(in.Delimiter), ""), nil
 			})
-		m.EXPECT().GetObject(mock.Anything, mock.Anything).Return(nil, errS3)
+		m.EXPECT().GetObject(mock.Anything, mock.Anything).RunAndReturn(metadataOr(errS3))
 
 		_, err := NewLister(m, "bucket", statsPrefix).GetStatistics(t.Context(), jobID1)
 		require.ErrorIs(t, err, errS3)
@@ -394,7 +435,7 @@ func TestLister_GetStatistics_S3Errors(t *testing.T) {
 			func(_ context.Context, in *s3.ListObjectsV2Input, _ ...func(*s3.Options)) (*s3.ListObjectsV2Output, error) {
 				return listPage([]string{manifestKey}, aws.ToString(in.Prefix), aws.ToString(in.Delimiter), ""), nil
 			})
-		m.EXPECT().GetObject(mock.Anything, mock.Anything).Return(nil, &types.NoSuchKey{})
+		m.EXPECT().GetObject(mock.Anything, mock.Anything).RunAndReturn(metadataOr(&types.NoSuchKey{}))
 
 		_, err := NewLister(m, "bucket", statsPrefix).GetStatistics(t.Context(), jobID1)
 		require.ErrorIs(t, err, errclass.ErrNotFound)
@@ -405,17 +446,99 @@ func TestLister_GetStatistics_S3Errors(t *testing.T) {
 		require.ErrorAs(t, err, &noSuchKey)
 	})
 
+	t.Run("list the nodes of a change stream", func(t *testing.T) {
+		t.Parallel()
+
+		m := mocks.NewMockS3API(t)
+		m.EXPECT().GetObject(mock.Anything, mock.Anything).RunAndReturn(metadataOr(nil))
+		m.EXPECT().ListObjectsV2(mock.Anything, mock.Anything, mock.Anything).RunAndReturn(
+			listOrFail(manifestKey, "/change-stream/", errS3))
+
+		_, err := NewLister(m, "bucket", statsPrefix).GetStatistics(t.Context(), jobID1)
+		require.ErrorIs(t, err, errS3)
+	})
+
+	t.Run("list a manifest directory", func(t *testing.T) {
+		t.Parallel()
+
+		m := mocks.NewMockS3API(t)
+		m.EXPECT().GetObject(mock.Anything, mock.Anything).RunAndReturn(metadataOr(nil))
+		m.EXPECT().ListObjectsV2(mock.Anything, mock.Anything, mock.Anything).RunAndReturn(
+			listOrFail(manifestKey, "/manifest/", errS3))
+
+		_, err := NewLister(m, "bucket", statsPrefix).GetStatistics(t.Context(), jobID1)
+		require.ErrorIs(t, err, errS3)
+	})
+
+	t.Run("get sindex.json", func(t *testing.T) {
+		t.Parallel()
+
+		sindexKey := statsKey + "/sindex/ns/bar/sindex.json"
+
+		m := mocks.NewMockS3API(t)
+		m.EXPECT().ListObjectsV2(mock.Anything, mock.Anything, mock.Anything).RunAndReturn(
+			func(_ context.Context, in *s3.ListObjectsV2Input, _ ...func(*s3.Options)) (*s3.ListObjectsV2Output, error) {
+				return listPage([]string{sindexKey}, aws.ToString(in.Prefix), aws.ToString(in.Delimiter), ""), nil
+			})
+		m.EXPECT().GetObject(mock.Anything, mock.Anything).RunAndReturn(
+			func(ctx context.Context, in *s3.GetObjectInput, opts ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+				if aws.ToString(in.Key) == sindexKey {
+					return nil, errS3
+				}
+
+				// udf.json is missing, which is no error.
+				return metadataOr(&types.NoSuchKey{})(ctx, in, opts...)
+			})
+
+		_, err := NewLister(m, "bucket", statsPrefix).GetStatistics(t.Context(), jobID1)
+		require.ErrorIs(t, err, errS3)
+		require.ErrorContains(t, err, sindexKey)
+	})
+
 	t.Run("get udf.json", func(t *testing.T) {
 		t.Parallel()
 
 		m := mocks.NewMockS3API(t)
 		m.EXPECT().ListObjectsV2(mock.Anything, mock.Anything, mock.Anything).Return(&s3.ListObjectsV2Output{}, nil)
-		m.EXPECT().GetObject(mock.Anything, mock.Anything).Return(nil, errS3)
+		m.EXPECT().GetObject(mock.Anything, mock.Anything).RunAndReturn(metadataOr(errS3))
 
 		_, err := NewLister(m, "bucket", statsPrefix).GetStatistics(t.Context(), jobID1)
 		require.ErrorIs(t, err, errS3)
 		require.ErrorContains(t, err, statsKey+"/udf/udf.json")
 	})
+}
+
+func TestLister_GetStatistics_NoMetadata(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		objects map[string]string
+	}{
+		{
+			name: "backup that does not exist",
+			objects: map[string]string{
+				jobID2 + "/ns/bar/query-stream/manifest/" + queryManifestName(1, 0, 1): queryManifestJSON(1, 1, 1),
+			},
+		},
+		{
+			name: "unfinished backup",
+			objects: map[string]string{
+				statsKey + "/ns/bar/query-stream/manifest/" + queryManifestName(1, 0, 1): queryManifestJSON(1, 1, 1),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			l := NewLister(mockBucket(t, tt.objects), "bucket", statsPrefix)
+
+			_, err := l.GetStatistics(t.Context(), jobID1)
+			require.ErrorIs(t, err, ErrMetadataNotFound)
+		})
+	}
 }
 
 func TestLister_GetStatistics_InvalidBackupID(t *testing.T) {
@@ -431,4 +554,148 @@ func TestLister_GetStatistics_InvalidBackupID(t *testing.T) {
 			require.ErrorIs(t, err, errclass.ErrInvalidConfig)
 		})
 	}
+}
+
+func TestQueryManifests(t *testing.T) {
+	t.Parallel()
+
+	const dir = statsKey + "/ns/bar/query-stream/manifest/"
+
+	keys := []string{
+		dir + queryManifestName(17, 3, 50),
+		dir + queryManifestName(17, 4, 10),
+		dir + queryManifestName(17, 4, 20),
+		// Same regime and timestamp as the one before: the first listed wins.
+		dir + "17-4-0000000000020-ffffff.json",
+		dir + queryManifestName(18, 1, 1),
+		dir + "17-foo.json",
+		dir + changeManifestName(1, 1),
+	}
+
+	assert.Equal(t, []manifestRef{
+		{key: keys[0]},
+		{key: keys[1]},
+		{key: keys[2], newest: true},
+		{key: keys[3]},
+		{key: keys[4], newest: true},
+	}, queryManifests(keys))
+	assert.Empty(t, queryManifests(nil))
+}
+
+func TestNewestChangeManifest(t *testing.T) {
+	t.Parallel()
+
+	const dir = statsKey + "/ns/bar/change-stream/" + statsNode + "/manifest/"
+
+	tests := []struct {
+		name   string
+		keys   []string
+		want   string
+		wantOK bool
+	}{
+		{
+			name: "higher regime wins over a later timestamp",
+			keys: []string{
+				dir + changeManifestName(4, 90), dir + changeManifestName(5, 10), dir + changeManifestName(5, 9),
+			},
+			want:   dir + changeManifestName(5, 10),
+			wantOK: true,
+		},
+		{
+			name:   "the first of two equally new manifests wins",
+			keys:   []string{dir + "5-0000000000010-aaaaaa.json", dir + "5-0000000000010-bbbbbb.json"},
+			want:   dir + "5-0000000000010-aaaaaa.json",
+			wantOK: true,
+		},
+		{
+			name:   "names restore cannot parse are skipped",
+			keys:   []string{dir + "manifest.json", dir + changeManifestName(1, 1), dir + "x-1-5e58e6.json"},
+			want:   dir + changeManifestName(1, 1),
+			wantOK: true,
+		},
+		{name: "no parsable name", keys: []string{dir + "manifest.json"}},
+		{name: "no manifest"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, ok := newestChangeManifest(tt.keys)
+			require.Equal(t, tt.wantOK, ok)
+
+			if ok {
+				assert.Equal(t, manifestRef{key: tt.want, change: true}, got)
+			}
+		})
+	}
+}
+
+func TestLister_fetch(t *testing.T) {
+	t.Parallel()
+
+	const key = "backups/object.json"
+
+	errS3 := errors.New("s3 unavailable")
+	errRead := errors.New("connection reset")
+
+	tests := []struct {
+		name        string
+		out         *s3.GetObjectOutput
+		err         error
+		want        string
+		wantErr     error
+		notNotFound bool
+	}{
+		{name: "shorter than the limit", out: objectBody("abc"), want: "abc"},
+		{name: "cut short at the limit", out: objectBody("abcdef"), want: "abcd"},
+		{name: "missing object", err: &types.NoSuchKey{}, wantErr: errclass.ErrNotFound},
+		{name: "other S3 error", err: errS3, wantErr: errS3, notNotFound: true},
+		{
+			name:        "failed read",
+			out:         &s3.GetObjectOutput{Body: io.NopCloser(io.MultiReader(strings.NewReader("ab"), failingReader{errRead}))},
+			wantErr:     errRead,
+			notNotFound: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			m := mocks.NewMockS3API(t)
+			m.EXPECT().GetObject(mock.Anything, mock.Anything).RunAndReturn(
+				func(_ context.Context, in *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+					require.Equal(t, "bucket", aws.ToString(in.Bucket))
+					require.Equal(t, key, aws.ToString(in.Key))
+
+					return tt.out, tt.err
+				})
+
+			got, err := NewLister(m, "bucket", "").fetch(t.Context(), key, 4)
+			if tt.wantErr == nil {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, string(got))
+
+				return
+			}
+
+			require.ErrorIs(t, err, tt.wantErr)
+			require.ErrorContains(t, err, key)
+			assert.Nil(t, got)
+
+			if tt.notNotFound {
+				assert.NotErrorIs(t, err, errclass.ErrNotFound)
+			}
+		})
+	}
+}
+
+// failingReader fails every read with err.
+type failingReader struct {
+	err error
+}
+
+func (r failingReader) Read([]byte) (int, error) {
+	return 0, r.err
 }

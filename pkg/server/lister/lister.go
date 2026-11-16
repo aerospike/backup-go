@@ -51,9 +51,14 @@ const (
 	s3ErrNoSuchKey = "NoSuchKey"
 )
 
-// ErrMetadataNotFound is returned when a backup has no metadata.json.
-// It belongs to the [errclass.ErrNotFound] class.
-var ErrMetadataNotFound = fmt.Errorf("%w: metadata.json not found", errclass.ErrNotFound)
+var (
+	// ErrMetadataNotFound is returned when a backup has no metadata.json.
+	// It belongs to the [errclass.ErrNotFound] class.
+	ErrMetadataNotFound = fmt.Errorf("%w: metadata.json not found", errclass.ErrNotFound)
+
+	// errObjectNotFound marks an object the bucket does not hold.
+	errObjectNotFound = fmt.Errorf("%w: object not found", errclass.ErrNotFound)
+)
 
 // S3API is an interface for the S3 client.
 type S3API interface {
@@ -179,14 +184,15 @@ func (l *Lister) FetchAllMetadata(ctx context.Context) ([]models.Metadata, error
 
 // GetMetadata fetches and parses the metadata for a single backup.
 func (l *Lister) GetMetadata(ctx context.Context, backupID string) (models.Metadata, error) {
-	data, err := l.fetchOne(ctx, backupID)
-	if err != nil {
-		return models.Metadata{}, fmt.Errorf("failed to get manifest %s: %w", backupID, err)
+	var md models.Metadata
+
+	err := l.readJSON(ctx, objectKey(backupID, metadataFileName), maxMetadataSize, &md)
+	if errors.Is(err, errObjectNotFound) {
+		return models.Metadata{}, fmt.Errorf("failed to get metadata of %s: %w", backupID, ErrMetadataNotFound)
 	}
 
-	var md models.Metadata
-	if err := json.Unmarshal(data, &md); err != nil {
-		return models.Metadata{}, fmt.Errorf("failed to parse metadata: %w", err)
+	if err != nil {
+		return models.Metadata{}, fmt.Errorf("failed to get metadata of %s: %w", backupID, err)
 	}
 
 	return md, nil
@@ -226,29 +232,29 @@ func (l *Lister) listSnapshotPrefixes(ctx context.Context) ([]string, error) {
 	return out, nil
 }
 
-func (l *Lister) fetchOne(ctx context.Context, prefix string) ([]byte, error) {
-	key := objectKey(prefix, metadataFileName)
-
+// readJSON decodes the object at key into v, reading at most limit bytes of
+// it, so an object larger than limit fails to parse. A missing object yields
+// errObjectNotFound.
+func (l *Lister) readJSON(ctx context.Context, key string, limit int64, v any) error {
 	out, err := l.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(l.bucket),
 		Key:    aws.String(key),
 	})
 	if err != nil {
 		if isNotFound(err) {
-			return nil, ErrMetadataNotFound
+			return fmt.Errorf("%w: %s: %w", errObjectNotFound, key, err)
 		}
 
-		return nil, fmt.Errorf("failed to get %s: %w", key, err)
+		return fmt.Errorf("failed to get %s: %w", key, err)
 	}
 
 	defer out.Body.Close()
 
-	data, err := io.ReadAll(io.LimitReader(out.Body, maxMetadataSize))
-	if err != nil {
-		return nil, fmt.Errorf("failed to read %s: %w", key, err)
+	if err := json.NewDecoder(io.LimitReader(out.Body, limit)).Decode(v); err != nil {
+		return fmt.Errorf("failed to parse %s: %w", key, err)
 	}
 
-	return data, nil
+	return nil
 }
 
 func objectKey(elems ...string) string {

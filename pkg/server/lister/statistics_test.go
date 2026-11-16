@@ -17,6 +17,7 @@ package lister
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -40,18 +41,40 @@ const (
 )
 
 // queryManifestJSON is a query stream manifest of a partition with base and
-// incr counts and two segments.
-func queryManifestJSON(baseRecords, incrRecords, baseBytes, incrBytes int) string {
+// incr counts and a segment of each size. Its byte counts disagree with the
+// segment sizes, which are what is counted.
+func queryManifestJSON(baseRecords, incrRecords int, segmentSizes ...int) string {
 	return `{"backup_id":"` + jobID1 + `","partition_id":1053,"partition_complete":true,` +
 		`"num_base_records":` + strconv.Itoa(baseRecords) + `,"num_incr_records":` + strconv.Itoa(incrRecords) +
-		`,"num_base_bytes":` + strconv.Itoa(baseBytes) + `,"num_incr_bytes":` + strconv.Itoa(incrBytes) +
-		`,"segments":[{"segment_name":"a.seg","size":1,"record_count":1},{"segment_name":"b.seg","size":1}]}`
+		`,"num_base_bytes":999999,"num_incr_bytes":999999,"segments":` + segmentsJSON(segmentSizes) + `}`
 }
 
-// changeManifestJSON is a change stream manifest of a node with one segment.
-func changeManifestJSON(records, bytes int) string {
+// changeManifestJSON is a change stream manifest of a node with a segment of
+// each size.
+func changeManifestJSON(records int, segmentSizes ...int) string {
 	return `{"backup_id":"` + jobID1 + `","lane":"change","num_records":` + strconv.Itoa(records) +
-		`,"num_bytes":` + strconv.Itoa(bytes) + `,"segments":[{"segment_name":"c.seg","size":1}]}`
+		`,"num_bytes":999999,"segments":` + segmentsJSON(segmentSizes) + `}`
+}
+
+// segmentsJSON is the segment list of a manifest, a segment of each size.
+func segmentsJSON(sizes []int) string {
+	entries := make([]string, len(sizes))
+	for i, size := range sizes {
+		entries[i] = `{"segment_name":"` + strconv.Itoa(i) + `.seg","size":` + strconv.Itoa(size) +
+			`,"checksum":"1a2b3c4d","record_count":1}`
+	}
+
+	return "[" + strings.Join(entries, ",") + "]"
+}
+
+// queryManifestName is the name of a query stream manifest of partition pid.
+func queryManifestName(pid, regime, timestamp int) string {
+	return fmt.Sprintf("%d-%d-%013d-b4f973.json", pid, regime, timestamp)
+}
+
+// changeManifestName is the name of a change stream manifest.
+func changeManifestName(regime, timestamp int) string {
+	return fmt.Sprintf("%d-%013d-5e58e6.json", regime, timestamp)
 }
 
 // sindexJSON is a sindex.json of namespace bar, as the server writes it, with
@@ -179,17 +202,71 @@ func TestLister_GetStatistics(t *testing.T) {
 				statsKey + "/metadata.json":                                             metadataJSON(jobID1),
 				statsKey + "/sindex/ns/bar/sindex.json":                                 sindexJSON("age", "email"),
 				statsKey + "/udf/udf.json":                                              udfJSON("a.lua", "b.lua", "c.lua"),
-				queryManifests + "1053-0-0000061529140-b4f973.json":                     queryManifestJSON(1, 2, 100, 200),
-				queryManifests + "2437-0-0000061529145-0e36ef.json":                     queryManifestJSON(3, 4, 300, 400),
-				queryManifests + "3676-0-0000061529149-238ab0.json":                     queryManifestJSON(5, 6, 500, 600),
+				queryManifests + queryManifestName(1053, 0, 61529140):                   queryManifestJSON(1, 2, 100, 200),
+				queryManifests + queryManifestName(2437, 0, 61529145):                   queryManifestJSON(3, 4, 300, 400),
+				queryManifests + queryManifestName(3676, 0, 61529149):                   queryManifestJSON(5, 6, 500, 600),
 				statsKey + "/ns/bar/query-stream/data/p1053/0-0000061529085-c4441f.seg": "segment",
-				changeManifests + "0-0000062031435-5e58e6.json":                         changeManifestJSON(7, 700),
+				changeManifests + changeManifestName(0, 62031435):                       changeManifestJSON(7, 700),
 				statsKey + "/ns/bar/change-stream/" + statsNode + "/data/0-1-a.seg":     "segment",
 			},
 			want: models.Statistics{
 				RecordCount: 9, IncrRecordCount: 12, ChangeRecordCount: 7, ByteCount: 2800, FileCount: 7,
 				IndexCount: 2, UDFCount: 3,
 			},
+		},
+		{
+			name: "every namespace and node is summed",
+			objects: map[string]string{
+				statsKey + "/ns/bar/query-stream/manifest/" + queryManifestName(1, 0, 1):      queryManifestJSON(1, 0, 10),
+				statsKey + "/ns/baz/query-stream/manifest/" + queryManifestName(1, 0, 1):      queryManifestJSON(2, 0, 20),
+				statsKey + "/ns/bar/change-stream/node1/manifest/" + changeManifestName(0, 1): changeManifestJSON(3, 30),
+				statsKey + "/ns/bar/change-stream/node2/manifest/" + changeManifestName(0, 1): changeManifestJSON(4, 40),
+				statsKey + "/ns/baz/change-stream/node1/manifest/" + changeManifestName(0, 1): changeManifestJSON(5, 50),
+				statsKey + "/ns/baz/change-stream/node2/manifest/" + changeManifestName(0, 1): changeManifestJSON(6, 60),
+				statsKey + "/ns/baz/change-stream/node3/manifest/" + changeManifestName(0, 1): changeManifestJSON(7, 70),
+				statsKey + "/ns/baz/change-stream/node3/manifest/not-a-manifest":              "ignored",
+			},
+			want: models.Statistics{
+				RecordCount: 3, ChangeRecordCount: 25, ByteCount: 280, FileCount: 7,
+			},
+		},
+		{
+			name: "a partition that changed owner takes its base count from its newest manifest",
+			objects: map[string]string{
+				// The new owner starts from the old owner's base count of 1000.
+				queryManifests + queryManifestName(17, 3, 50): queryManifestJSON(1000, 1, 100, 200),
+				queryManifests + queryManifestName(17, 4, 10): queryManifestJSON(1500, 2, 50, 60),
+				// A third owner under the same regime, later.
+				queryManifests + queryManifestName(17, 4, 20): queryManifestJSON(1600, 3, 5),
+				queryManifests + queryManifestName(18, 1, 1):  queryManifestJSON(7, 0, 1),
+			},
+			want: models.Statistics{
+				RecordCount: 1607, IncrRecordCount: 6, ByteCount: 416, FileCount: 6,
+			},
+		},
+		{
+			name: "only the newest change stream manifest of a node is counted",
+			objects: map[string]string{
+				changeManifests + changeManifestName(5, 10):                                   changeManifestJSON(3, 30),
+				changeManifests + changeManifestName(4, 90):                                   changeManifestJSON(10, 100, 100),
+				changeManifests + changeManifestName(5, 9):                                    changeManifestJSON(20, 200),
+				statsKey + "/ns/bar/change-stream/node2/manifest/" + changeManifestName(1, 1): changeManifestJSON(1, 1),
+			},
+			want: models.Statistics{ChangeRecordCount: 4, ByteCount: 31, FileCount: 2},
+		},
+		{
+			name: "manifests restore cannot name are skipped",
+			objects: map[string]string{
+				queryManifests + queryManifestName(17, 1, 1):     queryManifestJSON(1, 0, 10),
+				queryManifests + "17-foo.json":                   `{"num_base_records":":-("}`,
+				queryManifests + queryManifestName(4096, 1, 1):   `{"num_base_records":":-("}`,
+				queryManifests + changeManifestName(1, 1):        `{"num_base_records":":-("}`,
+				changeManifests + changeManifestName(1, 1):       changeManifestJSON(2, 20),
+				changeManifests + "x-1-5e58e6.json":              `{"num_records":":-("}`,
+				changeManifests + "manifest.json":                `{"num_records":":-("}`,
+				changeManifests + changeManifestName(9, 9) + "x": `{"num_records":":-("}`,
+			},
+			want: models.Statistics{RecordCount: 1, ChangeRecordCount: 2, ByteCount: 30, FileCount: 2},
 		},
 		{
 			name: "secondary indexes are summed over namespaces",
@@ -205,26 +282,10 @@ func TestLister_GetStatistics(t *testing.T) {
 		{
 			name: "a backup without sindex.json and udf.json has no indexes and udfs",
 			objects: map[string]string{
-				statsKey + "/metadata.json":                       metadataJSON(jobID1),
-				statsKey + "/ns/bar/query-stream/manifest/1.json": queryManifestJSON(1, 0, 10, 0),
+				statsKey + "/metadata.json": metadataJSON(jobID1),
+				statsKey + "/ns/bar/query-stream/manifest/" + queryManifestName(1, 0, 1): queryManifestJSON(1, 0, 4, 6),
 			},
 			want: models.Statistics{RecordCount: 1, ByteCount: 10, FileCount: 2},
-		},
-		{
-			name: "every namespace and node is summed",
-			objects: map[string]string{
-				statsKey + "/ns/bar/query-stream/manifest/1-0-1-a.json":          queryManifestJSON(1, 0, 10, 0),
-				statsKey + "/ns/baz/query-stream/manifest/1-0-1-a.json":          queryManifestJSON(2, 0, 20, 0),
-				statsKey + "/ns/bar/change-stream/node1/manifest/0-1-a.json":     changeManifestJSON(3, 30),
-				statsKey + "/ns/bar/change-stream/node2/manifest/0-1-a.json":     changeManifestJSON(4, 40),
-				statsKey + "/ns/baz/change-stream/node1/manifest/0-1-a.json":     changeManifestJSON(5, 50),
-				statsKey + "/ns/baz/change-stream/node2/manifest/0-1-a.json":     changeManifestJSON(6, 60),
-				statsKey + "/ns/baz/change-stream/node3/manifest/0-1-a.json":     changeManifestJSON(7, 70),
-				statsKey + "/ns/baz/change-stream/node3/manifest/not-a-manifest": "ignored",
-			},
-			want: models.Statistics{
-				RecordCount: 3, ChangeRecordCount: 25, ByteCount: 280, FileCount: 9,
-			},
 		},
 		{
 			name: "a backup without records has zero statistics",
@@ -235,9 +296,11 @@ func TestLister_GetStatistics(t *testing.T) {
 			want: models.Statistics{},
 		},
 		{
-			name:    "a backup that does not exist has zero statistics",
-			objects: map[string]string{jobID2 + "/ns/bar/query-stream/manifest/1-0-1-a.json": queryManifestJSON(1, 1, 1, 1)},
-			want:    models.Statistics{},
+			name: "a backup that does not exist has zero statistics",
+			objects: map[string]string{
+				jobID2 + "/ns/bar/query-stream/manifest/" + queryManifestName(1, 0, 1): queryManifestJSON(1, 1, 1),
+			},
+			want: models.Statistics{},
 		},
 	}
 
@@ -257,7 +320,8 @@ func TestLister_GetStatistics(t *testing.T) {
 func TestLister_GetStatistics_ParseErrors(t *testing.T) {
 	t.Parallel()
 
-	manifestKey := statsKey + "/ns/bar/query-stream/manifest/1-0-1-a.json"
+	manifestKey := statsKey + "/ns/bar/query-stream/manifest/" + queryManifestName(1, 0, 1)
+	changeKey := statsKey + "/ns/bar/change-stream/" + statsNode + "/manifest/" + changeManifestName(0, 1)
 	sindexKey := statsKey + "/sindex/ns/bar/sindex.json"
 	udfKey := statsKey + "/udf/udf.json"
 
@@ -268,6 +332,8 @@ func TestLister_GetStatistics_ParseErrors(t *testing.T) {
 	}{
 		{name: "unparseable manifest", key: manifestKey, body: `{"num_base_records":`},
 		{name: "count of the wrong type", key: manifestKey, body: `{"num_base_records":"1"}`},
+		{name: "segment size of the wrong type", key: manifestKey, body: `{"segments":[{"size":-1}]}`},
+		{name: "unparseable change manifest", key: changeKey, body: `{"num_records":`},
 		{name: "unparseable sindex.json", key: sindexKey, body: `{"sindex":[`},
 		{name: "sindex of the wrong type", key: sindexKey, body: `{"sindex":{}}`},
 		{name: "unparseable udf.json", key: udfKey, body: `{"udf":`},
@@ -290,7 +356,7 @@ func TestLister_GetStatistics_S3Errors(t *testing.T) {
 	t.Parallel()
 
 	errS3 := errors.New("s3 unavailable")
-	manifestKey := statsKey + "/ns/bar/query-stream/manifest/1-0-1-a.json"
+	manifestKey := statsKey + "/ns/bar/query-stream/manifest/" + queryManifestName(1, 0, 1)
 
 	t.Run("list", func(t *testing.T) {
 		t.Parallel()

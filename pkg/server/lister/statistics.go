@@ -16,16 +16,15 @@ package lister
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
-	"slices"
 	"strings"
 
+	"github.com/aerospike/backup-go/internal/util/collections"
+	"github.com/aerospike/backup-go/pkg/server/internal/manifestname"
 	"github.com/aerospike/backup-go/pkg/server/lister/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -33,30 +32,35 @@ const (
 	queryStreamDir  = "query-stream"
 	changeStreamDir = "change-stream"
 	manifestDir     = "manifest"
-	manifestSuffix  = ".json"
 	sindexDir       = "sindex"
 	sindexFileName  = "sindex.json"
 	udfDir          = "udf"
 	udfFileName     = "udf.json"
 
-	// maxManifestSize caps a manifest read. A query stream manifest lists the
-	// segments of one partition, so it grows with the partition. It also caps
-	// udf.json, which holds the source of every UDF module.
-	maxManifestSize = 64 << 20
+	// maxObjectSize caps every object GetStatistics reads. A query stream
+	// manifest lists the segments of one partition, so it grows with the
+	// partition, and udf.json holds the source of every UDF module.
+	maxObjectSize = 64 << 20
 )
 
-// streamManifest holds the counts of a manifest of either stream. A query
-// stream manifest sets the base and incr counts, a change stream manifest the
-// plain ones.
-type streamManifest struct {
+// segmentEntry is a segment as a manifest lists it.
+type segmentEntry struct {
+	Size uint64 `json:"size"`
+}
+
+// queryManifest holds the counts of a query stream manifest.
+type queryManifest struct {
+	// NumBaseRecords is cumulative across the owners of the partition.
 	NumBaseRecords uint64 `json:"num_base_records"`
-	NumIncrRecords uint64 `json:"num_incr_records"`
-	NumRecords     uint64 `json:"num_records"`
-	NumBaseBytes   uint64 `json:"num_base_bytes"`
-	NumIncrBytes   uint64 `json:"num_incr_bytes"`
-	NumBytes       uint64 `json:"num_bytes"`
-	// Segments are only counted, so their fields are not decoded.
-	Segments []struct{} `json:"segments"`
+	// NumIncrRecords is this owner's incremental round only.
+	NumIncrRecords uint64         `json:"num_incr_records"`
+	Segments       []segmentEntry `json:"segments"`
+}
+
+// changeManifest holds the counts of a change stream manifest.
+type changeManifest struct {
+	NumRecords uint64         `json:"num_records"`
+	Segments   []segmentEntry `json:"segments"`
 }
 
 // sindexFile holds the secondary index definitions of one namespace, one entry
@@ -72,65 +76,78 @@ type udfFile struct {
 	UDFs []struct{} `json:"udf"`
 }
 
-// statsObject is an object GetStatistics reads, and how it counts what it holds.
-type statsObject struct {
-	key string
-	// optional objects that do not exist count as zero.
-	optional bool
-	count    func(body io.Reader) (models.Statistics, error)
+// manifestRef is a manifest a restore applies, which GetStatistics reads.
+type manifestRef struct {
+	key    string
+	change bool
+	// newest marks the newest query stream manifest of its partition, whose
+	// base count is the partition's.
+	newest bool
 }
 
-func (m *streamManifest) statistics() models.Statistics {
-	return models.Statistics{
-		RecordCount:       m.NumBaseRecords,
-		IncrRecordCount:   m.NumIncrRecords,
-		ChangeRecordCount: m.NumRecords,
-		ByteCount:         m.NumBaseBytes + m.NumIncrBytes + m.NumBytes,
-		FileCount:         uint64(len(m.Segments)),
-	}
+// manifestDirRef is a directory of manifests of either stream.
+type manifestDirRef struct {
+	key    string
+	change bool
 }
 
 // GetStatistics sums the record, byte and file counts of the backup at
 // backupKey, the key of its directory as GetMetadata takes it, from the
 // manifests the server wrote for it, and counts the secondary indexes and UDFs
 // it holds. It reads no record data, so its cost grows with the number of
-// manifests, at most 4096 per namespace plus one per node, and not with the
-// size of the backup.
+// manifests, about one per partition plus one per node, and not with the size
+// of the backup.
 //
 // A server side backup lays out its files as follows:
 //
 //	<backup id>/metadata.json
 //	<backup id>/sindex/ns/<namespace>/sindex.json
 //	<backup id>/udf/udf.json
-//	<backup id>/ns/<namespace>/query-stream/manifest/<partition>-<regime>-<time>-<salt>.json
+//	<backup id>/ns/<namespace>/query-stream/manifest/<partition>-<regime>-<time>-<uuid>.json
 //	<backup id>/ns/<namespace>/query-stream/data/p<partition>/<...>.seg
-//	<backup id>/ns/<namespace>/change-stream/<node id>/manifest/<...>.json
+//	<backup id>/ns/<namespace>/change-stream/<node id>/manifest/<regime>-<time>-<uuid>.json
 //	<backup id>/ns/<namespace>/change-stream/<node id>/data/<...>.seg
 //
-// metadata.json records no counts. The query stream has one manifest per
-// partition that holds records, and none for an empty partition. Each counts the
-// records and bytes of the two rounds the server scans its partition in:
-//   - num_base_* for the base round, which reads every record of the partition
-//     once;
-//   - num_incr_* for the incremental round, a second full scan that keeps the
-//     records updated at or after the backup start less the cluster clock skew,
-//     a fixed 20 seconds for an AP namespace.
+// metadata.json records no counts. GetStatistics counts what a restore of the
+// backup applies, and picks the manifests the way restore does:
+//   - The query stream has a manifest per partition that holds records, and
+//     none for an empty partition. A partition that changed owner while the
+//     backup ran, as a node left or joined, has one more manifest per owner,
+//     named under a higher regime, and restore applies the segments of all of
+//     them. Each lists only the segments its owner wrote.
+//   - The change stream has a manifest per node. A node whose change stream
+//     restarted after a failure writes a new manifest under a higher regime, and
+//     restore applies only the newest: the incremental round reads again what
+//     the older ones held.
+//   - Restore skips a manifest whose name it cannot parse, and so does
+//     GetStatistics.
 //
-// The change stream has one manifest per node, whose num_records and num_bytes
-// count every write the node took while the backup ran, across all partitions.
-// Every manifest lists its segments.
+// A query stream manifest counts the records of the two rounds the server scans
+// its partition in:
+//   - num_base_records for the base round, which reads every record of the
+//     partition once. It is cumulative: a new owner starts from the count of
+//     the newest manifest before it.
+//   - num_incr_records for the incremental round, a second full scan that keeps
+//     the records updated at or after the backup start less the cluster clock
+//     skew, a fixed 20 seconds for an AP namespace. It counts its owner's round
+//     only.
 //
-// ByteCount and FileCount are exact: they cover the segments of both rounds and
-// of the change stream, and the byte counts of a manifest add up to the sizes of
-// the segments it lists.
+// A change stream manifest counts in num_records every write the node took
+// while the backup ran, across all partitions.
 //
-// RecordCount is an estimate: it counts the base round only. The server does not
-// deduplicate the rounds and the change stream against each other, restore does,
-// so summing them counts a record once per round and once per write that caught
-// it. Any record updated within the clock skew before the backup started is in
-// both rounds, so the sum doubles the count of a backup taken right after its
-// data was loaded. The base round holds each record once, which makes it exact
-// for a backup no write overlaps, and close otherwise:
+// ByteCount and FileCount are exact: they sum the sizes and count the segments
+// the manifests restore applies list, of both rounds and of the change stream.
+// Segments of a superseded change stream manifest that are still stored are not
+// counted.
+//
+// RecordCount is an estimate: it is the base count of the newest manifest of
+// each partition. The server does not deduplicate the rounds and the change
+// stream against each other, restore does, so summing them counts a record once
+// per round and once per write that caught it. Any record updated within the
+// clock skew before the backup started is in both rounds, so the sum doubles
+// the count of a backup taken right after its data was loaded. The base round
+// holds each record once, which makes it exact for a backup no write overlaps,
+// and close otherwise:
 //   - it misses the records inserted after the base round scanned their
 //     partition;
 //   - it still counts the records deleted after the base round scanned them;
@@ -143,53 +160,46 @@ func (m *streamManifest) statistics() models.Statistics {
 // count is zero.
 //
 // IncrRecordCount and ChangeRecordCount report the other two sources as they
-// are. RecordCount + IncrRecordCount + ChangeRecordCount is an upper bound on the
-// distinct records of the backup, and the change stream count tells how many
-// writes the backup overlapped.
+// are, summed over the manifests restore applies. RecordCount + IncrRecordCount
+// + ChangeRecordCount is an upper bound on the distinct records of the backup,
+// and the change stream count tells how many writes the backup overlapped.
 //
 // Counting distinct records exactly needs reading every segment, which does not
 // scale to large backups.
 //
 // A backup that does not exist has no manifests, and its statistics are zero.
 func (l *Lister) GetStatistics(ctx context.Context, backupKey string) (models.Statistics, error) {
-	manifests, err := l.listManifests(ctx, backupKey)
+	manifests, sindexes, err := l.listStatisticsObjects(ctx, backupKey)
 	if err != nil {
-		return models.Statistics{}, fmt.Errorf("failed to list manifests of %s: %w", backupKey, err)
+		return models.Statistics{}, fmt.Errorf("failed to list %s: %w", backupKey, err)
 	}
 
-	sindexes, err := l.listSIndexFiles(ctx, backupKey)
-	if err != nil {
-		return models.Statistics{}, fmt.Errorf("failed to list secondary indexes of %s: %w", backupKey, err)
-	}
+	type countFunc func(context.Context) (models.Statistics, error)
 
-	objects := make([]statsObject, 0, len(manifests)+len(sindexes)+1)
-	for _, key := range manifests {
-		objects = append(objects, statsObject{key: key, count: manifestStatistics})
-	}
-
-	for _, key := range sindexes {
-		objects = append(objects, statsObject{key: key, optional: true, count: sindexStatistics})
-	}
-
-	objects = append(objects, statsObject{
-		key: objectKey(backupKey, udfDir, udfFileName), optional: true, count: udfStatistics,
-	})
-
-	perObject := make([]models.Statistics, len(objects))
-
-	g, gctx := errgroup.WithContext(ctx)
-	g.SetLimit(l.concurrency)
-
-	for i, obj := range objects {
-		g.Go(func() error {
-			stats, err := l.objectStatistics(gctx, obj)
-			perObject[i] = stats
-
-			return err
+	counts := make([]countFunc, 0, len(manifests)+len(sindexes)+1)
+	for _, m := range manifests {
+		counts = append(counts, func(ctx context.Context) (models.Statistics, error) {
+			return l.manifestStatistics(ctx, m)
 		})
 	}
 
-	if err := g.Wait(); err != nil {
+	for _, key := range sindexes {
+		counts = append(counts, func(ctx context.Context) (models.Statistics, error) {
+			return l.sindexStatistics(ctx, key)
+		})
+	}
+
+	udfKey := objectKey(backupKey, udfDir, udfFileName)
+
+	counts = append(counts, func(ctx context.Context) (models.Statistics, error) {
+		return l.udfStatistics(ctx, udfKey)
+	})
+
+	perObject, err := collections.ParallelMap(ctx, l.concurrency, counts,
+		func(ctx context.Context, count countFunc) (models.Statistics, error) {
+			return count(ctx)
+		})
+	if err != nil {
 		return models.Statistics{}, err
 	}
 
@@ -201,110 +211,192 @@ func (l *Lister) GetStatistics(ctx context.Context, backupKey string) (models.St
 	return total, nil
 }
 
-// listManifests returns the keys of the manifests of both streams of every
-// namespace of the backup at backupKey.
-func (l *Lister) listManifests(ctx context.Context, backupKey string) ([]string, error) {
-	namespaces, _, err := l.listDir(ctx, objectKey(backupKey, namespacesDir))
+// listStatisticsObjects returns the manifests restore applies of every
+// namespace of the backup at backupKey, and the keys of its sindex.json files.
+// It lists level by level, each level's directories concurrently.
+func (l *Lister) listStatisticsObjects(
+	ctx context.Context, backupKey string,
+) (manifests []manifestRef, sindexes []string, err error) {
+	roots := []string{objectKey(backupKey, namespacesDir), objectKey(backupKey, sindexDir, namespacesDir)}
+
+	rootDirs, err := collections.ParallelMap(ctx, l.concurrency, roots, l.listSubdirs)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	var manifests []string
+	namespaces := rootDirs[0]
+	for _, namespace := range rootDirs[1] {
+		sindexes = append(sindexes, objectKey(namespace, sindexFileName))
+	}
 
-	for _, namespace := range namespaces {
-		nodes, _, err := l.listDir(ctx, objectKey(namespace, changeStreamDir))
-		if err != nil {
-			return nil, err
+	nodes, err := collections.ParallelMap(ctx, l.concurrency, namespaces,
+		func(ctx context.Context, namespace string) ([]string, error) {
+			return l.listSubdirs(ctx, objectKey(namespace, changeStreamDir))
+		})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var dirs []manifestDirRef
+
+	for i, namespace := range namespaces {
+		dirs = append(dirs, manifestDirRef{key: objectKey(namespace, queryStreamDir, manifestDir)})
+		for _, node := range nodes[i] {
+			dirs = append(dirs, manifestDirRef{key: objectKey(node, manifestDir), change: true})
 		}
+	}
 
-		manifestDirs := []string{objectKey(namespace, queryStreamDir, manifestDir)}
-		for _, node := range nodes {
-			manifestDirs = append(manifestDirs, objectKey(node, manifestDir))
-		}
+	files, err := collections.ParallelMap(ctx, l.concurrency, dirs,
+		func(ctx context.Context, dir manifestDirRef) ([]string, error) {
+			_, files, err := l.listDir(ctx, dir.key)
+			return files, err
+		})
+	if err != nil {
+		return nil, nil, err
+	}
 
-		for _, dir := range manifestDirs {
-			_, files, err := l.listDir(ctx, dir)
-			if err != nil {
-				return nil, err
+	for i, dir := range dirs {
+		if dir.change {
+			if m, ok := newestChangeManifest(files[i]); ok {
+				manifests = append(manifests, m)
 			}
 
-			manifests = append(manifests, files...)
+			continue
+		}
+
+		manifests = append(manifests, queryManifests(files[i])...)
+	}
+
+	return manifests, sindexes, nil
+}
+
+// queryManifests returns the query stream manifests among keys, the files of
+// one namespace's manifest directory, that restore applies: every one it can
+// parse the name of. The newest of each partition is marked.
+func queryManifests(keys []string) []manifestRef {
+	var (
+		refs   []manifestRef
+		names  []manifestname.Name
+		newest = make(map[int]int)
+	)
+
+	for _, key := range keys {
+		name, ok := manifestname.ParseQuery(key)
+		if !ok {
+			continue
+		}
+
+		refs = append(refs, manifestRef{key: key})
+		names = append(names, name)
+
+		// Like the server, the first of two equally new manifests wins.
+		if i, seen := newest[name.Partition]; !seen || name.Newer(names[i]) {
+			newest[name.Partition] = len(refs) - 1
 		}
 	}
 
-	return slices.DeleteFunc(manifests, func(key string) bool {
-		return !strings.HasSuffix(key, manifestSuffix)
-	}), nil
-}
-
-// listSIndexFiles returns the keys of the sindex.json files of every namespace
-// of the backup at backupKey. A namespace directory may lack the file.
-func (l *Lister) listSIndexFiles(ctx context.Context, backupKey string) ([]string, error) {
-	namespaces, _, err := l.listDir(ctx, objectKey(backupKey, sindexDir, namespacesDir))
-	if err != nil {
-		return nil, err
+	for _, i := range newest {
+		refs[i].newest = true
 	}
 
-	keys := make([]string, len(namespaces))
-	for i, namespace := range namespaces {
-		keys[i] = objectKey(namespace, sindexFileName)
-	}
-
-	return keys, nil
+	return refs
 }
 
-// objectStatistics reads the object obj names and counts what it holds.
-func (l *Lister) objectStatistics(ctx context.Context, obj statsObject) (models.Statistics, error) {
-	out, err := l.client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(l.bucket),
-		Key:    aws.String(obj.key),
-	})
-	if err != nil {
-		if obj.optional && isNotFound(err) {
-			return models.Statistics{}, nil
+// newestChangeManifest returns the change stream manifest among keys, the
+// files of one node's manifest directory, that restore applies: the newest one
+// it can parse the name of. ok is false when there is none.
+func newestChangeManifest(keys []string) (ref manifestRef, ok bool) {
+	var newest manifestname.Name
+
+	for _, key := range keys {
+		name, parsed := manifestname.ParseChange(key)
+		if !parsed || ok && !name.Newer(newest) {
+			continue
 		}
 
-		return models.Statistics{}, fmt.Errorf("failed to get %s: %w", obj.key, err)
+		ref, newest, ok = manifestRef{key: key, change: true}, name, true
 	}
 
-	defer out.Body.Close()
+	return ref, ok
+}
 
-	stats, err := obj.count(io.LimitReader(out.Body, maxManifestSize))
-	if err != nil {
-		return models.Statistics{}, fmt.Errorf("failed to parse %s: %w", obj.key, err)
+// manifestStatistics reads the counts of the manifest m.
+func (l *Lister) manifestStatistics(ctx context.Context, m manifestRef) (models.Statistics, error) {
+	if m.change {
+		var manifest changeManifest
+		if err := l.readJSON(ctx, m.key, maxObjectSize, &manifest); err != nil {
+			return models.Statistics{}, err
+		}
+
+		stats := segmentStatistics(manifest.Segments)
+		stats.ChangeRecordCount = manifest.NumRecords
+
+		return stats, nil
+	}
+
+	var manifest queryManifest
+	if err := l.readJSON(ctx, m.key, maxObjectSize, &manifest); err != nil {
+		return models.Statistics{}, err
+	}
+
+	stats := segmentStatistics(manifest.Segments)
+	stats.IncrRecordCount = manifest.NumIncrRecords
+
+	if m.newest {
+		stats.RecordCount = manifest.NumBaseRecords
 	}
 
 	return stats, nil
 }
 
-// manifestStatistics reads the counts of a manifest of either stream.
-func manifestStatistics(body io.Reader) (models.Statistics, error) {
-	var manifest streamManifest
-	if err := json.NewDecoder(body).Decode(&manifest); err != nil {
-		return models.Statistics{}, fmt.Errorf("manifest: %w", err)
+// segmentStatistics counts segments and sums their sizes.
+func segmentStatistics(segments []segmentEntry) models.Statistics {
+	stats := models.Statistics{FileCount: uint64(len(segments))}
+	for _, segment := range segments {
+		stats.ByteCount += segment.Size
 	}
 
-	return manifest.statistics(), nil
+	return stats
 }
 
-// sindexStatistics counts the secondary indexes of a sindex.json.
-func sindexStatistics(body io.Reader) (models.Statistics, error) {
+// sindexStatistics counts the secondary indexes of the sindex.json at key. A
+// missing file counts as none.
+func (l *Lister) sindexStatistics(ctx context.Context, key string) (models.Statistics, error) {
 	var file sindexFile
-	if err := json.NewDecoder(body).Decode(&file); err != nil {
-		return models.Statistics{}, fmt.Errorf("secondary indexes: %w", err)
+	if err := l.readOptionalJSON(ctx, key, &file); err != nil {
+		return models.Statistics{}, err
 	}
 
 	return models.Statistics{IndexCount: uint64(len(file.SIndexes))}, nil
 }
 
-// udfStatistics counts the UDF modules of a udf.json.
-func udfStatistics(body io.Reader) (models.Statistics, error) {
+// udfStatistics counts the UDF modules of the udf.json at key. A missing file
+// counts as none.
+func (l *Lister) udfStatistics(ctx context.Context, key string) (models.Statistics, error) {
 	var file udfFile
-	if err := json.NewDecoder(body).Decode(&file); err != nil {
-		return models.Statistics{}, fmt.Errorf("udfs: %w", err)
+	if err := l.readOptionalJSON(ctx, key, &file); err != nil {
+		return models.Statistics{}, err
 	}
 
 	return models.Statistics{UDFCount: uint64(len(file.UDFs))}, nil
+}
+
+// readOptionalJSON is readJSON for an object that may be missing, which leaves
+// v as it is.
+func (l *Lister) readOptionalJSON(ctx context.Context, key string, v any) error {
+	err := l.readJSON(ctx, key, maxObjectSize, v)
+	if errors.Is(err, errObjectNotFound) {
+		return nil
+	}
+
+	return err
+}
+
+// listSubdirs returns the keys of the directories directly under dir, without
+// a trailing slash.
+func (l *Lister) listSubdirs(ctx context.Context, dir string) ([]string, error) {
+	dirs, _, err := l.listDir(ctx, dir)
+	return dirs, err
 }
 
 // listDir returns the keys of the directories, without a trailing slash, and of

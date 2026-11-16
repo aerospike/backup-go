@@ -22,6 +22,7 @@ import (
 
 	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/internal/util/collections"
+	"github.com/aerospike/backup-go/pkg/asinfo"
 	"github.com/aerospike/backup-go/pkg/server/internal/manifestname"
 	"github.com/aerospike/backup-go/pkg/server/lister/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -92,10 +93,11 @@ type manifestDirRef struct {
 	change bool
 }
 
-// GetStatistics sums the record, byte and file counts of the backup at
-// backupKey, the key of its directory as GetMetadata takes it, from the
+// GetStatistics sums the record, byte and file counts of one backup from the
 // manifests the server wrote for it, and counts the secondary indexes and UDFs
-// it holds. It reads no record data, so its cost grows with the number of
+// it holds. Like GetMetadata, it takes the job id the backup was started with,
+// not a storage path, and looks it up under the lister's prefix; anything else
+// fails with [ErrInvalidBackupID]. It reads no record data, so its cost grows with the number of
 // manifests, about one per partition plus one per node, and not with the size
 // of the backup.
 //
@@ -169,10 +171,17 @@ type manifestDirRef struct {
 // scale to large backups.
 //
 // A backup that does not exist has no manifests, and its statistics are zero.
-func (l *Lister) GetStatistics(ctx context.Context, backupKey string) (models.Statistics, error) {
+func (l *Lister) GetStatistics(ctx context.Context, backupID string) (models.Statistics, error) {
+	// A job id holds no slash, so the keys cannot leave the prefix.
+	if !asinfo.IsJobID(backupID) {
+		return models.Statistics{}, fmt.Errorf("%w: %q", ErrInvalidBackupID, backupID)
+	}
+
+	backupKey := objectKey(l.prefix, backupID)
+
 	manifests, sindexes, err := l.listStatisticsObjects(ctx, backupKey)
 	if err != nil {
-		return models.Statistics{}, fmt.Errorf("failed to list %s: %w", backupKey, err)
+		return models.Statistics{}, fmt.Errorf("failed to list backup %s: %w", backupID, err)
 	}
 
 	type countFunc func(context.Context) (models.Statistics, error)
@@ -213,7 +222,8 @@ func (l *Lister) GetStatistics(ctx context.Context, backupKey string) (models.St
 }
 
 // listStatisticsObjects returns the manifests restore applies of every
-// namespace of the backup at backupKey, and the keys of its sindex.json files.
+// namespace of the backup whose directory is backupKey, and the keys of its
+// sindex.json files.
 // It lists level by level, each level's directories concurrently.
 func (l *Lister) listStatisticsObjects(
 	ctx context.Context, backupKey string,

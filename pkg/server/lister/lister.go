@@ -55,8 +55,8 @@ const (
 // It belongs to the [errclass.ErrNotFound] class.
 var ErrMetadataNotFound = fmt.Errorf("%w: metadata.json not found", errclass.ErrNotFound)
 
-// ErrInvalidBackupID is returned when GetMetadata is given something that is not
-// a backup id, such as an empty string or a storage path.
+// ErrInvalidBackupID is returned when GetMetadata or GetStatistics is given
+// something that is not a backup id, such as an empty string or a storage path.
 // It belongs to the [errclass.ErrInvalidConfig] class.
 var ErrInvalidBackupID = fmt.Errorf("%w: invalid backup id", errclass.ErrInvalidConfig)
 

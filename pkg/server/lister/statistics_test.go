@@ -35,8 +35,11 @@ import (
 )
 
 const (
-	statsKey  = "backups/" + jobID1
-	statsNode = "BB9D5F76B77F4A6"
+	// statsPrefix is the prefix of the lister the tests read jobID1 with, and
+	// statsKey the directory of jobID1 under it.
+	statsPrefix = "backups"
+	statsKey    = statsPrefix + "/" + jobID1
+	statsNode   = "BB9D5F76B77F4A6"
 	// statsPageSize keeps listing pages small, so a listing spans several pages.
 	statsPageSize = 2
 )
@@ -309,9 +312,9 @@ func TestLister_GetStatistics(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			l := NewLister(mockBucket(t, tt.objects), "bucket", "backups")
+			l := NewLister(mockBucket(t, tt.objects), "bucket", statsPrefix)
 
-			got, err := l.GetStatistics(t.Context(), statsKey)
+			got, err := l.GetStatistics(t.Context(), jobID1)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})
@@ -345,9 +348,9 @@ func TestLister_GetStatistics_ParseErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			l := NewLister(mockBucket(t, map[string]string{tt.key: tt.body}), "bucket", "")
+			l := NewLister(mockBucket(t, map[string]string{tt.key: tt.body}), "bucket", statsPrefix)
 
-			_, err := l.GetStatistics(t.Context(), statsKey)
+			_, err := l.GetStatistics(t.Context(), jobID1)
 			require.ErrorContains(t, err, "failed to parse "+tt.key)
 		})
 	}
@@ -365,7 +368,7 @@ func TestLister_GetStatistics_S3Errors(t *testing.T) {
 		m := mocks.NewMockS3API(t)
 		m.EXPECT().ListObjectsV2(mock.Anything, mock.Anything, mock.Anything).Return(nil, errS3)
 
-		_, err := NewLister(m, "bucket", "").GetStatistics(t.Context(), statsKey)
+		_, err := NewLister(m, "bucket", statsPrefix).GetStatistics(t.Context(), jobID1)
 		require.ErrorIs(t, err, errS3)
 	})
 
@@ -379,7 +382,7 @@ func TestLister_GetStatistics_S3Errors(t *testing.T) {
 			})
 		m.EXPECT().GetObject(mock.Anything, mock.Anything).Return(nil, errS3)
 
-		_, err := NewLister(m, "bucket", "").GetStatistics(t.Context(), statsKey)
+		_, err := NewLister(m, "bucket", statsPrefix).GetStatistics(t.Context(), jobID1)
 		require.ErrorIs(t, err, errS3)
 	})
 
@@ -393,7 +396,7 @@ func TestLister_GetStatistics_S3Errors(t *testing.T) {
 			})
 		m.EXPECT().GetObject(mock.Anything, mock.Anything).Return(nil, &types.NoSuchKey{})
 
-		_, err := NewLister(m, "bucket", "").GetStatistics(t.Context(), statsKey)
+		_, err := NewLister(m, "bucket", statsPrefix).GetStatistics(t.Context(), jobID1)
 		require.ErrorIs(t, err, errclass.ErrNotFound)
 		require.ErrorContains(t, err, manifestKey)
 	})
@@ -405,8 +408,23 @@ func TestLister_GetStatistics_S3Errors(t *testing.T) {
 		m.EXPECT().ListObjectsV2(mock.Anything, mock.Anything, mock.Anything).Return(&s3.ListObjectsV2Output{}, nil)
 		m.EXPECT().GetObject(mock.Anything, mock.Anything).Return(nil, errS3)
 
-		_, err := NewLister(m, "bucket", "").GetStatistics(t.Context(), statsKey)
+		_, err := NewLister(m, "bucket", statsPrefix).GetStatistics(t.Context(), jobID1)
 		require.ErrorIs(t, err, errS3)
 		require.ErrorContains(t, err, statsKey+"/udf/udf.json")
 	})
+}
+
+func TestLister_GetStatistics_InvalidBackupID(t *testing.T) {
+	t.Parallel()
+
+	for _, id := range []string{"", statsKey, "../" + jobID1, jobID1 + "/ns"} {
+		t.Run(id, func(t *testing.T) {
+			t.Parallel()
+
+			// No S3 call is expected: the id is refused first.
+			_, err := NewLister(mocks.NewMockS3API(t), "bucket", statsPrefix).GetStatistics(t.Context(), id)
+			require.ErrorIs(t, err, ErrInvalidBackupID)
+			require.ErrorIs(t, err, errclass.ErrInvalidConfig)
+		})
+	}
 }

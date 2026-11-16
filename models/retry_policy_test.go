@@ -384,6 +384,39 @@ func TestRetryPolicy_Do(t *testing.T) {
 	}
 }
 
+// TestRetryPolicy_Do_CanceledContext checks that the operation is not executed
+// when the context is canceled before the first attempt.
+func TestRetryPolicy_Do_CanceledContext(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		policy *RetryPolicy
+	}{
+		{name: "with retries", policy: NewRetryPolicy(10*time.Millisecond, 2.0, 3)},
+		{name: "no retries", policy: NewRetryPolicy(10*time.Millisecond, 2.0, 0)},
+		{name: "nil policy", policy: nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+
+			called := false
+			err := tt.policy.Do(ctx, func() error {
+				called = true
+				return nil
+			})
+
+			require.ErrorIs(t, err, context.Canceled)
+			require.False(t, called)
+		})
+	}
+}
+
 func TestRetryPolicy_calculateDelay(t *testing.T) {
 	t.Parallel()
 

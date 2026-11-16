@@ -51,6 +51,7 @@ func TestSindexWriterSuccess(t *testing.T) {
 	logger := slog.Default()
 
 	writer := sindexWriter{
+		ctx:         t.Context(),
 		asc:         mockDBWriter,
 		writePolicy: &a.WritePolicy{},
 		logger:      logger,
@@ -90,6 +91,7 @@ func TestSindexWriterIndexAlreadyExists(t *testing.T) {
 	logger := slog.Default()
 
 	writer := sindexWriter{
+		ctx:         t.Context(),
 		asc:         mockDBWriter,
 		writePolicy: &a.WritePolicy{},
 		logger:      logger,
@@ -129,6 +131,7 @@ func TestSindexWriterCreateError(t *testing.T) {
 	logger := slog.Default()
 
 	writer := sindexWriter{
+		ctx:         t.Context(),
 		asc:         mockDBWriter,
 		writePolicy: &a.WritePolicy{},
 		logger:      logger,
@@ -168,6 +171,7 @@ func TestSindexWriterDropError(t *testing.T) {
 	logger := slog.Default()
 
 	writer := sindexWriter{
+		ctx:         t.Context(),
 		asc:         mockDBWriter,
 		writePolicy: &a.WritePolicy{},
 		logger:      logger,
@@ -196,6 +200,7 @@ func TestSindexWriterInvalidBinType(t *testing.T) {
 	logger := slog.Default()
 
 	writer := sindexWriter{
+		ctx:         t.Context(),
 		asc:         mockDBWriter,
 		writePolicy: &a.WritePolicy{},
 		logger:      logger,
@@ -224,6 +229,7 @@ func TestSindexWriterInvalidIndexType(t *testing.T) {
 	logger := slog.Default()
 
 	writer := sindexWriter{
+		ctx:         t.Context(),
 		asc:         mockDBWriter,
 		writePolicy: &a.WritePolicy{},
 		logger:      logger,
@@ -266,6 +272,7 @@ func TestSindexWriterWithCDTContext(t *testing.T) {
 	logger := slog.Default()
 
 	writer := sindexWriter{
+		ctx:         t.Context(),
 		asc:         mockDBWriter,
 		writePolicy: &a.WritePolicy{},
 		logger:      logger,
@@ -297,6 +304,7 @@ func TestSindexWriterInvalidCDTContext(t *testing.T) {
 	logger := slog.Default()
 
 	writer := sindexWriter{
+		ctx:         t.Context(),
 		asc:         mockDBWriter,
 		writePolicy: &a.WritePolicy{},
 		logger:      logger,
@@ -336,6 +344,7 @@ func TestSindexWriterTaskError(t *testing.T) {
 	logger := slog.Default()
 
 	writer := sindexWriter{
+		ctx:         t.Context(),
 		asc:         mockDBWriter,
 		writePolicy: &a.WritePolicy{},
 		logger:      logger,
@@ -374,6 +383,7 @@ func TestSindexWriterNilTask(t *testing.T) {
 	logger := slog.Default()
 
 	writer := sindexWriter{
+		ctx:         t.Context(),
 		asc:         mockDBWriter,
 		writePolicy: &a.WritePolicy{},
 		logger:      logger,

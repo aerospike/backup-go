@@ -133,7 +133,13 @@ func (p *RetryPolicy) calculateJitter(baseDelay time.Duration) time.Duration {
 // Do executes the operation with automatic retry logic.
 // The operation is retried up to MaxRetries times with exponential backoff and jitter.
 // Returns operation error if all retries are exhausted.
+// The operation is not executed if ctx is already canceled.
 func (p *RetryPolicy) Do(ctx context.Context, operation func() error) error {
+	// The operation may ignore ctx. The sleep covers the attempts after the first.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	if p == nil {
 		return operation()
 	}
@@ -155,7 +161,7 @@ func (p *RetryPolicy) Do(ctx context.Context, operation func() error) error {
 			break
 		}
 
-		// sleep before the next attempt. We check context only in sleep, not to slow down first operation.
+		// sleep before the next attempt. It returns early if ctx is canceled.
 		if err := p.sleep(ctx, attempt); err != nil {
 			// Show all errors if any.
 			return errors.Join(err, lastErr)

@@ -2135,15 +2135,20 @@ func TestClient_AbortRestore(t *testing.T) {
 			setup: func(t *testing.T) (*Client, context.Context) {
 				t.Helper()
 
+				ctx, cancel := context.WithCancel(t.Context())
+
+				// The context is canceled during the first attempt: a context canceled
+				// before it would stop the command from being sent at all.
 				mockNodeGetter := mocks.NewMockNodeGetter(t)
-				mockNodeGetter.EXPECT().GetRandomNode().Return(nil, a.ErrInvalidParam)
+				mockNodeGetter.EXPECT().GetRandomNode().RunAndReturn(func() (*a.Node, a.Error) {
+					cancel()
+
+					return nil, a.ErrInvalidParam
+				})
 
 				// The backoff must be long enough for the canceled context, and not
 				// the elapsed delay, to end the wait between the attempts.
 				ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(time.Hour, 1, testMaxRetries))
-
-				ctx, cancel := context.WithCancel(t.Context())
-				cancel()
 
 				return ic, ctx
 			},

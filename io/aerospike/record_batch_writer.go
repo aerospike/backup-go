@@ -17,10 +17,12 @@ package aerospike
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/internal/metrics"
 	"github.com/aerospike/backup-go/models"
 )
@@ -126,7 +128,9 @@ func (rw *batchRecordWriter) flushBuffer() error {
 		slog.Any("retryPolicy", rw.retryPolicy),
 	)
 
-	return rw.retryPolicy.Do(rw.ctx,
+	bufferSize := len(rw.operationBuffer)
+
+	err := rw.retryPolicy.Do(rw.ctx,
 		func() error {
 			rw.logger.Debug("attempting batch operation",
 				slog.Int("bufferSize", len(rw.operationBuffer)),
@@ -170,6 +174,12 @@ func (rw *batchRecordWriter) flushBuffer() error {
 			}
 		},
 	)
+	if err != nil {
+		return fmt.Errorf("%w: failed to write batch of %d records: %w",
+			errclass.ErrAerospike, bufferSize, err)
+	}
+
+	return nil
 }
 
 func (rw *batchRecordWriter) processAndFilterOperations(batchError a.Error) ([]a.BatchRecordIfc, error) {
@@ -201,8 +211,18 @@ func (rw *batchRecordWriter) processOperationResult(op a.BatchRecordIfc) bool {
 		atypes.ALWAYS_FORBIDDEN,
 		atypes.FAIL_FORBIDDEN,
 		atypes.BIN_TYPE_ERROR,
-		atypes.BIN_NOT_FOUND:
+		atypes.BIN_NOT_FOUND,
+		atypes.KEY_NOT_FOUND_ERROR:
+		// Without ignoreRecordError, a rejected record must fail the restore.
+		// It stays in the buffer and is retried on purpose, the same way as in
+		// singleRecordWriter, so its error is returned once the retry policy
+		// is exhausted.
+		if !rw.ignoreRecordError {
+			return true
+		}
+
 		rw.stats.IncrRecordsIgnored()
+
 		return false
 	case atypes.OK:
 		rw.stats.IncrRecordsInserted()

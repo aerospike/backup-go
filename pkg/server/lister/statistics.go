@@ -276,8 +276,8 @@ func (l *Lister) listStatisticsObjects(
 // parse the name of. The newest of each partition is marked.
 func queryManifests(keys []string) []manifestRef {
 	var (
-		refs   []manifestRef
-		names  []manifestname.Name
+		refs   = make([]manifestRef, 0, len(keys))
+		names  = make([]manifestname.Name, 0, len(keys))
 		newest = make(map[int]int)
 	)
 

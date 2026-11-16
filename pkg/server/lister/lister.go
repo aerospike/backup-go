@@ -197,12 +197,13 @@ func (l *Lister) GetMetadata(ctx context.Context, backupID string) (models.Metad
 		return models.Metadata{}, fmt.Errorf("%w: %q", ErrInvalidBackupID, backupID)
 	}
 
-	data, found, err := l.fetch(ctx, objectKey(l.prefix, backupID, metadataFileName), maxMetadataSize)
-	switch {
-	case err != nil:
+	data, err := l.fetch(ctx, objectKey(l.prefix, backupID, metadataFileName), maxMetadataSize)
+	if errors.Is(err, errclass.ErrNotFound) {
+		err = fmt.Errorf("%w: %w", ErrMetadataNotFound, err)
+	}
+
+	if err != nil {
 		return models.Metadata{}, fmt.Errorf("failed to get metadata of backup %s: %w", backupID, err)
-	case !found:
-		return models.Metadata{}, fmt.Errorf("failed to get metadata of backup %s: %w", backupID, ErrMetadataNotFound)
 	}
 
 	var md models.Metadata
@@ -250,29 +251,29 @@ func (l *Lister) listBackupIDs(ctx context.Context) ([]string, error) {
 }
 
 // fetch reads the object at key, at most limit bytes of it, so a larger object
-// is cut short. found is false, with no error, when the bucket does not hold
-// it.
-func (l *Lister) fetch(ctx context.Context, key string, limit int64) (data []byte, found bool, err error) {
+// is cut short. The error of a missing object belongs to the
+// [errclass.ErrNotFound] class.
+func (l *Lister) fetch(ctx context.Context, key string, limit int64) ([]byte, error) {
 	out, err := l.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(l.bucket),
 		Key:    aws.String(key),
 	})
 	if err != nil {
 		if isNotFound(err) {
-			return nil, false, nil
+			err = fmt.Errorf("%w: %w", errclass.ErrNotFound, err)
 		}
 
-		return nil, false, fmt.Errorf("failed to get %s: %w", key, err)
+		return nil, fmt.Errorf("failed to get %s: %w", key, err)
 	}
 
 	defer out.Body.Close()
 
-	data, err = io.ReadAll(io.LimitReader(out.Body, limit))
+	data, err := io.ReadAll(io.LimitReader(out.Body, limit))
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to read %s: %w", key, err)
+		return nil, fmt.Errorf("failed to read %s: %w", key, err)
 	}
 
-	return data, true, nil
+	return data, nil
 }
 
 func objectKey(elems ...string) string {

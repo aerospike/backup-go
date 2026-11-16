@@ -17,6 +17,7 @@ package lister
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path"
 	"strings"
@@ -337,12 +338,9 @@ func newestChangeManifest(keys []string) (ref manifestRef, ok bool) {
 // manifestStatistics reads the counts of the manifest m. The manifest was
 // listed, so a missing one is an error.
 func (l *Lister) manifestStatistics(ctx context.Context, m manifestRef) (models.Statistics, error) {
-	data, found, err := l.fetch(ctx, m.key, maxObjectSize)
-	switch {
-	case err != nil:
+	data, err := l.fetch(ctx, m.key, maxObjectSize)
+	if err != nil {
 		return models.Statistics{}, err
-	case !found:
-		return models.Statistics{}, fmt.Errorf("%w: manifest %s", errclass.ErrNotFound, m.key)
 	}
 
 	if m.change {
@@ -385,8 +383,12 @@ func segmentStatistics(segments []segmentEntry) models.Statistics {
 // sindexStatistics counts the secondary indexes of the sindex.json at key. A
 // missing file counts as none.
 func (l *Lister) sindexStatistics(ctx context.Context, key string) (models.Statistics, error) {
-	data, found, err := l.fetch(ctx, key, maxObjectSize)
-	if err != nil || !found {
+	data, err := l.fetch(ctx, key, maxObjectSize)
+	if errors.Is(err, errclass.ErrNotFound) {
+		return models.Statistics{}, nil
+	}
+
+	if err != nil {
 		return models.Statistics{}, err
 	}
 
@@ -401,8 +403,12 @@ func (l *Lister) sindexStatistics(ctx context.Context, key string) (models.Stati
 // udfStatistics counts the UDF modules of the udf.json at key. A missing file
 // counts as none.
 func (l *Lister) udfStatistics(ctx context.Context, key string) (models.Statistics, error) {
-	data, found, err := l.fetch(ctx, key, maxObjectSize)
-	if err != nil || !found {
+	data, err := l.fetch(ctx, key, maxObjectSize)
+	if errors.Is(err, errclass.ErrNotFound) {
+		return models.Statistics{}, nil
+	}
+
+	if err != nil {
 		return models.Statistics{}, err
 	}
 

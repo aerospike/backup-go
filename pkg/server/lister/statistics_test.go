@@ -399,6 +399,10 @@ func TestLister_GetStatistics_S3Errors(t *testing.T) {
 		_, err := NewLister(m, "bucket", statsPrefix).GetStatistics(t.Context(), jobID1)
 		require.ErrorIs(t, err, errclass.ErrNotFound)
 		require.ErrorContains(t, err, manifestKey)
+
+		// The S3 error is passed on, not replaced.
+		var noSuchKey *types.NoSuchKey
+		require.ErrorAs(t, err, &noSuchKey)
 	})
 
 	t.Run("get udf.json", func(t *testing.T) {

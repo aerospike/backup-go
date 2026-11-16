@@ -229,8 +229,6 @@ type manifestSegment struct {
 // it is filled in in place rather than returned: a manifest states what it is
 // before stating what it holds.
 func decodeManifest(r io.Reader, header *manifestHeader, fn func(manifestSegment) error) error {
-	// The manifest is walked as it arrives, so the cap bounds the transfer and
-	// not the memory reading one costs.
 	dec := json.NewDecoder(io.LimitReader(r, manifestname.MaxSize))
 
 	if err := expectDelim(dec, '{'); err != nil {

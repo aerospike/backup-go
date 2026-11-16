@@ -31,12 +31,17 @@ func TestStatistics_Add(t *testing.T) {
 	}{
 		{
 			name: "every count is added",
-			s:    Statistics{RecordCount: 1, IncrRecordCount: 2, ChangeRecordCount: 3, ByteCount: 10, FileCount: 2},
+			s: Statistics{
+				RecordCount: 1, IncrRecordCount: 2, ChangeRecordCount: 3, ByteCount: 10, FileCount: 2,
+				IndexCount: 1, UDFCount: 2,
+			},
 			other: Statistics{
 				RecordCount: 3, IncrRecordCount: 4, ChangeRecordCount: 5, ByteCount: 30, FileCount: 4,
+				IndexCount: 3, UDFCount: 1,
 			},
 			want: Statistics{
 				RecordCount: 4, IncrRecordCount: 6, ChangeRecordCount: 8, ByteCount: 40, FileCount: 6,
+				IndexCount: 4, UDFCount: 3,
 			},
 		},
 		{

@@ -54,6 +54,29 @@ func changeManifestJSON(records, bytes int) string {
 		`,"num_bytes":` + strconv.Itoa(bytes) + `,"segments":[{"segment_name":"c.seg","size":1}]}`
 }
 
+// sindexJSON is a sindex.json of namespace bar, as the server writes it, with
+// one entry per index.
+func sindexJSON(indexes ...string) string {
+	entries := make([]string, len(indexes))
+	for i, name := range indexes {
+		entries[i] = `{"key":"bar|users|` + name + `|.|I","value":"` + name + `"}`
+	}
+
+	return `{"backup_id":"` + jobID1 + `","namespace":"bar","format_version":2,"sindex":[` +
+		strings.Join(entries, ",") + `]}`
+}
+
+// udfJSON is a udf.json, as the server writes it, with one entry per module.
+func udfJSON(modules ...string) string {
+	entries := make([]string, len(modules))
+	for i, name := range modules {
+		entries[i] = `{"key":"` + name + `","value":"{\"content64\": \"cmV0dXJu\", \"type\": \"LUA\", ` +
+			`\"name\": \"` + name + `\"}"}`
+	}
+
+	return `{"backup_id":"` + jobID1 + `","format_version":2,"udf":[` + strings.Join(entries, ",") + `]}`
+}
+
 // mockBucket serves objects to m as S3 would: listings with a delimiter, split
 // into pages of statsPageSize entries, and reads by key.
 func mockBucket(t *testing.T, objects map[string]string) *mocks.MockS3API {
@@ -154,8 +177,8 @@ func TestLister_GetStatistics(t *testing.T) {
 			name: "every count is summed per stream",
 			objects: map[string]string{
 				statsKey + "/metadata.json":                                             metadataJSON(jobID1),
-				statsKey + "/sindex/ns/bar/sindex.json":                                 `{"sindex":[]}`,
-				statsKey + "/udf/udf.json":                                              `{"udf":[]}`,
+				statsKey + "/sindex/ns/bar/sindex.json":                                 sindexJSON("age", "email"),
+				statsKey + "/udf/udf.json":                                              udfJSON("a.lua", "b.lua", "c.lua"),
 				queryManifests + "1053-0-0000061529140-b4f973.json":                     queryManifestJSON(1, 2, 100, 200),
 				queryManifests + "2437-0-0000061529145-0e36ef.json":                     queryManifestJSON(3, 4, 300, 400),
 				queryManifests + "3676-0-0000061529149-238ab0.json":                     queryManifestJSON(5, 6, 500, 600),
@@ -165,7 +188,27 @@ func TestLister_GetStatistics(t *testing.T) {
 			},
 			want: models.Statistics{
 				RecordCount: 9, IncrRecordCount: 12, ChangeRecordCount: 7, ByteCount: 2800, FileCount: 7,
+				IndexCount: 2, UDFCount: 3,
 			},
+		},
+		{
+			name: "secondary indexes are summed over namespaces",
+			objects: map[string]string{
+				statsKey + "/sindex/ns/bar/sindex.json": sindexJSON("a", "b", "c"),
+				statsKey + "/sindex/ns/baz/sindex.json": sindexJSON("d"),
+				statsKey + "/sindex/ns/qux/sindex.json": sindexJSON(),
+				statsKey + "/sindex/ns/quux/other.json": "ignored",
+				statsKey + "/udf/udf.json":              udfJSON("a.lua"),
+			},
+			want: models.Statistics{IndexCount: 4, UDFCount: 1},
+		},
+		{
+			name: "a backup without sindex.json and udf.json has no indexes and udfs",
+			objects: map[string]string{
+				statsKey + "/metadata.json":                       metadataJSON(jobID1),
+				statsKey + "/ns/bar/query-stream/manifest/1.json": queryManifestJSON(1, 0, 10, 0),
+			},
+			want: models.Statistics{RecordCount: 1, ByteCount: 10, FileCount: 2},
 		},
 		{
 			name: "every namespace and node is summed",
@@ -211,27 +254,34 @@ func TestLister_GetStatistics(t *testing.T) {
 	}
 }
 
-func TestLister_GetStatistics_ManifestErrors(t *testing.T) {
+func TestLister_GetStatistics_ParseErrors(t *testing.T) {
 	t.Parallel()
 
 	manifestKey := statsKey + "/ns/bar/query-stream/manifest/1-0-1-a.json"
+	sindexKey := statsKey + "/sindex/ns/bar/sindex.json"
+	udfKey := statsKey + "/udf/udf.json"
 
 	tests := []struct {
 		name string
+		key  string
 		body string
 	}{
-		{name: "unparseable manifest", body: `{"num_base_records":`},
-		{name: "count of the wrong type", body: `{"num_base_records":"1"}`},
+		{name: "unparseable manifest", key: manifestKey, body: `{"num_base_records":`},
+		{name: "count of the wrong type", key: manifestKey, body: `{"num_base_records":"1"}`},
+		{name: "unparseable sindex.json", key: sindexKey, body: `{"sindex":[`},
+		{name: "sindex of the wrong type", key: sindexKey, body: `{"sindex":{}}`},
+		{name: "unparseable udf.json", key: udfKey, body: `{"udf":`},
+		{name: "udf of the wrong type", key: udfKey, body: `{"udf":"a.lua"}`},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			l := NewLister(mockBucket(t, map[string]string{manifestKey: tt.body}), "bucket", "")
+			l := NewLister(mockBucket(t, map[string]string{tt.key: tt.body}), "bucket", "")
 
 			_, err := l.GetStatistics(t.Context(), statsKey)
-			require.ErrorContains(t, err, "failed to parse manifest "+manifestKey)
+			require.ErrorContains(t, err, "failed to parse "+tt.key)
 		})
 	}
 }
@@ -264,5 +314,17 @@ func TestLister_GetStatistics_S3Errors(t *testing.T) {
 
 		_, err := NewLister(m, "bucket", "").GetStatistics(t.Context(), statsKey)
 		require.ErrorIs(t, err, errS3)
+	})
+
+	t.Run("get udf.json", func(t *testing.T) {
+		t.Parallel()
+
+		m := mocks.NewMockS3API(t)
+		m.EXPECT().ListObjectsV2(mock.Anything, mock.Anything, mock.Anything).Return(&s3.ListObjectsV2Output{}, nil)
+		m.EXPECT().GetObject(mock.Anything, mock.Anything).Return(nil, errS3)
+
+		_, err := NewLister(m, "bucket", "").GetStatistics(t.Context(), statsKey)
+		require.ErrorIs(t, err, errS3)
+		require.ErrorContains(t, err, statsKey+"/udf/udf.json")
 	})
 }

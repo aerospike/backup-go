@@ -34,9 +34,14 @@ const (
 	changeStreamDir = "change-stream"
 	manifestDir     = "manifest"
 	manifestSuffix  = ".json"
+	sindexDir       = "sindex"
+	sindexFileName  = "sindex.json"
+	udfDir          = "udf"
+	udfFileName     = "udf.json"
 
 	// maxManifestSize caps a manifest read. A query stream manifest lists the
-	// segments of one partition, so it grows with the partition.
+	// segments of one partition, so it grows with the partition. It also caps
+	// udf.json, which holds the source of every UDF module.
 	maxManifestSize = 64 << 20
 )
 
@@ -54,6 +59,27 @@ type streamManifest struct {
 	Segments []struct{} `json:"segments"`
 }
 
+// sindexFile holds the secondary index definitions of one namespace, one entry
+// per index; deleted indexes are left out.
+type sindexFile struct {
+	// SIndexes are only counted, so their fields are not decoded.
+	SIndexes []struct{} `json:"sindex"`
+}
+
+// udfFile holds the UDF modules of the cluster, one entry per module.
+type udfFile struct {
+	// UDFs are only counted, so their fields are not decoded.
+	UDFs []struct{} `json:"udf"`
+}
+
+// statsObject is an object GetStatistics reads, and how it counts what it holds.
+type statsObject struct {
+	key string
+	// optional objects that do not exist count as zero.
+	optional bool
+	count    func(body io.Reader) (models.Statistics, error)
+}
+
 func (m *streamManifest) statistics() models.Statistics {
 	return models.Statistics{
 		RecordCount:       m.NumBaseRecords,
@@ -66,9 +92,10 @@ func (m *streamManifest) statistics() models.Statistics {
 
 // GetStatistics sums the record, byte and file counts of the backup at
 // backupKey, the key of its directory as GetMetadata takes it, from the
-// manifests the server wrote for it. It reads no record data, so its cost grows
-// with the number of manifests, at most 4096 per namespace plus one per node,
-// and not with the size of the backup.
+// manifests the server wrote for it, and counts the secondary indexes and UDFs
+// it holds. It reads no record data, so its cost grows with the number of
+// manifests, at most 4096 per namespace plus one per node, and not with the
+// size of the backup.
 //
 // A server side backup lays out its files as follows:
 //
@@ -109,6 +136,12 @@ func (m *streamManifest) statistics() models.Statistics {
 //   - it still counts the records deleted after the base round scanned them;
 //   - the server counts a base round that resumed after a failure slightly high.
 //
+// IndexCount and UDFCount are exact. The principal node writes sindex.json, the
+// definitions of the secondary indexes of the namespace, and udf.json, every UDF
+// module of the cluster, when the backup finishes. A backup taken with
+// no-indexes or no-udfs, or one that did not finish, lacks the file, and its
+// count is zero.
+//
 // IncrRecordCount and ChangeRecordCount report the other two sources as they
 // are. RecordCount + IncrRecordCount + ChangeRecordCount is an upper bound on the
 // distinct records of the backup, and the change stream count tells how many
@@ -124,15 +157,33 @@ func (l *Lister) GetStatistics(ctx context.Context, backupKey string) (models.St
 		return models.Statistics{}, fmt.Errorf("failed to list manifests of %s: %w", backupKey, err)
 	}
 
-	perManifest := make([]models.Statistics, len(manifests))
+	sindexes, err := l.listSIndexFiles(ctx, backupKey)
+	if err != nil {
+		return models.Statistics{}, fmt.Errorf("failed to list secondary indexes of %s: %w", backupKey, err)
+	}
+
+	objects := make([]statsObject, 0, len(manifests)+len(sindexes)+1)
+	for _, key := range manifests {
+		objects = append(objects, statsObject{key: key, count: manifestStatistics})
+	}
+
+	for _, key := range sindexes {
+		objects = append(objects, statsObject{key: key, optional: true, count: sindexStatistics})
+	}
+
+	objects = append(objects, statsObject{
+		key: objectKey(backupKey, udfDir, udfFileName), optional: true, count: udfStatistics,
+	})
+
+	perObject := make([]models.Statistics, len(objects))
 
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(l.concurrency)
 
-	for i, key := range manifests {
+	for i, obj := range objects {
 		g.Go(func() error {
-			stats, err := l.manifestStatistics(gctx, key)
-			perManifest[i] = stats
+			stats, err := l.objectStatistics(gctx, obj)
+			perObject[i] = stats
 
 			return err
 		})
@@ -143,7 +194,7 @@ func (l *Lister) GetStatistics(ctx context.Context, backupKey string) (models.St
 	}
 
 	var total models.Statistics
-	for _, stats := range perManifest {
+	for _, stats := range perObject {
 		total.Add(stats)
 	}
 
@@ -186,24 +237,74 @@ func (l *Lister) listManifests(ctx context.Context, backupKey string) ([]string,
 	}), nil
 }
 
-// manifestStatistics reads the counts of the manifest at key.
-func (l *Lister) manifestStatistics(ctx context.Context, key string) (models.Statistics, error) {
+// listSIndexFiles returns the keys of the sindex.json files of every namespace
+// of the backup at backupKey. A namespace directory may lack the file.
+func (l *Lister) listSIndexFiles(ctx context.Context, backupKey string) ([]string, error) {
+	namespaces, _, err := l.listDir(ctx, objectKey(backupKey, sindexDir, namespacesDir))
+	if err != nil {
+		return nil, err
+	}
+
+	keys := make([]string, len(namespaces))
+	for i, namespace := range namespaces {
+		keys[i] = objectKey(namespace, sindexFileName)
+	}
+
+	return keys, nil
+}
+
+// objectStatistics reads the object obj names and counts what it holds.
+func (l *Lister) objectStatistics(ctx context.Context, obj statsObject) (models.Statistics, error) {
 	out, err := l.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(l.bucket),
-		Key:    aws.String(key),
+		Key:    aws.String(obj.key),
 	})
 	if err != nil {
-		return models.Statistics{}, fmt.Errorf("failed to get %s: %w", key, err)
+		if obj.optional && isNotFound(err) {
+			return models.Statistics{}, nil
+		}
+
+		return models.Statistics{}, fmt.Errorf("failed to get %s: %w", obj.key, err)
 	}
 
 	defer out.Body.Close()
 
+	stats, err := obj.count(io.LimitReader(out.Body, maxManifestSize))
+	if err != nil {
+		return models.Statistics{}, fmt.Errorf("failed to parse %s: %w", obj.key, err)
+	}
+
+	return stats, nil
+}
+
+// manifestStatistics reads the counts of a manifest of either stream.
+func manifestStatistics(body io.Reader) (models.Statistics, error) {
 	var manifest streamManifest
-	if err := json.NewDecoder(io.LimitReader(out.Body, maxManifestSize)).Decode(&manifest); err != nil {
-		return models.Statistics{}, fmt.Errorf("failed to parse manifest %s: %w", key, err)
+	if err := json.NewDecoder(body).Decode(&manifest); err != nil {
+		return models.Statistics{}, fmt.Errorf("manifest: %w", err)
 	}
 
 	return manifest.statistics(), nil
+}
+
+// sindexStatistics counts the secondary indexes of a sindex.json.
+func sindexStatistics(body io.Reader) (models.Statistics, error) {
+	var file sindexFile
+	if err := json.NewDecoder(body).Decode(&file); err != nil {
+		return models.Statistics{}, fmt.Errorf("secondary indexes: %w", err)
+	}
+
+	return models.Statistics{IndexCount: uint64(len(file.SIndexes))}, nil
+}
+
+// udfStatistics counts the UDF modules of a udf.json.
+func udfStatistics(body io.Reader) (models.Statistics, error) {
+	var file udfFile
+	if err := json.NewDecoder(body).Decode(&file); err != nil {
+		return models.Statistics{}, fmt.Errorf("udfs: %w", err)
+	}
+
+	return models.Statistics{UDFCount: uint64(len(file.UDFs))}, nil
 }
 
 // listDir returns the keys of the directories, without a trailing slash, and of

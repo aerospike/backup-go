@@ -31,6 +31,12 @@ type Statistics struct {
 	ByteCount uint64
 	// FileCount is the number of segment files of the backup.
 	FileCount uint64
+	// IndexCount is the number of secondary index definitions the backup holds,
+	// summed over its namespaces.
+	IndexCount uint64
+	// UDFCount is the number of UDF modules the backup holds. UDFs are
+	// cluster-wide, so every namespace backup holds all of them.
+	UDFCount uint64
 }
 
 // Add adds the counts of other to s.
@@ -40,4 +46,6 @@ func (s *Statistics) Add(other Statistics) {
 	s.ChangeRecordCount += other.ChangeRecordCount
 	s.ByteCount += other.ByteCount
 	s.FileCount += other.FileCount
+	s.IndexCount += other.IndexCount
+	s.UDFCount += other.UDFCount
 }

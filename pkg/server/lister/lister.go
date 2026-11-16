@@ -199,7 +199,7 @@ func (l *Lister) GetMetadata(ctx context.Context, backupID string) (models.Metad
 
 	data, err := l.fetch(ctx, objectKey(l.prefix, backupID, metadataFileName), maxMetadataSize)
 	if errors.Is(err, errclass.ErrNotFound) {
-		err = fmt.Errorf("%w: %w", ErrMetadataNotFound, err)
+		return models.Metadata{}, fmt.Errorf("failed to get metadata of backup %s: %w", backupID, ErrMetadataNotFound)
 	}
 
 	if err != nil {

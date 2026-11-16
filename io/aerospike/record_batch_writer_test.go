@@ -21,6 +21,7 @@ import (
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	atypes "github.com/aerospike/aerospike-client-go/v8/types"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -263,6 +264,7 @@ func TestFlushBuffer_RejectedRecord(t *testing.T) {
 		atypes.FAIL_FORBIDDEN,
 		atypes.BIN_TYPE_ERROR,
 		atypes.BIN_NOT_FOUND,
+		atypes.KEY_NOT_FOUND_ERROR,
 	}
 
 	tests := []struct {
@@ -310,6 +312,8 @@ func TestFlushBuffer_RejectedRecord(t *testing.T) {
 
 				err := rw.flushBuffer()
 				if tt.wantErr {
+					require.ErrorIs(t, err, errclass.ErrAerospike)
+
 					var ae a.Error
 					require.ErrorAs(t, err, &ae)
 					assert.True(t, ae.Matches(code))

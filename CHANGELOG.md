@@ -107,6 +107,14 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
   looked for at the root of the storage. The segments a manifest names are now located below the
   path given with `streamers.WithPath`, so they are checked, and segments no manifest names are
   found again. (BKRS-487)
+- A batch restore without `IgnoreRecordError` counted the records the server rejected
+  (`RECORD_TOO_BIG`, `KEY_MISMATCH`, `BIN_NAME_TOO_LONG`, `ALWAYS_FORBIDDEN`, `FAIL_FORBIDDEN`,
+  `BIN_TYPE_ERROR`, `BIN_NOT_FOUND`) as ignored and finished without an error, so the records
+  were lost silently. Such a record is now retried under the retry policy and then fails the
+  restore, as with batch writes disabled. The error of a failed batch write now matches
+  `ErrAerospike`, as the error of a single record write does. With `IgnoreRecordError` set,
+  the batch writer now also ignores `KEY_NOT_FOUND_ERROR`, as the single record writer does.
+  (BKRS-513)
 
 ## [0.13.0] - 2026-11-03
 

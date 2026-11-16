@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/aerospike/backup-go/errclass"
@@ -320,7 +321,9 @@ func newestChangeManifest(keys []string) (ref manifestRef, ok bool) {
 	var newest manifestname.Name
 
 	for _, key := range keys {
-		name, parsed := manifestname.ParseChange(key)
+		// The listing does not descend below the directory, so the leaf is the
+		// last element of the key.
+		name, parsed := manifestname.ParseChange(path.Base(key))
 		if !parsed || ok && !name.Newer(newest) {
 			continue
 		}

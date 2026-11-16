@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+
+	"github.com/aerospike/backup-go/pkg/server/internal/manifestname"
 )
 
 // The change stream of a node may hold more than one manifest. A node that had
@@ -43,54 +45,29 @@ const (
 	maxChangeNodes = 256
 )
 
-// changeCapture is when a change stream manifest was started: the regime of
-// the cluster and the timestamp, in this order of precedence.
-type changeCapture struct {
-	timestamp uint64
-	regime    uint32
-}
-
-// newer reports whether c is a more recent capture than other.
-func (c changeCapture) newer(other changeCapture) bool {
-	return c.regime > other.regime || (c.regime == other.regime && c.timestamp > other.timestamp)
-}
-
-// parseChangeManifest reads the node and the capture of a change stream
-// manifest out of its path,
+// parseChangeManifest reads the node and the name of a change stream manifest
+// out of its path,
 // .../change-stream/{node}/manifest/{regime}-{timestamp}-{uuid}.json, the way
 // the server reads it on restore: the node is what sits between the markers,
-// and sscanf(leaf, "%u-%llu-") must convert both numbers. ok is false for any
-// other path, which the server skips on restore.
-func parseChangeManifest(manifestPath string) (node string, capture changeCapture, ok bool) {
+// and the leaf after them is read by [manifestname.ParseChange]. ok is false
+// for any other path, which the server skips on restore.
+func parseChangeManifest(manifestPath string) (node string, name manifestname.Name, ok bool) {
 	_, rest, found := strings.Cut(manifestPath, changeStreamMarker)
 	if !found {
-		return "", changeCapture{}, false
+		return "", manifestname.Name{}, false
 	}
 
 	slash := strings.IndexByte(rest, '/')
 	if slash <= 0 || slash > maxChangeNodeIDLen || !strings.HasPrefix(rest[slash:], changeManifestMarker) {
-		return "", changeCapture{}, false
+		return "", manifestname.Name{}, false
 	}
 
-	node = rest[:slash]
-	leaf := rest[slash+len(changeManifestMarker):]
-
-	sc := nameScanner{rest: leaf}
-
-	regime, ok := sc.number(decimalBase)
-	if !ok || !sc.literal(manifestNameSeparator) {
-		return "", changeCapture{}, false
+	name, ok = manifestname.ParseChange(rest[slash+len(changeManifestMarker):])
+	if !ok {
+		return "", manifestname.Name{}, false
 	}
 
-	// The separator after the timestamp is no conversion, so sscanf counts
-	// two whether or not it matches.
-	timestamp, ok := sc.number(decimalBase)
-	if !ok || !strings.HasSuffix(leaf, manifestSuffix) {
-		return "", changeCapture{}, false
-	}
-
-	// %u stores into an unsigned int.
-	return node, changeCapture{regime: uint32(regime), timestamp: timestamp}, true
+	return rest[:slash], name, true
 }
 
 // changeManifests lists the manifests of a change stream unit and returns the
@@ -100,8 +77,8 @@ func parseChangeManifest(manifestPath string) (node string, capture changeCaptur
 // superseded and counted as such.
 //
 // A unit is the change stream of one node, so it has a single newest manifest.
-// Of manifests started at the same capture the first one listed is kept, as
-// the server keeps it.
+// Of manifests of the same regime and timestamp the first one listed is kept,
+// as the server keeps it.
 //
 // limit bounds the manifests the listing looks at, zero meaning all of them. A
 // listing cut short may miss the newest manifest, which is then picked from the
@@ -110,7 +87,7 @@ func (s *Streamer) changeManifests(ctx context.Context, u *unit, limit int) ([]f
 	var (
 		picked     []file
 		newest     file
-		best       changeCapture
+		best       manifestname.Name
 		haveNewest bool
 		capped     bool
 		superseded int64
@@ -132,15 +109,15 @@ func (s *Streamer) changeManifests(ctx context.Context, u *unit, limit int) ([]f
 
 		s.stats.manifestsFound.Add(1)
 
-		_, capture, ok := parseChangeManifest(f.Path)
+		_, name, ok := parseChangeManifest(f.Path)
 
 		switch {
 		case !ok:
 			picked = append(picked, f)
 		case !haveNewest:
-			newest, best, haveNewest = f, capture, true
-		case capture.newer(best):
-			newest, best = f, capture
+			newest, best, haveNewest = f, name, true
+		case name.Newer(best):
+			newest, best = f, name
 			superseded++
 		default:
 			superseded++

@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aerospike/backup-go/pkg/server/internal/manifestname"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -40,47 +41,47 @@ func TestParseChangeManifest(t *testing.T) {
 	longNode := strings.Repeat("A", maxChangeNodeIDLen)
 
 	tests := []struct {
-		name        string
-		give        string
-		wantNode    string
-		wantCapture changeCapture
-		wantOK      bool
+		name     string
+		give     string
+		wantNode string
+		wantName manifestname.Name
+		wantOK   bool
 	}{
 		{
-			name:        "name the server writes",
-			give:        testChangeManifestDir + "7-0001811970100-00a1b2.json",
-			wantNode:    testNode,
-			wantCapture: changeCapture{regime: 7, timestamp: 1811970100},
-			wantOK:      true,
+			name:     "name the server writes",
+			give:     testChangeManifestDir + "7-0001811970100-00a1b2.json",
+			wantNode: testNode,
+			wantName: manifestname.Name{Regime: 7, Timestamp: 1811970100},
+			wantOK:   true,
 		},
 		{
 			// The separator after the timestamp is no conversion.
-			name:        "nothing after the timestamp",
-			give:        testChangeManifestDir + "7-12.json",
-			wantNode:    testNode,
-			wantCapture: changeCapture{regime: 7, timestamp: 12},
-			wantOK:      true,
+			name:     "nothing after the timestamp",
+			give:     testChangeManifestDir + "7-12.json",
+			wantNode: testNode,
+			wantName: manifestname.Name{Regime: 7, Timestamp: 12},
+			wantOK:   true,
 		},
 		{
-			name:        "regime wraps around an unsigned int",
-			give:        testChangeManifestDir + "4294967297-1-0.json",
-			wantNode:    testNode,
-			wantCapture: changeCapture{regime: 1, timestamp: 1},
-			wantOK:      true,
+			name:     "regime wraps around an unsigned int",
+			give:     testChangeManifestDir + "4294967297-1-0.json",
+			wantNode: testNode,
+			wantName: manifestname.Name{Regime: 1, Timestamp: 1},
+			wantOK:   true,
 		},
 		{
-			name:        "regime saturates",
-			give:        testChangeManifestDir + "99999999999999999999-1-0.json",
-			wantNode:    testNode,
-			wantCapture: changeCapture{regime: math.MaxUint32, timestamp: 1},
-			wantOK:      true,
+			name:     "regime saturates",
+			give:     testChangeManifestDir + "99999999999999999999-1-0.json",
+			wantNode: testNode,
+			wantName: manifestname.Name{Regime: math.MaxUint32, Timestamp: 1},
+			wantOK:   true,
 		},
 		{
-			name:        "longest node id",
-			give:        testBackupID + "/ns/" + testNS + "/change-stream/" + longNode + "/manifest/1-2-3.json",
-			wantNode:    longNode,
-			wantCapture: changeCapture{regime: 1, timestamp: 2},
-			wantOK:      true,
+			name:     "longest node id",
+			give:     testBackupID + "/ns/" + testNS + "/change-stream/" + longNode + "/manifest/1-2-3.json",
+			wantNode: longNode,
+			wantName: manifestname.Name{Regime: 1, Timestamp: 2},
+			wantOK:   true,
 		},
 		{
 			name: "node id too long",
@@ -120,36 +121,11 @@ func TestParseChangeManifest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			node, capture, ok := parseChangeManifest(tt.give)
+			node, name, ok := parseChangeManifest(tt.give)
 
 			assert.Equal(t, tt.wantOK, ok)
 			assert.Equal(t, tt.wantNode, node)
-			assert.Equal(t, tt.wantCapture, capture)
-		})
-	}
-}
-
-func TestChangeCaptureNewer(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		give  changeCapture
-		other changeCapture
-		want  bool
-	}{
-		{name: "higher regime", give: changeCapture{regime: 2}, other: changeCapture{regime: 1, timestamp: 9}, want: true},
-		{name: "lower regime", give: changeCapture{regime: 1, timestamp: 9}, other: changeCapture{regime: 2}},
-		{name: "later in the same regime", give: changeCapture{regime: 1, timestamp: 2}, other: changeCapture{regime: 1, timestamp: 1}, want: true},
-		{name: "earlier in the same regime", give: changeCapture{regime: 1, timestamp: 1}, other: changeCapture{regime: 1, timestamp: 2}},
-		{name: "same capture", give: changeCapture{regime: 1, timestamp: 1}, other: changeCapture{regime: 1, timestamp: 1}},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			assert.Equal(t, tt.want, tt.give.newer(tt.other))
+			assert.Equal(t, tt.wantName, name)
 		})
 	}
 }

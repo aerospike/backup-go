@@ -78,10 +78,8 @@ func TestParseQuery(t *testing.T) {
 func TestParseChange(t *testing.T) {
 	t.Parallel()
 
-	const dir = "519118324/ns/test/change-stream/BB9D5F76B77F4A6/manifest/"
-
-	// Each case is read as sscanf(leaf, "%u-%llu-") reads it, and the name must
-	// end in .json.
+	// Each case is a leaf, what follows /manifest/ in a key, read as
+	// sscanf(leaf, "%u-%llu-") reads it, and the leaf must end in .json.
 	tests := []struct {
 		name   string
 		give   string
@@ -90,26 +88,46 @@ func TestParseChange(t *testing.T) {
 	}{
 		{
 			name:   "server name",
-			give:   dir + "3-0000062031435-5e58e6.json",
+			give:   "3-0000062031435-5e58e6.json",
 			want:   Name{Regime: 3, Timestamp: 62031435},
 			wantOK: true,
 		},
 		{
 			name:   "nothing past the timestamp is checked",
-			give:   dir + "3-0000062031435.json",
+			give:   "3-0000062031435.json",
 			want:   Name{Regime: 3, Timestamp: 62031435},
 			wantOK: true,
 		},
 		{
 			name:   "white space before a number",
-			give:   dir + " 3- 0000062031435-5e58e6.json",
+			give:   " 3- 0000062031435-5e58e6.json",
 			want:   Name{Regime: 3, Timestamp: 62031435},
 			wantOK: true,
 		},
-		{name: "not json", give: dir + "3-0000062031435-5e58e6.seg"},
-		{name: "no timestamp", give: dir + "3-x-5e58e6.json"},
-		{name: "regime not a number", give: dir + "x-0000062031435-5e58e6.json"},
-		{name: "no separator", give: dir + "3.json"},
+		{
+			name:   "regime truncated to an unsigned int",
+			give:   "4294967297-1-0.json",
+			want:   Name{Regime: 1, Timestamp: 1},
+			wantOK: true,
+		},
+		{
+			name:   "regime saturates",
+			give:   "99999999999999999999-1-0.json",
+			want:   Name{Regime: math.MaxUint32, Timestamp: 1},
+			wantOK: true,
+		},
+		{
+			// The leaf is read whole, not its last element.
+			name:   "slash past the timestamp",
+			give:   "3-5/x.json",
+			want:   Name{Regime: 3, Timestamp: 5},
+			wantOK: true,
+		},
+		{name: "nested below the manifest directory", give: "old/3-0000062031435-5e58e6.json"},
+		{name: "not json", give: "3-0000062031435-5e58e6.seg"},
+		{name: "no timestamp", give: "3-x-5e58e6.json"},
+		{name: "regime not a number", give: "x-0000062031435-5e58e6.json"},
+		{name: "no separator", give: "3.json"},
 		{name: "empty", give: ""},
 	}
 

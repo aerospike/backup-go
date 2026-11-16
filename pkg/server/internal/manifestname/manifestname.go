@@ -95,13 +95,13 @@ func ParseQuery(manifestPath string) (name Name, ok bool) {
 	return Name{Partition: int(p), Regime: uint32(regime), Timestamp: timestamp}, true
 }
 
-// ParseChange reads the name of the change stream manifest at manifestPath,
+// ParseChange reads the name of a change stream manifest,
 // {regime}-{timestamp}-{uuid}.json, the way the server reads it when it picks
-// the manifest of a node to restore: sscanf(leaf, "%u-%llu-") must convert both
-// numbers, and the name must end in .json. ok is false for any other name,
-// which the server skips on restore.
-func ParseChange(manifestPath string) (name Name, ok bool) {
-	leaf := path.Base(manifestPath)
+// the manifest of a node to restore. leaf is what follows /manifest/ in the
+// key of the manifest, whole: sscanf(leaf, "%u-%llu-") must convert both
+// numbers, and leaf must end in .json. ok is false for any other leaf, which
+// the server skips on restore.
+func ParseChange(leaf string) (name Name, ok bool) {
 	if !strings.HasSuffix(leaf, suffix) {
 		return Name{}, false
 	}
@@ -120,6 +120,7 @@ func ParseChange(manifestPath string) (name Name, ok bool) {
 		return Name{}, false
 	}
 
+	// %u stores into an unsigned int.
 	return Name{Regime: uint32(regime), Timestamp: timestamp}, true
 }
 

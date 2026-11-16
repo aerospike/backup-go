@@ -2109,11 +2109,10 @@ func TestRestoreContextCancel(t *testing.T) {
 		writer,
 		nil,
 	)
-	require.NoError(t, err)
-	require.NotNil(t, bh)
-
-	err = bh.Wait(ctx)
-	require.Error(t, err)
+	// The handler reads cluster info before it starts, and no command is sent on a
+	// canceled context.
+	require.ErrorIs(t, err, context.Canceled)
+	require.Nil(t, bh)
 }
 
 func TestBackupEstimate(t *testing.T) {

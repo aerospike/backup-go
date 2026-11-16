@@ -126,7 +126,8 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
   (BKRS-513)
 - `RetryPolicy.Do` ran the first attempt even when the context was already canceled, so the
   info client's `StartBackup` and `StartRestore` started a server job after cancellation. `Do`
-  now returns the context's error without running the operation. (BKRS-571)
+  now returns the context's error without running the operation. `Client.Backup` on a canceled
+  context therefore fails while it reads the cluster info, and returns no handler. (BKRS-571)
 
 ## [0.13.0] - 2026-11-03
 

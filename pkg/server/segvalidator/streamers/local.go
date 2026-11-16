@@ -28,7 +28,8 @@ import (
 )
 
 // NewLocal creates a streamer over the backup identified by backupID in a
-// directory holding backups, laid out the way an object storage would be.
+// directory holding backups, laid out the way an object storage would be. A
+// backup written under a path below root is located with WithPath.
 func NewLocal(root, backupID string, opts ...Option) (*Streamer, error) {
 	if root == "" {
 		return nil, fmt.Errorf("%w: root directory must not be empty", errclass.ErrInvalidConfig)

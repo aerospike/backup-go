@@ -38,7 +38,8 @@ type S3API interface {
 	) (*s3.GetObjectOutput, error)
 }
 
-// NewS3 creates a streamer over the backup identified by backupID in a bucket.
+// NewS3 creates a streamer over the backup identified by backupID in a bucket. A
+// backup written under a path in the bucket is located with WithPath.
 func NewS3(client S3API, bucket, backupID string, opts ...Option) (*Streamer, error) {
 	if client == nil {
 		return nil, fmt.Errorf("%w: s3 client must not be nil", errclass.ErrInvalidConfig)

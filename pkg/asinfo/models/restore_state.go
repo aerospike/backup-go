@@ -23,8 +23,9 @@ type RestoreState string
 const (
 	RestoreStateActive   RestoreState = "ACTIVE"
 	RestoreStateComplete RestoreState = "COMPLETE"
-	// RestoreStateFailed is normally followed by RestoreStateAborted once the
-	// principal aborts the job.
+	// RestoreStateFailed is terminal. The node that failed keeps it while the
+	// other nodes of the job report RestoreStateAborted. A cold restore keeps
+	// the namespace gated until it is released with restore-open.
 	RestoreStateFailed   RestoreState = "FAILED"
 	RestoreStateAborting RestoreState = "ABORTING"
 	// RestoreStateAborted is terminal. A cold restore keeps the namespace gated
@@ -38,8 +39,9 @@ const (
 type RestoreKind string
 
 const (
-	// RestoreKindCold is a restore into an empty namespace gated from clients,
-	// prepared with restore-prepare.
+	// RestoreKindCold is a restore into an empty namespace gated from clients.
+	// The restore command prepares the namespace on every node and the server
+	// starts the restore once every node is READY.
 	RestoreKindCold RestoreKind = "cold"
 	// RestoreKindFuzzy is a restore into a live namespace through the normal
 	// write path.
@@ -56,6 +58,7 @@ const (
 	// NamespaceStatePreparing is a gated namespace that is not empty yet.
 	NamespaceStatePreparing NamespaceState = "PREPARING"
 	// NamespaceStateReady is a gated, empty namespace, ready for the restore.
+	// The server starts the restore once the namespace is READY on every node.
 	NamespaceStateReady NamespaceState = "READY"
 	// NamespaceStateRestoring is a gated namespace the restore writes into.
 	NamespaceStateRestoring NamespaceState = "RESTORING"
@@ -64,9 +67,11 @@ const (
 	NamespaceStateFailed NamespaceState = "FAILED"
 	// NamespaceStateOpening is a namespace being released after a complete restore.
 	NamespaceStateOpening NamespaceState = "OPENING"
-	// NamespaceStateNotHosted is reported by a node that does not host the
-	// namespace, and for a declined start.
-	NamespaceStateNotHosted NamespaceState = infoNoValue
+	// NamespaceStateUnknown should not occur.
+	NamespaceStateUnknown NamespaceState = "UNKNOWN"
+	// NamespaceStateStub is reported by a stub row: a job that never got its
+	// parameters, or the placeholder of a node that restarted.
+	NamespaceStateStub NamespaceState = infoNoValue
 
 	// namespaceStateUnknown holds the place of the states this package does
 	// not know in namespaceStatePriority. The server never reports it.
@@ -87,17 +92,16 @@ var namespaceStatePriority = []NamespaceState{
 
 // ResolveNamespaceState picks a single namespace state out of the states
 // reported by the nodes, so that the cluster is only reported READY when every
-// node hosting the namespace is READY.
+// node that reports more than a stub row is READY.
 //
-// The nodes that do not host the namespace are skipped. The states are
-// resolved by priority: FAILED, then a state this package does not know (it
-// cannot be proven to be READY, but must not hide a failure), RESTORING,
-// PREPARING, OPENING, NONE and READY last. An empty state is returned when no
-// node reports a state.
+// The stub rows are skipped. The states are resolved by priority: FAILED,
+// then a state this package does not know (it cannot be proven to be READY,
+// but must not hide a failure), RESTORING, PREPARING, OPENING, NONE and READY
+// last. An empty state is returned when no node reports a state.
 func ResolveNamespaceState(states []NamespaceState) NamespaceState {
 	return resolveByPriority(states, namespaceStatePriority, namespaceStateUnknown,
 		func(state NamespaceState) bool {
-			return state == "" || state == NamespaceStateNotHosted
+			return state == "" || state == NamespaceStateStub
 		})
 }
 
@@ -142,28 +146,56 @@ func ResolveClearState(states []ClearState) ClearState {
 }
 
 // ResolveRestoreState returns the combined restore job state across nodes.
-// FAILED on any node makes the whole job failed, then ABORTING, ABORTED and
-// ACTIVE win in that order. The job is COMPLETE only when it is COMPLETE on
-// every node; any other combination is UNKNOWN.
+//
+// A job with FAILED, ABORTING or ABORTED on any node is unusable: it is
+// ABORTING while any node is not terminal yet, a state this package does not
+// know included, and once every node is terminal it is FAILED if any node
+// failed, and ABORTED otherwise. Otherwise a state this package does not know,
+// UNKNOWN included, makes the whole job UNKNOWN, the job is ACTIVE while any
+// node is ACTIVE, and COMPLETE only when every node is COMPLETE.
 func ResolveRestoreState(states []RestoreState) RestoreState {
-	for _, state := range []RestoreState{
-		RestoreStateFailed,
-		RestoreStateAborting,
-		RestoreStateAborted,
-		RestoreStateActive,
-	} {
-		if slices.Contains(states, state) {
-			return state
+	switch {
+	case len(states) == 0:
+		return RestoreStateUnknown
+	case slices.ContainsFunc(states, isRestoreStateStopping):
+		switch {
+		case !all(states, isRestoreStateTerminal):
+			return RestoreStateAborting
+		case slices.Contains(states, RestoreStateFailed):
+			return RestoreStateFailed
+		default:
+			return RestoreStateAborted
 		}
-	}
-
-	if len(states) > 0 && !slices.ContainsFunc(states, func(s RestoreState) bool {
-		return s != RestoreStateComplete
-	}) {
+	case !all(states, isRestoreStateRunning):
+		return RestoreStateUnknown
+	case slices.Contains(states, RestoreStateActive):
+		return RestoreStateActive
+	default:
 		return RestoreStateComplete
 	}
+}
 
-	return RestoreStateUnknown
+// isRestoreStateStopping reports whether state is one of the states of a job
+// that stops without completing: FAILED, ABORTING or ABORTED.
+func isRestoreStateStopping(state RestoreState) bool {
+	return state == RestoreStateFailed || state == RestoreStateAborting || state == RestoreStateAborted
+}
+
+// isRestoreStateTerminal reports whether state is terminal on its node:
+// COMPLETE, FAILED or ABORTED.
+func isRestoreStateTerminal(state RestoreState) bool {
+	return state == RestoreStateComplete || state == RestoreStateFailed || state == RestoreStateAborted
+}
+
+// isRestoreStateRunning reports whether state is one of the states of a job
+// that has not stopped: ACTIVE or COMPLETE.
+func isRestoreStateRunning(state RestoreState) bool {
+	return state == RestoreStateActive || state == RestoreStateComplete
+}
+
+// all reports whether f reports true for every element of s.
+func all[T any](s []T, f func(T) bool) bool {
+	return !slices.ContainsFunc(s, func(v T) bool { return !f(v) })
 }
 
 // resolveByPriority returns the state of the highest priority among states.

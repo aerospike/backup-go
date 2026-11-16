@@ -19,14 +19,13 @@ import (
 
 	"github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/models"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestChangeNamespaceProcessor(t *testing.T) {
 	t.Parallel()
-	source := ptr.String("sourceNS")
-	destination := ptr.String("destinationNS")
+	source := new("sourceNS")
+	destination := new("destinationNS")
 
 	key, _ := aerospike.NewKey(*source, "set", 1)
 	invalidKey, _ := aerospike.NewKey("otherNs", "set", 1)

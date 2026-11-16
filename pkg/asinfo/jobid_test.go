@@ -102,7 +102,7 @@ func TestNewJobID_ServerConstraints(t *testing.T) {
 			name: "fits the server cap",
 			assertion: func(t *testing.T, id string) {
 				t.Helper()
-				require.LessOrEqual(t, len(id), jobIDMaxLen)
+				require.LessOrEqual(t, len(id), idMaxLen)
 			},
 		},
 		{

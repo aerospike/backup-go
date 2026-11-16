@@ -17,13 +17,14 @@ package backup
 import (
 	"fmt"
 
-	saClient "github.com/aerospike/backup-go/pkg/secretagent"
+	"github.com/aerospike/tools-common-go/secretagent"
 )
 
 // SecretAgentConfig contains Secret Agent connection information.
 type SecretAgentConfig struct {
 	// Connection type: tcp, unix.
-	// Use constants form the `secretagent`: `ConnectionTypeTCP` or `ConnectionTypeUDS`
+	// Use constants from github.com/aerospike/tools-common-go/secretagent:
+	// `ConnectionTypeTCP` or `ConnectionTypeUDS`.
 	ConnectionType *string
 	// Secret agent host for TCP connection or socket file path for UDS connection.
 	Address *string
@@ -67,8 +68,22 @@ func (s *SecretAgentConfig) validate() error {
 	}
 
 	if s.ConnectionType != nil &&
-		(*s.ConnectionType != saClient.ConnectionTypeTCP && *s.ConnectionType != saClient.ConnectionTypeUDS) {
+		(*s.ConnectionType != secretagent.ConnectionTypeTCP && *s.ConnectionType != secretagent.ConnectionTypeUDS) {
 		return fmt.Errorf("unsupported connection type: %s", *s.ConnectionType)
+	}
+
+	// An empty path would be treated as unset by the Secret Agent client,
+	// silently turning TLS off, so it is rejected here.
+	if err := validateFilePath("ca file", s.CaFile); err != nil {
+		return err
+	}
+
+	if err := validateFilePath("cert file", s.CertFile); err != nil {
+		return err
+	}
+
+	if err := validateFilePath("key file", s.KeyFile); err != nil {
+		return err
 	}
 
 	if s.CertFile != nil && s.KeyFile == nil {
@@ -77,6 +92,19 @@ func (s *SecretAgentConfig) validate() error {
 
 	if s.KeyFile != nil && s.CertFile == nil {
 		return fmt.Errorf("cert file is required when key file is set")
+	}
+
+	if s.CertFile != nil && s.CaFile == nil {
+		return fmt.Errorf("ca file is required when cert file is set")
+	}
+
+	return nil
+}
+
+// validateFilePath rejects a set but empty file path.
+func validateFilePath(name string, path *string) error {
+	if path != nil && *path == "" {
+		return fmt.Errorf("%s must not be empty", name)
 	}
 
 	return nil

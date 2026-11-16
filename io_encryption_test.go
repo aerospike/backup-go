@@ -26,14 +26,13 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
+	"github.com/aerospike/tools-common-go/secretagent/secretagenttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 const (
-	testEncSAAddress      = ":9090"
 	testPKeyFile          = "tests/integration/pkey_test"
 	testPKeyEnv           = "testPKeyEnv"
 	testPKeyEnvErrContent = "testPKeyEnvErr"
@@ -87,16 +86,7 @@ func TestIOEncryption_readPrivateKey(t *testing.T) {
 	t.Setenv(testPKeyEnv, string(pemData))
 	t.Setenv(testPKeyEnvErrContent, testPKeyEnvErrContent)
 
-	listener, err := mockTCPServer(t.Context(), testEncSAAddress, mockHandler)
-	require.NoError(t, err)
-	defer func() { _ = listener.Close() }()
-	// Wait for server start.
-	time.Sleep(1 * time.Second)
-
-	saAddr := testEncSAAddress
-	saCfg := testSecretAgentConfig()
-	saCfg.Port = nil
-	saCfg.Address = &saAddr
+	saCfg := testServerConfig(secretagenttest.NewServer(t, testSecrets()))
 
 	keyFile := testPKeyFile
 	encPolicyKeyFile := &EncryptionPolicy{

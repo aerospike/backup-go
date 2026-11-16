@@ -22,6 +22,8 @@
 .vscode
 .DS_Store
 .cursor
+CLAUDE.md
+.claude
 
 # Go workspace file
 go.work

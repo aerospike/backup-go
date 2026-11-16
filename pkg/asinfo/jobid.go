@@ -35,9 +35,6 @@ const (
 	jobIDSaltSpace uint32 = 36 * 36 * 36 * 36
 	// jobIDLen is the full width of a generated id: timestamp, separator and salt.
 	jobIDLen = len(jobIDTimeLayout) + 1 + jobIDSaltLen
-	// jobIDMaxLen is the server's cap on a job id. JOB_ID_MAX_SIZE is 20 in backup.h;
-	// one byte is reserved for a possible NUL terminator.
-	jobIDMaxLen = 19
 
 	base36Digits = "0123456789abcdefghijklmnopqrstuvwxyz"
 
@@ -104,8 +101,8 @@ func quoteCharClass(s string) string {
 
 // Compile-time guard: an id that exceeds the server cap must not reach the cluster.
 // An array cannot have a negative length, so this declaration fails to build if
-// jobIDLen ever grows past jobIDMaxLen.
-var _ [jobIDMaxLen - jobIDLen]struct{}
+// jobIDLen ever grows past idMaxLen.
+var _ [idMaxLen - jobIDLen]struct{}
 
 // jobIDSaltCounter hands out salt values. It starts at a random point so that two
 // processes backing up the same cluster are unlikely to walk the same sequence, and

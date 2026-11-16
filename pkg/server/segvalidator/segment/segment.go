@@ -41,7 +41,9 @@ type Option interface {
 // options holds what the caller knows about the segment beyond its bytes.
 type options struct {
 	partition      int
+	blockType      BlockType
 	checkPartition bool
+	checkBlockType bool
 }
 
 // partitionOption is the Option WithPartition returns.
@@ -61,9 +63,30 @@ func WithPartition(id int) Option {
 	return partitionOption(id)
 }
 
+// blockTypeOption is the Option WithBlockType returns.
+type blockTypeOption BlockType
+
+func (t blockTypeOption) apply(o *options) {
+	o.blockType = BlockType(t)
+	o.checkBlockType = true
+}
+
+// WithBlockType requires the frame of the segment to carry block type t. The
+// server restores a segment as part of the stream whose manifest names it, and
+// refuses one whose frame says the other stream wrote it, so a query stream
+// segment must carry BlockQueryRecords and a change stream segment
+// BlockChangeRecords. Without it any block type the server interprets is
+// accepted. A type other than these two makes Validate fail with
+// ErrInvalidBlockType.
+func WithBlockType(t BlockType) Option {
+	return blockTypeOption(t)
+}
+
 // Validate parses data as a backup segment object and returns what it found.
 //
-// The frame is checked first, then every record of the body: header, metadata,
+// The frame is checked first, its block type included when WithBlockType
+// names the stream the segment belongs to, then every record of the body:
+// header, metadata,
 // bins, end marker and padding. The body must end exactly on a record
 // boundary, and the number of records must match the frame footer. A
 // compressed record fails the segment, because the server refuses to restore
@@ -88,7 +111,11 @@ func Validate(data []byte, opts ...Option) (Stats, error) {
 		return Stats{}, fmt.Errorf("%w: %d", ErrInvalidPartition, o.partition)
 	}
 
-	fr, err := parseFrame(data)
+	if o.checkBlockType && !o.blockType.known() {
+		return Stats{}, fmt.Errorf("%w: %d", ErrInvalidBlockType, o.blockType)
+	}
+
+	fr, err := parseFrame(data, o.blockType)
 	if err != nil {
 		return Stats{}, err
 	}

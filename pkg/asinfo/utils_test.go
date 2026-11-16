@@ -16,11 +16,19 @@ package asinfo
 
 import (
 	"bytes"
+	"fmt"
 	"log/slog"
+	"net"
+	"os"
+	"syscall"
 	"testing"
 
+	a "github.com/aerospike/aerospike-client-go/v8"
+	"github.com/aerospike/backup-go/errclass"
 	"github.com/aerospike/backup-go/models"
 	"github.com/aerospike/backup-go/pkg/asinfo/mocks"
+	infomodels "github.com/aerospike/backup-go/pkg/asinfo/models"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -128,4 +136,205 @@ func TestClient_parseSIndexes_logsSkippedInvalidIndexType(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, got)
 	require.Empty(t, logBuf.String())
+}
+
+// testErrNoCode is an error response that carries no result code.
+const testErrNoCode = "ERROR::failed"
+
+func Test_cmdRespErrorCode(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		give string
+		want int
+	}{
+		{name: "not found", give: testNoRestoreJob, want: cmdRespCodeNotFound},
+		{name: "leading space", give: " " + testNoRestoreJob, want: cmdRespCodeNotFound},
+		{name: "parameter error", give: "ERROR:4:'nodes' is not a restore parameter", want: 4},
+		{name: "code without message", give: "ERROR:22", want: 22},
+		{name: "no code", give: testErrNoCode, want: cmdRespNoCode},
+		{name: "not a number", give: "ERROR:abc:failed", want: cmdRespNoCode},
+		{name: "no prefix", give: "ok", want: cmdRespNoCode},
+		{name: "prefix without separator", give: errCmdRespPrefix, want: cmdRespNoCode},
+		{name: "error code inside a row", give: "error-reason=S3 " + testNoRestoreJob, want: cmdRespNoCode},
+		{
+			name: "message with colons",
+			give: "ERROR:22:restore-abort: wrong namespace - job-id=r1 is for ns=test",
+			want: 22,
+		},
+		{
+			name: "start not acknowledged in time",
+			give: "ERROR:9:backup job b1: start not acknowledged by all nodes and could not be confirmed",
+			want: cmdRespCodeTimeout,
+		},
+		{
+			name: "start not confirmed",
+			give: "ERROR:1:backup job b1: start could not be confirmed - check backup-status before retrying",
+			want: cmdRespCodeUnknown,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, cmdRespErrorCode(tt.give))
+		})
+	}
+}
+
+func Test_isNotFoundResp(t *testing.T) {
+	t.Parallel()
+
+	const testCmd = testRestoreStatusCmd
+
+	respErr := func(resp string) error {
+		_, err := parseResultResponse(testCmd, map[string]string{testCmd: resp})
+
+		return fmt.Errorf("failed to request restore status: %w", err)
+	}
+
+	tests := []struct {
+		name string
+		give error
+		want bool
+	}{
+		{name: "not found response", give: respErr(testNoRestoreJob), want: true},
+		{name: "no jobs at all", give: respErr("ERROR:2:no backup jobs"), want: true},
+		{name: "other error response", give: respErr("ERROR:20:unknown namespace source-ns"), want: false},
+		{name: "network error", give: fmt.Errorf("%w: network", errclass.ErrAerospike), want: false},
+		{name: "nil", give: nil, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, isNotFoundResp(tt.give))
+
+			if tt.give != nil {
+				assert.ErrorIs(t, tt.give, errclass.ErrAerospike)
+			}
+		})
+	}
+}
+
+func Test_mayHaveTakenEffect(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testCmd    = testRestoreStatusCmd
+		testNetTCP = "tcp"
+	)
+
+	respErr := func(resp string) error {
+		_, err := parseResultResponse(testCmd, map[string]string{testCmd: resp})
+
+		return fmt.Errorf("failed to start restore: %w", err)
+	}
+
+	// netErr wraps a client failure the way requestByNode does.
+	netErr := func(err error) error {
+		return fmt.Errorf("failed to start restore: %w: %w", errclass.ErrAerospike, err)
+	}
+
+	tests := []struct {
+		name string
+		give error
+		want bool
+	}{
+		{name: "network error", give: fmt.Errorf("%w: network", errclass.ErrAerospike), want: true},
+		{name: "not acknowledged in time", give: respErr("ERROR:9:restore: composite publish timed out"), want: true},
+		{
+			name: "start not confirmed",
+			give: respErr("ERROR:1:backup job b1: start could not be confirmed"),
+			want: true,
+		},
+		{name: "parameter error", give: respErr("ERROR:4:missing 'job-id'"), want: false},
+		{name: "job id in use", give: respErr("ERROR:22:backup: job-id=b1 is in use or was used before"), want: false},
+		{
+			name: "job id taken at publish time",
+			give: respErr("ERROR:26:backup job b1: this job-id is in use - poll backup-status, or pick another job-id"),
+			want: false,
+		},
+		{name: "error without a code", give: respErr(testErrNoCode), want: false},
+		{name: "network timeout", give: netErr(a.ErrNetTimeout), want: true},
+		{name: "no connection to the node", give: netErr(a.ErrConnectionPoolEmpty), want: false},
+		{name: "connection limit reached", give: netErr(a.ErrTooManyConnectionsForNode), want: false},
+		{name: "node not available", give: netErr(a.ErrServerNotAvailable), want: false},
+		{
+			name: "connection refused",
+			give: netErr(&net.OpError{Op: netOpDial, Net: testNetTCP, Err: syscall.ECONNREFUSED}),
+			want: false,
+		},
+		{
+			name: "request not written in full",
+			give: netErr(&net.OpError{Op: netOpWrite, Net: testNetTCP, Err: syscall.EPIPE}),
+			want: false,
+		},
+		{
+			name: "answer not read",
+			give: netErr(&net.OpError{Op: "read", Net: testNetTCP, Err: os.ErrDeadlineExceeded}),
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, mayHaveTakenEffect(tt.give))
+		})
+	}
+}
+
+func Test_principalFromStatistics(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testPrincipal      = "BB9020011AC4202"
+		testOtherPrincipal = "BB9030011AC4202"
+	)
+
+	tests := []struct {
+		name    string
+		give    []infomodels.InfoMap
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "paxos principal",
+			give: []infomodels.InfoMap{{statPaxosPrincipal: testPrincipal}},
+			want: testPrincipal,
+		},
+		{
+			name: "paxos principal is preferred",
+			give: []infomodels.InfoMap{{statClusterPrincipal: testOtherPrincipal, statPaxosPrincipal: testPrincipal}},
+			want: testPrincipal,
+		},
+		{
+			name: "cluster principal when paxos principal is missing",
+			give: []infomodels.InfoMap{{statClusterPrincipal: testPrincipal}},
+			want: testPrincipal,
+		},
+		{name: "no principal", give: []infomodels.InfoMap{{"cluster_size": "3"}}, wantErr: true},
+		{name: "empty principal", give: []infomodels.InfoMap{{statPaxosPrincipal: ""}}, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := principalFromStatistics(tt.give)
+			if tt.wantErr {
+				require.ErrorIs(t, err, errclass.ErrAerospike)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

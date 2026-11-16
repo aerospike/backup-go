@@ -212,14 +212,30 @@ func TestClient_GetPendingMigrations(t *testing.T) {
 func TestClient_getClusterStable(t *testing.T) {
 	t.Parallel()
 
-	client, aerr := newAerospikeClient()
-	require.NoError(t, aerr)
+	tests := []struct {
+		name                 string
+		giveIgnoreMigrations bool
+	}{
+		{name: "checking migrations", giveIgnoreMigrations: false},
+		{name: "ignoring migrations", giveIgnoreMigrations: true},
+	}
 
-	ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	_, err = ic.getClusterStable(testASNamespace)
-	require.NoError(t, err)
+			client, aerr := newAerospikeClient()
+			require.NoError(t, aerr)
+			t.Cleanup(client.Close)
+
+			ic, err := NewClient(client.Cluster(), a.NewInfoPolicy(), models.NewDefaultRetryPolicy(), slog.Default())
+			require.NoError(t, err)
+
+			stable, err := ic.getClusterStable(testASNamespace, tt.giveIgnoreMigrations)
+			require.NoError(t, err)
+			require.True(t, stable)
+		})
+	}
 }
 
 func TestClient_getStatistics(t *testing.T) {

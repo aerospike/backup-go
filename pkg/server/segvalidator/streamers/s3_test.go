@@ -29,6 +29,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const testBucket = "backups"
@@ -155,26 +157,19 @@ func (f *fakeBucket) GetObject(_ context.Context, in *s3.GetObjectInput, _ ...fu
 func TestNewS3Validation(t *testing.T) {
 	t.Parallel()
 
-	if _, err := NewS3(nil, testBucket, testBackupID); err == nil {
-		t.Error("NewS3() with no client succeeded, want an error")
-	}
+	_, err := NewS3(nil, testBucket, testBackupID)
+	require.Error(t, err, "NewS3() with no client succeeded")
 
-	if _, err := NewS3(newFakeBucket(nil), "", testBackupID); err == nil {
-		t.Error("NewS3() with no bucket succeeded, want an error")
-	}
+	_, err = NewS3(newFakeBucket(nil), "", testBackupID)
+	require.Error(t, err, "NewS3() with no bucket succeeded")
 
-	if _, err := NewS3(newFakeBucket(nil), testBucket, ""); err == nil {
-		t.Error("NewS3() with no backup id succeeded, want an error")
-	}
+	_, err = NewS3(newFakeBucket(nil), testBucket, "")
+	require.Error(t, err, "NewS3() with no backup id succeeded")
 
 	s, err := NewS3(newFakeBucket(nil), testBucket, testBackupID)
-	if err != nil {
-		t.Fatalf("NewS3() error = %v", err)
-	}
+	require.NoError(t, err)
 
-	if s.BackupID() != testBackupID {
-		t.Errorf("BackupID() = %q, want %q", s.BackupID(), testBackupID)
-	}
+	assert.Equal(t, testBackupID, s.BackupID())
 }
 
 func TestS3Store_ListDirsNamesOneLevel(t *testing.T) {
@@ -184,27 +179,19 @@ func TestS3Store_ListDirsNamesOneLevel(t *testing.T) {
 	st := &s3Store{client: newFakeBucket(b.files), bucket: testBucket}
 
 	dirs, err := listDirs(t.Context(), st, path.Join(testBackupID, namespacesDir, testNS))
-	if err != nil {
-		t.Fatalf("listDirs() error = %v", err)
-	}
+	require.NoError(t, err)
 
 	sort.Strings(dirs)
 
-	if want := []string{string(ChangeStream), string(QueryStream)}; !slices.Equal(dirs, want) {
-		t.Fatalf("listDirs() = %v, want %v", dirs, want)
-	}
+	require.Equal(t, []string{string(ChangeStream), string(QueryStream)}, dirs)
 
 	// The listing names the partitions themselves, not the segments below them,
 	// however many there are.
 	partitions, err := listDirs(t.Context(), st,
 		path.Join(testBackupID, namespacesDir, testNS, string(QueryStream), dataDir))
-	if err != nil {
-		t.Fatalf("listDirs() error = %v", err)
-	}
+	require.NoError(t, err)
 
-	if len(partitions) != 12 {
-		t.Fatalf("listDirs() found %d partitions, want 12: %v", len(partitions), partitions)
-	}
+	require.Len(t, partitions, 12, "listDirs() partitions")
 }
 
 func TestS3Store_ListFilesPaginates(t *testing.T) {
@@ -222,19 +209,13 @@ func TestS3Store_ListFilesPaginates(t *testing.T) {
 
 			return nil
 		})
-	if err != nil {
-		t.Fatalf("listFiles() error = %v", err)
-	}
+	require.NoError(t, err)
 
 	sort.Strings(found)
 
-	if want := b.segments(); !slices.Equal(found, want) {
-		t.Fatalf("listFiles() found %d files, want %d", len(found), len(want))
-	}
+	require.Equal(t, b.segments(), found)
 
-	if bucket.lists.Load() < 2 {
-		t.Errorf("listing took %d requests, want it to have been paginated", bucket.lists.Load())
-	}
+	assert.GreaterOrEqual(t, bucket.lists.Load(), int64(2), "want the listing to have been paginated")
 }
 
 func TestS3Store_ListFilesStops(t *testing.T) {
@@ -251,17 +232,11 @@ func TestS3Store_ListFilesStops(t *testing.T) {
 
 		return errStopListing
 	})
-	if err != nil {
-		t.Fatalf("listFiles() error = %v", err)
-	}
+	require.NoError(t, err)
 
-	if seen != 1 {
-		t.Errorf("saw %d files after stopping the listing, want 1", seen)
-	}
+	assert.Equal(t, 1, seen, "files seen after stopping the listing")
 
-	if bucket.lists.Load() != 1 {
-		t.Errorf("listing took %d requests after being stopped, want 1", bucket.lists.Load())
-	}
+	assert.Equal(t, int64(1), bucket.lists.Load(), "listing requests after being stopped")
 }
 
 func TestS3Store_DirectoryMarkersAreNotFiles(t *testing.T) {
@@ -280,14 +255,10 @@ func TestS3Store_DirectoryMarkersAreNotFiles(t *testing.T) {
 
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("listFiles() error = %v", err)
-	}
+	require.NoError(t, err)
 
 	for _, p := range found {
-		if strings.HasSuffix(p, "/") {
-			t.Errorf("listFiles() returned the directory marker %q", p)
-		}
+		assert.False(t, strings.HasSuffix(p, "/"), "listFiles() returned the directory marker %q", p)
 	}
 }
 
@@ -296,29 +267,17 @@ func TestS3Store_MissingObject(t *testing.T) {
 
 	st := &s3Store{client: newFakeBucket(map[string][]byte{}), bucket: testBucket}
 
-	if _, err := st.open(t.Context(), "no/such/segment.seg"); !errors.Is(err, ErrSegmentMissing) {
-		t.Fatalf("open() error = %v, want ErrSegmentMissing", err)
-	}
+	_, err := st.open(t.Context(), "no/such/segment.seg")
+	require.ErrorIs(t, err, ErrSegmentMissing)
 }
 
 func TestIsNotFound(t *testing.T) {
 	t.Parallel()
 
-	if isNotFound(nil) {
-		t.Error("isNotFound(nil) = true, want false")
-	}
-
-	if isNotFound(errors.New("connection reset")) {
-		t.Error("isNotFound() = true for an error that is not an API error")
-	}
-
-	if !isNotFound(&types.NoSuchKey{}) {
-		t.Error("isNotFound(NoSuchKey) = false, want true")
-	}
-
-	if isNotFound(&types.NoSuchBucket{}) {
-		t.Error("isNotFound(NoSuchBucket) = true, want a missing bucket to be a failure")
-	}
+	assert.False(t, isNotFound(nil), "isNotFound(nil)")
+	assert.False(t, isNotFound(errors.New("connection reset")), "isNotFound() for an error that is not an API error")
+	assert.True(t, isNotFound(&types.NoSuchKey{}), "isNotFound(NoSuchKey)")
+	assert.False(t, isNotFound(&types.NoSuchBucket{}), "isNotFound(NoSuchBucket), want a missing bucket to be a failure")
 }
 
 func TestS3Store_ListingFails(t *testing.T) {
@@ -329,13 +288,11 @@ func TestS3Store_ListingFails(t *testing.T) {
 	// empty backup.
 	st := &s3Store{client: newFakeBucket(b.files), bucket: "no-such-bucket"}
 
-	if err := st.listLevel(t.Context(), testBackupID, func(levelEntry) error { return nil }); err == nil {
-		t.Error("listLevel() of an unreachable bucket succeeded, want an error")
-	}
+	require.Error(t, st.listLevel(t.Context(), testBackupID, func(levelEntry) error { return nil }),
+		"listLevel() of an unreachable bucket succeeded")
 
-	if err := st.listFiles(t.Context(), testBackupID, func(file) error { return nil }); err == nil {
-		t.Error("listFiles() of an unreachable bucket succeeded, want an error")
-	}
+	assert.Error(t, st.listFiles(t.Context(), testBackupID, func(file) error { return nil }),
+		"listFiles() of an unreachable bucket succeeded")
 }
 
 func TestS3Store_GetFails(t *testing.T) {
@@ -345,14 +302,10 @@ func TestS3Store_GetFails(t *testing.T) {
 
 	_, err := st.open(t.Context(), path.Join(testBackupID, "manifest.json"))
 
-	if !errors.Is(err, errBucket) {
-		t.Fatalf("open() error = %v, want the failure of the request", err)
-	}
+	require.ErrorIs(t, err, errBucket, "want the failure of the request")
 
 	// A request that failed says nothing about whether the object is there.
-	if errors.Is(err, ErrSegmentMissing) {
-		t.Error("open() error = ErrSegmentMissing, want a failed request")
-	}
+	assert.NotErrorIs(t, err, ErrSegmentMissing, "want a failed request")
 }
 
 // errBucket is what a bucket that will not answer reports.
@@ -387,21 +340,16 @@ func TestS3Store_ListLevelStopsOnTheCaller(t *testing.T) {
 
 		return errStopListing
 	})
-	if err != nil {
-		t.Fatalf("listLevel() error = %v, want the listing to stop without failing", err)
-	}
+	require.NoError(t, err, "want the listing to stop without failing")
 
-	if seen != 1 {
-		t.Errorf("listLevel() handed over %d partitions after the first one stopped it, want 1", seen)
-	}
+	assert.Equal(t, 1, seen, "listLevel() handed over more partitions after the first one stopped it")
 
 	errCaller := errors.New("caller failed")
 
-	if err := st.listLevel(t.Context(), dir, func(levelEntry) error {
+	err = st.listLevel(t.Context(), dir, func(levelEntry) error {
 		return errCaller
-	}); !errors.Is(err, errCaller) {
-		t.Errorf("listLevel() error = %v, want the failure of the caller", err)
-	}
+	})
+	assert.ErrorIs(t, err, errCaller, "want the failure of the caller")
 }
 
 func TestS3Store_ListLevelSkipsDirectoryMarkers(t *testing.T) {
@@ -420,17 +368,15 @@ func TestS3Store_ListLevelSkipsDirectoryMarkers(t *testing.T) {
 
 	var found []levelEntry
 
-	if err := st.listLevel(t.Context(), dir, func(e levelEntry) error {
+	err := st.listLevel(t.Context(), dir, func(e levelEntry) error {
 		found = append(found, e)
 
 		return nil
-	}); err != nil {
-		t.Fatalf("listLevel() error = %v", err)
-	}
+	})
+	require.NoError(t, err)
 
 	for _, e := range found {
-		if e.Name == "" || strings.HasSuffix(e.Path, "/") {
-			t.Errorf("listLevel() returned %+v, want neither a marker nor a nameless directory", e)
-		}
+		assert.False(t, e.Name == "" || strings.HasSuffix(e.Path, "/"),
+			"listLevel() returned %+v, want neither a marker nor a nameless directory", e)
 	}
 }

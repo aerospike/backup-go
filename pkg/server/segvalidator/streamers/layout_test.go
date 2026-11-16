@@ -22,6 +22,8 @@ import (
 	"testing"
 
 	"github.com/aerospike/backup-go/pkg/server/segvalidator/segment"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // realManifest is shaped like the manifest a server writes, fields the
@@ -78,28 +80,24 @@ func TestDecodeManifest(t *testing.T) {
 	t.Parallel()
 
 	header, segments, err := decodeAll(t, realManifest)
-	if err != nil {
-		t.Fatalf("decodeManifest() error = %v", err)
+	require.NoError(t, err)
+
+	assert.Equal(t, "source-ns1", header.Namespace, "want the namespace of the manifest")
+	assert.Equal(t, "p935", header.Partition, "want the partition of the manifest")
+
+	require.Len(t, segments, 2)
+
+	// The first segment is the one the manifest names first.
+	if assert.NotNil(t, segments[0].Size, "first segment = %+v", segments[0]) {
+		assert.Equal(t, int64(326752), *segments[0].Size, "first segment = %+v", segments[0])
 	}
 
-	if header.Namespace != "source-ns1" || header.Partition != "p935" {
-		t.Errorf("header = %+v, want the namespace and partition of the manifest", header)
-	}
-
-	if len(segments) != 2 {
-		t.Fatalf("decodeManifest() recorded %d segments, want 2", len(segments))
-	}
-
-	if segments[0].Size == nil || *segments[0].Size != 326752 ||
-		!strings.HasSuffix(segments[0].SegmentName, "7-0000181178352-db526a.seg") {
-		t.Errorf("first segment = %+v, want the one the manifest names first", segments[0])
-	}
+	assert.True(t, strings.HasSuffix(segments[0].SegmentName, "7-0000181178352-db526a.seg"),
+		"first segment = %+v, want the one the manifest names first", segments[0])
 
 	// The second segment records no count, which reads as zero.
-	if segments[0].RecordCount != testRecordCount || segments[1].RecordCount != 0 {
-		t.Errorf("record counts = %d and %d, want %d and 0",
-			segments[0].RecordCount, segments[1].RecordCount, testRecordCount)
-	}
+	assert.Equal(t, int64(testRecordCount), segments[0].RecordCount, "record count of the first segment")
+	assert.Zero(t, segments[1].RecordCount, "record count of the second segment")
 }
 
 func TestDecodeManifest_SegmentsAreWalkedNotCollected(t *testing.T) {
@@ -133,18 +131,12 @@ func TestDecodeManifest_SegmentsAreWalkedNotCollected(t *testing.T) {
 
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("decodeManifest() error = %v", err)
-	}
+	require.NoError(t, err)
 
-	if seen != recorded {
-		t.Fatalf("walked %d segments, want %d", seen, recorded)
-	}
+	require.Equal(t, recorded, seen, "segments walked")
 
 	// The fields after the segment array are still read as fields.
-	if header.Partition != "p1" {
-		t.Errorf("header = %+v, want the partition written after the segments", header)
-	}
+	assert.Equal(t, "p1", header.Partition, "want the partition written after the segments")
 }
 
 func TestDecodeManifest_Rejects(t *testing.T) {
@@ -172,15 +164,11 @@ func TestDecodeManifest_Rejects(t *testing.T) {
 			t.Parallel()
 
 			_, _, err := decodeAll(t, tt.body)
-			if err == nil {
-				t.Fatal("decodeManifest() succeeded, want an error")
-			}
+			require.Error(t, err)
 
 			// A run reports an unusable manifest and carries on; anything else
 			// it takes for a storage that stopped answering and gives up on.
-			if !errors.Is(err, ErrManifestUnusable) {
-				t.Errorf("decodeManifest() error = %v, want ErrManifestUnusable", err)
-			}
+			assert.ErrorIs(t, err, ErrManifestUnusable)
 		})
 	}
 }
@@ -196,26 +184,28 @@ func TestDecodeManifest_StopsOnTheCaller(t *testing.T) {
 		return errStop
 	})
 
-	if !errors.Is(err, errStop) {
-		t.Fatalf("decodeManifest() error = %v, want the error of the caller", err)
-	}
+	require.ErrorIs(t, err, errStop, "want the error of the caller")
 
 	// The error of the caller is not the manifest failing to be read: a run
 	// stopped by a canceled context must not come out of it holding a report
 	// of a corrupt backup.
-	if errors.Is(err, ErrManifestUnusable) {
-		t.Errorf("decodeManifest() error = %v, want the error of the caller alone", err)
-	}
+	assert.NotErrorIs(t, err, ErrManifestUnusable, "want the error of the caller alone")
 }
 
 func TestManifestSegment_Resolve(t *testing.T) {
 	t.Parallel()
 
-	const data = "519118324/ns/source-ns1/query-stream/data"
+	const (
+		data       = "519118324/ns/source-ns1/query-stream/data"
+		prefix     = "backups/daily"
+		prefixData = prefix + "/" + data
+	)
 
 	tests := []struct {
 		name      string
 		recorded  string
+		prefix    string
+		data      string
 		partition string
 		want      string
 		wantErr   bool
@@ -223,45 +213,58 @@ func TestManifestSegment_Resolve(t *testing.T) {
 		{
 			name:     "path from the root of the storage",
 			recorded: data + "/p7/s0.seg",
+			data:     data,
 			want:     data + "/p7/s0.seg",
+		},
+		{
+			name:     "path from the root of a backup written under a path",
+			recorded: data + "/p7/s0.seg",
+			prefix:   prefix,
+			data:     prefixData,
+			want:     prefixData + "/p7/s0.seg",
 		},
 		{
 			name:      "bare name in the partition of the manifest",
 			recorded:  "s0.seg",
+			data:      data,
 			partition: "p7",
 			want:      data + "/p7/s0.seg",
 		},
 		{
+			name:      "bare name in a backup written under a path",
+			recorded:  "s0.seg",
+			prefix:    prefix,
+			data:      prefixData,
+			partition: "p7",
+			want:      prefixData + "/p7/s0.seg",
+		},
+		{
 			name:     "bare name in a stream without partitions",
 			recorded: "s0.seg",
+			data:     data,
 			want:     data + "/s0.seg",
 		},
-		{name: "no name", recorded: "  ", wantErr: true},
-		{name: "leaving the storage", recorded: "../../etc/passwd", wantErr: true},
-		{name: "absolute", recorded: "/etc/passwd", wantErr: true},
+		{name: "no name", recorded: "  ", data: data, wantErr: true},
+		{name: "leaving the storage", recorded: "../../etc/passwd", data: data, wantErr: true},
+		{name: "leaving the path", recorded: "../../etc/passwd", prefix: prefix, data: prefixData, wantErr: true},
+		{name: "absolute", recorded: "/etc/passwd", data: data, wantErr: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := manifestSegment{SegmentName: tt.recorded}.resolve(data, tt.partition)
+			got, err := manifestSegment{SegmentName: tt.recorded}.resolve(tt.prefix, tt.data, tt.partition)
 
 			if tt.wantErr {
-				if !errors.Is(err, ErrManifestUnusable) {
-					t.Fatalf("resolve() error = %v, want ErrManifestUnusable", err)
-				}
+				require.ErrorIs(t, err, ErrManifestUnusable)
 
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("resolve() error = %v", err)
-			}
+			require.NoError(t, err)
 
-			if got != tt.want {
-				t.Errorf("resolve() = %q, want %q", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -294,16 +297,12 @@ func TestManifestSegment_Check(t *testing.T) {
 			err := tt.give.check()
 
 			if !tt.wantErr {
-				if err != nil {
-					t.Fatalf("check() error = %v", err)
-				}
+				require.NoError(t, err)
 
 				return
 			}
 
-			if !errors.Is(err, ErrManifestUnusable) {
-				t.Fatalf("check() error = %v, want ErrManifestUnusable", err)
-			}
+			require.ErrorIs(t, err, ErrManifestUnusable)
 		})
 	}
 }
@@ -357,19 +356,9 @@ func TestQuotas(t *testing.T) {
 				total += q
 			}
 
-			if total != tt.n {
-				t.Errorf("quotas() hands out %d of a sample of %d: %v", total, tt.n, got)
-			}
+			assert.Equal(t, tt.n, total, "quotas() hands out a different total than the sample: %v", got)
 
-			if len(got) != len(tt.want) {
-				t.Fatalf("quotas() = %v, want %v", got, tt.want)
-			}
-
-			for i := range got {
-				if got[i] != tt.want[i] {
-					t.Fatalf("quotas() = %v, want %v", got, tt.want)
-				}
-			}
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -387,9 +376,7 @@ func TestShare(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		if got := share(tt.remaining, tt.sources); got != tt.want {
-			t.Errorf("share(%d, %d) = %d, want %d", tt.remaining, tt.sources, got, tt.want)
-		}
+		assert.Equal(t, tt.want, share(tt.remaining, tt.sources), "share(%d, %d)", tt.remaining, tt.sources)
 	}
 }
 
@@ -403,17 +390,13 @@ func TestReservoir(t *testing.T) {
 		res.offer(i)
 	}
 
-	if len(res.result()) != 2 {
-		t.Fatalf("a reservoir offered 2 values holds %d, want 2", len(res.result()))
-	}
+	require.Len(t, res.result(), 2, "a reservoir offered 2 values")
 
 	for i := range 1000 {
 		res.offer(i)
 	}
 
-	if len(res.result()) != 3 {
-		t.Fatalf("a reservoir of 3 holds %d values", len(res.result()))
-	}
+	require.Len(t, res.result(), 3, "a reservoir of 3")
 }
 
 func TestReservoirIsUniform(t *testing.T) {
@@ -443,9 +426,7 @@ func TestReservoirIsUniform(t *testing.T) {
 	expected := float64(rounds) * picks / values
 
 	for v, count := range counts {
-		if diff := float64(count) - expected; diff < -expected/5 || diff > expected/5 {
-			t.Errorf("value %d picked %d times, want about %.0f", v, count, expected)
-		}
+		assert.InDelta(t, expected, float64(count), expected/5, "value %d picked too often or too rarely", v)
 	}
 }
 
@@ -453,17 +434,11 @@ func TestSeedForIsStable(t *testing.T) {
 	t.Parallel()
 
 	first, second := seedFor(42, 1), seedFor(42, 2)
-	if first == second {
-		t.Error("two pieces of work of the same run share a seed")
-	}
+	assert.NotEqual(t, first, second, "two pieces of work of the same run share a seed")
 
-	if again := seedFor(42, 1); again != first {
-		t.Errorf("the same piece of work of the same run got two seeds: %d and %d", first, again)
-	}
+	assert.Equal(t, first, seedFor(42, 1), "the same piece of work of the same run got two seeds")
 
-	if seedFor(1, 1) == seedFor(2, 1) {
-		t.Error("two runs share the seed of a piece of work")
-	}
+	assert.NotEqual(t, seedFor(1, 1), seedFor(2, 1), "two runs share the seed of a piece of work")
 }
 
 func TestDecodeManifest_PartitionNamedDirectly(t *testing.T) {
@@ -472,13 +447,9 @@ func TestDecodeManifest_PartitionNamedDirectly(t *testing.T) {
 	// A manifest writes its partition as a number, which names the directory
 	// holding it. One that names the directory itself is taken at its word.
 	header, _, err := decodeAll(t, `{"partition_id":"node-a","segments":[]}`)
-	if err != nil {
-		t.Fatalf("decodeManifest() error = %v", err)
-	}
+	require.NoError(t, err)
 
-	if header.Partition != "node-a" {
-		t.Fatalf("partition = %q, want %q", header.Partition, "node-a")
-	}
+	require.Equal(t, "node-a", header.Partition)
 }
 
 func TestDecodeManifest_RejectsBrokenFields(t *testing.T) {
@@ -499,13 +470,9 @@ func TestDecodeManifest_RejectsBrokenFields(t *testing.T) {
 			t.Parallel()
 
 			_, _, err := decodeAll(t, tt.body)
-			if err == nil {
-				t.Fatal("decodeManifest() succeeded, want an error")
-			}
+			require.Error(t, err)
 
-			if !errors.Is(err, ErrManifestUnusable) {
-				t.Errorf("decodeManifest() error = %v, want ErrManifestUnusable", err)
-			}
+			assert.ErrorIs(t, err, ErrManifestUnusable)
 		})
 	}
 }
@@ -536,28 +503,20 @@ func TestReadKey(t *testing.T) {
 
 			if tt.wantKey != "" {
 				// Step over the opening brace, so the next token is the key.
-				if err := expectDelim(dec, '{'); err != nil {
-					t.Fatalf("expectDelim() error = %v", err)
-				}
+				require.NoError(t, expectDelim(dec, '{'))
 			}
 
 			key, err := readKey(dec)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Fatalf("readKey() = %q, want an error", key)
-				}
+				require.Error(t, err, "readKey() = %q", key)
 
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("readKey() unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
-			if key != tt.wantKey {
-				t.Fatalf("readKey() = %q, want %q", key, tt.wantKey)
-			}
+			require.Equal(t, tt.wantKey, key)
 		})
 	}
 }
@@ -661,9 +620,8 @@ func TestSegment_Partition(t *testing.T) {
 			t.Parallel()
 
 			id, ok := tt.give.Partition()
-			if id != tt.wantID || ok != tt.wantOK {
-				t.Fatalf("Partition() = (%d, %v), want (%d, %v)", id, ok, tt.wantID, tt.wantOK)
-			}
+			assert.Equal(t, tt.wantID, id, "Partition() id")
+			assert.Equal(t, tt.wantOK, ok, "Partition() ok")
 		})
 	}
 }

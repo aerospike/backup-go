@@ -60,9 +60,14 @@ const (
 )
 
 // maxManifestSize caps a manifest read, so a bogus file cannot keep a validator
-// downloading forever. A manifest is walked as it arrives, so the limit bounds
-// the transfer and not the memory reading one costs.
-const maxManifestSize = 64 << 20
+// downloading forever. It is the ceiling the server reads a manifest up to on
+// restore. A manifest is walked as it arrives, so the limit bounds the transfer
+// and not the memory reading one costs.
+const maxManifestSize = 256 << 20
+
+// maxManifestsPerPartition is the number of query stream manifests the server
+// restores a partition from. A partition with more of them fails the restore.
+const maxManifestsPerPartition = 16
 
 // Stream is one of the two streams a server side backup writes. They hold the
 // same kind of data and are validated the same way; which one a segment came
@@ -76,23 +81,81 @@ const (
 	ChangeStream Stream = "change-stream"
 )
 
+// BlockType returns the block type the server stamps on the segments of the
+// stream, which is the one a restore requires of them. ok is false for a stream
+// the server does not write.
+func (s Stream) BlockType() (t segment.BlockType, ok bool) {
+	switch s {
+	case QueryStream:
+		return segment.BlockQueryRecords, true
+	case ChangeStream:
+		return segment.BlockChangeRecords, true
+	default:
+		return 0, false
+	}
+}
+
 // streams are the streams of a namespace, in the order they are visited.
 var streams = []Stream{QueryStream, ChangeStream}
+
+// ErrNoQueryManifests is reported for a namespace a restore finds no query
+// stream manifest for. The server takes that for a backup id that does not
+// exist and fails the restore, unless the backup is an incremental one of a
+// backup-ids list.
+var ErrNoQueryManifests = fmt.Errorf("%w: namespace has no query stream manifest", errclass.ErrNotFound)
 
 // ErrManifestUnusable is returned for a manifest that cannot be turned into a
 // list of segments, whether because it did not parse or because it names
 // something that cannot be located in the storage.
 var ErrManifestUnusable = fmt.Errorf("%w: manifest cannot be read", errclass.ErrCorruptData)
 
-// namespacesRoot locates the directory naming the namespaces of the backup.
-func namespacesRoot(backupID string) string {
-	return path.Join(backupID, namespacesDir)
+// namespacesRoot locates the directory naming the namespaces of the backup
+// whose directory is backupDir.
+func namespacesRoot(backupDir string) string {
+	return path.Join(backupDir, namespacesDir)
 }
 
-// streamRoot locates the directory of one stream of one namespace. What sits
-// below it is discovered rather than assumed.
-func streamRoot(backupID, namespace string, stream Stream) string {
-	return path.Join(backupID, namespacesDir, namespace, string(stream))
+// streamRoot locates the directory of one stream of one namespace of the backup
+// whose directory is backupDir. What sits below it is discovered rather than
+// assumed.
+func streamRoot(backupDir, namespace string, stream Stream) string {
+	return path.Join(backupDir, namespacesDir, namespace, string(stream))
+}
+
+// cleanPrefix normalizes the path a backup was written under. The path is
+// relative to the root of the storage, so surrounding slashes are dropped, and
+// a path leading out of the storage is refused.
+func cleanPrefix(prefix string) (string, error) {
+	cleaned := path.Clean(strings.Trim(prefix, "/"))
+
+	switch {
+	case cleaned == ".":
+		return "", nil
+	case leavesRoot(cleaned):
+		return "", fmt.Errorf("%w: path %q points outside the storage", errclass.ErrInvalidConfig, prefix)
+	default:
+		return cleaned, nil
+	}
+}
+
+// leavesRoot reports whether a clean relative path leads out of the directory
+// it is relative to.
+func leavesRoot(cleaned string) bool {
+	return cleaned == ".." || strings.HasPrefix(cleaned, "../")
+}
+
+// checkBackupID refuses a backup id that is not the name of a single
+// directory. The path a backup was written under is given apart from its id.
+func checkBackupID(backupID string) error {
+	switch {
+	case backupID == "":
+		return fmt.Errorf("%w: backup id must not be empty", errclass.ErrInvalidConfig)
+	case backupID == "." || leavesRoot(backupID) || strings.Contains(backupID, "/"):
+		return fmt.Errorf("%w: backup id %q must name a single directory, a path goes to WithPath",
+			errclass.ErrInvalidConfig, backupID)
+	default:
+		return nil
+	}
 }
 
 // isSegment reports whether a listed file is a segment. A data directory is
@@ -319,11 +382,12 @@ func (m manifestSegment) check() error {
 // resolve turns the name a manifest records into the path of the segment in the
 // storage.
 //
-// A manifest names a segment by its path from the root of the storage, the
-// backup id included. A name without a slash is taken to be a file name in the
+// A manifest names a segment by its path from the path the backup was written
+// under, prefix, the backup id included: the server leaves its own path out of
+// what it records. A name without a slash is taken to be a file name in the
 // data directory of the partition the manifest belongs to, so that a manifest
 // written the short way is still usable.
-func (m manifestSegment) resolve(data, partition string) (string, error) {
+func (m manifestSegment) resolve(prefix, data, partition string) (string, error) {
 	name := strings.TrimSpace(m.SegmentName)
 
 	switch {
@@ -331,11 +395,11 @@ func (m manifestSegment) resolve(data, partition string) (string, error) {
 		return "", fmt.Errorf("%w: it records a segment without a name", ErrManifestUnusable)
 	case strings.Contains(name, "/"):
 		cleaned := path.Clean(name)
-		if path.IsAbs(cleaned) || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		if path.IsAbs(cleaned) || leavesRoot(cleaned) {
 			return "", fmt.Errorf("%w: segment %q points outside the storage", ErrManifestUnusable, name)
 		}
 
-		return cleaned, nil
+		return path.Join(prefix, cleaned), nil
 	default:
 		return path.Join(data, partition, name), nil
 	}

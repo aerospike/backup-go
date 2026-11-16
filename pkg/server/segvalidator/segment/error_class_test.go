@@ -45,6 +45,7 @@ func TestErrorClasses(t *testing.T) {
 		ErrNonZeroPadding,
 		ErrFrameContentMismatch,
 		ErrWrongPartition,
+		ErrBlockTypeMismatch,
 		ErrZeroGeneration,
 		ErrBadSetNameLength,
 		ErrZeroKeySize,
@@ -73,7 +74,7 @@ func TestErrorClasses(t *testing.T) {
 	}{
 		{name: "corrupt data", errs: corrupt, class: errclass.ErrCorruptData},
 		{name: "unsupported", errs: unsupported, class: errclass.ErrUnsupported},
-		{name: "invalid config", errs: []error{ErrInvalidPartition}, class: errclass.ErrInvalidConfig},
+		{name: "invalid config", errs: []error{ErrInvalidPartition, ErrInvalidBlockType}, class: errclass.ErrInvalidConfig},
 	}
 
 	for _, tt := range tests {

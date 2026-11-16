@@ -149,7 +149,6 @@ These import paths are what consumers are expected to use:
 - `github.com/aerospike/backup-go/io/storage/...` — storage backends and their options
 - `github.com/aerospike/backup-go/io/encoding/asb` — ASB format and its file validator
 - `github.com/aerospike/backup-go/pkg/asinfo` — Aerospike info command client
-- `github.com/aerospike/backup-go/pkg/secretagent` — Secret Agent client
 - `github.com/aerospike/backup-go/errclass` — error classes, for packages used without the root one
 
 Packages under `pkg/server` are **under active development** and change without notice.

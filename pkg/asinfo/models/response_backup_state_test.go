@@ -29,8 +29,9 @@ const (
 	testStartTimeStr  = "2026-09-22 10.36.53.415 UTC"
 	testFinishTimeStr = "2026-09-22 10.41.20.077 UTC"
 
-	testErrorReason = "storage unreachable"
-	testAbortReason = "aborted by operator"
+	testErrorReason    = "storage unreachable"
+	testFallbackReason = "node BB9020011AC4202 failed after the base scan"
+	testAbortReason    = "aborted by operator"
 )
 
 var (
@@ -68,12 +69,23 @@ func TestNewResponseBackupState(t *testing.T) {
 					"finish-time":              "-",
 					"partitions-count-pending": "0",
 					"count-read-failures":      "0",
+					fieldBackupPolicy:          "best-effort",
+					fieldAchievedConsistency:   "-",
+					"fallback-reason":          testFallbackReason,
+					"recs-per-sec":             "1200",
+					"buffers-scan-cap":         "48",
+					fieldLastLapMs:             "250",
 				},
 			},
 			want: &ResponseBackupState{
 				JobID:              testJobID,
 				Namespace:          testNamespace,
 				State:              BackupStateIncrScanActive,
+				Policy:             BackupPolicyBestEffort,
+				FallbackReason:     testFallbackReason,
+				RecsPerSec:         1200,
+				BuffersScanCap:     48,
+				LastLapMs:          new(uint64(250)),
 				RecsBase:           515423,
 				PartitionsFlushed:  1365,
 				PartitionsOwned:    1365,
@@ -123,12 +135,17 @@ func TestNewResponseBackupState(t *testing.T) {
 					"finish-time":                      testFinishTimeStr,
 					"partitions-count-pending":         "5",
 					"count-read-failures":              "4",
+					fieldBackupPolicy:                  "strict",
+					fieldAchievedConsistency:           "strict",
+					fieldLastLapMs:                     "-",
 				},
 			},
 			want: &ResponseBackupState{
 				JobID:                        testJobID,
 				Namespace:                    testNamespace,
 				State:                        BackupStateComplete,
+				Policy:                       BackupPolicyStrict,
+				AchievedConsistency:          ConsistencyStrict,
 				BackupRPS:                    500,
 				BackupWorkerThreads:          8,
 				BackupUploadThreads:          16,
@@ -246,6 +263,8 @@ func TestNewResponseBackupState(t *testing.T) {
 					"state":       "INIT",
 					"start-time":  "-",
 					"finish-time": "-",
+
+					fieldFallbackReason: infoNoValue,
 				},
 			},
 			want: &ResponseBackupState{
@@ -347,19 +366,29 @@ func TestResolveBackupState(t *testing.T) {
 		want   BackupState
 	}{
 		{
-			name:   "failed overrides all",
+			name:   "failed once every node is terminal",
 			states: []BackupState{BackupStateComplete, BackupStateFailed, BackupStateAborted},
 			want:   BackupStateFailed,
 		},
 		{
-			name:   "aborting overrides aborted and lifecycle states",
-			states: []BackupState{BackupStateAborted, BackupStateAborting, BackupStateInit},
+			name:   "aborted once every node is terminal",
+			states: []BackupState{BackupStateComplete, BackupStateAborted},
+			want:   BackupStateAborted,
+		},
+		{
+			name:   "aborting while a node aborts",
+			states: []BackupState{BackupStateAborted, BackupStateAborting},
 			want:   BackupStateAborting,
 		},
 		{
-			name:   "aborted overrides lifecycle states",
-			states: []BackupState{BackupStateComplete, BackupStateAborted},
-			want:   BackupStateAborted,
+			name:   "aborting while a failed job still runs on a node",
+			states: []BackupState{BackupStateFailed, BackupStateIncrScanActive},
+			want:   BackupStateAborting,
+		},
+		{
+			name:   "aborting while an aborted job still runs on a node",
+			states: []BackupState{BackupStateAborted, BackupStateBaseScanActive},
+			want:   BackupStateAborting,
 		},
 		{
 			name:   "lowest lifecycle state wins",
@@ -375,6 +404,26 @@ func TestResolveBackupState(t *testing.T) {
 			name:   "all complete",
 			states: []BackupState{BackupStateComplete, BackupStateComplete},
 			want:   BackupStateComplete,
+		},
+		{
+			name:   "complete mixed with unknown",
+			states: []BackupState{BackupStateComplete, BackupStateUnknown},
+			want:   BackupStateUnknown,
+		},
+		{
+			name:   "complete mixed with a state this package does not know",
+			states: []BackupState{BackupStateComplete, "SOMETHING_NEW"},
+			want:   BackupStateUnknown,
+		},
+		{
+			name:   "failed mixed with unknown is not hidden",
+			states: []BackupState{BackupStateFailed, BackupStateUnknown},
+			want:   BackupStateAborting,
+		},
+		{
+			name:   "aborted mixed with a state this package does not know is not hidden",
+			states: []BackupState{BackupStateAborted, "SOMETHING_NEW"},
+			want:   BackupStateAborting,
 		},
 		{
 			name:   "unknown when no known states",
@@ -438,6 +487,11 @@ func TestMergeResponseBackupStates(t *testing.T) {
 					ProgressPct:             100,
 					StartTime:               startLate,
 					FinishTime:              finishLate,
+					Policy:                  BackupPolicyBestEffort,
+					AchievedConsistency:     ConsistencyStrict,
+					RecsPerSec:              100,
+					BuffersScanCap:          48,
+					LastLapMs:               new(uint64(250)),
 				},
 				{
 					JobID:                   testJobID,
@@ -466,6 +520,12 @@ func TestMergeResponseBackupStates(t *testing.T) {
 					ChangeStreamActive:      true,
 					StartTime:               startEarly,
 					FinishTime:              finishEarly,
+					Policy:                  BackupPolicyBestEffort,
+					AchievedConsistency:     ConsistencyFuzzy,
+					FallbackReason:          testFallbackReason,
+					RecsPerSec:              50,
+					BuffersScanCap:          48,
+					LastLapMs:               new(uint64(1200)),
 				},
 			},
 			want: &ResponseBackupState{
@@ -495,12 +555,55 @@ func TestMergeResponseBackupStates(t *testing.T) {
 				ChangeStreamActive:      true,
 				StartTime:               startEarly,
 				FinishTime:              finishLate,
+				Policy:                  BackupPolicyBestEffort,
+				AchievedConsistency:     ConsistencyFuzzy,
+				FallbackReason:          testFallbackReason,
+				RecsPerSec:              150,
+				BuffersScanCap:          96,
+				LastLapMs:               new(uint64(1200)),
+			},
+		},
+		{
+			name: "finish time is the latest once every node finished",
+			statuses: []*ResponseBackupState{
+				{JobID: testJobID, Namespace: testNamespace, State: BackupStateComplete, FinishTime: testStartTime},
+				{JobID: testJobID, Namespace: testNamespace, State: BackupStateComplete, FinishTime: testFinishTime},
+			},
+			want: &ResponseBackupState{
+				JobID:      testJobID,
+				Namespace:  testNamespace,
+				State:      BackupStateComplete,
+				FinishTime: testFinishTime,
+			},
+		},
+		{
+			name: "finish time is zero while a node has not finished",
+			statuses: []*ResponseBackupState{
+				{JobID: testJobID, Namespace: testNamespace, State: BackupStateFailed, FinishTime: testFinishTime},
+				{JobID: testJobID, Namespace: testNamespace, State: BackupStateBaseScanActive},
+			},
+			want: &ResponseBackupState{
+				JobID:     testJobID,
+				Namespace: testNamespace,
+				State:     BackupStateAborting,
+			},
+		},
+		{
+			name: "job id and namespace are taken from the first row that is not a stub",
+			statuses: []*ResponseBackupState{
+				{JobID: testJobID, Namespace: infoNoName, State: BackupStateFailed},
+				{JobID: testJobID, Namespace: testNamespace, State: BackupStateAborted},
+			},
+			want: &ResponseBackupState{
+				JobID:     testJobID,
+				Namespace: testNamespace,
+				State:     BackupStateFailed,
 			},
 		},
 		{
 			name: "first reported error reason and abort origin are kept",
 			statuses: []*ResponseBackupState{
-				{JobID: testJobID, Namespace: testNamespace, State: BackupStateBaseScanActive},
+				{JobID: testJobID, Namespace: testNamespace, State: BackupStateAborted},
 				{
 					JobID: testJobID, Namespace: testNamespace, State: BackupStateAborted,
 					ErrorReason: testErrorReason, AbortOrigin: AbortOriginServer,

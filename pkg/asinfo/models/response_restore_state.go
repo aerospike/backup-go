@@ -44,18 +44,24 @@ const (
 	fieldClear              = "clear"
 	fieldClearZeroedBytes   = "clear-zeroed-bytes"
 	fieldClearMs            = "clear-ms"
+	fieldHeldReason         = "held-reason"
+	fieldPendingQDepth      = "pending-q-depth"
+	fieldPendingQCap        = "pending-q-cap"
+	fieldSourceConsistency  = "source-consistency"
 
-	fieldApplied      = "applied"
-	fieldIgnored      = "ignored"
-	fieldFailed       = "failed"
-	fieldOutstanding  = "outstanding"
-	fieldSkipped      = "skipped"
-	fieldHandedOff    = "handed-off"
-	fieldCovered      = "covered"
-	fieldClusterWide  = "cluster-wide"
-	fieldRead         = "read"
-	fieldDeleted      = "deleted"
-	fieldDeleteAbsent = "delete-absent"
+	fieldTotal           = "total"
+	fieldApplied         = "applied"
+	fieldDeletes         = "deletes"
+	fieldFiltered        = "filtered"
+	fieldFilteredNotOurs = "filtered-not-ours"
+	fieldFailed          = "failed"
+
+	fieldOutstanding       = "outstanding"
+	fieldMaxInflight       = "max-inflight"
+	fieldIgnoreRecordError = "ignore-record-error"
+	fieldCovered           = "covered"
+	fieldClusterWide       = "cluster-wide"
+	fieldDeleteAbsent      = "delete-absent"
 )
 
 // ResponseRestoreState represents the status of a server-side restore job, as
@@ -70,8 +76,8 @@ type ResponseRestoreState struct {
 	Namespace string
 	Kind      RestoreKind
 	State     RestoreState
-	// NsState is the restore gate of the namespace. It is NamespaceStateNotHosted
-	// on a node that does not host the namespace.
+	// NsState is the restore gate of the namespace. It is NamespaceStateStub
+	// on a stub row.
 	NsState NamespaceState
 	// ErrorReason is only reported by the server when the job failed or was aborted.
 	ErrorReason string
@@ -79,8 +85,8 @@ type ResponseRestoreState struct {
 	AbortOrigin AbortOrigin
 
 	// RestoreRPS is the effective records per second limit, 0 for no limit.
-	// A cold job that is prepared but not started yet reports 0 for it and for
-	// the thread counts.
+	// A node that restarted and holds the gate from its local restore file
+	// (Placeholder) reports 0 for it and for the thread counts.
 	RestoreRPS uint32
 	// RestoreWorkerThreads is the effective number of apply threads per node.
 	RestoreWorkerThreads uint32
@@ -106,6 +112,43 @@ type ResponseRestoreState struct {
 	// TTLClamped counts the records of TTLExtended capped at now + 10 years.
 	TTLClamped uint64
 
+	// SourceConsistency is the lowest consistency of the backups the node read
+	// so far. It is empty before the node read any.
+	SourceConsistency Consistency
+	// RecsPerSec is the rate of Applied, as of the last lap of the monitor.
+	RecsPerSec uint64
+	// LastLapMs is how long ago the restore monitor last reached the job, in
+	// milliseconds. A growing value shows a monitor blocked on the object
+	// store. It is nil for a finished job, or before the first lap.
+	LastLapMs *uint64
+
+	// ProgressPct is the progress of the job, from 0 to 100. A node reports it
+	// for its own share of the partitions, and reports 100 only once the job
+	// is complete. See [MergeResponseRestoreStates] for the cluster-wide value.
+	ProgressPct float64
+
+	// Record counters, reported by both modes. A record read lands in one of
+	// the buckets Applied, Filtered and Failed once its outcome is final;
+	// Deletes and FilteredNotOurs are parts of Applied and Filtered.
+
+	// Total is the sum of Applied, Filtered and Failed. It can fall short of
+	// the records read: records in flight or abandoned on a stop are in no
+	// bucket.
+	Total uint64
+	// Applied counts the records written, durable deletes included.
+	Applied uint64
+	// Deletes counts the durable deletes of Applied.
+	Deletes uint64
+	// Filtered counts the records read but not written: rejected by the filter
+	// expression, out of the scope of the node, or skipped otherwise.
+	Filtered uint64
+	// FilteredNotOurs counts the records of Filtered dropped because another
+	// node owns their partition. Only a cold restore reports it.
+	FilteredNotOurs uint64
+	// Failed counts the records that failed, the ones a fuzzy restore
+	// tolerates with IgnoreRecordError included.
+	Failed uint64
+
 	// Cold restore fields.
 
 	// Joiner is true if the node joined after the layout was frozen.
@@ -113,7 +156,9 @@ type ResponseRestoreState struct {
 	// Placeholder is true if the node restarted and holds the gate from its
 	// local restore file while it waits for the cluster metadata.
 	Placeholder bool
-	// PidsInScope counts the partitions in the restore layout.
+	// PidsInScope counts the partitions the node hydrates: those of the
+	// restore layout it holds a hydrated copy of. Merged across the nodes, it
+	// counts each partition once per hydrated copy.
 	PidsInScope uint32
 	// MissingLayoutNodes counts the layout nodes not in the cluster. A non-zero
 	// value blocks the completion.
@@ -133,31 +178,32 @@ type ResponseRestoreState struct {
 	ClearZeroedBytes uint64
 	// ClearMs is the wall time of the last completed clear, in milliseconds.
 	ClearMs uint64
+	// PendingQDepth is the depth of the download queue of the node, as of the
+	// last lap of the monitor.
+	PendingQDepth uint64
+	// PendingQCap is the capacity of the download queue of the node.
+	PendingQCap uint64
+	// HeldReason tells why a live job holds the node in PREPARING, such as
+	// "truncate-state-live" for a namespace with truncate state to undo. It is
+	// only reported while the node is held.
+	HeldReason string
 
 	// Fuzzy restore fields. With more than one backup id, the coverage counters
 	// are for the entry of BackupEntry.
 
-	// Applied counts records written.
-	Applied uint64
-	// Ignored counts records that failed but were tolerated.
-	Ignored uint64
-	// Failed counts records that failed.
-	Failed uint64
 	// Outstanding counts writes in service or waiting for a retry.
 	Outstanding uint64
-	// Skipped counts records not replayed: filtered, expired or tombstones.
-	Skipped uint64
-	// HandedOff counts records skipped because their partition moved to another node.
-	HandedOff uint64
+	// MaxInflight is the ceiling of Outstanding the writes are throttled at.
+	MaxInflight uint32
+	// IgnoreRecordError tells whether the records of Failed are tolerated
+	// instead of failing the job.
+	IgnoreRecordError bool
 	// Covered counts partitions the node has fully restored.
 	Covered uint32
 	// ClusterWide counts partitions known to be covered across the cluster.
 	ClusterWide uint32
-	// Read counts records read from the backup.
-	Read uint64
-	// Deleted counts durable deletes replayed from the incremental backups.
-	Deleted uint64
-	// DeleteAbsent counts the deletes of Deleted whose record was already absent.
+	// DeleteAbsent counts the deletes of Deletes whose record was already
+	// absent. It is only reported for more than one backup id.
 	DeleteAbsent uint64
 }
 
@@ -181,8 +227,12 @@ func NewResponseRestoreState(im []InfoMap) *ResponseRestoreState {
 			BackupID:    r[fieldBackupID],
 			ClusterKey:  r[fieldClusterKey],
 			Clear:       ClearState(r[fieldClear]),
-			StartTime:   parseInfoTime(r[fieldStartTime]),
-			FinishTime:  parseInfoTime(r[fieldFinishTime]),
+			HeldReason:  infoValue(r, fieldHeldReason),
+			LastLapMs:   parseOptionalUint64(r, fieldLastLapMs),
+
+			SourceConsistency: Consistency(infoValue(r, fieldSourceConsistency)),
+			StartTime:         parseInfoTime(r[fieldStartTime]),
+			FinishTime:        parseInfoTime(r[fieldFinishTime]),
 		}
 
 		status.parseFields(r)
@@ -199,14 +249,16 @@ func (s *ResponseRestoreState) parseFields(r InfoMap) {
 	parseInfoFields(r, InfoMap.ParseUint64,
 		infoFieldOf(fieldTTLExtended, &s.TTLExtended),
 		infoFieldOf(fieldTTLClamped, &s.TTLClamped),
+		infoFieldOf(fieldTotal, &s.Total),
 		infoFieldOf(fieldApplied, &s.Applied),
-		infoFieldOf(fieldIgnored, &s.Ignored),
+		infoFieldOf(fieldDeletes, &s.Deletes),
+		infoFieldOf(fieldFiltered, &s.Filtered),
+		infoFieldOf(fieldFilteredNotOurs, &s.FilteredNotOurs),
 		infoFieldOf(fieldFailed, &s.Failed),
 		infoFieldOf(fieldOutstanding, &s.Outstanding),
-		infoFieldOf(fieldSkipped, &s.Skipped),
-		infoFieldOf(fieldHandedOff, &s.HandedOff),
-		infoFieldOf(fieldRead, &s.Read),
-		infoFieldOf(fieldDeleted, &s.Deleted),
+		infoFieldOf(fieldRecsPerSec, &s.RecsPerSec),
+		infoFieldOf(fieldPendingQDepth, &s.PendingQDepth),
+		infoFieldOf(fieldPendingQCap, &s.PendingQCap),
 		infoFieldOf(fieldDeleteAbsent, &s.DeleteAbsent),
 		infoFieldOf(fieldClearZeroedBytes, &s.ClearZeroedBytes),
 		infoFieldOf(fieldClearMs, &s.ClearMs),
@@ -224,35 +276,54 @@ func (s *ResponseRestoreState) parseFields(r InfoMap) {
 		infoFieldOf(fieldNDoneNodes, &s.NDoneNodes),
 		infoFieldOf(fieldCovered, &s.Covered),
 		infoFieldOf(fieldClusterWide, &s.ClusterWide),
+		infoFieldOf(fieldMaxInflight, &s.MaxInflight),
+	)
+
+	parseInfoFields(r, InfoMap.ParseFloat64,
+		infoFieldOf(fieldProgressPct, &s.ProgressPct),
 	)
 
 	parseInfoFields(r, InfoMap.ParseBool,
 		infoFieldOf(fieldJoiner, &s.Joiner),
 		infoFieldOf(fieldPlaceholder, &s.Placeholder),
 		infoFieldOf(fieldDone, &s.Done),
+		infoFieldOf(fieldIgnoreRecordError, &s.IgnoreRecordError),
 	)
 }
 
 // MergeResponseRestoreStates combines per-node restore status responses into a
 // single cluster-wide view:
-//   - State, NsState and Clear are resolved with [ResolveRestoreState],
-//     [ResolveNamespaceState] and [ResolveClearState];
-//   - the per-node counters are summed, ClearZeroedBytes included;
-//   - the effective limits, ClearMs and the figures every node reports in the
-//     cluster view (PidsInScope, MissingLayoutNodes, NDoneNodes, ClusterWide,
-//     BackupEntries) are taken as their maximum;
+//   - State, NsState, Clear and SourceConsistency are resolved with
+//     [ResolveRestoreState], [ResolveNamespaceState], [ResolveClearState] and
+//     [ResolveConsistency];
+//   - the per-node counters, rates and gauges are summed, PidsInScope and
+//     ClearZeroedBytes included;
+//   - the effective limits, MaxInflight, ClearMs and the figures every node
+//     reports in the cluster view (MissingLayoutNodes, NDoneNodes, ClusterWide,
+//     BackupEntries) are taken as their maximum, and LastLapMs is the oldest
+//     lap;
 //   - BackupID and BackupEntry are those of the node that is the furthest
 //     behind;
-//   - Joiner, Placeholder and Done are true if they are true on any node;
-//   - StartTime is the earliest timestamp, FinishTime the latest, and the
-//     strings are the first ones reported by any node.
+//   - Joiner, Placeholder, Done and IgnoreRecordError are true if they are
+//     true on any node;
+//   - ProgressPct is the mean of the progress of the nodes weighted by their
+//     share of the partitions, see [ResponseRestoreState.progressWeight];
+//   - StartTime is the earliest timestamp, FinishTime the latest, or zero
+//     while any node has not finished, JobID and Namespace are the first ones
+//     reported by a row that is not a stub, and the other strings are the
+//     first ones reported by any node.
 func MergeResponseRestoreStates(statuses []*ResponseRestoreState) *ResponseRestoreState {
 	var (
 		merged      *ResponseRestoreState
 		states      []RestoreState
 		nsStates    []NamespaceState
 		clearStates []ClearState
+		sources     []Consistency
 		hasBackup   bool
+		unfinished  bool
+
+		progressWeightedSum float64
+		progressWeight      float64
 	)
 
 	for _, status := range statuses {
@@ -261,16 +332,15 @@ func MergeResponseRestoreStates(statuses []*ResponseRestoreState) *ResponseResto
 		}
 
 		if merged == nil {
-			merged = &ResponseRestoreState{
-				JobID:     status.JobID,
-				Namespace: status.Namespace,
-				Kind:      status.Kind,
-			}
+			merged = &ResponseRestoreState{Kind: status.Kind}
 		}
+
+		unfinished = unfinished || status.FinishTime.IsZero()
 
 		states = append(states, status.State)
 		nsStates = append(nsStates, status.NsState)
 		clearStates = append(clearStates, status.Clear)
+		sources = append(sources, status.SourceConsistency)
 
 		if status.BackupEntries > 0 && (!hasBackup || merged.isBehind(status)) {
 			merged.BackupID = status.BackupID
@@ -279,17 +349,59 @@ func MergeResponseRestoreStates(statuses []*ResponseRestoreState) *ResponseResto
 		}
 
 		merged.add(status)
+
+		weight := status.progressWeight()
+		progressWeightedSum += status.ProgressPct * weight
+		progressWeight += weight
 	}
 
 	if merged == nil {
 		return nil
 	}
 
+	// Each node reports its own progress-pct for its own partitions. Those
+	// percentages aren't equally sized slices of the cluster job unless every
+	// node has the same number of partitions.
+	if progressWeight > 0 {
+		merged.ProgressPct = progressWeightedSum / progressWeight
+	}
+
+	if unfinished {
+		merged.FinishTime = time.Time{}
+	}
+
 	merged.State = ResolveRestoreState(states)
 	merged.NsState = ResolveNamespaceState(nsStates)
 	merged.Clear = ResolveClearState(clearStates)
+	merged.SourceConsistency = ResolveConsistency(sources)
 
 	return merged
+}
+
+// IsFinished reports whether the job is terminal on the node: COMPLETE,
+// FAILED or ABORTED.
+func (s *ResponseRestoreState) IsFinished() bool {
+	return isRestoreStateTerminal(s.State)
+}
+
+// HasNamespace reports whether the row names its namespace. A stub row, a job
+// that never got its parameters, may report "(none)" or "-" in place of it.
+func (s *ResponseRestoreState) HasNamespace() bool {
+	return knownName(s.Namespace)
+}
+
+// progressWeight returns the share of the partitions the ProgressPct of node s
+// is measured against. A cold restore reports it as PidsInScope; a node with
+// no partitions in scope takes no part in the progress. A fuzzy restore
+// measures the progress against the partitions the node is master of, which it
+// does not report: they are spread evenly across the nodes, so every node
+// weighs the same.
+func (s *ResponseRestoreState) progressWeight() float64 {
+	if s.Kind == RestoreKindCold {
+		return float64(s.PidsInScope)
+	}
+
+	return 1
 }
 
 // isBehind reports whether node n applies an earlier backup entry than s: a
@@ -304,52 +416,46 @@ func (s *ResponseRestoreState) isBehind(n *ResponseRestoreState) bool {
 
 // add merges the figures of a single node into s, see [MergeResponseRestoreStates].
 func (s *ResponseRestoreState) add(n *ResponseRestoreState) {
+	s.JobID = firstKnownName(s.JobID, n.JobID)
+	s.Namespace = firstKnownName(s.Namespace, n.Namespace)
 	s.ErrorReason = cmp.Or(s.ErrorReason, n.ErrorReason)
 	s.AbortOrigin = cmp.Or(s.AbortOrigin, n.AbortOrigin)
 	s.ClusterKey = cmp.Or(s.ClusterKey, n.ClusterKey)
+	s.HeldReason = cmp.Or(s.HeldReason, n.HeldReason)
 	s.StartTime = earliestTime(s.StartTime, n.StartTime)
 	s.FinishTime = latestTime(s.FinishTime, n.FinishTime)
+	s.LastLapMs = maxOptional(s.LastLapMs, n.LastLapMs)
 
 	s.RestoreRPS = max(s.RestoreRPS, n.RestoreRPS)
 	s.RestoreWorkerThreads = max(s.RestoreWorkerThreads, n.RestoreWorkerThreads)
 	s.RestoreDownloadThreads = max(s.RestoreDownloadThreads, n.RestoreDownloadThreads)
 	s.ExtraTTL = max(s.ExtraTTL, n.ExtraTTL)
 	s.BackupEntries = max(s.BackupEntries, n.BackupEntries)
-	s.PidsInScope = max(s.PidsInScope, n.PidsInScope)
 	s.MissingLayoutNodes = max(s.MissingLayoutNodes, n.MissingLayoutNodes)
 	s.NDoneNodes = max(s.NDoneNodes, n.NDoneNodes)
 	s.ClusterWide = max(s.ClusterWide, n.ClusterWide)
 	s.ClearMs = max(s.ClearMs, n.ClearMs)
+	s.MaxInflight = max(s.MaxInflight, n.MaxInflight)
 
 	s.Joiner = s.Joiner || n.Joiner
 	s.Placeholder = s.Placeholder || n.Placeholder
 	s.Done = s.Done || n.Done
+	s.IgnoreRecordError = s.IgnoreRecordError || n.IgnoreRecordError
 
 	s.TTLExtended += n.TTLExtended
 	s.TTLClamped += n.TTLClamped
+	s.Total += n.Total
 	s.Applied += n.Applied
-	s.Ignored += n.Ignored
+	s.Deletes += n.Deletes
+	s.Filtered += n.Filtered
+	s.FilteredNotOurs += n.FilteredNotOurs
 	s.Failed += n.Failed
 	s.Outstanding += n.Outstanding
-	s.Skipped += n.Skipped
-	s.HandedOff += n.HandedOff
+	s.RecsPerSec += n.RecsPerSec
+	s.PendingQDepth += n.PendingQDepth
+	s.PendingQCap += n.PendingQCap
 	s.Covered += n.Covered
-	s.Read += n.Read
-	s.Deleted += n.Deleted
 	s.DeleteAbsent += n.DeleteAbsent
+	s.PidsInScope += n.PidsInScope
 	s.ClearZeroedBytes += n.ClearZeroedBytes
-}
-
-// IsStarted reports whether the status belongs to a restore job that was
-// started with the restore command, and not only prepared. A fuzzy job exists
-// only once it was started. A prepared cold job is reported before its start,
-// with zero effective limits and its namespace not yet RESTORING.
-func (s *ResponseRestoreState) IsStarted() bool {
-	if s.Kind == RestoreKindFuzzy {
-		return true
-	}
-
-	return s.RestoreWorkerThreads > 0 ||
-		s.NsState == NamespaceStateRestoring ||
-		s.NsState == NamespaceStateOpening
 }

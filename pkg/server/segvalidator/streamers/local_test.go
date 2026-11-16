@@ -20,27 +20,24 @@ import (
 	"path"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewLocalValidation(t *testing.T) {
 	t.Parallel()
 
-	if _, err := NewLocal("", testBackupID); err == nil {
-		t.Error("NewLocal() with no root succeeded, want an error")
-	}
+	_, err := NewLocal("", testBackupID)
+	require.Error(t, err, "NewLocal() with no root succeeded")
 
-	if _, err := NewLocal(t.TempDir(), ""); err == nil {
-		t.Error("NewLocal() with no backup id succeeded, want an error")
-	}
+	_, err = NewLocal(t.TempDir(), "")
+	require.Error(t, err, "NewLocal() with no backup id succeeded")
 
 	s, err := NewLocal(t.TempDir(), testBackupID)
-	if err != nil {
-		t.Fatalf("NewLocal() error = %v", err)
-	}
+	require.NoError(t, err)
 
-	if s.BackupID() != testBackupID {
-		t.Errorf("BackupID() = %q, want %q", s.BackupID(), testBackupID)
-	}
+	assert.Equal(t, testBackupID, s.BackupID())
 }
 
 func TestLocalStore_MissingDirectoryHoldsNothing(t *testing.T) {
@@ -49,13 +46,9 @@ func TestLocalStore_MissingDirectoryHoldsNothing(t *testing.T) {
 	st := &localStore{root: t.TempDir()}
 
 	dirs, err := listDirs(t.Context(), st, "no/such/directory")
-	if err != nil {
-		t.Fatalf("listDirs() error = %v", err)
-	}
+	require.NoError(t, err)
 
-	if len(dirs) != 0 {
-		t.Errorf("listDirs() = %v, want nothing", dirs)
-	}
+	assert.Empty(t, dirs)
 
 	seen := 0
 
@@ -64,13 +57,9 @@ func TestLocalStore_MissingDirectoryHoldsNothing(t *testing.T) {
 
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("listFiles() error = %v", err)
-	}
+	require.NoError(t, err)
 
-	if seen != 0 {
-		t.Errorf("listFiles() saw %d files, want none", seen)
-	}
+	assert.Zero(t, seen, "listFiles() saw files, want none")
 }
 
 func TestLocalStore_ListFilesStops(t *testing.T) {
@@ -88,13 +77,9 @@ func TestLocalStore_ListFilesStops(t *testing.T) {
 
 		return errStopListing
 	})
-	if err != nil {
-		t.Fatalf("listFiles() error = %v", err)
-	}
+	require.NoError(t, err)
 
-	if seen != 1 {
-		t.Errorf("saw %d files after stopping the listing, want 1", seen)
-	}
+	assert.Equal(t, 1, seen, "files seen after stopping the listing")
 }
 
 func TestLocalStore_RefusesToLeaveTheRoot(t *testing.T) {
@@ -103,19 +88,17 @@ func TestLocalStore_RefusesToLeaveTheRoot(t *testing.T) {
 	root := t.TempDir()
 	outside := filepath.Join(filepath.Dir(root), "outside.seg")
 
-	if err := os.WriteFile(outside, []byte("secret"), 0o600); err != nil {
-		t.Fatalf("write file: %v", err)
-	}
+	require.NoError(t, os.WriteFile(outside, []byte("secret"), 0o600))
 
 	st := &localStore{root: root}
 
 	// A manifest naming a segment outside the backup must not make a validator
 	// read it, whatever it points at.
 	for _, p := range []string{"../outside.seg", "/etc/passwd"} {
-		if _, err := st.open(t.Context(), p); err == nil {
-			t.Errorf("open(%q) succeeded, want it refused", p)
-		} else if errors.Is(err, ErrSegmentMissing) {
-			t.Errorf("open(%q) reported a missing segment, want the path refused", p)
+		_, err := st.open(t.Context(), p)
+		if assert.Error(t, err, "open(%q) succeeded, want it refused", p) {
+			assert.NotErrorIs(t, err, ErrSegmentMissing,
+				"open(%q) reported a missing segment, want the path refused", p)
 		}
 	}
 }
@@ -125,9 +108,8 @@ func TestLocalStore_MissingFile(t *testing.T) {
 
 	st := &localStore{root: t.TempDir()}
 
-	if _, err := st.open(t.Context(), path.Join(testBackupID, "no-such-segment.seg")); !errors.Is(err, ErrSegmentMissing) {
-		t.Fatalf("open() error = %v, want ErrSegmentMissing", err)
-	}
+	_, err := st.open(t.Context(), path.Join(testBackupID, "no-such-segment.seg"))
+	require.ErrorIs(t, err, ErrSegmentMissing)
 }
 
 // writeBackup materializes a backup into a directory.
@@ -137,13 +119,8 @@ func writeBackup(t *testing.T, root string, b *testBackup) {
 	for p, body := range b.files {
 		full := filepath.Join(root, filepath.FromSlash(p))
 
-		if err := os.MkdirAll(filepath.Dir(full), 0o750); err != nil {
-			t.Fatalf("create directory: %v", err)
-		}
-
-		if err := os.WriteFile(full, body, 0o600); err != nil {
-			t.Fatalf("write file: %v", err)
-		}
+		require.NoError(t, os.MkdirAll(filepath.Dir(full), 0o750), "create directory")
+		require.NoError(t, os.WriteFile(full, body, 0o600), "write file")
 	}
 }
 
@@ -156,40 +133,33 @@ func TestLocalStore_PathOutsideTheRoot(t *testing.T) {
 	// it is read, listed or resolved.
 	outside := "../elsewhere"
 
-	if err := st.listLevel(t.Context(), outside, func(levelEntry) error { return nil }); err == nil {
-		t.Error("listLevel() outside the root succeeded, want an error")
-	}
+	require.Error(t, st.listLevel(t.Context(), outside, func(levelEntry) error { return nil }),
+		"listLevel() outside the root succeeded")
 
-	if err := st.listFiles(t.Context(), outside, func(file) error { return nil }); err == nil {
-		t.Error("listFiles() outside the root succeeded, want an error")
-	}
+	require.Error(t, st.listFiles(t.Context(), outside, func(file) error { return nil }),
+		"listFiles() outside the root succeeded")
 
-	if _, err := st.open(t.Context(), outside); err == nil {
-		t.Error("open() outside the root succeeded, want an error")
-	}
+	_, err := st.open(t.Context(), outside)
+	assert.Error(t, err, "open() outside the root succeeded")
 }
 
 func TestLocalStore_DirectoryThatIsAFile(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "notadir"), []byte("x"), 0o600); err != nil {
-		t.Fatalf("write file: %v", err)
-	}
+	require.NoError(t, os.WriteFile(filepath.Join(root, "notadir"), []byte("x"), 0o600))
 
 	st := &localStore{root: root}
 
 	// A path that exists but is not a directory is a failure, unlike a
 	// directory that is simply not there.
-	if err := st.listLevel(t.Context(), "notadir", func(levelEntry) error { return nil }); err == nil {
-		t.Error("listLevel() of a file succeeded, want an error")
-	}
+	require.Error(t, st.listLevel(t.Context(), "notadir", func(levelEntry) error { return nil }),
+		"listLevel() of a file succeeded")
 
 	// The same goes for reading through it.
-	if _, err := st.open(t.Context(), "notadir/below"); err == nil {
-		t.Error("open() through a file succeeded, want an error")
-	} else if errors.Is(err, ErrSegmentMissing) {
-		t.Errorf("open() error = %v, want a failure and not a missing segment", err)
+	_, err := st.open(t.Context(), "notadir/below")
+	if assert.Error(t, err, "open() through a file succeeded") {
+		assert.NotErrorIs(t, err, ErrSegmentMissing, "want a failure and not a missing segment")
 	}
 }
 
@@ -210,28 +180,22 @@ func TestLocalStore_ListingStopsOnTheCaller(t *testing.T) {
 
 		return errStopListing
 	})
-	if err != nil {
-		t.Fatalf("listLevel() error = %v, want the listing to stop without failing", err)
-	}
+	require.NoError(t, err, "want the listing to stop without failing")
 
-	if seen != 1 {
-		t.Errorf("listLevel() handed over %d entries after the first one stopped it, want 1", seen)
-	}
+	assert.Equal(t, 1, seen, "listLevel() handed over more entries after the first one stopped it")
 
 	// A caller that fails is a failure of the listing.
 	errCaller := errors.New("caller failed")
 
-	if err := st.listLevel(t.Context(), dir, func(levelEntry) error {
+	err = st.listLevel(t.Context(), dir, func(levelEntry) error {
 		return errCaller
-	}); !errors.Is(err, errCaller) {
-		t.Errorf("listLevel() error = %v, want the failure of the caller", err)
-	}
+	})
+	require.ErrorIs(t, err, errCaller, "listLevel() want the failure of the caller")
 
-	if err := st.listFiles(t.Context(), dir, func(file) error {
+	err = st.listFiles(t.Context(), dir, func(file) error {
 		return errCaller
-	}); !errors.Is(err, errCaller) {
-		t.Errorf("listFiles() error = %v, want the failure of the caller", err)
-	}
+	})
+	assert.ErrorIs(t, err, errCaller, "listFiles() want the failure of the caller")
 }
 
 func TestLocalStore_StoragePathOfAnUnrelatedFile(t *testing.T) {
@@ -241,7 +205,6 @@ func TestLocalStore_StoragePathOfAnUnrelatedFile(t *testing.T) {
 	// it is rather than being turned into nonsense.
 	st := &localStore{root: filepath.Join("relative", "root")}
 
-	if got := st.storagePath(filepath.Join(string(filepath.Separator), "elsewhere", "s.seg")); got == "" {
-		t.Fatal("storagePath() = \"\", want the path it was given")
-	}
+	require.NotEmpty(t, st.storagePath(filepath.Join(string(filepath.Separator), "elsewhere", "s.seg")),
+		"storagePath() want the path it was given")
 }

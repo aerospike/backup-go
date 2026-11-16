@@ -14,7 +14,7 @@
 
 // Package manifestname reads the names of the manifests of a server-integrated
 // backup the way the server reads them on restore, which decides which
-// manifests a restore applies.
+// manifests a restore applies, and holds the largest manifest it reads.
 package manifestname
 
 import (
@@ -25,6 +25,11 @@ import (
 
 	"github.com/aerospike/backup-go/pkg/server/segvalidator/segment"
 )
+
+// MaxSize is the largest manifest, in bytes, the server reads on restore. A
+// reader caps a manifest read at it, so a bogus file cannot keep it downloading
+// forever.
+const MaxSize = 256 << 20
 
 const (
 	// separator separates the fields of a manifest name.

@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/aerospike/backup-go/errclass"
+	"github.com/aerospike/backup-go/pkg/server/internal/manifestname"
 	"github.com/aerospike/backup-go/pkg/server/segvalidator/segment"
 )
 
@@ -58,12 +59,6 @@ const (
 	// partitionDirPrefix starts the name of a partition directory, p<id>.
 	partitionDirPrefix = "p"
 )
-
-// maxManifestSize caps a manifest read, so a bogus file cannot keep a validator
-// downloading forever. It is the ceiling the server reads a manifest up to on
-// restore. A manifest is walked as it arrives, so the limit bounds the transfer
-// and not the memory reading one costs.
-const maxManifestSize = 256 << 20
 
 // maxManifestsPerPartition is the number of query stream manifests the server
 // restores a partition from. A partition with more of them fails the restore.
@@ -234,7 +229,9 @@ type manifestSegment struct {
 // it is filled in in place rather than returned: a manifest states what it is
 // before stating what it holds.
 func decodeManifest(r io.Reader, header *manifestHeader, fn func(manifestSegment) error) error {
-	dec := json.NewDecoder(io.LimitReader(r, maxManifestSize))
+	// The manifest is walked as it arrives, so the cap bounds the transfer and
+	// not the memory reading one costs.
+	dec := json.NewDecoder(io.LimitReader(r, manifestname.MaxSize))
 
 	if err := expectDelim(dec, '{'); err != nil {
 		return err

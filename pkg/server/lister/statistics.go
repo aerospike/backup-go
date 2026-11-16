@@ -40,11 +40,6 @@ const (
 	sindexFileName  = "sindex.json"
 	udfDir          = "udf"
 	udfFileName     = "udf.json"
-
-	// maxObjectSize caps every object GetStatistics reads. A query stream
-	// manifest lists the segments of one partition, so it grows with the
-	// partition, and udf.json holds the source of every UDF module.
-	maxObjectSize = 64 << 20
 )
 
 // segmentEntry is a segment as a manifest lists it.
@@ -338,7 +333,7 @@ func newestChangeManifest(keys []string) (ref manifestRef, ok bool) {
 // manifestStatistics reads the counts of the manifest m. The manifest was
 // listed, so a missing one is an error.
 func (l *Lister) manifestStatistics(ctx context.Context, m manifestRef) (models.Statistics, error) {
-	data, err := l.fetch(ctx, m.key, maxObjectSize)
+	data, err := l.fetch(ctx, m.key, manifestname.MaxSize)
 	if err != nil {
 		return models.Statistics{}, err
 	}
@@ -383,7 +378,7 @@ func segmentStatistics(segments []segmentEntry) models.Statistics {
 // sindexStatistics counts the secondary indexes of the sindex.json at key. A
 // missing file counts as none.
 func (l *Lister) sindexStatistics(ctx context.Context, key string) (models.Statistics, error) {
-	data, err := l.fetch(ctx, key, maxObjectSize)
+	data, err := l.fetch(ctx, key, manifestname.MaxSize)
 	if errors.Is(err, errclass.ErrNotFound) {
 		return models.Statistics{}, nil
 	}
@@ -403,7 +398,7 @@ func (l *Lister) sindexStatistics(ctx context.Context, key string) (models.Stati
 // udfStatistics counts the UDF modules of the udf.json at key. A missing file
 // counts as none.
 func (l *Lister) udfStatistics(ctx context.Context, key string) (models.Statistics, error) {
-	data, err := l.fetch(ctx, key, maxObjectSize)
+	data, err := l.fetch(ctx, key, manifestname.MaxSize)
 	if errors.Is(err, errclass.ErrNotFound) {
 		return models.Statistics{}, nil
 	}

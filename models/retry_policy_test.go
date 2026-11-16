@@ -417,6 +417,27 @@ func TestRetryPolicy_Do_CanceledContext(t *testing.T) {
 	}
 }
 
+// TestRetryPolicy_Do_CanceledBetweenImmediateRetries checks that a context canceled
+// by an attempt stops the retries even when they have no backoff to wait for.
+func TestRetryPolicy_Do_CanceledBetweenImmediateRetries(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+
+	calls := 0
+	err := NewRetryPolicy(0, 1.0, 5).Do(ctx, func() error {
+		calls++
+
+		cancel()
+
+		return errors.New("temporary error")
+	})
+
+	require.ErrorIs(t, err, context.Canceled)
+	require.ErrorContains(t, err, "temporary error")
+	require.Equal(t, 1, calls)
+}
+
 func TestRetryPolicy_calculateDelay(t *testing.T) {
 	t.Parallel()
 

@@ -85,19 +85,23 @@ func (p *RetryPolicy) totalAttempts() uint {
 	return p.MaxRetries
 }
 
-// sleep waits for the calculated delay or until context is canceled.
-// Returns ctx.Err() if context was canceled, nil if sleep completed.
-func (p *RetryPolicy) sleep(ctx context.Context, attempt uint) error {
-	if p == nil {
-		return nil
+// wait blocks for the backoff that precedes the attempt: nothing before the
+// first one. Returns ctx.Err() if context is canceled before or during the wait.
+func (p *RetryPolicy) wait(ctx context.Context, attempt uint) error {
+	// Checked apart from the select below: with a zero delay both of its cases
+	// are ready, and select would pick one of them at random.
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
-	duration := p.calculateDelay(attempt)
+	if attempt == 0 {
+		return nil
+	}
 
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-time.After(duration):
+	case <-time.After(p.calculateDelay(attempt - 1)):
 		return nil
 	}
 }
@@ -135,36 +139,20 @@ func (p *RetryPolicy) calculateJitter(baseDelay time.Duration) time.Duration {
 // Returns operation error if all retries are exhausted.
 // The operation is not executed if ctx is already canceled.
 func (p *RetryPolicy) Do(ctx context.Context, operation func() error) error {
-	// The operation may ignore ctx. The sleep covers the attempts after the first.
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
-	if p == nil {
-		return operation()
-	}
-
 	var lastErr error
 
 	totalAttempts := p.totalAttempts()
 
 	for attempt := range totalAttempts {
-		// Execute operation.
-		lastErr = operation()
-		if lastErr == nil {
-			// Success.
-			return nil
-		}
-
-		// If this was the last attempt, exit.
-		if attempt >= totalAttempts-1 {
-			break
-		}
-
-		// sleep before the next attempt. It returns early if ctx is canceled.
-		if err := p.sleep(ctx, attempt); err != nil {
+		// The operation may ignore ctx, so every attempt waits on it first.
+		if err := p.wait(ctx, attempt); err != nil {
 			// Show all errors if any.
 			return errors.Join(err, lastErr)
+		}
+
+		lastErr = operation()
+		if lastErr == nil {
+			return nil
 		}
 	}
 

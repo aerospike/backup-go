@@ -55,8 +55,8 @@ const (
 // It belongs to the [errclass.ErrNotFound] class.
 var ErrMetadataNotFound = fmt.Errorf("%w: metadata.json not found", errclass.ErrNotFound)
 
-// ErrInvalidBackupID is returned when GetMetadata is given something that is not
-// a backup id, such as an empty string or a storage path.
+// ErrInvalidBackupID is returned when GetMetadata or GetStatistics is given
+// something that is not a backup id, such as an empty string or a storage path.
 // It belongs to the [errclass.ErrInvalidConfig] class.
 var ErrInvalidBackupID = fmt.Errorf("%w: invalid backup id", errclass.ErrInvalidConfig)
 
@@ -197,7 +197,11 @@ func (l *Lister) GetMetadata(ctx context.Context, backupID string) (models.Metad
 		return models.Metadata{}, fmt.Errorf("%w: %q", ErrInvalidBackupID, backupID)
 	}
 
-	data, err := l.fetchOne(ctx, backupID)
+	data, err := l.fetch(ctx, objectKey(l.prefix, backupID, metadataFileName), maxMetadataSize)
+	if errors.Is(err, errclass.ErrNotFound) {
+		return models.Metadata{}, fmt.Errorf("failed to get metadata of backup %s: %w", backupID, ErrMetadataNotFound)
+	}
+
 	if err != nil {
 		return models.Metadata{}, fmt.Errorf("failed to get metadata of backup %s: %w", backupID, err)
 	}
@@ -246,17 +250,17 @@ func (l *Lister) listBackupIDs(ctx context.Context) ([]string, error) {
 	return out, nil
 }
 
-// fetchOne downloads the metadata file of one backup.
-func (l *Lister) fetchOne(ctx context.Context, backupID string) ([]byte, error) {
-	key := objectKey(l.prefix, backupID, metadataFileName)
-
+// fetch reads the object at key, at most limit bytes of it, so a larger object
+// is cut short. The error of a missing object belongs to the
+// [errclass.ErrNotFound] class.
+func (l *Lister) fetch(ctx context.Context, key string, limit int64) ([]byte, error) {
 	out, err := l.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(l.bucket),
 		Key:    aws.String(key),
 	})
 	if err != nil {
 		if isNotFound(err) {
-			return nil, ErrMetadataNotFound
+			err = fmt.Errorf("%w: %w", errclass.ErrNotFound, err)
 		}
 
 		return nil, fmt.Errorf("failed to get %s: %w", key, err)
@@ -264,7 +268,7 @@ func (l *Lister) fetchOne(ctx context.Context, backupID string) ([]byte, error) 
 
 	defer out.Body.Close()
 
-	data, err := io.ReadAll(io.LimitReader(out.Body, maxMetadataSize))
+	data, err := io.ReadAll(io.LimitReader(out.Body, limit))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read %s: %w", key, err)
 	}

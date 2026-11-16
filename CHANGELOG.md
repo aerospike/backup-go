@@ -48,6 +48,15 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
   local storage. Surrounding slashes are ignored, and a path leading out of the storage fails
   with `ErrInvalidConfig`. Without it the backup is looked for at the root of the storage.
   (BKRS-487)
+- `Lister.GetStatistics` returns the size of a server-integrated backup in `models.Statistics`,
+  from its manifests and without reading record data: the record counts of the base scan, the
+  incremental scan and the change stream, the byte and file counts of its segments, and the
+  number of secondary indexes and UDFs it holds. Like `GetMetadata`, it takes a backup id and
+  fails with `ErrInvalidBackupID` for anything else, and with `ErrMetadataNotFound` for a backup
+  that does not exist or has not finished. It counts only the manifests a restore applies, so a
+  partition that changed owner or a change stream that restarted is not counted twice. The byte,
+  file, index and UDF counts are exact; the record count is the base scan's, an estimate that is
+  exact when no write overlaps the backup. (BKRS-478)
 
 ### Changed
 

@@ -124,14 +124,8 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
   `ErrAerospike`, as the error of a single record write does. With `IgnoreRecordError` set,
   the batch writer now also ignores `KEY_NOT_FOUND_ERROR`, as the single record writer does.
   (BKRS-513)
-- `RetryPolicy.Do` ran the first attempt even when the context was already canceled, so the
-  info client's `StartBackup` and `StartRestore` started a server job after cancellation. `Do`
-  now returns the context's error without running the operation. `Client.Backup` on a canceled
-  context therefore fails while it reads the cluster info, and returns no handler. (BKRS-571)
-- `RetryPolicy.MaxRetries` counted the first attempt, so `MaxRetries: 1` made no retry, the same
-  as `0`, and every policy made one retry fewer than it states. The operation now runs at most
-  `MaxRetries+1` times. `NewDefaultRetryPolicy` (`MaxRetries: 3`) now makes 4 attempts, with up
-  to 7s of backoff instead of 3s. (BKRS-571)
+- `RetryPolicy.Do` no longer runs the operation on a canceled context, and makes up to
+  `MaxRetries` retries instead of one fewer. (BKRS-571)
 
 ## [0.13.0] - 2026-11-03
 

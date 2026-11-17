@@ -111,14 +111,16 @@ func (p *RetryPolicy) wait(ctx context.Context, attempt uint) error {
 func (p *RetryPolicy) calculateDelay(attempt uint) time.Duration {
 	baseDelay := time.Duration(float64(p.BaseTimeout) * math.Pow(p.Multiplier, float64(attempt)))
 
-	jitter := p.calculateJitter(baseDelay)
+	jitter := retryJitter(baseDelay)
 	delay := max(baseDelay+jitter, 0)
 
 	return delay
 }
 
-// calculateJitter computes the jitter to prevent thundering herd.
-func (p *RetryPolicy) calculateJitter(baseDelay time.Duration) time.Duration {
+// retryJitter computes the jitter of a retry delay to prevent thundering herd.
+// It is a function, as it depends on the delay only, and is named after the
+// retry policy, its only user, to keep it apart in the models package.
+func retryJitter(baseDelay time.Duration) time.Duration {
 	jitterAmount := time.Duration(float64(baseDelay) * jitterPercent)
 
 	// A base delay of zero means the caller asked for immediate retries, so there

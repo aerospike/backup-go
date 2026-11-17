@@ -34,10 +34,12 @@ type RetryPolicy struct {
 	BaseTimeout time.Duration
 
 	// Multiplier is used to increase the delay between subsequent retry attempts.
-	// The actual delay is calculated as: BaseTimeout * (Multiplier ^ attemptNumber)
+	// The delay before retry n, counted from 1, is BaseTimeout * Multiplier^(n-1),
+	// with +-10% jitter.
 	Multiplier float64
 
-	// MaxRetries is the maximum number of retry attempts that will be made.
+	// MaxRetries is the maximum number of retry attempts that will be made after
+	// the first attempt, so the operation runs at most MaxRetries+1 times.
 	// If set to 0, no retries will be performed.
 	MaxRetries uint
 }
@@ -70,19 +72,17 @@ func (p *RetryPolicy) Validate() error {
 		return fmt.Errorf("%w: multiplier must be greater than or equal to 1", errclass.ErrInvalidConfig)
 	}
 
-	// MaxRetries validation removed - 0 is valid (means no retries)
-
 	return nil
 }
 
-// totalAttempts returns the total number of attempts (initial + retries).
-// Can be used to iterate over all attempts or logging.
+// totalAttempts returns the total number of attempts: the first one plus the
+// retries. A nil policy makes a single attempt.
 func (p *RetryPolicy) totalAttempts() uint {
-	if p == nil || p.MaxRetries == 0 {
+	if p == nil {
 		return 1
 	}
 
-	return p.MaxRetries
+	return p.MaxRetries + 1
 }
 
 // wait blocks for the backoff that precedes the attempt: nothing before the

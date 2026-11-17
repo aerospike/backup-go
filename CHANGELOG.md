@@ -128,6 +128,10 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
   info client's `StartBackup` and `StartRestore` started a server job after cancellation. `Do`
   now returns the context's error without running the operation. `Client.Backup` on a canceled
   context therefore fails while it reads the cluster info, and returns no handler. (BKRS-571)
+- `RetryPolicy.MaxRetries` counted the first attempt, so `MaxRetries: 1` made no retry, the same
+  as `0`, and every policy made one retry fewer than it states. The operation now runs at most
+  `MaxRetries+1` times. `NewDefaultRetryPolicy` (`MaxRetries: 3`) now makes 4 attempts, with up
+  to 7s of backoff instead of 3s. (BKRS-571)
 
 ## [0.13.0] - 2026-11-03
 

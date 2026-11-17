@@ -124,6 +124,8 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
   `ErrAerospike`, as the error of a single record write does. With `IgnoreRecordError` set,
   the batch writer now also ignores `KEY_NOT_FOUND_ERROR`, as the single record writer does.
   (BKRS-513)
+- `RetryPolicy.Do` no longer runs the operation on a canceled context, and makes up to
+  `MaxRetries` retries instead of one fewer. (BKRS-571)
 
 ## [0.13.0] - 2026-11-03
 

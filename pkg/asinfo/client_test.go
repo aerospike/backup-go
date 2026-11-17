@@ -1142,7 +1142,7 @@ func TestClient_randomNodeErrorIsPreserved(t *testing.T) {
 			mockNodeGetter := mocks.NewMockNodeGetter(t)
 			mockNodeGetter.EXPECT().GetRandomNode().Return(nil, a.ErrClusterIsEmpty)
 
-			ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, 1))
+			ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, 0))
 
 			err := tt.run(t.Context(), ic)
 			require.Error(t, err)
@@ -2087,7 +2087,7 @@ func TestClient_AbortServerBackup(t *testing.T) {
 	mockNodeGetter := mocks.NewMockNodeGetter(t)
 	mockNodeGetter.EXPECT().GetRandomNode().Return(nil, a.ErrInvalidParam).Maybe()
 
-	ic = newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, 1))
+	ic = newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, 0))
 
 	err = ic.AbortBackup(t.Context(), testBackupID)
 
@@ -2135,15 +2135,20 @@ func TestClient_AbortRestore(t *testing.T) {
 			setup: func(t *testing.T) (*Client, context.Context) {
 				t.Helper()
 
+				ctx, cancel := context.WithCancel(t.Context())
+
+				// The context is canceled during the first attempt: a context canceled
+				// before it would stop the command from being sent at all.
 				mockNodeGetter := mocks.NewMockNodeGetter(t)
-				mockNodeGetter.EXPECT().GetRandomNode().Return(nil, a.ErrInvalidParam)
+				mockNodeGetter.EXPECT().GetRandomNode().RunAndReturn(func() (*a.Node, a.Error) {
+					cancel()
+
+					return nil, a.ErrInvalidParam
+				})
 
 				// The backoff must be long enough for the canceled context, and not
 				// the elapsed delay, to end the wait between the attempts.
 				ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(time.Hour, 1, testMaxRetries))
-
-				ctx, cancel := context.WithCancel(t.Context())
-				cancel()
 
 				return ic, ctx
 			},
@@ -2574,7 +2579,7 @@ func TestClient_StartJobID(t *testing.T) {
 			mockNodeGetter := mocks.NewMockNodeGetter(t)
 			mockNodeGetter.EXPECT().GetRandomNode().Return(nil, a.ErrInvalidParam).Times(testCalls)
 
-			ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, 1))
+			ic := newClient(mockNodeGetter, testInfoPolicy, models.NewRetryPolicy(0, 1, 0))
 
 			ids := make(map[string]struct{}, testCalls)
 
@@ -2658,7 +2663,7 @@ func TestClient_RetriesAreNotNested(t *testing.T) {
 			err := tt.call(t.Context(), ic)
 
 			require.ErrorIs(t, err, errclass.ErrAerospike)
-			require.Equal(t, testMaxRetries, attempts)
+			require.Equal(t, testMaxRetries+1, attempts)
 		})
 	}
 }
@@ -3406,7 +3411,7 @@ func TestRetryOnPrincipal(t *testing.T) {
 				Return(map[string]string{tt.statusCmd: tt.statusResp}, nil).Once()
 
 			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
-			policy := models.NewRetryPolicy(time.Millisecond, 1, 2)
+			policy := models.NewRetryPolicy(time.Millisecond, 1, 1)
 			principal := func() (infoGetter, error) { return node, nil }
 
 			err := retryOnPrincipal(t.Context(), policy, principal, func(n infoGetter, attempts *retryAttempts) error {
@@ -3455,7 +3460,7 @@ func TestRetryOnPrincipal_OutcomeUnknown(t *testing.T) {
 			t.Parallel()
 
 			node := mocks.NewMockinfoGetter(t)
-			policy := models.NewRetryPolicy(time.Millisecond, 1, uint(len(tt.give)))
+			policy := models.NewRetryPolicy(time.Millisecond, 1, uint(len(tt.give)-1))
 
 			var attempt int
 
@@ -3648,7 +3653,7 @@ func TestOpenRestoreWithRetry(t *testing.T) {
 				Return(map[string]string{testRestoreOpenCmd: testRestoreNotGated}, nil).Once()
 
 			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
-			policy := models.NewRetryPolicy(time.Millisecond, 1, 2)
+			policy := models.NewRetryPolicy(time.Millisecond, 1, 1)
 			principal := func() (infoGetter, error) { return node, nil }
 
 			err := retryOnPrincipal(t.Context(), policy, principal,

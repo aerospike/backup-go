@@ -34,10 +34,12 @@ type RetryPolicy struct {
 	BaseTimeout time.Duration
 
 	// Multiplier is used to increase the delay between subsequent retry attempts.
-	// The actual delay is calculated as: BaseTimeout * (Multiplier ^ attemptNumber)
+	// The delay before retry n, counted from 1, is BaseTimeout * Multiplier^(n-1),
+	// with +-10% jitter.
 	Multiplier float64
 
-	// MaxRetries is the maximum number of retry attempts that will be made.
+	// MaxRetries is the maximum number of retry attempts that will be made after
+	// the first attempt, so the operation runs at most MaxRetries+1 times.
 	// If set to 0, no retries will be performed.
 	MaxRetries uint
 }
@@ -70,34 +72,36 @@ func (p *RetryPolicy) Validate() error {
 		return fmt.Errorf("%w: multiplier must be greater than or equal to 1", errclass.ErrInvalidConfig)
 	}
 
-	// MaxRetries validation removed - 0 is valid (means no retries)
-
 	return nil
 }
 
-// totalAttempts returns the total number of attempts (initial + retries).
-// Can be used to iterate over all attempts or logging.
+// totalAttempts returns the total number of attempts: the first one plus the
+// retries. A nil policy makes a single attempt.
 func (p *RetryPolicy) totalAttempts() uint {
-	if p == nil || p.MaxRetries == 0 {
+	if p == nil {
 		return 1
 	}
 
-	return p.MaxRetries
+	return p.MaxRetries + 1
 }
 
-// sleep waits for the calculated delay or until context is canceled.
-// Returns ctx.Err() if context was canceled, nil if sleep completed.
-func (p *RetryPolicy) sleep(ctx context.Context, attempt uint) error {
-	if p == nil {
-		return nil
+// wait blocks for the backoff that precedes the attempt: nothing before the
+// first one. Returns ctx.Err() if context is canceled before or during the wait.
+func (p *RetryPolicy) wait(ctx context.Context, attempt uint) error {
+	// Checked apart from the select below: with a zero delay both of its cases
+	// are ready, and select would pick one of them at random.
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
-	duration := p.calculateDelay(attempt)
+	if attempt == 0 {
+		return nil
+	}
 
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-time.After(duration):
+	case <-time.After(p.calculateDelay(attempt - 1)):
 		return nil
 	}
 }
@@ -107,14 +111,16 @@ func (p *RetryPolicy) sleep(ctx context.Context, attempt uint) error {
 func (p *RetryPolicy) calculateDelay(attempt uint) time.Duration {
 	baseDelay := time.Duration(float64(p.BaseTimeout) * math.Pow(p.Multiplier, float64(attempt)))
 
-	jitter := p.calculateJitter(baseDelay)
+	jitter := retryJitter(baseDelay)
 	delay := max(baseDelay+jitter, 0)
 
 	return delay
 }
 
-// calculateJitter computes the jitter to prevent thundering herd.
-func (p *RetryPolicy) calculateJitter(baseDelay time.Duration) time.Duration {
+// retryJitter computes the jitter of a retry delay to prevent thundering herd.
+// It is a function, as it depends on the delay only, and is named after the
+// retry policy, its only user, to keep it apart in the models package.
+func retryJitter(baseDelay time.Duration) time.Duration {
 	jitterAmount := time.Duration(float64(baseDelay) * jitterPercent)
 
 	// A base delay of zero means the caller asked for immediate retries, so there
@@ -133,32 +139,22 @@ func (p *RetryPolicy) calculateJitter(baseDelay time.Duration) time.Duration {
 // Do executes the operation with automatic retry logic.
 // The operation is retried up to MaxRetries times with exponential backoff and jitter.
 // Returns operation error if all retries are exhausted.
+// The operation is not executed if ctx is already canceled.
 func (p *RetryPolicy) Do(ctx context.Context, operation func() error) error {
-	if p == nil {
-		return operation()
-	}
-
 	var lastErr error
 
 	totalAttempts := p.totalAttempts()
 
 	for attempt := range totalAttempts {
-		// Execute operation.
-		lastErr = operation()
-		if lastErr == nil {
-			// Success.
-			return nil
-		}
-
-		// If this was the last attempt, exit.
-		if attempt >= totalAttempts-1 {
-			break
-		}
-
-		// sleep before the next attempt. We check context only in sleep, not to slow down first operation.
-		if err := p.sleep(ctx, attempt); err != nil {
+		// The operation may ignore ctx, so every attempt waits on it first.
+		if err := p.wait(ctx, attempt); err != nil {
 			// Show all errors if any.
 			return errors.Join(err, lastErr)
+		}
+
+		lastErr = operation()
+		if lastErr == nil {
+			return nil
 		}
 	}
 

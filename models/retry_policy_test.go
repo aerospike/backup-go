@@ -259,7 +259,7 @@ func TestRetryPolicy_Do(t *testing.T) {
 				}
 			},
 			wantErr:       true,
-			wantCallCount: 2,
+			wantCallCount: 3,
 		},
 		{
 			name:   "no retries (MaxRetries=0)",
@@ -339,7 +339,7 @@ func TestRetryPolicy_Do(t *testing.T) {
 				}
 			},
 			wantErr:       true,
-			wantCallCount: 1,
+			wantCallCount: 2,
 		},
 		{
 			// A zero base timeout is valid and means immediate retries. It must
@@ -354,7 +354,7 @@ func TestRetryPolicy_Do(t *testing.T) {
 				}
 			},
 			wantErr:       true,
-			wantCallCount: testMaxRetries,
+			wantCallCount: testMaxRetries + 1,
 		},
 	}
 
@@ -382,6 +382,60 @@ func TestRetryPolicy_Do(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestRetryPolicy_Do_CanceledContext checks that the operation is not executed
+// when the context is canceled before the first attempt.
+func TestRetryPolicy_Do_CanceledContext(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		policy *RetryPolicy
+	}{
+		{name: "with retries", policy: NewRetryPolicy(10*time.Millisecond, 2.0, 3)},
+		{name: "no retries", policy: NewRetryPolicy(10*time.Millisecond, 2.0, 0)},
+		{name: "nil policy", policy: nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+
+			called := false
+			err := tt.policy.Do(ctx, func() error {
+				called = true
+				return nil
+			})
+
+			require.ErrorIs(t, err, context.Canceled)
+			require.False(t, called)
+		})
+	}
+}
+
+// TestRetryPolicy_Do_CanceledBetweenImmediateRetries checks that a context canceled
+// by an attempt stops the retries even when they have no backoff to wait for.
+func TestRetryPolicy_Do_CanceledBetweenImmediateRetries(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+
+	calls := 0
+	err := NewRetryPolicy(0, 1.0, 5).Do(ctx, func() error {
+		calls++
+
+		cancel()
+
+		return errors.New("temporary error")
+	})
+
+	require.ErrorIs(t, err, context.Canceled)
+	require.ErrorContains(t, err, "temporary error")
+	require.Equal(t, 1, calls)
 }
 
 func TestRetryPolicy_calculateDelay(t *testing.T) {
@@ -470,7 +524,7 @@ func TestRetryPolicy_Do_ErrorMessages(t *testing.T) {
 		})
 
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "failed after 2 attempt(s)")
+		require.Contains(t, err.Error(), "failed after 3 attempt(s)")
 		require.Contains(t, err.Error(), "test error")
 	})
 

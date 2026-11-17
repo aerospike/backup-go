@@ -70,7 +70,7 @@ func newTestWriter(t *testing.T, asc dbWriter) *batchRecordWriter {
 	logger := slog.New(slog.DiscardHandler)
 
 	// One attempt, no sleep.
-	rp := models.NewRetryPolicy(0, 1, 1)
+	rp := models.NewRetryPolicy(0, 1, 0)
 
 	return newBatchRecordWriter(
 		ctx, asc, wp, stats, rp, nil,
@@ -303,7 +303,7 @@ func TestFlushBuffer_RejectedRecord(t *testing.T) {
 				rw := newTestWriter(t, asc)
 				rw.ignoreRecordError = tt.ignoreRecordError
 				// Several attempts, no sleep.
-				rw.retryPolicy = models.NewRetryPolicy(0, 1, testAttempts)
+				rw.retryPolicy = models.NewRetryPolicy(0, 1, testAttempts-1)
 
 				rw.operationBuffer = []a.BatchRecordIfc{
 					mkOp(t, atypes.OK, nil),
@@ -349,7 +349,7 @@ func TestFlushBuffer_RetryResendsOnlyFailedOps(t *testing.T) {
 		return nil
 	}}
 	rw := newTestWriter(t, asc)
-	rw.retryPolicy = models.NewRetryPolicy(0, 1, testAttempts)
+	rw.retryPolicy = models.NewRetryPolicy(0, 1, testAttempts-1)
 
 	rw.operationBuffer = []a.BatchRecordIfc{
 		mkOp(t, atypes.OK, nil),

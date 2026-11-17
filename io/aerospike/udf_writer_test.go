@@ -37,6 +37,7 @@ func TestUDFWriterInvalidType(t *testing.T) {
 	logger := slog.Default()
 
 	writer := udfWriter{
+		ctx:         t.Context(),
 		asc:         mockDBWriter,
 		writePolicy: &a.WritePolicy{},
 		logger:      logger,
@@ -69,6 +70,7 @@ func TestUDFWriterRegisterError(t *testing.T) {
 	logger := slog.Default()
 
 	writer := udfWriter{
+		ctx:         t.Context(),
 		asc:         mockDBWriter,
 		writePolicy: &a.WritePolicy{},
 		logger:      logger,
@@ -100,6 +102,7 @@ func TestUDFWriterNilJob(t *testing.T) {
 	logger := slog.Default()
 
 	writer := udfWriter{
+		ctx:         t.Context(),
 		asc:         mockDBWriter,
 		writePolicy: &a.WritePolicy{},
 		logger:      logger,

@@ -22,12 +22,20 @@ import (
 	"io"
 	"log/slog"
 	"maps"
+	"math"
 	"path/filepath"
 	"sync"
 	"time"
 
 	a "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/backup-go/models"
+)
+
+const (
+	// maxStateFileSize caps the bytes read from a state file. A state keeps up to
+	// MaxParallel filters in each of its two maps, and a filter cursor holds up
+	// to MaxPartitions partition statuses, so a valid file stays below this limit.
+	maxStateFileSize = 512 << 20
 )
 
 // State contains current backups status data.
@@ -138,11 +146,13 @@ func newStateFromFile(
 	}
 	defer f.Close()
 
-	dec := gob.NewDecoder(f)
+	s, err := decodeState(f, maxStateFileSize)
+	if err != nil {
+		return nil, err
+	}
 
-	var s State
-	if err = dec.Decode(&s); err != nil {
-		return nil, fmt.Errorf("%w: failed to decode state: %w", ErrCorruptData, err)
+	if err = s.validate(); err != nil {
+		return nil, fmt.Errorf("%w: failed to validate state: %w", ErrCorruptData, err)
 	}
 
 	s.ctx = ctx
@@ -153,8 +163,9 @@ func newStateFromFile(
 	s.SaveCommandChan = make(chan int)
 	s.Counter++
 
-	// Init current state.
-	maps.Copy(s.RecordStates, s.RecordStatesSaved)
+	// Init current state from the saved one. The decoded RecordStates is dropped:
+	// gob omits empty maps, so it can be nil, and its entries are not validated.
+	s.RecordStates = maps.Clone(s.RecordStatesSaved)
 
 	logger.Debug("loaded state file successfully", slog.Int("filtersLoaded", len(s.RecordStatesSaved)))
 
@@ -162,7 +173,57 @@ func newStateFromFile(
 	go s.serve()
 	go s.serveRecords()
 
+	return s, nil
+}
+
+// decodeState decodes a State from r, reading at most limit bytes. The state
+// file comes from the backup destination and is not trusted: a state that does
+// not fit into limit fails to decode.
+func decodeState(r io.Reader, limit int64) (*State, error) {
+	var s State
+	if err := gob.NewDecoder(io.LimitReader(r, limit)).Decode(&s); err != nil {
+		return nil, fmt.Errorf("%w: failed to decode state: %w", ErrCorruptData, err)
+	}
+
 	return &s, nil
+}
+
+// validate checks a state decoded from a state file. Partition ranges that are
+// out of range would make the Aerospike client panic when the scan starts.
+func (s *State) validate() error {
+	// A negative counter would drop the file suffix and make the continued run
+	// overwrite the files of the previous runs. The counter is incremented on load.
+	if s.Counter < 0 || s.Counter == math.MaxInt {
+		return fmt.Errorf("counter %d is out of range", s.Counter)
+	}
+
+	// Every state written by dump has at least one saved filter.
+	if len(s.RecordStatesSaved) == 0 {
+		return errors.New("no saved partition filters")
+	}
+
+	for n := range s.RecordStatesSaved {
+		pfs := s.RecordStatesSaved[n]
+		if err := validatePartitionFilter(&pfs); err != nil {
+			return fmt.Errorf("invalid partition filter %d: %w", n, err)
+		}
+	}
+
+	return nil
+}
+
+// validatePartitionFilter checks the partition range of a serialized partition
+// filter. The cursor is not checked here.
+func validatePartitionFilter(pfs *models.PartitionFilterSerialized) error {
+	if pfs.Begin < 0 || pfs.Begin >= MaxPartitions {
+		return fmt.Errorf("begin %d is out of range [0, %d)", pfs.Begin, MaxPartitions)
+	}
+
+	if pfs.Count < 1 || pfs.Count > MaxPartitions-pfs.Begin {
+		return fmt.Errorf("count %d is out of range [1, %d]", pfs.Count, MaxPartitions-pfs.Begin)
+	}
+
+	return nil
 }
 
 // serve dumps files to disk.

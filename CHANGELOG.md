@@ -126,6 +126,12 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
   (BKRS-513)
 - `RetryPolicy.Do` no longer runs the operation on a canceled context, and makes up to
   `MaxRetries` retries instead of one fewer. (BKRS-571)
+- Continuing a backup from a corrupted state file (`ConfigBackup.Continue`) panicked with
+  `assignment to entry in nil map`, or loaded no partition filters, so the backup saved nothing
+  and finished without an error. The state is now validated when it is loaded, and the backup
+  fails with `ErrCorruptData` if the state has no saved partition filters, a partition range
+  outside `[0, 4096)` or an invalid counter. At most 512 MiB of a state file is read.
+  (BKRS-524)
 
 ## [0.13.0] - 2026-11-03
 

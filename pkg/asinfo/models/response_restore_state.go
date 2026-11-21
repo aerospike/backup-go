@@ -133,8 +133,9 @@ type ResponseRestoreState struct {
 	ProgressPct float64
 
 	// Record counters, reported by both modes. A record read lands in one of
-	// the buckets Applied, Filtered and Failed once its outcome is final;
-	// Deletes and FilteredNotOurs are parts of Applied and Filtered.
+	// the buckets Applied, Filtered and Failed once its outcome is final.
+	// Deletes is a part of Applied; FilteredNotOurs, FilterExits and
+	// ExitShadowed are parts of Filtered.
 
 	// Total is the sum of Applied, Filtered and Failed. It can fall short of
 	// the records read: records in flight or abandoned on a stop are in no
@@ -150,6 +151,13 @@ type ResponseRestoreState struct {
 	// FilteredNotOurs counts the records of Filtered dropped because another
 	// node owns their partition. Only a cold restore reports it.
 	FilteredNotOurs uint64
+	// FilterExits counts the records of Filtered that are exit tombstones: a
+	// version of a record its backup found outside the filter. Only a cold
+	// restore reports it.
+	FilterExits uint64
+	// ExitShadowed counts the records of Filtered that are older copies an
+	// exit tombstone kept out. Only a cold restore reports it.
+	ExitShadowed uint64
 	// Failed counts the records that failed, the ones a fuzzy restore
 	// tolerates with IgnoreRecordError included.
 	Failed uint64
@@ -173,7 +181,8 @@ type ResponseRestoreState struct {
 	// ClusterKey is the cluster key, in hex, the job is running under.
 	ClusterKey string
 	// NodeDone is true when the node finished its own share of the restore. A
-	// joiner has no share and never sets it.
+	// joiner has no share and never sets it. See [MergeResponseRestoreStates]
+	// for the cluster-wide value.
 	NodeDone bool
 	// Done is true when the job is complete. While the job is live, only the
 	// principal sets it.
@@ -199,12 +208,6 @@ type ResponseRestoreState struct {
 	// ceiling is based on, in seconds since the Citrusleaf epoch
 	// (2010-01-01 UTC). It is 0 until the node got the parameters of the job.
 	RefTime uint32
-	// FilterExits counts the records of Filtered that are exit tombstones of a
-	// filtered backup: a record that stopped matching the filter of its backup.
-	FilterExits uint64
-	// ExitShadowed counts the records of Filtered that are older copies an
-	// exit tombstone kept out.
-	ExitShadowed uint64
 	// ExitCapHit is true if the node stopped noting exit tombstones at its
 	// cap, so some keys may be restored at an older version that matched the
 	// filter.
@@ -325,16 +328,19 @@ func (s *ResponseRestoreState) parseFields(r InfoMap) {
 //     [ResolveConsistency];
 //   - the per-node counters, rates and gauges are summed, PidsInScope and
 //     ClearZeroedBytes included;
-//   - the effective limits, MaxInflight, RefTime, ClearMs and the figures every node
-//     reports in the cluster view (MissingLayoutNodes, NDoneNodes, ClusterWide,
-//     BackupEntries) are taken as their maximum, and LastLapMs is the oldest
-//     lap;
+//   - the effective limits, MaxInflight, RefTime, ClearMs and the figures
+//     every node reports in the cluster view (MissingLayoutNodes, NDoneNodes,
+//     ClusterWide, BackupEntries) are taken as their maximum, and LastLapMs
+//     is the oldest lap;
 //   - BackupID and BackupEntry are those of the node that is the furthest
 //     behind;
 //   - Joiner, Placeholder, Done, ExitCapHit and IgnoreRecordError are true if
 //     they are true on any node;
-//   - NodeDone is true only if it is true on every node that is not a joiner,
-//     as a joiner has no share to finish, and false if every node is a joiner;
+//   - NodeDone is true if Done is, as every share of a complete job is done;
+//     otherwise it is true only if no layout node is missing
+//     (MissingLayoutNodes is 0) and it is true on every node that is not a
+//     joiner, as a joiner has no share to finish, and false if every node is
+//     a joiner;
 //   - ProgressPct is the mean of the progress of the nodes weighted by their
 //     share of the partitions, see [ResponseRestoreState.progressWeight];
 //   - StartTime is the earliest timestamp, FinishTime the latest, or zero
@@ -406,7 +412,9 @@ func MergeResponseRestoreStates(statuses []*ResponseRestoreState) *ResponseResto
 		merged.FinishTime = time.Time{}
 	}
 
-	merged.NodeDone = hasShare && sharesDone
+	// A layout node out of the cluster reports no row, so its share cannot be
+	// confirmed unless the job is complete.
+	merged.NodeDone = merged.Done || (hasShare && sharesDone && merged.MissingLayoutNodes == 0)
 	merged.State = ResolveRestoreState(states)
 	merged.NsState = ResolveNamespaceState(nsStates)
 	merged.Clear = ResolveClearState(clearStates)

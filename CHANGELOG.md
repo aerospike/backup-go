@@ -31,13 +31,6 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
   the record counters `Total`, `Applied`, `Deletes`, `Filtered`, `FilteredNotOurs` and `Failed`
   for both modes, `PendingQDepth`, `PendingQCap`, `HeldReason`, `MaxInflight` and
   `IgnoreRecordError`. (BKRS-494)
-- `ResponseBackupState.RecsFilterExits` reports `recs_filter_exits`, the records of `RecsFiltered`
-  written as exit tombstones, and `UploadPermanentFailures` reports `upload_permanent_failures`.
-  `ResponseRestoreState` reports `RefTime` (`ref_time`), `FilterExits` (`filter_exits`),
-  `ExitShadowed` (`exit_shadowed`), `ExitCapHit` (`exit_cap_hit`) and `NodeDone` (`node_done`) of
-  a cold restore. Merged across the nodes, the counters are summed, `RefTime` is the maximum,
-  `ExitCapHit` is true if it is true on any node, and `NodeDone` is true only if it is true on
-  every node that is not a joiner. (BKRS-598)
 - `ResponseRestoreState.IsFinished` reports a job that is terminal on the node, and
   `ResponseRestoreState.HasNamespace` reports a row that names its namespace, as a stub row may
   not. (BKRS-494)
@@ -64,6 +57,14 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
   partition that changed owner or a change stream that restarted is not counted twice. The byte,
   file, index and UDF counts are exact; the record count is the base scan's, an estimate that is
   exact when no write overlaps the backup. (BKRS-478)
+- `ResponseBackupState.RecsFilterExits` reports `recs_filter_exits`, the records of `RecsFiltered`
+  written as exit tombstones, and `UploadPermanentFailures` reports `upload_permanent_failures`.
+  `ResponseRestoreState` reports `RefTime` (`ref_time`), `FilterExits` (`filter_exits`),
+  `ExitShadowed` (`exit_shadowed`), `ExitCapHit` (`exit_cap_hit`) and `NodeDone` (`node_done`) of
+  a cold restore. Merged across the nodes, the counters are summed, `RefTime` is the maximum and
+  `ExitCapHit` is true if it is true on any node. `NodeDone` is true if `Done` is; otherwise it
+  is true only if `MissingLayoutNodes` is 0 and it is true on every node that is not a joiner,
+  and false if every node is a joiner. (BKRS-598)
 
 ### Changed
 

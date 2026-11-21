@@ -519,6 +519,8 @@ func TestMergeResponseRestoreStates(t *testing.T) {
 					FilteredNotOurs:        12,
 					FilterExits:            2,
 					ExitShadowed:           1,
+					ExitCapHit:             true,
+					RefTime:                531504000,
 					Failed:                 5,
 				},
 				nil,
@@ -556,8 +558,7 @@ func TestMergeResponseRestoreStates(t *testing.T) {
 					FilteredNotOurs:        8,
 					FilterExits:            1,
 					ExitShadowed:           1,
-					ExitCapHit:             true,
-					RefTime:                531504000,
+					RefTime:                531503000,
 				},
 			},
 			want: &ResponseRestoreState{
@@ -756,7 +757,36 @@ func TestMergeResponseRestoreStates(t *testing.T) {
 			},
 		},
 		{
-			name: "node done is false while a node with a share is not done",
+			name: "node done once every node that is not a joiner is done",
+			statuses: []*ResponseRestoreState{
+				{JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive, NodeDone: true},
+				{JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive, Joiner: true},
+				{JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive, NodeDone: true},
+			},
+			want: &ResponseRestoreState{
+				JobID:     testJobID,
+				Namespace: testNamespace,
+				Kind:      RestoreKindCold,
+				State:     RestoreStateActive,
+				Joiner:    true,
+				NodeDone:  true,
+			},
+		},
+		{
+			name: "node done is false while the first node with a share is not done",
+			statuses: []*ResponseRestoreState{
+				{JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive},
+				{JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive, NodeDone: true},
+			},
+			want: &ResponseRestoreState{
+				JobID:     testJobID,
+				Namespace: testNamespace,
+				Kind:      RestoreKindCold,
+				State:     RestoreStateActive,
+			},
+		},
+		{
+			name: "node done is false while the last node with a share is not done",
 			statuses: []*ResponseRestoreState{
 				{JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive, NodeDone: true},
 				{JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive},
@@ -768,6 +798,69 @@ func TestMergeResponseRestoreStates(t *testing.T) {
 				Kind:      RestoreKindCold,
 				State:     RestoreStateActive,
 				Joiner:    true,
+			},
+		},
+		{
+			name: "node done is false while a layout node is missing",
+			statuses: []*ResponseRestoreState{
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					NodeDone: true, MissingLayoutNodes: 2,
+				},
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					NodeDone: true, MissingLayoutNodes: 1,
+				},
+			},
+			want: &ResponseRestoreState{
+				JobID:              testJobID,
+				Namespace:          testNamespace,
+				Kind:               RestoreKindCold,
+				State:              RestoreStateActive,
+				MissingLayoutNodes: 2,
+			},
+		},
+		{
+			name: "node done once the job is done, even with a layout node missing",
+			statuses: []*ResponseRestoreState{
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateComplete,
+					NodeDone: true, Done: true, MissingLayoutNodes: 1,
+				},
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateComplete,
+					NodeDone: true, Done: true, MissingLayoutNodes: 1,
+				},
+			},
+			want: &ResponseRestoreState{
+				JobID:              testJobID,
+				Namespace:          testNamespace,
+				Kind:               RestoreKindCold,
+				State:              RestoreStateComplete,
+				MissingLayoutNodes: 1,
+				NodeDone:           true,
+				Done:               true,
+			},
+		},
+		{
+			name: "ref time and missing layout nodes are the maximum when the first node reports less",
+			statuses: []*ResponseRestoreState{
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					RefTime: 531503000, MissingLayoutNodes: 1,
+				},
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					RefTime: 531504000, MissingLayoutNodes: 2,
+				},
+			},
+			want: &ResponseRestoreState{
+				JobID:              testJobID,
+				Namespace:          testNamespace,
+				Kind:               RestoreKindCold,
+				State:              RestoreStateActive,
+				RefTime:            531504000,
+				MissingLayoutNodes: 2,
 			},
 		},
 		{

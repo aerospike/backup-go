@@ -187,8 +187,9 @@ type ResponseBackupState struct {
 	// time range or the filter expression.
 	RecsFiltered uint64
 	// RecsFilterExits counts the records of RecsFiltered written as exit
-	// tombstones: a record that matched the filter and then stopped matching
-	// it. They also count in RecsBackedUp.
+	// tombstones: a version of a record outside the filter, written so that a
+	// restore keeps out the copies of its key in older backups. They also
+	// count in RecsBackedUp.
 	RecsFilterExits uint64
 	// RecsDegenerate counts captured writes with no set name or no bins.
 	RecsDegenerate uint64

@@ -80,11 +80,11 @@ const (
 	specRestoreColdTTL = "job-id=r3:ns=test:kind=cold:state=ACTIVE:restore-rps=0:restore-worker-threads=8:" +
 		"restore-download-threads=8:ns_state=RESTORING:finish_time=-:" +
 		"joiner=false:placeholder=false:pids_in_scope=1366:progress_pct=61.20:" +
-		"missing_layout_nodes=0:n_done_nodes=0:source_consistency=strict:ref_time=531504000:" +
+		"missing_layout_nodes=1:n_done_nodes=2:source_consistency=strict:ref_time=531504000:" +
 		"extra-ttl=86400:" +
-		"ttl_extended=812000:ttl_clamped=0:cluster_key=8f3a6c21d47e09b5:node_done=true:" +
+		"ttl_extended=812000:ttl_clamped=7:cluster_key=8f3a6c21d47e09b5:node_done=true:" +
 		"done=false:clear=none:" +
-		"clear_zeroed_bytes=0:clear_ms=0:total=1904331:applied=1203300:deletes=1200:" +
+		"clear_zeroed_bytes=4294967296:clear_ms=8421:total=1904331:applied=1203300:deletes=1200:" +
 		"filtered=701031:filtered_not_ours=700950:filter_exits=40:exit_shadowed=41:" +
 		"exit_cap_hit=true:failed=0:recs_per_sec=95000:" +
 		"pending_q_depth=9:pending_q_cap=16:last_lap_ms=301"
@@ -302,6 +302,7 @@ func TestParseStatusResponse_Restore(t *testing.T) {
 				RestoreDownloadThreads: specWorkers,
 				ExtraTTL:               86400,
 				TTLExtended:            812000,
+				TTLClamped:             7,
 				SourceConsistency:      infomodels.ConsistencyStrict,
 				RecsPerSec:             95000,
 				LastLapMs:              new(uint64(301)),
@@ -317,8 +318,12 @@ func TestParseStatusResponse_Restore(t *testing.T) {
 				RefTime:                531504000,
 				NodeDone:               true,
 				PidsInScope:            specPidsInPlay,
+				MissingLayoutNodes:     1,
+				NDoneNodes:             2,
 				ClusterKey:             specClusterID,
 				Clear:                  infomodels.ClearStateNone,
+				ClearZeroedBytes:       4294967296,
+				ClearMs:                8421,
 				PendingQDepth:          9,
 				PendingQCap:            16,
 			},

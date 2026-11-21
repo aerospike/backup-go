@@ -184,8 +184,8 @@ type ResponseRestoreState struct {
 	// joiner has no share and never sets it. See [MergeResponseRestoreStates]
 	// for the cluster-wide value.
 	NodeDone bool
-	// Done is true when the job is complete. While the job is live, only the
-	// principal sets it.
+	// Done is true when the job is complete: a node sets it once the
+	// completion published by the principal reaches it.
 	Done bool
 	// Clear is the storage clear state of the node. A node reporting
 	// ClearStateRequired must be cleared with restore-clear-storage before its
@@ -340,7 +340,9 @@ func (s *ResponseRestoreState) parseFields(r InfoMap) {
 //     otherwise it is true only if no layout node is missing
 //     (MissingLayoutNodes is 0) and it is true on every node that is not a
 //     joiner, as a joiner has no share to finish, and false if every node is
-//     a joiner;
+//     a joiner. It covers the statuses given and the missing layout nodes the
+//     servers count: a layout node in the cluster with no status here is not
+//     accounted for;
 //   - ProgressPct is the mean of the progress of the nodes weighted by their
 //     share of the partitions, see [ResponseRestoreState.progressWeight];
 //   - StartTime is the earliest timestamp, FinishTime the latest, or zero
@@ -412,8 +414,8 @@ func MergeResponseRestoreStates(statuses []*ResponseRestoreState) *ResponseResto
 		merged.FinishTime = time.Time{}
 	}
 
-	// A layout node out of the cluster reports no row, so its share cannot be
-	// confirmed unless the job is complete.
+	// A layout node the servers count as missing reports no row, so its share
+	// cannot be confirmed unless the job is complete.
 	merged.NodeDone = merged.Done || (hasShare && sharesDone && merged.MissingLayoutNodes == 0)
 	merged.State = ResolveRestoreState(states)
 	merged.NsState = ResolveNamespaceState(nsStates)

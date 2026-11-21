@@ -864,6 +864,111 @@ func TestMergeResponseRestoreStates(t *testing.T) {
 			},
 		},
 		{
+			name: "exit cap hit on a later node only",
+			statuses: []*ResponseRestoreState{
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					NodeDone: true,
+				},
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					NodeDone: true, ExitCapHit: true,
+				},
+			},
+			want: &ResponseRestoreState{
+				JobID:      testJobID,
+				Namespace:  testNamespace,
+				Kind:       RestoreKindCold,
+				State:      RestoreStateActive,
+				NodeDone:   true,
+				ExitCapHit: true,
+			},
+		},
+		{
+			name: "node done is false while one layout node is missing",
+			statuses: []*ResponseRestoreState{
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					NodeDone: true, MissingLayoutNodes: 1,
+				},
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					NodeDone: true, MissingLayoutNodes: 1,
+				},
+			},
+			want: &ResponseRestoreState{
+				JobID:              testJobID,
+				Namespace:          testNamespace,
+				Kind:               RestoreKindCold,
+				State:              RestoreStateActive,
+				MissingLayoutNodes: 1,
+			},
+		},
+		{
+			name: "node done once the job is done, even with a placeholder node",
+			statuses: []*ResponseRestoreState{
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateComplete,
+					NodeDone: true, Done: true,
+				},
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					Placeholder: true,
+				},
+			},
+			want: &ResponseRestoreState{
+				JobID:       testJobID,
+				Namespace:   testNamespace,
+				Kind:        RestoreKindCold,
+				State:       RestoreStateActive,
+				Placeholder: true,
+				NodeDone:    true,
+				Done:        true,
+			},
+		},
+		{
+			name: "node done once the job is done, even if every node is a joiner",
+			statuses: []*ResponseRestoreState{
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateComplete,
+					Joiner: true, Done: true,
+				},
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateComplete,
+					Joiner: true,
+				},
+			},
+			want: &ResponseRestoreState{
+				JobID:     testJobID,
+				Namespace: testNamespace,
+				Kind:      RestoreKindCold,
+				State:     RestoreStateComplete,
+				Joiner:    true,
+				NodeDone:  true,
+				Done:      true,
+			},
+		},
+		{
+			name: "node done is false while a placeholder node is not done",
+			statuses: []*ResponseRestoreState{
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					NodeDone: true,
+				},
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					Placeholder: true,
+				},
+			},
+			want: &ResponseRestoreState{
+				JobID:       testJobID,
+				Namespace:   testNamespace,
+				Kind:        RestoreKindCold,
+				State:       RestoreStateActive,
+				Placeholder: true,
+			},
+		},
+		{
 			name: "node done is false when every node is a joiner",
 			statuses: []*ResponseRestoreState{
 				{JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive, Joiner: true},

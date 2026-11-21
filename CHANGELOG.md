@@ -31,6 +31,13 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
   the record counters `Total`, `Applied`, `Deletes`, `Filtered`, `FilteredNotOurs` and `Failed`
   for both modes, `PendingQDepth`, `PendingQCap`, `HeldReason`, `MaxInflight` and
   `IgnoreRecordError`. (BKRS-494)
+- `ResponseBackupState.RecsFilterExits` reports `recs_filter_exits`, the records of `RecsFiltered`
+  written as exit tombstones, and `UploadPermanentFailures` reports `upload_permanent_failures`.
+  `ResponseRestoreState` reports `RefTime` (`ref_time`), `FilterExits` (`filter_exits`),
+  `ExitShadowed` (`exit_shadowed`), `ExitCapHit` (`exit_cap_hit`) and `NodeDone` (`node_done`) of
+  a cold restore. Merged across the nodes, the counters are summed, `RefTime` is the maximum,
+  `ExitCapHit` is true if it is true on any node, and `NodeDone` is true only if it is true on
+  every node that is not a joiner. (BKRS-598)
 - `ResponseRestoreState.IsFinished` reports a job that is terminal on the node, and
   `ResponseRestoreState.HasNamespace` reports a row that names its namespace, as a stub row may
   not. (BKRS-494)

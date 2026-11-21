@@ -41,13 +41,14 @@ const (
 		"backup-upload-threads=8:backup-s3-throughput-target-gbps=10:backup-policy=strict:" +
 		"achieved_consistency=-:recs_backed_up=1250000:recs_base=1250000:recs_query_incr=0:" +
 		"recs_change_incr=0:bytes_backed_up=1610612736:bytes_base=1610612736:bytes_query_incr=0:" +
-		"bytes_change_incr=0:recs_filtered=0:recs_degenerate=0:recs_skipped_xdr_tomb=0:" +
+		"bytes_change_incr=0:recs_filtered=9:recs_filter_exits=2:recs_degenerate=0:" +
+		"recs_skipped_xdr_tomb=0:" +
 		"recs_read_failed=0:partitions_flushed=512:partitions_owned=1366:partitions_scanned=530:" +
 		"progress_pct=37.48:change_stream_active=true:start_time=2026-11-04 10.00.00.000 UTC:" +
 		"finish_time=-:partitions_count_pending=0:count_read_failures=0:backpressure_active=false:" +
 		"backpressure_activations=3:bytes_in_per_sec=220200960:bytes_out_per_sec=209715200:" +
 		"upload_q_depth=5:upload_q_cap=16:buffers_in_use=12:total_buffers_allocated=24:" +
-		"recs_per_sec=171000:buffers_scan_cap=20:last_lap_ms=412"
+		"recs_per_sec=171000:buffers_scan_cap=20:last_lap_ms=412:upload_permanent_failures=1"
 	specBackupDraining = "job-id=full-1104:ns=test:state=FINAL_DRAINING:progress_pct=95.00:" +
 		"change_stream_active=true:start_time=2026-11-04 10.00.00.000 UTC:finish_time=-:" +
 		"drain_blocked_migrations=37:partitions_count_pending=0:last_lap_ms=380"
@@ -79,10 +80,13 @@ const (
 	specRestoreColdTTL = "job-id=r3:ns=test:kind=cold:state=ACTIVE:restore-rps=0:restore-worker-threads=8:" +
 		"restore-download-threads=8:ns_state=RESTORING:finish_time=-:" +
 		"joiner=false:placeholder=false:pids_in_scope=1366:progress_pct=61.20:" +
-		"missing_layout_nodes=0:n_done_nodes=0:source_consistency=strict:extra-ttl=86400:" +
-		"ttl_extended=812000:ttl_clamped=0:cluster_key=8f3a6c21d47e09b5:done=false:clear=none:" +
+		"missing_layout_nodes=0:n_done_nodes=0:source_consistency=strict:ref_time=531504000:" +
+		"extra-ttl=86400:" +
+		"ttl_extended=812000:ttl_clamped=0:cluster_key=8f3a6c21d47e09b5:node_done=true:" +
+		"done=false:clear=none:" +
 		"clear_zeroed_bytes=0:clear_ms=0:total=1904331:applied=1203300:deletes=1200:" +
-		"filtered=701031:filtered_not_ours=700950:failed=0:recs_per_sec=95000:" +
+		"filtered=701031:filtered_not_ours=700950:filter_exits=40:exit_shadowed=41:" +
+		"exit_cap_hit=true:failed=0:recs_per_sec=95000:" +
 		"pending_q_depth=9:pending_q_cap=16:last_lap_ms=301"
 	specRestoreColdAborted = "job-id=r1:ns=test:kind=cold:state=ABORTED:ns_state=FAILED:" +
 		"last_lap_ms=-:error_reason=aborted by operator:abort_origin=operator"
@@ -125,6 +129,8 @@ func TestParseStatusResponse_Backup(t *testing.T) {
 				RecsBase:                     1250000,
 				BytesBackedUp:                1610612736,
 				BytesBase:                    1610612736,
+				RecsFiltered:                 9,
+				RecsFilterExits:              2,
 				PartitionsFlushed:            512,
 				PartitionsOwned:              1366,
 				PartitionsScanned:            530,
@@ -139,6 +145,7 @@ func TestParseStatusResponse_Backup(t *testing.T) {
 				TotalBuffersAllocated:        24,
 				RecsPerSec:                   171000,
 				BuffersScanCap:               20,
+				UploadPermanentFailures:      1,
 				LastLapMs:                    new(uint64(412)),
 			},
 		},
@@ -304,6 +311,11 @@ func TestParseStatusResponse_Restore(t *testing.T) {
 				Deletes:                1200,
 				Filtered:               701031,
 				FilteredNotOurs:        700950,
+				FilterExits:            40,
+				ExitShadowed:           41,
+				ExitCapHit:             true,
+				RefTime:                531504000,
+				NodeDone:               true,
 				PidsInScope:            specPidsInPlay,
 				ClusterKey:             specClusterID,
 				Clear:                  infomodels.ClearStateNone,

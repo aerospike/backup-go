@@ -48,7 +48,7 @@ const (
 	RestoreKindFuzzy RestoreKind = "fuzzy"
 )
 
-// NamespaceState is the restore gate of a namespace on a node, the ns-state
+// NamespaceState is the restore gate of a namespace on a node, the ns_state
 // field of the restore-status info response. Only a cold restore changes it.
 type NamespaceState string
 

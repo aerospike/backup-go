@@ -26,42 +26,42 @@ const (
 	fieldRestoreRPS             = "restore-rps"
 	fieldRestoreWorkerThreads   = "restore-worker-threads"
 	fieldRestoreDownloadThreads = "restore-download-threads"
-	fieldNsState                = "ns-state"
+	fieldNsState                = "ns_state"
 
 	fieldJoiner             = "joiner"
 	fieldPlaceholder        = "placeholder"
-	fieldPidsInScope        = "pids-in-scope"
-	fieldMissingLayoutNodes = "missing-layout-nodes"
-	fieldNDoneNodes         = "n-done-nodes"
+	fieldPidsInScope        = "pids_in_scope"
+	fieldMissingLayoutNodes = "missing_layout_nodes"
+	fieldNDoneNodes         = "n_done_nodes"
 	fieldBackupID           = "backup-id"
-	fieldBackupEntry        = "backup-entry"
-	fieldBackupEntries      = "backup-entries"
+	fieldBackupEntry        = "backup_entry"
+	fieldBackupEntries      = "backup_entries"
 	fieldExtraTTL           = "extra-ttl"
-	fieldTTLExtended        = "ttl-extended"
-	fieldTTLClamped         = "ttl-clamped"
-	fieldClusterKey         = "cluster-key"
+	fieldTTLExtended        = "ttl_extended"
+	fieldTTLClamped         = "ttl_clamped"
+	fieldClusterKey         = "cluster_key"
 	fieldDone               = "done"
 	fieldClear              = "clear"
-	fieldClearZeroedBytes   = "clear-zeroed-bytes"
-	fieldClearMs            = "clear-ms"
-	fieldHeldReason         = "held-reason"
-	fieldPendingQDepth      = "pending-q-depth"
-	fieldPendingQCap        = "pending-q-cap"
-	fieldSourceConsistency  = "source-consistency"
+	fieldClearZeroedBytes   = "clear_zeroed_bytes"
+	fieldClearMs            = "clear_ms"
+	fieldHeldReason         = "held_reason"
+	fieldPendingQDepth      = "pending_q_depth"
+	fieldPendingQCap        = "pending_q_cap"
+	fieldSourceConsistency  = "source_consistency"
 
 	fieldTotal           = "total"
 	fieldApplied         = "applied"
 	fieldDeletes         = "deletes"
 	fieldFiltered        = "filtered"
-	fieldFilteredNotOurs = "filtered-not-ours"
+	fieldFilteredNotOurs = "filtered_not_ours"
 	fieldFailed          = "failed"
 
 	fieldOutstanding       = "outstanding"
 	fieldMaxInflight       = "max-inflight"
 	fieldIgnoreRecordError = "ignore-record-error"
 	fieldCovered           = "covered"
-	fieldClusterWide       = "cluster-wide"
-	fieldDeleteAbsent      = "delete-absent"
+	fieldClusterWide       = "cluster_wide"
+	fieldDeleteAbsent      = "delete_absent"
 )
 
 // ResponseRestoreState represents the status of a server-side restore job, as
@@ -359,7 +359,7 @@ func MergeResponseRestoreStates(statuses []*ResponseRestoreState) *ResponseResto
 		return nil
 	}
 
-	// Each node reports its own progress-pct for its own partitions. Those
+	// Each node reports its own progress_pct for its own partitions. Those
 	// percentages aren't equally sized slices of the cluster job unless every
 	// node has the same number of partitions.
 	if progressWeight > 0 {

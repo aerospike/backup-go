@@ -2017,8 +2017,8 @@ func TestClient_parseResultResponse(t *testing.T) {
 		{
 			name:     "Command exists with a successful response holding ERROR",
 			cmd:      "testCommand",
-			input:    map[string]string{"testCommand": "job-id=1:error-reason=S3 ERROR:2:slow down"},
-			expected: "job-id=1:error-reason=S3 ERROR:2:slow down",
+			input:    map[string]string{"testCommand": "job-id=1:error_reason=S3 ERROR:2:slow down"},
+			expected: "job-id=1:error_reason=S3 ERROR:2:slow down",
 			errMsg:   "",
 		},
 		{
@@ -2295,19 +2295,19 @@ func TestClient_getBackupStatusByNode(t *testing.T) {
 
 	const runningStatus = "job-id=260922T103653-5xsr:ns=source-ns1:state=INCR_SCAN_ACTIVE:" +
 		"backup-rps=0:backup-worker-threads=8:backup-upload-threads=8:backup-s3-throughput-target-gbps=10:" +
-		"recs-backed-up=515423:recs-base=515423:recs-query-incr=0:recs-change-incr=0:" +
-		"bytes-backed-up=1048576:bytes-base=1048576:bytes-query-incr=0:bytes-change-incr=0:" +
-		"recs-filtered=0:recs-degenerate=0:recs-skipped-xdr-tomb=0:recs-read-failed=0:" +
-		"partitions-flushed=1365:partitions-owned=1365:partitions-scanned=1365:" +
-		"progress-pct=95.00:change-stream-active=true:start-time=2026-09-22 10.36.53.415 UTC:finish-time=-:" +
-		"partitions-count-pending=0:count-read-failures=0:backpressure-active=true:" +
-		"backpressure-activations=3:bytes-in-per-sec=2048:bytes-out-per-sec=1024:upload-q-depth=4:" +
-		"upload-q-cap=64:buffers-in-use=12:total-buffers-allocated=32"
+		"recs_backed_up=515423:recs_base=515423:recs_query_incr=0:recs_change_incr=0:" +
+		"bytes_backed_up=1048576:bytes_base=1048576:bytes_query_incr=0:bytes_change_incr=0:" +
+		"recs_filtered=0:recs_degenerate=0:recs_skipped_xdr_tomb=0:recs_read_failed=0:" +
+		"partitions_flushed=1365:partitions_owned=1365:partitions_scanned=1365:" +
+		"progress_pct=95.00:change_stream_active=true:start_time=2026-09-22 10.36.53.415 UTC:finish_time=-:" +
+		"partitions_count_pending=0:count_read_failures=0:backpressure_active=true:" +
+		"backpressure_activations=3:bytes_in_per_sec=2048:bytes_out_per_sec=1024:upload_q_depth=4:" +
+		"upload_q_cap=64:buffers_in_use=12:total_buffers_allocated=32"
 
-	const failedStatus = "job-id=260922T103653-5xsr:ns=source-ns1:state=ABORTED:recs-backed-up=12:" +
-		"recs-base=10:recs-query-incr=1:recs-change-incr=1:" +
-		"start-time=2026-09-22 10.36.53.415 UTC:finish-time=2026-09-22 10.41.20.077 UTC:" +
-		"error-reason=storage unreachable:abort-origin=server"
+	const failedStatus = "job-id=260922T103653-5xsr:ns=source-ns1:state=ABORTED:recs_backed_up=12:" +
+		"recs_base=10:recs_query_incr=1:recs_change_incr=1:" +
+		"start_time=2026-09-22 10.36.53.415 UTC:finish_time=2026-09-22 10.41.20.077 UTC:" +
+		"error_reason=storage unreachable:abort_origin=server"
 
 	tests := []struct {
 		name     string
@@ -2341,7 +2341,7 @@ func TestClient_getBackupStatusByNode(t *testing.T) {
 			},
 		},
 		{
-			name:     "parses conditional error-reason and abort-origin fields",
+			name:     "parses conditional error_reason and abort_origin fields",
 			response: failedStatus,
 			check: func(t *testing.T, resp []infomodels.InfoMap) {
 				t.Helper()
@@ -2794,9 +2794,9 @@ func TestClearRestoreStorage(t *testing.T) {
 		testAccepted = "ok"
 		clearCmd     = "restore-clear-storage:namespace=" + testRestoreNamespace
 		// testColdRow is the restore-status row of a cold job being prepared.
-		testColdRow = "job-id=%s:ns=%s:kind=cold:state=ACTIVE:ns-state=PREPARING:clear=%s"
+		testColdRow = "job-id=%s:ns=%s:kind=cold:state=ACTIVE:ns_state=PREPARING:clear=%s"
 		// testFuzzyRow is the restore-status row of a fuzzy job, which has no clear field.
-		testFuzzyRow = "job-id=%s:ns=%s:kind=fuzzy:state=ACTIVE:ns-state=NONE"
+		testFuzzyRow = "job-id=%s:ns=%s:kind=fuzzy:state=ACTIVE:ns_state=NONE"
 	)
 
 	coldRow := func(ns string, clearState infomodels.ClearState) string {
@@ -3175,7 +3175,7 @@ func TestClient_sendStartRestore(t *testing.T) {
 		testUnconfirmed = errCmdRespPrefix + ":1:restore: job-id=" + testJobID +
 			": start could not be confirmed - check restore-status before retrying"
 		// testColdStatus is the restore-status row of a cold job.
-		testColdStatus = "job-id=%s:ns=%s:kind=cold:state=%s:restore-worker-threads=8:ns-state=%s"
+		testColdStatus = "job-id=%s:ns=%s:kind=cold:state=%s:restore-worker-threads=8:ns_state=%s"
 	)
 
 	restoringStatus := fmt.Sprintf(testColdStatus, testJobID, testNamespace,
@@ -3389,7 +3389,7 @@ func TestRetryOnPrincipal(t *testing.T) {
 			notFound:  testNoRestoreJob,
 			rejected:  testRestoreUsed,
 			statusResp: "job-id=" + testRestoreJobID + ":ns=" + testRestoreNamespace +
-				":kind=cold:state=ACTIVE:ns-state=PREPARING",
+				":kind=cold:state=ACTIVE:ns_state=PREPARING",
 			send: func(ic *Client, node infoGetter, attempts *retryAttempts) error {
 				return ic.sendStartRestore(node, testRestoreStartCmd, testRestoreStatusCmd, attempts)
 			},
@@ -3680,7 +3680,7 @@ func TestGetRestoreStatus(t *testing.T) {
 
 	const (
 		// testStatusRow is the restore-status row of a cold job.
-		testStatusRow = "job-id=%s:ns=%s:kind=cold:state=%s:ns-state=%s:ttl-extended=%d"
+		testStatusRow = "job-id=%s:ns=%s:kind=cold:state=%s:ns_state=%s:ttl_extended=%d"
 		// testNoName is the namespace of a stub row.
 		testNoName = "(none)"
 	)
@@ -3907,7 +3907,7 @@ func TestGetBackupStatus(t *testing.T) {
 		testBackupJobOnNode = "backup job " + testBackupJobID + " on node "
 		// testBackupRow is the backup-status row of a running job.
 		testBackupRow = "job-id=" + testBackupJobID + ":ns=" + testBackupNamespace +
-			":state=BASE_SCAN_ACTIVE:recs-base=%d"
+			":state=BASE_SCAN_ACTIVE:recs_base=%d"
 	)
 
 	tests := []struct {

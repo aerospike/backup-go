@@ -116,7 +116,7 @@ func TestResolveConsistency(t *testing.T) {
 func TestParseOptionalUint64(t *testing.T) {
 	t.Parallel()
 
-	const testKey = "last-lap-ms"
+	const testKey = "last_lap_ms"
 
 	tests := []struct {
 		name string

@@ -39,62 +39,62 @@ const (
 
 	specBackupRunning = "job-id=full-1104:ns=test:state=BASE_SCAN_ACTIVE:backup-rps=0:backup-worker-threads=4:" +
 		"backup-upload-threads=8:backup-s3-throughput-target-gbps=10:backup-policy=strict:" +
-		"achieved-consistency=-:recs-backed-up=1250000:recs-base=1250000:recs-query-incr=0:" +
-		"recs-change-incr=0:bytes-backed-up=1610612736:bytes-base=1610612736:bytes-query-incr=0:" +
-		"bytes-change-incr=0:recs-filtered=0:recs-degenerate=0:recs-skipped-xdr-tomb=0:" +
-		"recs-read-failed=0:partitions-flushed=512:partitions-owned=1366:partitions-scanned=530:" +
-		"progress-pct=37.48:change-stream-active=true:start-time=2026-11-04 10.00.00.000 UTC:" +
-		"finish-time=-:partitions-count-pending=0:count-read-failures=0:backpressure-active=false:" +
-		"backpressure-activations=3:bytes-in-per-sec=220200960:bytes-out-per-sec=209715200:" +
-		"upload-q-depth=5:upload-q-cap=16:buffers-in-use=12:total-buffers-allocated=24:" +
-		"recs-per-sec=171000:buffers-scan-cap=20:last-lap-ms=412"
-	specBackupDraining = "job-id=full-1104:ns=test:state=FINAL_DRAINING:progress-pct=95.00:" +
-		"change-stream-active=true:start-time=2026-11-04 10.00.00.000 UTC:finish-time=-:" +
-		"drain-blocked-migrations=37:partitions-count-pending=0:last-lap-ms=380"
+		"achieved_consistency=-:recs_backed_up=1250000:recs_base=1250000:recs_query_incr=0:" +
+		"recs_change_incr=0:bytes_backed_up=1610612736:bytes_base=1610612736:bytes_query_incr=0:" +
+		"bytes_change_incr=0:recs_filtered=0:recs_degenerate=0:recs_skipped_xdr_tomb=0:" +
+		"recs_read_failed=0:partitions_flushed=512:partitions_owned=1366:partitions_scanned=530:" +
+		"progress_pct=37.48:change_stream_active=true:start_time=2026-11-04 10.00.00.000 UTC:" +
+		"finish_time=-:partitions_count_pending=0:count_read_failures=0:backpressure_active=false:" +
+		"backpressure_activations=3:bytes_in_per_sec=220200960:bytes_out_per_sec=209715200:" +
+		"upload_q_depth=5:upload_q_cap=16:buffers_in_use=12:total_buffers_allocated=24:" +
+		"recs_per_sec=171000:buffers_scan_cap=20:last_lap_ms=412"
+	specBackupDraining = "job-id=full-1104:ns=test:state=FINAL_DRAINING:progress_pct=95.00:" +
+		"change_stream_active=true:start_time=2026-11-04 10.00.00.000 UTC:finish_time=-:" +
+		"drain_blocked_migrations=37:partitions_count_pending=0:last_lap_ms=380"
 	specBackupFallback = "job-id=nightly-07:ns=test:state=COMPLETE:backup-rps=0:backup-worker-threads=4:" +
 		"backup-upload-threads=8:backup-s3-throughput-target-gbps=10:backup-policy=best-effort:" +
-		"achieved-consistency=fuzzy:fallback-reason=node bb9020011ac4202 failed - <reason>:" +
-		"progress-pct=100.00:change-stream-active=false:" +
-		"start-time=2026-11-04 01.00.00.000 UTC:finish-time=2026-11-04 01.42.10.512 UTC:last-lap-ms=-"
-	specBackupOperatorAbort = "job-id=full-1104:ns=test:state=ABORTED:achieved-consistency=-:" +
-		"finish-time=2026-11-04 10.12.03.004 UTC:error-reason=aborted by operator:" +
-		"abort-origin=operator:partitions-count-pending=0:last-lap-ms=-"
+		"achieved_consistency=fuzzy:fallback_reason=node bb9020011ac4202 failed - <reason>:" +
+		"progress_pct=100.00:change_stream_active=false:" +
+		"start_time=2026-11-04 01.00.00.000 UTC:finish_time=2026-11-04 01.42.10.512 UTC:last_lap_ms=-"
+	specBackupOperatorAbort = "job-id=full-1104:ns=test:state=ABORTED:achieved_consistency=-:" +
+		"finish_time=2026-11-04 10.12.03.004 UTC:error_reason=aborted by operator:" +
+		"abort_origin=operator:partitions_count_pending=0:last_lap_ms=-"
 	specBackupServerAbort = "job-id=full-1104:ns=test:state=ABORTED:" +
-		"error-reason=node bb9020011ac4202 failed+ <reason>:abort-origin=server"
+		"error_reason=node bb9020011ac4202 failed+ <reason>:abort_origin=server"
 	specBackupFailedStub = "job-id=b9:ns=(none):state=FAILED:backup-rps=0:backup-worker-threads=0:" +
 		"backup-upload-threads=0:backup-s3-throughput-target-gbps=0:backup-policy=-:" +
-		"achieved-consistency=-:start-time=-:error-reason=<reason>"
+		"achieved_consistency=-:start_time=-:error_reason=<reason>"
 	specBackupSeveral = "job-id=incr-1105:ns=test:state=INCR_SCAN_ACTIVE;job-id=full-1104:ns=test:state=COMPLETE"
 
 	specRestoreColdClear = "job-id=r1:ns=test:kind=cold:state=ACTIVE:restore-rps=0:restore-worker-threads=8:" +
-		"restore-download-threads=8:ns-state=PREPARING:start-time=2026-11-04 12.00.00.000 UTC:" +
-		"finish-time=-:joiner=false:placeholder=false:pids-in-scope=1366:progress-pct=0.00:" +
-		"missing-layout-nodes=0:n-done-nodes=0:source-consistency=-:backup-id=incr-1106:" +
-		"backup-entry=2:backup-entries=3:cluster-key=8f3a6c21d47e09b5:done=false:" +
-		"clear=required:clear-zeroed-bytes=0:clear-ms=0:total=0:applied=0:deletes=0:" +
-		"filtered=0:filtered-not-ours=0:failed=0:recs-per-sec=0:pending-q-depth=0:" +
-		"pending-q-cap=16:last-lap-ms=250"
-	specRestoreColdHeld = "job-id=r1:ns=test:kind=cold:state=ACTIVE:ns-state=PREPARING:pids-in-scope=1366:" +
-		"held-reason=truncate-state-live:progress-pct=0.00"
+		"restore-download-threads=8:ns_state=PREPARING:start_time=2026-11-04 12.00.00.000 UTC:" +
+		"finish_time=-:joiner=false:placeholder=false:pids_in_scope=1366:progress_pct=0.00:" +
+		"missing_layout_nodes=0:n_done_nodes=0:source_consistency=-:backup-id=incr-1106:" +
+		"backup_entry=2:backup_entries=3:cluster_key=8f3a6c21d47e09b5:done=false:" +
+		"clear=required:clear_zeroed_bytes=0:clear_ms=0:total=0:applied=0:deletes=0:" +
+		"filtered=0:filtered_not_ours=0:failed=0:recs_per_sec=0:pending_q_depth=0:" +
+		"pending_q_cap=16:last_lap_ms=250"
+	specRestoreColdHeld = "job-id=r1:ns=test:kind=cold:state=ACTIVE:ns_state=PREPARING:pids_in_scope=1366:" +
+		"held_reason=truncate-state-live:progress_pct=0.00"
 	specRestoreColdTTL = "job-id=r3:ns=test:kind=cold:state=ACTIVE:restore-rps=0:restore-worker-threads=8:" +
-		"restore-download-threads=8:ns-state=RESTORING:finish-time=-:" +
-		"joiner=false:placeholder=false:pids-in-scope=1366:progress-pct=61.20:" +
-		"missing-layout-nodes=0:n-done-nodes=0:source-consistency=strict:extra-ttl=86400:" +
-		"ttl-extended=812000:ttl-clamped=0:cluster-key=8f3a6c21d47e09b5:done=false:clear=none:" +
-		"clear-zeroed-bytes=0:clear-ms=0:total=1904331:applied=1203300:deletes=1200:" +
-		"filtered=701031:filtered-not-ours=700950:failed=0:recs-per-sec=95000:" +
-		"pending-q-depth=9:pending-q-cap=16:last-lap-ms=301"
-	specRestoreColdAborted = "job-id=r1:ns=test:kind=cold:state=ABORTED:ns-state=FAILED:" +
-		"last-lap-ms=-:error-reason=aborted by operator:abort-origin=operator"
+		"restore-download-threads=8:ns_state=RESTORING:finish_time=-:" +
+		"joiner=false:placeholder=false:pids_in_scope=1366:progress_pct=61.20:" +
+		"missing_layout_nodes=0:n_done_nodes=0:source_consistency=strict:extra-ttl=86400:" +
+		"ttl_extended=812000:ttl_clamped=0:cluster_key=8f3a6c21d47e09b5:done=false:clear=none:" +
+		"clear_zeroed_bytes=0:clear_ms=0:total=1904331:applied=1203300:deletes=1200:" +
+		"filtered=701031:filtered_not_ours=700950:failed=0:recs_per_sec=95000:" +
+		"pending_q_depth=9:pending_q_cap=16:last_lap_ms=301"
+	specRestoreColdAborted = "job-id=r1:ns=test:kind=cold:state=ABORTED:ns_state=FAILED:" +
+		"last_lap_ms=-:error_reason=aborted by operator:abort_origin=operator"
 	specRestoreFuzzy = "job-id=r2:ns=test:kind=fuzzy:state=ACTIVE:restore-rps=0:restore-worker-threads=8:" +
-		"restore-download-threads=8:ns-state=NONE:start-time=2026-11-04 14.00.00.000 UTC:" +
-		"finish-time=-:total=5400211:applied=5400100:deletes=310:filtered=100:failed=11:" +
-		"recs-per-sec=120000:ignore-record-error=true:outstanding=480:max-inflight=500:" +
-		"covered=900:cluster-wide=2700:progress-pct=65.90:source-consistency=strict:" +
-		"backup-id=incr-1105:backup-entry=1:backup-entries=2:delete-absent=4:last-lap-ms=205"
-	specRestoreNamespaceOnly = "ns=test:ns-state=NONE"
+		"restore-download-threads=8:ns_state=NONE:start_time=2026-11-04 14.00.00.000 UTC:" +
+		"finish_time=-:total=5400211:applied=5400100:deletes=310:filtered=100:failed=11:" +
+		"recs_per_sec=120000:ignore-record-error=true:outstanding=480:max-inflight=500:" +
+		"covered=900:cluster_wide=2700:progress_pct=65.90:source_consistency=strict:" +
+		"backup-id=incr-1105:backup_entry=1:backup_entries=2:delete_absent=4:last_lap_ms=205"
+	specRestoreNamespaceOnly = "ns=test:ns_state=NONE"
 	// specRestoreSecretsNs is a row of the namespace specSecretsNs.
-	specRestoreSecretsNs = "job-id=r5:ns=" + specSecretsNs + ":kind=cold:state=ACTIVE:ns-state=READY"
+	specRestoreSecretsNs = "job-id=r5:ns=" + specSecretsNs + ":kind=cold:state=ACTIVE:ns_state=READY"
 )
 
 // TestParseStatusResponse_Backup feeds the backup-status examples of the

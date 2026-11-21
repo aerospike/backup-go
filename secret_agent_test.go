@@ -31,6 +31,8 @@ const (
 	testSASecretKey       = "secrets:resource:key"
 	testSASecretErrPrefix = "sacred:resource:key"
 	testSASecretKeyErr    = "resource:key"
+	testSASecretEmptyKey  = "secrets:resource:"
+	testSASecretMissing   = "secrets:resource:missing"
 	testCaFile            = "tests/integration/cert_test.pem"
 	testPKey              = `MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDq+ku8oxfSQnUF
 4qs8ctSYwtQwgyGViCfO7fnVf+cyIcKhZSCUlqIQPN17pBzUaWLKaLCSvIhehE1N
@@ -238,8 +240,8 @@ func TestParseSecret_Errors(t *testing.T) {
 		wantErr error
 	}{
 		{name: "nil config", config: nil, secret: testSASecretKey, wantErr: ErrInvalidConfig},
-		{name: "empty key", config: cfg, secret: "secrets:resource:", wantErr: ErrInvalidConfig},
-		{name: "unknown secret", config: cfg, secret: "secrets:resource:missing", wantErr: ErrSecretAgent},
+		{name: "empty key", config: cfg, secret: testSASecretEmptyKey, wantErr: ErrInvalidConfig},
+		{name: "unknown secret", config: cfg, secret: testSASecretMissing, wantErr: ErrSecretAgent},
 	}
 
 	for _, tt := range tests {
@@ -249,6 +251,63 @@ func TestParseSecret_Errors(t *testing.T) {
 			value, err := ParseSecret(t.Context(), tt.config, tt.secret)
 			require.ErrorIs(t, err, tt.wantErr)
 			require.Empty(t, value)
+		})
+	}
+}
+
+func TestResolveSecret(t *testing.T) {
+	t.Parallel()
+
+	const (
+		keyNotBase64    = "not-base64"
+		secretNotBase64 = "secrets:resource:not-base64"
+	)
+
+	secrets := testSecrets()
+	secrets[testSAResource][keyNotBase64] = "not base64!"
+
+	srv := secretagenttest.NewServer(t, secrets)
+
+	client, err := NewSecretAgentClient(testServerConfig(srv))
+	require.NoError(t, err)
+
+	base64Cfg := testServerConfig(srv)
+	isBase64 := true
+	base64Cfg.IsBase64 = &isBase64
+
+	base64Client, err := NewSecretAgentClient(base64Cfg)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name    string
+		client  *secretagent.Client
+		secret  string
+		want    string
+		wantErr error
+	}{
+		{name: "resolves", client: client, secret: testSASecretKey, want: testPKey},
+		{name: "nil client", client: nil, secret: testSASecretKey, wantErr: ErrInvalidConfig},
+		{name: "plain value", client: client, secret: testSASecretKeyErr, want: testSASecretKeyErr},
+		{name: "plain value with nil client", client: nil, secret: testSASecretErrPrefix, want: testSASecretErrPrefix},
+		{name: "empty key", client: client, secret: testSASecretEmptyKey, wantErr: ErrInvalidConfig},
+		{name: "unknown secret", client: client, secret: testSASecretMissing, wantErr: ErrSecretAgent},
+		{name: "invalid response", client: base64Client, secret: secretNotBase64, wantErr: ErrCorruptData},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			value, err := ResolveSecret(t.Context(), tt.client, tt.secret)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				require.Empty(t, value)
+
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.want, value)
 		})
 	}
 }

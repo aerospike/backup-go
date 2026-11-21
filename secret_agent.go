@@ -44,7 +44,28 @@ func classifySecretAgentError(err error) error {
 	return fmt.Errorf("%w: %w", ErrSecretAgent, err)
 }
 
-// getSecret gets the secret from the secret agent using the given client.
+// ResolveSecret returns secret unchanged when it is not a secret reference, and
+// otherwise fetches the value of the reference, in the form
+// secrets:[<resource>:]<key>, from the secret agent over client. Unlike
+// ParseSecret it reuses client instead of creating a new one for every call, so
+// it suits callers that resolve many values.
+//
+// The returned error wraps one of the error classes of this package, matched
+// with errors.Is:
+//   - ErrInvalidConfig: secret is an invalid secret reference, or client is nil;
+//   - ErrUnsupported: the request needs a feature that is not supported;
+//   - ErrCorruptData: the secret agent returned an invalid response;
+//   - ErrSecretAgent: the request failed for any other reason.
+func ResolveSecret(ctx context.Context, client *secretagent.Client, secret string) (string, error) {
+	if !secretagent.IsSecret(secret) {
+		return secret, nil
+	}
+
+	return getSecret(ctx, client, secret)
+}
+
+// getSecret gets the secret from the secret agent using the given client. It
+// rejects a key that is not a secret reference.
 func getSecret(ctx context.Context, client *secretagent.Client, key string) (string, error) {
 	if client == nil {
 		return "", fmt.Errorf("%w: secret config not initialized", ErrInvalidConfig)
@@ -78,7 +99,7 @@ func ParseSecret(ctx context.Context, config *SecretAgentConfig, secret string) 
 		return "", err
 	}
 
-	return getSecret(ctx, client, secret)
+	return ResolveSecret(ctx, client, secret)
 }
 
 // NewSecretAgentClient initializes a new secret agent client from config.

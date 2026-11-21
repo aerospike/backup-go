@@ -57,6 +57,11 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
   partition that changed owner or a change stream that restarted is not counted twice. The byte,
   file, index and UDF counts are exact; the record count is the base scan's, an estimate that is
   exact when no write overlaps the backup. (BKRS-478)
+- `ResolveSecret` resolves a value over an existing `secretagent.Client` (see
+  `NewSecretAgentClient`): like `ParseSecret`, it returns a plain value unchanged, fetches a
+  `secrets:[<resource>:]<key>` reference, and returns an error of the same classes: `ErrInvalidConfig`, `ErrUnsupported`, `ErrCorruptData` or `ErrSecretAgent`.
+  Before, only `ParseSecret` classified these errors, and it creates a new client and TLS
+  config on every call, so a caller reusing one client had to copy the mapping. (BKRS-597)
 
 ### Changed
 

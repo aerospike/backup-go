@@ -30,6 +30,7 @@ const (
 	testClusterKey    = "4f1c2a9b7d10"
 	testThreads       = "8"
 	testFalse         = "false"
+	testTrue          = "true"
 	testHeldReason    = "truncate-state-live"
 
 	testKindCold    = string(RestoreKindCold)
@@ -63,7 +64,7 @@ func TestNewResponseRestoreState(t *testing.T) {
 					fieldStartTime:              testStartTimeStr,
 					fieldFinishTime:             infoNoValue,
 					fieldJoiner:                 testFalse,
-					fieldPlaceholder:            "true",
+					fieldPlaceholder:            testTrue,
 					fieldPidsInScope:            "4096",
 					fieldMissingLayoutNodes:     "1",
 					fieldNDoneNodes:             "2",
@@ -74,6 +75,7 @@ func TestNewResponseRestoreState(t *testing.T) {
 					fieldTTLExtended:            "70",
 					fieldTTLClamped:             "5",
 					fieldClusterKey:             testClusterKey,
+					fieldNodeDone:               testTrue,
 					fieldDone:                   testFalse,
 					fieldClear:                  string(ClearStateNone),
 					fieldClearZeroedBytes:       "4294967296",
@@ -90,6 +92,10 @@ func TestNewResponseRestoreState(t *testing.T) {
 					fieldDeletes:                "40",
 					fieldFiltered:               "190",
 					fieldFilteredNotOurs:        "150",
+					fieldFilterExits:            "10",
+					fieldExitShadowed:           "25",
+					fieldExitCapHit:             testTrue,
+					fieldRefTime:                "531504000",
 					fieldFailed:                 "10",
 				},
 			},
@@ -109,11 +115,16 @@ func TestNewResponseRestoreState(t *testing.T) {
 				ExtraTTL:               3600,
 				TTLExtended:            70,
 				TTLClamped:             5,
+				RefTime:                531504000,
+				FilterExits:            10,
+				ExitShadowed:           25,
+				ExitCapHit:             true,
 				Placeholder:            true,
 				PidsInScope:            4096,
 				MissingLayoutNodes:     1,
 				NDoneNodes:             2,
 				ClusterKey:             testClusterKey,
+				NodeDone:               true,
 				Clear:                  ClearStateNone,
 				ClearZeroedBytes:       4294967296,
 				ClearMs:                8421,
@@ -149,7 +160,7 @@ func TestNewResponseRestoreState(t *testing.T) {
 					fieldProgressPct:            "100.00",
 					fieldSourceConsistency:      string(ConsistencyFuzzy),
 					fieldMaxInflight:            "200",
-					fieldIgnoreRecordError:      "true",
+					fieldIgnoreRecordError:      testTrue,
 					fieldLastLapMs:              infoNoValue,
 					fieldHeldReason:             infoNoValue,
 					fieldTotal:                  "928",
@@ -494,6 +505,7 @@ func TestMergeResponseRestoreStates(t *testing.T) {
 					PidsInScope:            2048,
 					NDoneNodes:             2,
 					ClusterKey:             testClusterKey,
+					NodeDone:               true,
 					Done:                   true,
 					Clear:                  ClearStateNone,
 					ClearZeroedBytes:       1000,
@@ -505,6 +517,10 @@ func TestMergeResponseRestoreStates(t *testing.T) {
 					Deletes:                5,
 					Filtered:               15,
 					FilteredNotOurs:        12,
+					FilterExits:            2,
+					ExitShadowed:           1,
+					ExitCapHit:             true,
+					RefTime:                531504000,
 					Failed:                 5,
 				},
 				nil,
@@ -540,6 +556,9 @@ func TestMergeResponseRestoreStates(t *testing.T) {
 					Deletes:                1,
 					Filtered:               10,
 					FilteredNotOurs:        8,
+					FilterExits:            1,
+					ExitShadowed:           1,
+					RefTime:                531503000,
 				},
 			},
 			want: &ResponseRestoreState{
@@ -564,6 +583,7 @@ func TestMergeResponseRestoreStates(t *testing.T) {
 				NDoneNodes:             2,
 				ClusterKey:             testClusterKey,
 				Joiner:                 true,
+				NodeDone:               true,
 				Done:                   true,
 				Clear:                  ClearStateClearing,
 				ClearZeroedBytes:       1500,
@@ -576,6 +596,10 @@ func TestMergeResponseRestoreStates(t *testing.T) {
 				Deletes:                6,
 				Filtered:               25,
 				FilteredNotOurs:        20,
+				FilterExits:            3,
+				ExitShadowed:           2,
+				ExitCapHit:             true,
+				RefTime:                531504000,
 				Failed:                 5,
 			},
 		},
@@ -730,6 +754,231 @@ func TestMergeResponseRestoreStates(t *testing.T) {
 				Namespace: testNamespace,
 				Kind:      RestoreKindCold,
 				State:     RestoreStateActive,
+			},
+		},
+		{
+			name: "node done once every node that is not a joiner is done",
+			statuses: []*ResponseRestoreState{
+				{JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive, NodeDone: true},
+				{JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive, Joiner: true},
+				{JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive, NodeDone: true},
+			},
+			want: &ResponseRestoreState{
+				JobID:     testJobID,
+				Namespace: testNamespace,
+				Kind:      RestoreKindCold,
+				State:     RestoreStateActive,
+				Joiner:    true,
+				NodeDone:  true,
+			},
+		},
+		{
+			name: "node done is false while the first node with a share is not done",
+			statuses: []*ResponseRestoreState{
+				{JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive},
+				{JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive, NodeDone: true},
+			},
+			want: &ResponseRestoreState{
+				JobID:     testJobID,
+				Namespace: testNamespace,
+				Kind:      RestoreKindCold,
+				State:     RestoreStateActive,
+			},
+		},
+		{
+			name: "node done is false while the last node with a share is not done",
+			statuses: []*ResponseRestoreState{
+				{JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive, NodeDone: true},
+				{JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive},
+				{JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive, Joiner: true},
+			},
+			want: &ResponseRestoreState{
+				JobID:     testJobID,
+				Namespace: testNamespace,
+				Kind:      RestoreKindCold,
+				State:     RestoreStateActive,
+				Joiner:    true,
+			},
+		},
+		{
+			name: "node done is false while a layout node is missing",
+			statuses: []*ResponseRestoreState{
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					NodeDone: true, MissingLayoutNodes: 2,
+				},
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					NodeDone: true, MissingLayoutNodes: 1,
+				},
+			},
+			want: &ResponseRestoreState{
+				JobID:              testJobID,
+				Namespace:          testNamespace,
+				Kind:               RestoreKindCold,
+				State:              RestoreStateActive,
+				MissingLayoutNodes: 2,
+			},
+		},
+		{
+			name: "node done once the job is done, even with a layout node missing",
+			statuses: []*ResponseRestoreState{
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateComplete,
+					NodeDone: true, Done: true, MissingLayoutNodes: 1,
+				},
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateComplete,
+					NodeDone: true, Done: true, MissingLayoutNodes: 1,
+				},
+			},
+			want: &ResponseRestoreState{
+				JobID:              testJobID,
+				Namespace:          testNamespace,
+				Kind:               RestoreKindCold,
+				State:              RestoreStateComplete,
+				MissingLayoutNodes: 1,
+				NodeDone:           true,
+				Done:               true,
+			},
+		},
+		{
+			name: "ref time and missing layout nodes are the maximum when the first node reports less",
+			statuses: []*ResponseRestoreState{
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					RefTime: 531503000, MissingLayoutNodes: 1,
+				},
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					RefTime: 531504000, MissingLayoutNodes: 2,
+				},
+			},
+			want: &ResponseRestoreState{
+				JobID:              testJobID,
+				Namespace:          testNamespace,
+				Kind:               RestoreKindCold,
+				State:              RestoreStateActive,
+				RefTime:            531504000,
+				MissingLayoutNodes: 2,
+			},
+		},
+		{
+			name: "exit cap hit on a later node only",
+			statuses: []*ResponseRestoreState{
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					NodeDone: true,
+				},
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					NodeDone: true, ExitCapHit: true,
+				},
+			},
+			want: &ResponseRestoreState{
+				JobID:      testJobID,
+				Namespace:  testNamespace,
+				Kind:       RestoreKindCold,
+				State:      RestoreStateActive,
+				NodeDone:   true,
+				ExitCapHit: true,
+			},
+		},
+		{
+			name: "node done is false while one layout node is missing",
+			statuses: []*ResponseRestoreState{
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					NodeDone: true, MissingLayoutNodes: 1,
+				},
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					NodeDone: true, MissingLayoutNodes: 1,
+				},
+			},
+			want: &ResponseRestoreState{
+				JobID:              testJobID,
+				Namespace:          testNamespace,
+				Kind:               RestoreKindCold,
+				State:              RestoreStateActive,
+				MissingLayoutNodes: 1,
+			},
+		},
+		{
+			name: "node done once the job is done, even with a placeholder node",
+			statuses: []*ResponseRestoreState{
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateComplete,
+					NodeDone: true, Done: true,
+				},
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					Placeholder: true,
+				},
+			},
+			want: &ResponseRestoreState{
+				JobID:       testJobID,
+				Namespace:   testNamespace,
+				Kind:        RestoreKindCold,
+				State:       RestoreStateActive,
+				Placeholder: true,
+				NodeDone:    true,
+				Done:        true,
+			},
+		},
+		{
+			name: "node done once the job is done, even if every node is a joiner",
+			statuses: []*ResponseRestoreState{
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateComplete,
+					Joiner: true, Done: true,
+				},
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateComplete,
+					Joiner: true,
+				},
+			},
+			want: &ResponseRestoreState{
+				JobID:     testJobID,
+				Namespace: testNamespace,
+				Kind:      RestoreKindCold,
+				State:     RestoreStateComplete,
+				Joiner:    true,
+				NodeDone:  true,
+				Done:      true,
+			},
+		},
+		{
+			name: "node done is false while a placeholder node is not done",
+			statuses: []*ResponseRestoreState{
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					NodeDone: true,
+				},
+				{
+					JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive,
+					Placeholder: true,
+				},
+			},
+			want: &ResponseRestoreState{
+				JobID:       testJobID,
+				Namespace:   testNamespace,
+				Kind:        RestoreKindCold,
+				State:       RestoreStateActive,
+				Placeholder: true,
+			},
+		},
+		{
+			name: "node done is false when every node is a joiner",
+			statuses: []*ResponseRestoreState{
+				{JobID: testJobID, Namespace: testNamespace, Kind: RestoreKindCold, State: RestoreStateActive, Joiner: true},
+			},
+			want: &ResponseRestoreState{
+				JobID:     testJobID,
+				Namespace: testNamespace,
+				Kind:      RestoreKindCold,
+				State:     RestoreStateActive,
+				Joiner:    true,
 			},
 		},
 		{

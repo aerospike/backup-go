@@ -27,38 +27,40 @@ const (
 	fieldBackupWorkerThreads          = "backup-worker-threads"
 	fieldBackupUploadThreads          = "backup-upload-threads"
 	fieldBackupS3ThroughputTargetGbps = "backup-s3-throughput-target-gbps"
-	fieldRecsBackedUp                 = "recs-backed-up"
-	fieldRecsBase                     = "recs-base"
-	fieldRecsQueryIncr                = "recs-query-incr"
-	fieldRecsChangeIncr               = "recs-change-incr"
-	fieldBytesBackedUp                = "bytes-backed-up"
-	fieldBytesBase                    = "bytes-base"
-	fieldBytesQueryIncr               = "bytes-query-incr"
-	fieldBytesChangeIncr              = "bytes-change-incr"
-	fieldRecsFiltered                 = "recs-filtered"
-	fieldRecsDegenerate               = "recs-degenerate"
-	fieldRecsSkippedXDRTomb           = "recs-skipped-xdr-tomb"
-	fieldRecsReadFailed               = "recs-read-failed"
-	fieldPartitionsFlushed            = "partitions-flushed"
-	fieldPartitionsOwned              = "partitions-owned"
-	fieldPartitionsScanned            = "partitions-scanned"
-	fieldProgressPct                  = "progress-pct"
-	fieldChangeStreamActive           = "change-stream-active"
-	fieldDrainBlockedMigrations       = "drain-blocked-migrations"
-	fieldPartitionsCountPending       = "partitions-count-pending"
-	fieldCountReadFailures            = "count-read-failures"
-	fieldBackpressureActive           = "backpressure-active"
-	fieldBackpressureActivations      = "backpressure-activations"
-	fieldBytesInPerSec                = "bytes-in-per-sec"
-	fieldBytesOutPerSec               = "bytes-out-per-sec"
-	fieldUploadQDepth                 = "upload-q-depth"
-	fieldUploadQCap                   = "upload-q-cap"
-	fieldBuffersInUse                 = "buffers-in-use"
-	fieldTotalBuffersAllocated        = "total-buffers-allocated"
+	fieldRecsBackedUp                 = "recs_backed_up"
+	fieldRecsBase                     = "recs_base"
+	fieldRecsQueryIncr                = "recs_query_incr"
+	fieldRecsChangeIncr               = "recs_change_incr"
+	fieldBytesBackedUp                = "bytes_backed_up"
+	fieldBytesBase                    = "bytes_base"
+	fieldBytesQueryIncr               = "bytes_query_incr"
+	fieldBytesChangeIncr              = "bytes_change_incr"
+	fieldRecsFiltered                 = "recs_filtered"
+	fieldRecsFilterExits              = "recs_filter_exits"
+	fieldRecsDegenerate               = "recs_degenerate"
+	fieldRecsSkippedXDRTomb           = "recs_skipped_xdr_tomb"
+	fieldRecsReadFailed               = "recs_read_failed"
+	fieldPartitionsFlushed            = "partitions_flushed"
+	fieldPartitionsOwned              = "partitions_owned"
+	fieldPartitionsScanned            = "partitions_scanned"
+	fieldProgressPct                  = "progress_pct"
+	fieldChangeStreamActive           = "change_stream_active"
+	fieldDrainBlockedMigrations       = "drain_blocked_migrations"
+	fieldPartitionsCountPending       = "partitions_count_pending"
+	fieldCountReadFailures            = "count_read_failures"
+	fieldBackpressureActive           = "backpressure_active"
+	fieldBackpressureActivations      = "backpressure_activations"
+	fieldBytesInPerSec                = "bytes_in_per_sec"
+	fieldBytesOutPerSec               = "bytes_out_per_sec"
+	fieldUploadQDepth                 = "upload_q_depth"
+	fieldUploadQCap                   = "upload_q_cap"
+	fieldBuffersInUse                 = "buffers_in_use"
+	fieldTotalBuffersAllocated        = "total_buffers_allocated"
 	fieldBackupPolicy                 = "backup-policy"
-	fieldAchievedConsistency          = "achieved-consistency"
-	fieldFallbackReason               = "fallback-reason"
-	fieldBuffersScanCap               = "buffers-scan-cap"
+	fieldAchievedConsistency          = "achieved_consistency"
+	fieldFallbackReason               = "fallback_reason"
+	fieldBuffersScanCap               = "buffers_scan_cap"
+	fieldUploadPermanentFailures      = "upload_permanent_failures"
 )
 
 type BackupState string
@@ -184,6 +186,11 @@ type ResponseBackupState struct {
 	// RecsFiltered counts records excluded by the set list, the modified
 	// time range or the filter expression.
 	RecsFiltered uint64
+	// RecsFilterExits counts the records of RecsFiltered written as exit
+	// tombstones: a version of a record outside the filter, written so that a
+	// restore keeps out the copies of its key in older backups. They also
+	// count in RecsBackedUp.
+	RecsFilterExits uint64
 	// RecsDegenerate counts captured writes with no set name or no bins.
 	RecsDegenerate uint64
 	// RecsSkippedXDRTomb counts XDR tombstones skipped by the scans.
@@ -230,6 +237,9 @@ type ResponseBackupState struct {
 	TotalBuffersAllocated uint64
 	// BuffersScanCap is the number of buffers in use at which the scan waits.
 	BuffersScanCap uint64
+	// UploadPermanentFailures counts the uploads abandoned as permanently
+	// failed: the storage refused them.
+	UploadPermanentFailures uint64
 	// RecsPerSec is the record rate over the window of the byte rates.
 	RecsPerSec uint64
 	// LastLapMs is how long ago the job monitor finished its last lap, in
@@ -282,6 +292,7 @@ func (s *ResponseBackupState) parseFields(r InfoMap) {
 		infoFieldOf(fieldBytesQueryIncr, &s.BytesQueryIncr),
 		infoFieldOf(fieldBytesChangeIncr, &s.BytesChangeIncr),
 		infoFieldOf(fieldRecsFiltered, &s.RecsFiltered),
+		infoFieldOf(fieldRecsFilterExits, &s.RecsFilterExits),
 		infoFieldOf(fieldRecsDegenerate, &s.RecsDegenerate),
 		infoFieldOf(fieldRecsSkippedXDRTomb, &s.RecsSkippedXDRTomb),
 		infoFieldOf(fieldRecsReadFailed, &s.RecsReadFailed),
@@ -295,6 +306,7 @@ func (s *ResponseBackupState) parseFields(r InfoMap) {
 		infoFieldOf(fieldBuffersInUse, &s.BuffersInUse),
 		infoFieldOf(fieldTotalBuffersAllocated, &s.TotalBuffersAllocated),
 		infoFieldOf(fieldBuffersScanCap, &s.BuffersScanCap),
+		infoFieldOf(fieldUploadPermanentFailures, &s.UploadPermanentFailures),
 		infoFieldOf(fieldRecsPerSec, &s.RecsPerSec),
 	)
 
@@ -439,7 +451,7 @@ func MergeResponseBackupStates(statuses []*ResponseBackupState) *ResponseBackupS
 	merged.State = ResolveBackupState(states)
 	merged.AchievedConsistency = ResolveConsistency(consistencies)
 
-	// Each node reports its own progress-pct for the partitions it owns.
+	// Each node reports its own progress_pct for the partitions it owns.
 	// Those percentages aren't equally sized slices of the cluster job
 	// unless every node owns the same number of partitions.
 	if merged.PartitionsOwned > 0 {
@@ -475,6 +487,7 @@ func (s *ResponseBackupState) add(n *ResponseBackupState) {
 	s.BytesQueryIncr += n.BytesQueryIncr
 	s.BytesChangeIncr += n.BytesChangeIncr
 	s.RecsFiltered += n.RecsFiltered
+	s.RecsFilterExits += n.RecsFilterExits
 	s.RecsDegenerate += n.RecsDegenerate
 	s.RecsSkippedXDRTomb += n.RecsSkippedXDRTomb
 	s.RecsReadFailed += n.RecsReadFailed
@@ -496,5 +509,6 @@ func (s *ResponseBackupState) add(n *ResponseBackupState) {
 	s.BuffersInUse += n.BuffersInUse
 	s.TotalBuffersAllocated += n.TotalBuffersAllocated
 	s.BuffersScanCap += n.BuffersScanCap
+	s.UploadPermanentFailures += n.UploadPermanentFailures
 	s.RecsPerSec += n.RecsPerSec
 }

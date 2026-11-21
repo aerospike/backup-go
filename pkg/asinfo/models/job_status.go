@@ -23,7 +23,7 @@ const (
 	infoTimeLayout = "2006-01-02 15.04.05.000 UTC"
 
 	// infoNoValue is emitted by the server in place of a value that is not
-	// set, e.g. the finish-time of a running job.
+	// set, e.g. the finish_time of a running job.
 	infoNoValue = "-"
 	// infoNoName is emitted by the server in place of the job id or the
 	// namespace of a stub row, a job that failed before its parameters were
@@ -44,12 +44,12 @@ const (
 	fieldJobID       = "job-id"
 	fieldNamespace   = "ns"
 	fieldState       = "state"
-	fieldStartTime   = "start-time"
-	fieldFinishTime  = "finish-time"
-	fieldErrorReason = "error-reason"
-	fieldAbortOrigin = "abort-origin"
-	fieldRecsPerSec  = "recs-per-sec"
-	fieldLastLapMs   = "last-lap-ms"
+	fieldStartTime   = "start_time"
+	fieldFinishTime  = "finish_time"
+	fieldErrorReason = "error_reason"
+	fieldAbortOrigin = "abort_origin"
+	fieldRecsPerSec  = "recs_per_sec"
+	fieldLastLapMs   = "last_lap_ms"
 )
 
 // AbortOrigin tells what aborted a backup or restore job.
@@ -64,8 +64,8 @@ const (
 	AbortOriginCluster AbortOrigin = "cluster"
 )
 
-// Consistency is the consistency of a backup: the achieved-consistency field
-// of the backup-status info response, and the source-consistency field of the
+// Consistency is the consistency of a backup: the achieved_consistency field
+// of the backup-status info response, and the source_consistency field of the
 // restore-status info response. It is empty while the server reports none.
 type Consistency string
 

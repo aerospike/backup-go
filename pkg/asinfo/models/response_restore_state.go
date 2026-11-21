@@ -26,42 +26,47 @@ const (
 	fieldRestoreRPS             = "restore-rps"
 	fieldRestoreWorkerThreads   = "restore-worker-threads"
 	fieldRestoreDownloadThreads = "restore-download-threads"
-	fieldNsState                = "ns-state"
+	fieldNsState                = "ns_state"
 
 	fieldJoiner             = "joiner"
 	fieldPlaceholder        = "placeholder"
-	fieldPidsInScope        = "pids-in-scope"
-	fieldMissingLayoutNodes = "missing-layout-nodes"
-	fieldNDoneNodes         = "n-done-nodes"
+	fieldPidsInScope        = "pids_in_scope"
+	fieldMissingLayoutNodes = "missing_layout_nodes"
+	fieldNDoneNodes         = "n_done_nodes"
 	fieldBackupID           = "backup-id"
-	fieldBackupEntry        = "backup-entry"
-	fieldBackupEntries      = "backup-entries"
+	fieldBackupEntry        = "backup_entry"
+	fieldBackupEntries      = "backup_entries"
+	fieldRefTime            = "ref_time"
 	fieldExtraTTL           = "extra-ttl"
-	fieldTTLExtended        = "ttl-extended"
-	fieldTTLClamped         = "ttl-clamped"
-	fieldClusterKey         = "cluster-key"
+	fieldTTLExtended        = "ttl_extended"
+	fieldTTLClamped         = "ttl_clamped"
+	fieldClusterKey         = "cluster_key"
+	fieldNodeDone           = "node_done"
 	fieldDone               = "done"
 	fieldClear              = "clear"
-	fieldClearZeroedBytes   = "clear-zeroed-bytes"
-	fieldClearMs            = "clear-ms"
-	fieldHeldReason         = "held-reason"
-	fieldPendingQDepth      = "pending-q-depth"
-	fieldPendingQCap        = "pending-q-cap"
-	fieldSourceConsistency  = "source-consistency"
+	fieldClearZeroedBytes   = "clear_zeroed_bytes"
+	fieldClearMs            = "clear_ms"
+	fieldHeldReason         = "held_reason"
+	fieldPendingQDepth      = "pending_q_depth"
+	fieldPendingQCap        = "pending_q_cap"
+	fieldSourceConsistency  = "source_consistency"
 
 	fieldTotal           = "total"
 	fieldApplied         = "applied"
 	fieldDeletes         = "deletes"
 	fieldFiltered        = "filtered"
-	fieldFilteredNotOurs = "filtered-not-ours"
+	fieldFilteredNotOurs = "filtered_not_ours"
+	fieldFilterExits     = "filter_exits"
+	fieldExitShadowed    = "exit_shadowed"
+	fieldExitCapHit      = "exit_cap_hit"
 	fieldFailed          = "failed"
 
 	fieldOutstanding       = "outstanding"
 	fieldMaxInflight       = "max-inflight"
 	fieldIgnoreRecordError = "ignore-record-error"
 	fieldCovered           = "covered"
-	fieldClusterWide       = "cluster-wide"
-	fieldDeleteAbsent      = "delete-absent"
+	fieldClusterWide       = "cluster_wide"
+	fieldDeleteAbsent      = "delete_absent"
 )
 
 // ResponseRestoreState represents the status of a server-side restore job, as
@@ -128,8 +133,9 @@ type ResponseRestoreState struct {
 	ProgressPct float64
 
 	// Record counters, reported by both modes. A record read lands in one of
-	// the buckets Applied, Filtered and Failed once its outcome is final;
-	// Deletes and FilteredNotOurs are parts of Applied and Filtered.
+	// the buckets Applied, Filtered and Failed once its outcome is final.
+	// Deletes is a part of Applied; FilteredNotOurs, FilterExits and
+	// ExitShadowed are parts of Filtered.
 
 	// Total is the sum of Applied, Filtered and Failed. It can fall short of
 	// the records read: records in flight or abandoned on a stop are in no
@@ -145,6 +151,13 @@ type ResponseRestoreState struct {
 	// FilteredNotOurs counts the records of Filtered dropped because another
 	// node owns their partition. Only a cold restore reports it.
 	FilteredNotOurs uint64
+	// FilterExits counts the records of Filtered that are exit tombstones: a
+	// version of a record its backup found outside the filter. Only a cold
+	// restore reports it.
+	FilterExits uint64
+	// ExitShadowed counts the records of Filtered that are older copies an
+	// exit tombstone kept out. Only a cold restore reports it.
+	ExitShadowed uint64
 	// Failed counts the records that failed, the ones a fuzzy restore
 	// tolerates with IgnoreRecordError included.
 	Failed uint64
@@ -167,8 +180,12 @@ type ResponseRestoreState struct {
 	NDoneNodes uint32
 	// ClusterKey is the cluster key, in hex, the job is running under.
 	ClusterKey string
-	// Done is true when the job is complete. While the job is live, only the
-	// principal sets it.
+	// NodeDone is true when the node finished its own share of the restore. A
+	// joiner has no share and never sets it. See [MergeResponseRestoreStates]
+	// for the cluster-wide value.
+	NodeDone bool
+	// Done is true when the job is complete: a node sets it once the
+	// completion published by the principal reaches it.
 	Done bool
 	// Clear is the storage clear state of the node. A node reporting
 	// ClearStateRequired must be cleared with restore-clear-storage before its
@@ -187,6 +204,14 @@ type ResponseRestoreState struct {
 	// "truncate-state-live" for a namespace with truncate state to undo. It is
 	// only reported while the node is held.
 	HeldReason string
+	// RefTime is the time the filter expression is judged at and the expiry
+	// ceiling is based on, in seconds since the Citrusleaf epoch
+	// (2010-01-01 UTC). It is 0 until the node got the parameters of the job.
+	RefTime uint32
+	// ExitCapHit is true if the node stopped noting exit tombstones at its
+	// cap, so some keys may be restored at an older version that matched the
+	// filter.
+	ExitCapHit bool
 
 	// Fuzzy restore fields. With more than one backup id, the coverage counters
 	// are for the entry of BackupEntry.
@@ -254,6 +279,8 @@ func (s *ResponseRestoreState) parseFields(r InfoMap) {
 		infoFieldOf(fieldDeletes, &s.Deletes),
 		infoFieldOf(fieldFiltered, &s.Filtered),
 		infoFieldOf(fieldFilteredNotOurs, &s.FilteredNotOurs),
+		infoFieldOf(fieldFilterExits, &s.FilterExits),
+		infoFieldOf(fieldExitShadowed, &s.ExitShadowed),
 		infoFieldOf(fieldFailed, &s.Failed),
 		infoFieldOf(fieldOutstanding, &s.Outstanding),
 		infoFieldOf(fieldRecsPerSec, &s.RecsPerSec),
@@ -270,6 +297,7 @@ func (s *ResponseRestoreState) parseFields(r InfoMap) {
 		infoFieldOf(fieldRestoreDownloadThreads, &s.RestoreDownloadThreads),
 		infoFieldOf(fieldBackupEntry, &s.BackupEntry),
 		infoFieldOf(fieldBackupEntries, &s.BackupEntries),
+		infoFieldOf(fieldRefTime, &s.RefTime),
 		infoFieldOf(fieldExtraTTL, &s.ExtraTTL),
 		infoFieldOf(fieldPidsInScope, &s.PidsInScope),
 		infoFieldOf(fieldMissingLayoutNodes, &s.MissingLayoutNodes),
@@ -286,7 +314,9 @@ func (s *ResponseRestoreState) parseFields(r InfoMap) {
 	parseInfoFields(r, InfoMap.ParseBool,
 		infoFieldOf(fieldJoiner, &s.Joiner),
 		infoFieldOf(fieldPlaceholder, &s.Placeholder),
+		infoFieldOf(fieldNodeDone, &s.NodeDone),
 		infoFieldOf(fieldDone, &s.Done),
+		infoFieldOf(fieldExitCapHit, &s.ExitCapHit),
 		infoFieldOf(fieldIgnoreRecordError, &s.IgnoreRecordError),
 	)
 }
@@ -298,14 +328,21 @@ func (s *ResponseRestoreState) parseFields(r InfoMap) {
 //     [ResolveConsistency];
 //   - the per-node counters, rates and gauges are summed, PidsInScope and
 //     ClearZeroedBytes included;
-//   - the effective limits, MaxInflight, ClearMs and the figures every node
-//     reports in the cluster view (MissingLayoutNodes, NDoneNodes, ClusterWide,
-//     BackupEntries) are taken as their maximum, and LastLapMs is the oldest
-//     lap;
+//   - the effective limits, MaxInflight, RefTime, ClearMs and the figures
+//     every node reports in the cluster view (MissingLayoutNodes, NDoneNodes,
+//     ClusterWide, BackupEntries) are taken as their maximum, and LastLapMs
+//     is the oldest lap;
 //   - BackupID and BackupEntry are those of the node that is the furthest
 //     behind;
-//   - Joiner, Placeholder, Done and IgnoreRecordError are true if they are
-//     true on any node;
+//   - Joiner, Placeholder, Done, ExitCapHit and IgnoreRecordError are true if
+//     they are true on any node;
+//   - NodeDone is true if Done is, as every share of a complete job is done;
+//     otherwise it is true only if no layout node is missing
+//     (MissingLayoutNodes is 0) and it is true on every node that is not a
+//     joiner, as a joiner has no share to finish, and false if every node is
+//     a joiner. It covers the statuses given and the missing layout nodes the
+//     servers count: a layout node in the cluster with no status here is not
+//     accounted for;
 //   - ProgressPct is the mean of the progress of the nodes weighted by their
 //     share of the partitions, see [ResponseRestoreState.progressWeight];
 //   - StartTime is the earliest timestamp, FinishTime the latest, or zero
@@ -321,6 +358,8 @@ func MergeResponseRestoreStates(statuses []*ResponseRestoreState) *ResponseResto
 		sources     []Consistency
 		hasBackup   bool
 		unfinished  bool
+		hasShare    bool
+		sharesDone  = true
 
 		progressWeightedSum float64
 		progressWeight      float64
@@ -336,6 +375,11 @@ func MergeResponseRestoreStates(statuses []*ResponseRestoreState) *ResponseResto
 		}
 
 		unfinished = unfinished || status.FinishTime.IsZero()
+
+		if !status.Joiner {
+			hasShare = true
+			sharesDone = sharesDone && status.NodeDone
+		}
 
 		states = append(states, status.State)
 		nsStates = append(nsStates, status.NsState)
@@ -359,7 +403,7 @@ func MergeResponseRestoreStates(statuses []*ResponseRestoreState) *ResponseResto
 		return nil
 	}
 
-	// Each node reports its own progress-pct for its own partitions. Those
+	// Each node reports its own progress_pct for its own partitions. Those
 	// percentages aren't equally sized slices of the cluster job unless every
 	// node has the same number of partitions.
 	if progressWeight > 0 {
@@ -370,6 +414,9 @@ func MergeResponseRestoreStates(statuses []*ResponseRestoreState) *ResponseResto
 		merged.FinishTime = time.Time{}
 	}
 
+	// A layout node the servers count as missing reports no row, so its share
+	// cannot be confirmed unless the job is complete.
+	merged.NodeDone = merged.Done || (hasShare && sharesDone && merged.MissingLayoutNodes == 0)
 	merged.State = ResolveRestoreState(states)
 	merged.NsState = ResolveNamespaceState(nsStates)
 	merged.Clear = ResolveClearState(clearStates)
@@ -430,6 +477,7 @@ func (s *ResponseRestoreState) add(n *ResponseRestoreState) {
 	s.RestoreWorkerThreads = max(s.RestoreWorkerThreads, n.RestoreWorkerThreads)
 	s.RestoreDownloadThreads = max(s.RestoreDownloadThreads, n.RestoreDownloadThreads)
 	s.ExtraTTL = max(s.ExtraTTL, n.ExtraTTL)
+	s.RefTime = max(s.RefTime, n.RefTime)
 	s.BackupEntries = max(s.BackupEntries, n.BackupEntries)
 	s.MissingLayoutNodes = max(s.MissingLayoutNodes, n.MissingLayoutNodes)
 	s.NDoneNodes = max(s.NDoneNodes, n.NDoneNodes)
@@ -440,6 +488,7 @@ func (s *ResponseRestoreState) add(n *ResponseRestoreState) {
 	s.Joiner = s.Joiner || n.Joiner
 	s.Placeholder = s.Placeholder || n.Placeholder
 	s.Done = s.Done || n.Done
+	s.ExitCapHit = s.ExitCapHit || n.ExitCapHit
 	s.IgnoreRecordError = s.IgnoreRecordError || n.IgnoreRecordError
 
 	s.TTLExtended += n.TTLExtended
@@ -449,6 +498,8 @@ func (s *ResponseRestoreState) add(n *ResponseRestoreState) {
 	s.Deletes += n.Deletes
 	s.Filtered += n.Filtered
 	s.FilteredNotOurs += n.FilteredNotOurs
+	s.FilterExits += n.FilterExits
+	s.ExitShadowed += n.ExitShadowed
 	s.Failed += n.Failed
 	s.Outstanding += n.Outstanding
 	s.RecsPerSec += n.RecsPerSec

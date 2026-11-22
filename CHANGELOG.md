@@ -34,7 +34,7 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
 - `ResponseRestoreState.IsFinished` reports a job that is terminal on the node, and
   `ResponseRestoreState.HasNamespace` reports a row that names its namespace, as a stub row may
   not. (BKRS-494)
-- `NamespaceStateUnknown` for `ns-state=UNKNOWN`. (BKRS-494)
+- `NamespaceStateUnknown` for `ns_state=UNKNOWN`. (BKRS-494)
 - Client-side checks of rules the server enforces, failing with `ErrInvalidConfig` before the
   command is sent and without a retry: (BKRS-494)
   - every job id and backup id is 1 to 20 printable ASCII characters, with no `|`, `:`, `;`, `=`,
@@ -57,6 +57,14 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
   partition that changed owner or a change stream that restarted is not counted twice. The byte,
   file, index and UDF counts are exact; the record count is the base scan's, an estimate that is
   exact when no write overlaps the backup. (BKRS-478)
+- `ResponseBackupState.RecsFilterExits` reports `recs_filter_exits`, the records of `RecsFiltered`
+  written as exit tombstones, and `UploadPermanentFailures` reports `upload_permanent_failures`.
+  `ResponseRestoreState` reports `RefTime` (`ref_time`), `FilterExits` (`filter_exits`),
+  `ExitShadowed` (`exit_shadowed`), `ExitCapHit` (`exit_cap_hit`) and `NodeDone` (`node_done`) of
+  a cold restore. Merged across the nodes, the counters are summed, `RefTime` is the maximum and
+  `ExitCapHit` is true if it is true on any node. `NodeDone` is true if `Done` is; otherwise it
+  is true only if `MissingLayoutNodes` is 0 and it is true on every node that is not a joiner,
+  and false if every node is a joiner. (BKRS-598)
 
 ### Changed
 
@@ -87,7 +95,7 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
 - `GetRestoreStatus` merges the stub rows (a job that never got its parameters, or the
   placeholder of a restarted node), so a node that failed before its parameters were known is
   not lost. A row of another namespace reports the job as not found. (BKRS-494)
-- `NamespaceStateNotHosted` is renamed `NamespaceStateStub`: `ns-state=-` is reported by a stub
+- `NamespaceStateNotHosted` is renamed `NamespaceStateStub`: `ns_state=-` is reported by a stub
   row. (BKRS-494)
 - The cluster principal is read from `paxos_principal` in the statistics, and from
   `cluster_principal` when it is missing. (BKRS-494)
@@ -98,6 +106,12 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
   only. An id holding a `/`, or `.` or `..`, fails with `ErrInvalidConfig`: the path the backup
   was written under is given with `streamers.WithPath`. `Streamer.BackupID` reports the id
   without the path. (BKRS-487)
+- `GetBackupStatus` and `GetRestoreStatus` read the statistic and state fields of the
+  `backup-status` and `restore-status` replies by their new server names, which use `_` instead
+  of `-` (`progress_pct`, `ns_state`, `start_time`, `recs_backed_up`, ...). The job parameters
+  keep `-` (`job-id`, `backup-id`, `backup-rps`, ...). A server that still sends the old names
+  is no longer supported. The fields of `ResponseBackupState` and `ResponseRestoreState` are
+  unchanged. (BKRS-598)
 
 ### Removed
 

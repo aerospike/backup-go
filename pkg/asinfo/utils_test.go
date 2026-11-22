@@ -157,7 +157,7 @@ func Test_cmdRespErrorCode(t *testing.T) {
 		{name: "not a number", give: "ERROR:abc:failed", want: cmdRespNoCode},
 		{name: "no prefix", give: "ok", want: cmdRespNoCode},
 		{name: "prefix without separator", give: errCmdRespPrefix, want: cmdRespNoCode},
-		{name: "error code inside a row", give: "error-reason=S3 " + testNoRestoreJob, want: cmdRespNoCode},
+		{name: "error code inside a row", give: "error_reason=S3 " + testNoRestoreJob, want: cmdRespNoCode},
 		{
 			name: "message with colons",
 			give: "ERROR:22:restore-abort: wrong namespace - job-id=r1 is for ns=test",

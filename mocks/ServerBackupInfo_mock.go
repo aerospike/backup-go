@@ -372,6 +372,68 @@ func (_c *MockServerBackupInfo_GetRestoreStatus_Call) RunAndReturn(run func(ctx 
 	return _c
 }
 
+// ListBackupJobs provides a mock function for the type MockServerBackupInfo
+func (_mock *MockServerBackupInfo) ListBackupJobs(ctx context.Context) ([]*models.ResponseBackupState, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListBackupJobs")
+	}
+
+	var r0 []*models.ResponseBackupState
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]*models.ResponseBackupState, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) []*models.ResponseBackupState); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*models.ResponseBackupState)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockServerBackupInfo_ListBackupJobs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListBackupJobs'
+type MockServerBackupInfo_ListBackupJobs_Call struct {
+	*mock.Call
+}
+
+// ListBackupJobs is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockServerBackupInfo_Expecter) ListBackupJobs(ctx any) *MockServerBackupInfo_ListBackupJobs_Call {
+	return &MockServerBackupInfo_ListBackupJobs_Call{Call: _e.mock.On("ListBackupJobs", ctx)}
+}
+
+func (_c *MockServerBackupInfo_ListBackupJobs_Call) Run(run func(ctx context.Context)) *MockServerBackupInfo_ListBackupJobs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockServerBackupInfo_ListBackupJobs_Call) Return(responseBackupStates []*models.ResponseBackupState, err error) *MockServerBackupInfo_ListBackupJobs_Call {
+	_c.Call.Return(responseBackupStates, err)
+	return _c
+}
+
+func (_c *MockServerBackupInfo_ListBackupJobs_Call) RunAndReturn(run func(ctx context.Context) ([]*models.ResponseBackupState, error)) *MockServerBackupInfo_ListBackupJobs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // OpenRestore provides a mock function for the type MockServerBackupInfo
 func (_mock *MockServerBackupInfo) OpenRestore(ctx context.Context, namespace string) error {
 	ret := _mock.Called(ctx, namespace)

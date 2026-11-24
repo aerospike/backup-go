@@ -168,6 +168,11 @@ func integratedBackupCalls() []integratedBackupCall {
 			want: "backup-status:job-id=260922T103653-5xsr",
 		},
 		{
+			name: cmdNameBackupStatus,
+			call: func(c infoCommands) (string, error) { return c.backupStatusAll() },
+			want: "backup-status",
+		},
+		{
 			name: cmdNameRestoreStatus,
 			call: func(c infoCommands) (string, error) { return c.restoreStatus(testCmdJobID) },
 			want: "restore-status:job-id=260922T103653-5xsr",

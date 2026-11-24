@@ -17,6 +17,12 @@ unreleased, so its API changes without a deprecation period. (BKRS-494)
 
 ### Added
 
+- `ServerBackupInfo.ListBackupJobs` lists every backup job the active nodes know, live and
+  finished, with each job's rows merged across the nodes. A cluster with no jobs returns an
+  empty list. Code that implements `ServerBackupInfo` must add the method. (BKRS-601)
+- `ResponseBackupState` reports `S3Bucket`, `Path`, `ModifiedAfter` and `ModifiedBefore`: where
+  the job writes and the time range it covers, on a server that reports them (SERVER-2684).
+  `NewResponseBackupStates` builds one state per row of a node's answer. (BKRS-601)
 - `RequestBackup.NoConfig` sends `no-config`, which stops the nodes from uploading their config
   file with the backup. (BKRS-494)
 - `RequestRestore.HydrateReplica` sends `hydrate-replica` with the restore command. Only the

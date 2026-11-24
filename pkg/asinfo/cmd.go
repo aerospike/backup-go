@@ -479,6 +479,16 @@ func (c infoCommands) backupStatus(jobID string) (string, error) {
 		build()
 }
 
+// backupStatusAll returns the command that reads the state of every backup job
+// a node knows: the command without parameters.
+func (c infoCommands) backupStatusAll() (string, error) {
+	if err := c.requireIntegratedBackup(cmdNameBackupStatus); err != nil {
+		return "", err
+	}
+
+	return cmdNameBackupStatus, nil
+}
+
 // restoreStatus returns the command that reads the state of the restore job
 // jobID. The job is filtered by its id only: job ids are single-use, and a
 // namespace filter may be answered with an error by a node that does not know

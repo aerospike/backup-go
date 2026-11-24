@@ -278,6 +278,56 @@ func getBackupStatus[N statusNode](ic *Client, nodes []N, cmd, jobID string,
 	return infomodels.MergeResponseBackupStates(statuses), nil
 }
 
+// ListBackupJobs returns every backup job the active nodes know, live and
+// finished, with the rows of each job merged across the nodes. A node that knows
+// no job adds none, so a cluster with no jobs returns an empty list.
+func (ic *Client) ListBackupJobs(ctx context.Context) ([]*infomodels.ResponseBackupState, error) {
+	cmd, err := ic.cmds.backupStatusAll()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build backup status command: %w", err)
+	}
+
+	return retryValue(ctx, ic.retryPolicy, func() ([]*infomodels.ResponseBackupState, error) {
+		return listBackupJobs(ic, ic.cluster.GetNodes(), cmd)
+	})
+}
+
+// listBackupJobs reads every backup job with cmd from every active node and
+// merges the rows of each job, in the order the jobs are first reported. Each
+// node reports its own share of a job, see [Client.GetBackupStatus].
+func listBackupJobs[N statusNode](ic *Client, nodes []N, cmd string,
+) ([]*infomodels.ResponseBackupState, error) {
+	var order []string
+
+	rows := make(map[string][]*infomodels.ResponseBackupState)
+
+	for _, node := range nodes {
+		if !node.IsActive() {
+			continue
+		}
+
+		resp, err := ic.getBackupStatusByNode(node, cmd)
+		if err != nil && !isNotFoundResp(err) {
+			return nil, fmt.Errorf("failed to get backup status from node %s: %w", node.GetName(), err)
+		}
+
+		for _, row := range infomodels.NewResponseBackupStates(resp) {
+			if _, ok := rows[row.JobID]; !ok {
+				order = append(order, row.JobID)
+			}
+
+			rows[row.JobID] = append(rows[row.JobID], row)
+		}
+	}
+
+	jobs := make([]*infomodels.ResponseBackupState, 0, len(order))
+	for _, jobID := range order {
+		jobs = append(jobs, infomodels.MergeResponseBackupStates(rows[jobID]))
+	}
+
+	return jobs, nil
+}
+
 // backupStatusOfNode reads the row of the backup job jobID from node with the
 // backup-status command cmd. It returns nil if the node reports no row, and an
 // error wrapping ErrNotFound if the node does not know the job.

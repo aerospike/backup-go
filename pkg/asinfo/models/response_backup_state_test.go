@@ -670,3 +670,49 @@ func TestMergeResponseBackupStates(t *testing.T) {
 		})
 	}
 }
+
+// TestNewResponseBackupStates checks that every row with a state becomes a job,
+// with where it writes and its time range, and that merging the rows of one job
+// keeps them when a node reports a stub row without them.
+func TestNewResponseBackupStates(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testOtherJobID = "260922T110000-k3f9"
+		testBucket     = "backups"
+		testPath       = "abs/daily"
+		testAfter      = "1758537413"
+		testBefore     = "1758541013"
+	)
+
+	rows := []InfoMap{
+		{
+			"job-id": testJobID, "ns": testNamespace, "state": "BASE_SCAN_ACTIVE",
+			"s3-bucket": testBucket, "path": testPath, "modified-before": testBefore,
+		},
+		{"recs_base": "1"},
+		{
+			"job-id": testOtherJobID, "ns": testNamespace, "state": "COMPLETE",
+			"s3-bucket": testBucket, "path": testPath,
+			"modified-after": testAfter, "modified-before": testBefore,
+		},
+	}
+
+	got := NewResponseBackupStates(rows)
+
+	require.Len(t, got, 2)
+	assert.Equal(t, testJobID, got[0].JobID)
+	assert.Equal(t, testBucket, got[0].S3Bucket)
+	assert.Equal(t, testPath, got[0].Path)
+	assert.Empty(t, got[0].ModifiedAfter)
+	assert.Equal(t, testBefore, got[0].ModifiedBefore)
+	assert.Equal(t, testOtherJobID, got[1].JobID)
+	assert.Equal(t, testAfter, got[1].ModifiedAfter)
+
+	stub := &ResponseBackupState{JobID: testJobID, State: BackupStateFailed}
+	merged := MergeResponseBackupStates([]*ResponseBackupState{stub, got[0]})
+
+	assert.Equal(t, testBucket, merged.S3Bucket)
+	assert.Equal(t, testPath, merged.Path)
+	assert.Equal(t, testBefore, merged.ModifiedBefore)
+}

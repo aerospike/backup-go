@@ -4122,3 +4122,90 @@ func TestClient_GetClusterStableNoNodes(t *testing.T) {
 	require.ErrorIs(t, err, errNoNodesAvailable)
 	assert.False(t, got)
 }
+
+// TestListBackupJobs checks that the rows of every job are merged across the
+// active nodes, and that a node with no jobs adds none.
+func TestListBackupJobs(t *testing.T) {
+	t.Parallel()
+
+	const (
+		testListCmd   = "backup-status"
+		testOtherJob  = "260922T110000-k3f9"
+		testNoJobs    = errCmdRespPrefix + ":2:no backup jobs"
+		testJobRow    = "job-id=%s:ns=" + testRestoreNamespace + ":state=%s:recs_base=%d:path=abs/daily"
+		testRunning   = "BASE_SCAN_ACTIVE"
+		testCompleted = "COMPLETE"
+	)
+
+	running := fmt.Sprintf(testJobRow, testRestoreJobID, testRunning, 10)
+	completed := fmt.Sprintf(testJobRow, testOtherJob, testCompleted, 1)
+
+	tests := []struct {
+		name      string
+		nodes     []statusNodeAnswer
+		want      []*infomodels.ResponseBackupState
+		wantErrIs error
+	}{
+		{
+			name: "rows of each job are merged across the active nodes",
+			nodes: []statusNodeAnswer{
+				{name: testNodeA, active: true, statusResp: running + ";" + completed},
+				{name: testNodeB, active: true, statusResp: fmt.Sprintf(testJobRow, testRestoreJobID, testRunning, 20)},
+				{name: testNodeC},
+			},
+			want: []*infomodels.ResponseBackupState{
+				{
+					JobID: testRestoreJobID, Namespace: testRestoreNamespace, Path: "abs/daily",
+					State: infomodels.BackupStateBaseScanActive, RecsBase: 30,
+				},
+				{
+					JobID: testOtherJob, Namespace: testRestoreNamespace, Path: "abs/daily",
+					State: infomodels.BackupStateComplete, RecsBase: 1,
+				},
+			},
+		},
+		{
+			name: "node with no jobs",
+			nodes: []statusNodeAnswer{
+				{name: testNodeA, active: true, statusResp: testNoJobs},
+				{name: testNodeB, active: true, statusResp: completed},
+			},
+			want: []*infomodels.ResponseBackupState{
+				{
+					JobID: testOtherJob, Namespace: testRestoreNamespace, Path: "abs/daily",
+					State: infomodels.BackupStateComplete, RecsBase: 1,
+				},
+			},
+		},
+		{
+			name:  "cluster with no jobs",
+			nodes: []statusNodeAnswer{{name: testNodeA, active: true, statusResp: testNoJobs}},
+			want:  []*infomodels.ResponseBackupState{},
+		},
+		{
+			name:      "node request failed",
+			nodes:     []statusNodeAnswer{{name: testNodeA, active: true, statusErr: a.ErrNetwork}},
+			wantErrIs: errclass.ErrAerospike,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			nodes := newStatusNodeMocks(t, tt.nodes, testListCmd, "")
+			ic := newClient(mocks.NewMockNodeGetter(t), testInfoPolicy, models.NewDefaultRetryPolicy())
+
+			got, err := listBackupJobs(ic, nodes, testListCmd)
+			if tt.wantErrIs != nil {
+				require.ErrorIs(t, err, tt.wantErrIs)
+				assert.Nil(t, got)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

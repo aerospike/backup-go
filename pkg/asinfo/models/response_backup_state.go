@@ -57,6 +57,10 @@ const (
 	fieldBuffersInUse                 = "buffers_in_use"
 	fieldTotalBuffersAllocated        = "total_buffers_allocated"
 	fieldBackupPolicy                 = "backup-policy"
+	fieldS3Bucket                     = "s3-bucket"
+	fieldPath                         = "path"
+	fieldModifiedAfter                = "modified-after"
+	fieldModifiedBefore               = "modified-before"
 	fieldAchievedConsistency          = "achieved_consistency"
 	fieldFallbackReason               = "fallback_reason"
 	fieldBuffersScanCap               = "buffers_scan_cap"
@@ -156,6 +160,15 @@ type ResponseBackupState struct {
 	// Policy is the effective backup policy. It is empty on a node that holds
 	// no parameters of the job.
 	Policy BackupPolicy
+	// S3Bucket and Path are where the job writes, as the backup command gave
+	// them. S3Bucket is empty for a job on a file system.
+	S3Bucket string
+	Path     string
+	// ModifiedAfter and ModifiedBefore are the job's time range in unix
+	// seconds, as the backup command gave them. ModifiedAfter is empty for a
+	// full backup.
+	ModifiedAfter  string
+	ModifiedBefore string
 	// AchievedConsistency is the consistency the backup achieved. It is empty
 	// until the backup commits.
 	AchievedConsistency Consistency
@@ -252,31 +265,57 @@ type ResponseBackupState struct {
 // InfoMap entry that contains a state field.
 func NewResponseBackupState(im []InfoMap) *ResponseBackupState {
 	for _, r := range im {
-		state, ok := r[fieldState]
-		if !ok {
-			continue
+		if status := newResponseBackupStateRow(r); status != nil {
+			return status
 		}
-
-		status := &ResponseBackupState{
-			JobID:               r[fieldJobID],
-			Namespace:           r[fieldNamespace],
-			ErrorReason:         r[fieldErrorReason],
-			State:               BackupState(state),
-			AbortOrigin:         AbortOrigin(r[fieldAbortOrigin]),
-			Policy:              BackupPolicy(infoValue(r, fieldBackupPolicy)),
-			AchievedConsistency: Consistency(infoValue(r, fieldAchievedConsistency)),
-			FallbackReason:      infoValue(r, fieldFallbackReason),
-			StartTime:           parseInfoTime(r[fieldStartTime]),
-			FinishTime:          parseInfoTime(r[fieldFinishTime]),
-			LastLapMs:           parseOptionalUint64(r, fieldLastLapMs),
-		}
-
-		status.parseFields(r)
-
-		return status
 	}
 
 	return nil
+}
+
+// NewResponseBackupStates builds a ResponseBackupState from every InfoMap
+// entry that contains a state field: one per job a node reports.
+func NewResponseBackupStates(im []InfoMap) []*ResponseBackupState {
+	statuses := make([]*ResponseBackupState, 0, len(im))
+
+	for _, r := range im {
+		if status := newResponseBackupStateRow(r); status != nil {
+			statuses = append(statuses, status)
+		}
+	}
+
+	return statuses
+}
+
+// newResponseBackupStateRow builds a ResponseBackupState from r, or returns
+// nil if r has no state field.
+func newResponseBackupStateRow(r InfoMap) *ResponseBackupState {
+	state, ok := r[fieldState]
+	if !ok {
+		return nil
+	}
+
+	status := &ResponseBackupState{
+		JobID:               r[fieldJobID],
+		Namespace:           r[fieldNamespace],
+		ErrorReason:         r[fieldErrorReason],
+		State:               BackupState(state),
+		AbortOrigin:         AbortOrigin(r[fieldAbortOrigin]),
+		Policy:              BackupPolicy(infoValue(r, fieldBackupPolicy)),
+		S3Bucket:            r[fieldS3Bucket],
+		Path:                r[fieldPath],
+		ModifiedAfter:       r[fieldModifiedAfter],
+		ModifiedBefore:      r[fieldModifiedBefore],
+		AchievedConsistency: Consistency(infoValue(r, fieldAchievedConsistency)),
+		FallbackReason:      infoValue(r, fieldFallbackReason),
+		StartTime:           parseInfoTime(r[fieldStartTime]),
+		FinishTime:          parseInfoTime(r[fieldFinishTime]),
+		LastLapMs:           parseOptionalUint64(r, fieldLastLapMs),
+	}
+
+	status.parseFields(r)
+
+	return status
 }
 
 // parseFields fills the numeric and boolean fields from the info map, see
@@ -407,8 +446,9 @@ func backupStateRank(state BackupState) (int, bool) {
 // [ResolveConsistency], StartTime is the earliest timestamp across nodes,
 // FinishTime is the latest, or zero while any node has not finished, JobID and
 // Namespace are the first ones reported by a row that is not a stub, and the
-// other strings (Policy, FallbackReason, ErrorReason, AbortOrigin) are the
-// first ones reported by any node.
+// other strings (Policy, S3Bucket, Path, ModifiedAfter, ModifiedBefore,
+// FallbackReason, ErrorReason, AbortOrigin) are the first ones reported by any
+// node.
 func MergeResponseBackupStates(statuses []*ResponseBackupState) *ResponseBackupState {
 	valid := make([]*ResponseBackupState, 0, len(statuses))
 
@@ -468,6 +508,10 @@ func (s *ResponseBackupState) add(n *ResponseBackupState) {
 	s.ErrorReason = cmp.Or(s.ErrorReason, n.ErrorReason)
 	s.AbortOrigin = cmp.Or(s.AbortOrigin, n.AbortOrigin)
 	s.Policy = cmp.Or(s.Policy, n.Policy)
+	s.S3Bucket = cmp.Or(s.S3Bucket, n.S3Bucket)
+	s.Path = cmp.Or(s.Path, n.Path)
+	s.ModifiedAfter = cmp.Or(s.ModifiedAfter, n.ModifiedAfter)
+	s.ModifiedBefore = cmp.Or(s.ModifiedBefore, n.ModifiedBefore)
 	s.FallbackReason = cmp.Or(s.FallbackReason, n.FallbackReason)
 	s.StartTime = earliestTime(s.StartTime, n.StartTime)
 	s.FinishTime = latestTime(s.FinishTime, n.FinishTime)

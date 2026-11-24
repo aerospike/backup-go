@@ -44,6 +44,7 @@ type ServerBackupInfo interface {
 	StartBackup(ctx context.Context, request *infomodels.RequestBackup) (string, error)
 	StartRestore(ctx context.Context, request *infomodels.RequestRestore) (string, error)
 	GetBackupStatus(ctx context.Context, jobID string) (*infomodels.ResponseBackupState, error)
+	ListBackupJobs(ctx context.Context) ([]*infomodels.ResponseBackupState, error)
 	GetRestoreStatus(ctx context.Context, namespace, jobID string) (*infomodels.ResponseRestoreState, error)
 	AbortBackup(ctx context.Context, backupID string) error
 	AbortRestore(ctx context.Context, namespace, backupID string) error
